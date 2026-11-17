@@ -16,7 +16,7 @@ MAKE-056 memegang tabel jalur Tukin (Tier 1–6). MAKE-069 memegang semua tabel 
 **terakhir** karena `siasn_upload_arsip` merujuk riwayat dan `document_attachment` (syarat K-6 DBV-027).
 
 Tier dinomori lanjutan MAKE-056. **Nomor di kode saat ini:** T7–T12 seperti tabel di bawah; tiket lama = **T13**
-(MAKE-086 F-02); konten & interaksi Fase 7 = **T14** (MAKE-089); tier SIASN = **T15** (`DaftarTabel::TIER_MAKS`, selalu terakhir — dikunci `UrutanTierTest`). T12b belum
+(MAKE-086 F-02); konten & interaksi Fase 7 = **T14** (MAKE-089); tier SIASN = **T15** (`DaftarTabel::TIER_MAKS`, selalu terakhir — dikunci `UrutanTierTest`). T12b
 disisipkan di tier 12 sesudah `question_category` (MAKE-097), sehingga nomor tier lain tidak bergeser. Label "T13" di dokumen DBV-029 =
 tiket lama (penomoran rencana), bukan tier SIASN di kode.
 
@@ -109,12 +109,15 @@ dikonversi R1a dan semua kolom teks ikut `stripslashes` bawaan. Kolom `siasn_lu`
 - Di kode: `DaftarTabel::tierMasterHalo`, dijalankan di **tier 12** sesudah `question_category` (satu transaksi tier 12),
   sesudah T8 `pengguna`. Urutan: `help_desk_contact` → `support_officer` → `officer_category`. Nomor tier lain tetap.
 - `support_officer.id_user` disalin langsung ke kolom akun v2 (K-M11, H8-6: tanpa tabel pemetaan); id yang tidak ada di
-  `pengguna` v2 → baris **dibuang** + dicatat `id_user yatim dibuang (K-M12)`; `0`/kosong → `id_user kosong dibuang (K-M12)`.
-- `officer_category` yatim ke petugas (Q-H4, termasuk petugas yang dibuang di atas) atau ke kategori (Q-H5) → dibuang +
-  dicatat per kolom (`id_support_officer …` / `id_question_category yatim dibuang (K-M12)`); jumlahnya tampil di laporan
-  impor (DBV-028 Q9). Pasangan ganda (Q-H3 WAJIB_0) bila tetap ada → dibuang + `MAKE-089 kunci ganda`.
-- **N1:** `support_officer.email` NULL → `''` + dicatat `N1 email NULL→''`. Petugas tetap diimpor (penugasan kategori
-  tidak hilang); admin melengkapi email lewat menu petugas. Jumlahnya = Q-H10 (pra-cek).
+  `pengguna` v2 → baris **dibuang** + dicatat `id_user yatim dibuang (K-M12)`; `0`/NULL → `id_user kosong dibuang (K-M12)`.
+- `officer_category` dengan petugas/kategori `0`/NULL → `rujukan kosong dibuang (Q9)`; yatim ke petugas (Q-H4, termasuk
+  petugas yang dibuang di atas) atau ke kategori (Q-H5) → dibuang + dicatat per kolom (`id_support_officer …` /
+  `id_question_category yatim dibuang (K-M12)`); satu baris dihitung sekali walau yatim dua arah. Jumlahnya tampil di laporan
+  impor (DBV-028 Q9). Pasangan ganda (Q-H3 WAJIB_0) bila tetap ada → dibuang + `MAKE-089 kunci ganda`; kunci NULL tidak
+  dihitung ganda.
+- **N1:** `support_officer.email` NULL → `''` + dicatat `N1 email NULL→''` **hanya untuk baris yang ditulis** (petugas yang
+  dibuang tidak dihitung). Email lain di-trim; spasi-saja menjadi `''` tanpa kode. Petugas tetap diimpor (penugasan kategori
+  tidak hilang); admin melengkapi email lewat menu petugas.
 - **N2:** `created_at`/`updated_at` ikut aturan umum R1a: `--zona-sumber` dari bukti GAP-2 (`NOW()` salinan = WIB → −7 jam;
   TIMESTAMP apa adanya). Zona salinan legacy dicek dan ditulis di lembar hasil sebelum T12b.
 - **N4:** `help_desk_contact.contact` di-trim (`kolomKode`; karakter tak terlihat dibuang dan dicatat).
@@ -122,7 +125,7 @@ dikonversi R1a dan semua kolom teks ikut `stripslashes` bawaan. Kolom `siasn_lu`
   AUTO_INCREMENT v2 membangkitkan ulang (tidak ada FK v2 ke kolom ini). Skema v2 tidak diubah. Nama PK yang ditemukan dicatat
   di lembar hasil.
 - **Q2:** teks melebihi panjang kolom v2 → impor gagal (aturan umum); Q-H9 dijalankan lebih dulu (runbook langkah 2).
-- `status` legacy `'1'`/`'0'` → tinyint (domain 0/1); nilai lain → berkas keputusan.
+- `status` legacy `'1'`/`'0'` → tinyint (domain 0/1); nilai lain → bagian `status` berkas keputusan, tanpa pemetaan → gagal.
 - Test: `backend/tests/Impor/ImporLegacyMasterHaloTest.php` (data sintetis).
 
 #### Runbook cutover T12b (operator; angka saja, tanpa isi baris)
@@ -130,14 +133,28 @@ dikonversi R1a dan semua kolom teks ikut `stripslashes` bawaan. Kolom `siasn_lu`
    (`SELECT NOW(), UTC_TIMESTAMP(), @@system_time_zone, @@global.time_zone;`), catat `--zona-sumber` di lembar hasil.
 2. **Audit salinan legacy, sebelum impor** (akun baca-saja, **tanpa `--force`**; berhenti di galat pertama = ada yang salah):
    `mysql --table -vvv --default-character-set=utf8mb4 --user=<akun_baca> -p <db_salinan_legacy> < backend/docs/db-review/sql/DBV-028-audit-legacy.sql > <KERJA>/hasil_audit_dbv028_legacy.txt 2>&1`
-   - WAJIB_0 (Q-H1, Q-H2, Q-H3) > 0 → **berhenti**, diputus Horii/DBV.
+   - WAJIB_0 (Q-H1, Q-H2, Q-H3) > 0 → **berhenti**, diputus Horii/DBV. Khusus Q-H2: cek dulu apakah grup gandanya
+     `id_user` 0/NULL; bila ya = INFO (barisnya dibuang `id_user kosong`, K-M12). `id_user` yatim yang ganda tetap
+     menggagalkan impor (pra-cek UNIQUE mendahului cek rujukan), konsisten dengan WAJIB_0.
    - **Q-H9 > 0 → berhenti**, diputus Horii/DBV sebelum T12b (DBV-028 Q2).
-   - Catat Q-H4/Q-H5 (yatim `officer_category`), Q-H10 (email kosong = jumlah koreksi N1), Q-H17 (akun tanpa `pengguna`
-     legacy), Q-H18a..c. Cocokkan nama PK `officer_category` (Q10).
+   - **Q-H6 / Q-H7 > 0** (status di luar 0/1) → isi `status.support_officer` / `status.help_desk_contact` di berkas keputusan
+     (`--keputusan`) sebelum impor tier 12, menurut aturan GAP-6; catat angkanya di lembar hasil.
+   - Catat Q-H4/Q-H5 (yatim `officer_category`), Q-H10 (email kosong), Q-H17 (akun tanpa `pengguna` legacy), Q-H18a..c.
+     Cocokkan nama PK `officer_category` (Q10). Untuk rumus langkah 3, hitung juga irisan Q-H4 ∩ Q-H5 (salinan legacy):
+     `SELECT COUNT(*) FROM officer_category oc WHERE NOT EXISTS (SELECT 1 FROM support_officer so WHERE so.id_support_officer = oc.id_support_officer) AND NOT EXISTS (SELECT 1 FROM question_category qc WHERE qc.id_question_category = oc.id_question_category);`
    - Kueri hanya dijalankan di salinan/gladi, tidak di server dev dari repo.
-3. **Impor** tier 12 (memuat T12b) seperti langkah 2 Bagian 6; dry-run dulu. Laporan per tabel `help_desk_contact`,
-   `support_officer`, `officer_category`: `sumber = ditulis + dibuang`, dengan kode buang/koreksi di atas. Bandingkan:
-   `support_officer` dibuang ≈ Q-H17 + akun legacy yang tidak ikut T8; `officer_category` dibuang ≥ Q-H4 + Q-H5.
+3. **Impor** tier 12 (memuat T12b) seperti langkah 2 Bagian 6; dry-run dulu. Angka yatim (`… yatim dibuang (K-M12)`)
+   hanya muncul di **run tulis**: dry-run tidak memeriksa rujukan, dan koreksi N1 di dry-run masih menghitung semua baris.
+   Laporan per tabel `help_desk_contact`, `support_officer`, `officer_category` wajib memenuhi
+   `sumber = ditulis + dilewati + Σdibuang`. Kode yang mungkin muncul: `id_user yatim dibuang (K-M12)`,
+   `id_user kosong dibuang (K-M12)`, `rujukan kosong dibuang (Q9)`, `id_support_officer yatim dibuang (K-M12)`,
+   `id_question_category yatim dibuang (K-M12)`, `MAKE-089 kunci ganda (setara INSERT IGNORE)`, koreksi `N1 email NULL→''`.
+   Pencocokan dengan audit langkah 2:
+   - `support_officer` dibuang ≈ Q-H17 + akun legacy yang tidak ikut T8;
+   - `officer_category` dibuang (yatim + rujukan kosong) **≥ |Q-H4 ∪ Q-H5| = Q-H4 + Q-H5 − irisan** (jadi juga ≥ max(Q-H4,
+     Q-H5)), dan ≤ Q-H4 + Q-H5 + baris milik petugas yang dibuang + baris ganda;
+   - koreksi N1 **≤ Q-H10**; selisihnya = email `''`/spasi yang disalin apa adanya (menjadi `''` tanpa kode) + petugas ber-email
+     NULL yang dibuang.
 4. **Sesudah T13 (tiket lama): audit gladi v2** (tanpa `--force`):
    `mysql --table -vvv --default-character-set=utf8mb4 --user=<akun_baca> -p <db_gladi_v2> < backend/docs/db-review/sql/DBV-028-audit-v2.sql > <KERJA>/hasil_audit_dbv028_v2.txt 2>&1`
    (bila DB gladi memakai `DBPrefix`, sesuaikan nama tabel di salinan berkas kerja, bukan di repo). Catat:
@@ -147,14 +164,23 @@ dikonversi R1a dan semua kolom teks ikut `stripslashes` bawaan. Kolom `siasn_lu`
    - **Q-H15:** tiket Open di kategori tanpa petugas aktif (petugas status 1 dan akun aktif) sesudah impor; > 0 → admin
      menugaskan petugas sebelum go-live;
    - Q-H11, Q-H16.
-5. **Syarat DBV Q8 (a):** di gladi, Q-H19 + EXPLAIN daftar tiket petugas (bentuk kueri MAKE-071) **wajib dijalankan sebelum
-   cutover** dan hasilnya dicatat (angka Q-H19, waktu ms, `key`/`key_len`). Pemicu Q-H19 > 5.000 atau > 100 ms → kartu DBV
-   `last_msg_at` wajib di `main` sebelum go-live (Q8 (b)).
+5. **Syarat DBV Q8 (a), wajib di gladi sebelum cutover** (hasil disalin ke runbook penutup MAKE-074):
+   - Ambil angka Q-H19 dari langkah 4 dan petugas yang menghasilkannya (id saja): kategori aktif milik petugas itu =
+     `SELECT GROUP_CONCAT(oc.id_question_category) FROM officer_category oc JOIN support_officer so ON so.id_support_officer = oc.id_support_officer WHERE so.id_support_officer = <id_petugas>;`
+   - Jalankan kueri daftar `peran=petugas` DBV-028 §4.3 (bentuk akhir di README beku MAKE-071 bila sudah di `main`) dengan
+     `<filter peran/status>` = `t.id_question_category IN (<kategori di atas>)`, dua kali: tanpa filter status dan dengan
+     `AND t.status IN (0, 1) AND t.status = 0` (Open):
+     - MySQL 8: `EXPLAIN ANALYZE <kueri>;`
+     - MariaDB: `ANALYZE FORMAT=JSON <kueri>;`
+   - Catat: angka Q-H19, baris cocok, `key` + `key_len` akses `t`, dan waktu total (ms; `actual time` baris teratas atau
+     `r_total_time_ms`).
+   - Pemicu: **Q-H19 > 5.000 atau waktu > 100 ms** → kartu DBV `last_msg_at` wajib di `main` sebelum go-live (Q8 (b)); ambang yang
+     sama dipakai test EXPLAIN MAKE-071 (Q8 (c)).
 6. **Lampiran tiket lama (T-8):** `lampiran:manifest` (Bagian 4) ikut membaca `disiplin_ticket_msg.attachments`; path di luar
    aturan dihitung `tidak_sah` (bandingkan dengan Q-H13), lalu `lampiran:tarik` → `lampiran:periksa`.
 
 ### T13 tiket lama
-- **Di kode sejak MAKE-086 (F-02): tier 13** (`DaftarTabel::tierTiketLama`, `AturanTiketLama`; tier SIASN menjadi 14).
+- **Di kode sejak MAKE-086 (F-02): tier 13** (`DaftarTabel::tierTiketLama`, `AturanTiketLama`; tier SIASN sekarang T15).
   Sumber = `inbox`/`inbox_msg` salinan legacy, disortir di `praPindai` (kelas + eskalasi per id lewat berkas keputusan
   bagian `baris`, daftar eskalasi dari `php spark impor:sortir-inbox`). Rincian: `backend/app/Libraries/Impor/README.md`.
 - `sender`/`receiver`/`closed_by`/`msg_sender`/`msg_receiver` tanpa FK (sentinel 0 = semua petugas, DQ-4/6): disalin;
