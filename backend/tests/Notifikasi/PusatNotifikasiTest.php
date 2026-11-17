@@ -108,6 +108,14 @@ final class PusatNotifikasiTest extends DatabaseTestCase
             ]);
         }
 
+        // Role 8: tiket miliknya belum dibaca + ia tercatat petugas kategori lain yang ber-tiket belum dibaca → tetap 0.
+        $this->db->table('question_category')->insert(['question_category' => 'Kategori Role 8', 'status' => 1]);
+        $kat8 = (int) $this->db->insertID();
+        $this->db->table('support_officer')->insert(['id_user' => $akun(Role::PIMPINAN), 'email' => 'pimpinan@contoh.test', 'status' => 1]);
+        $this->db->table('officer_category')->insert(['id_support_officer' => (int) $this->db->insertID(), 'id_question_category' => $kat8]);
+        $this->db->table('disiplin_ticket')->insert(['id_question_category' => $kat8, 'subject' => 'Milik role 8', 'sender' => $akun(Role::PIMPINAN), 'sender_name' => 'Uji', 'nip' => '-', 'status' => 0, 'is_read' => 2, 'is_read_off' => 1]);
+        $this->db->table('disiplin_ticket')->insert(['id_question_category' => $kat8, 'subject' => 'Untuk role 8', 'sender' => $akun(Role::PPPK), 'sender_name' => 'Uji', 'nip' => '-', 'status' => 0, 'is_read' => 1, 'is_read_off' => 2]);
+
         $this->notifLayanan($this->nipPegawai, '2026-11-01 08:00:00');
 
         // Pemilik: 1 (sisi pemilik). Petugas role 1: 2 (sisi petugas). Petugas-pemilik role 6: 1 miliknya + 1 milik pegawai; tiket

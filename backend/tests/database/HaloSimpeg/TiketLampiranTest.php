@@ -99,26 +99,68 @@ final class TiketLampiranTest extends DatabaseTestCase
         }
 
         $this->sebagai($this->lain)->get(self::URL . "tiket/{$d['id']}/pesan/{$pesan['id_inbox_msg']}/lampiran")->assertStatus(404);
+
+        // IDOR lintas tiket: id pesan milik tiket lain lewat tiket sendiri → 404 lampiran.
+        $milikLain = $this->buatTiketHs($this->kategori, $this->lain);
+        $this->harap404Lampiran($this->sebagai($this->lain)->get(self::URL . "tiket/{$milikLain}/pesan/{$pesan['id_inbox_msg']}/lampiran"));
         $this->sebagai($this->pemilik)->get(self::URL . "tiket/{$d['id']}/pesan/999999/lampiran")->assertStatus(404);
     }
 
     public function testLampiranLamaPathLegacyDibacaLewatEndpoint(): void
     {
-        $legacy = 'arsip/000000000000000012/inbox/lampiran_1_20240101101010.xlsx';
-        mkdir($this->akar . '/arsip/000000000000000012/inbox', 0700, true);
+        $legacy = 'arsip/000000000000000056/inbox/lampiran_1_20240101101010.xlsx';
+        mkdir($this->akar . '/arsip/000000000000000056/inbox', 0700, true);
         file_put_contents($this->akar . '/' . $legacy, 'isi lama');
         $t = $this->buatTiketHs($this->kategori, $this->pemilik);
         $m = $this->buatPesanHs($t, $this->pemilik, 'lama', '2024-01-01 03:10:10', $legacy);
 
-        $res = $this->sebagai($this->petugas)->get(self::URL . "tiket/{$t}/pesan/{$m}/lampiran");
-        $res->assertStatus(200);
-        $this->assertSame('isi lama', (string) $res->response()->getBody());
-        $this->assertSame("attachment; filename=\"lampiran-{$t}-{$m}.xlsx\"", $res->response()->getHeaderLine('Content-Disposition'));
+        // AC-E04.7: berlaku pada saklar penyajian berkas legacy `publik` maupun `privat` (F8-17).
+        $arsip  = config(Arsip::class);
+        $semula = $arsip->penyajianBerkasLegacy;
+
+        try {
+            foreach (['publik', 'privat'] as $saklar) {
+                $arsip->penyajianBerkasLegacy = $saklar;
+                $res                          = $this->sebagai($this->petugas)->get(self::URL . "tiket/{$t}/pesan/{$m}/lampiran");
+                $res->assertStatus(200);
+                $this->assertSame('isi lama', (string) $res->response()->getBody(), $saklar);
+                $this->assertSame("attachment; filename=\"lampiran-{$t}-{$m}.xlsx\"", $res->response()->getHeaderLine('Content-Disposition'));
+            }
+        } finally {
+            $arsip->penyajianBerkasLegacy = $semula;
+        }
+
+        // Ekstensi di luar daftar → octet-stream + attachment; tanpa ekstensi → nama tanpa akhiran.
+        foreach (['arsip/000000000000000056/inbox/lama.txt' => ['application/octet-stream', "lampiran-{$t}-%d.txt"], 'arsip/000000000000000056/inbox/tanpaekstensi' => ['application/octet-stream', "lampiran-{$t}-%d"]] as $p => [$mime, $nama]) {
+            file_put_contents($this->akar . '/' . $p, 'isi');
+            $id  = $this->buatPesanHs($t, $this->pemilik, 'x', '2024-01-02 00:00:00', $p);
+            $res = $this->sebagai($this->pemilik)->get(self::URL . "tiket/{$t}/pesan/{$id}/lampiran");
+            $res->assertStatus(200);
+            $this->assertStringStartsWith($mime, $res->response()->getHeaderLine('Content-Type'));
+            $this->assertSame('attachment; filename="' . sprintf($nama, $id) . '"', $res->response()->getHeaderLine('Content-Disposition'));
+        }
 
         $hilang = $this->buatPesanHs($t, $this->pemilik, 'hilang', '2024-01-02 00:00:00', 'arsip/x/inbox/tidak-ada.pdf');
         $this->harap404Lampiran($this->sebagai($this->pemilik)->get(self::URL . "tiket/{$t}/pesan/{$hilang}/lampiran"));
         $rusak = $this->buatPesanHs($t, $this->pemilik, 'rusak', '2024-01-03 00:00:00', '../../etc/passwd');
         $this->harap404Lampiran($this->sebagai($this->pemilik)->get(self::URL . "tiket/{$t}/pesan/{$rusak}/lampiran"));
+    }
+
+    public function testThrottleBuatDenganUnggahanTanpaBerkas(): void
+    {
+        for ($i = 0; $i < 5; $i++) {
+            $this->sebagai($this->pemilik)->post(self::URL . 'tiket', ['id_question_category' => $this->kategori, 'subject' => "S{$i}", 'msg' => 'M'])->assertStatus(201);
+        }
+
+        $tmp = $this->unggahHs('Surat.pdf', self::pdfHs());
+
+        try {
+            $this->sebagai($this->pemilik)->post(self::URL . 'tiket', ['id_question_category' => $this->kategori, 'subject' => 'S6', 'msg' => 'M'])->assertStatus(429);
+        } finally {
+            $this->lepasUnggahHs($tmp);
+        }
+
+        $this->assertSame([], glob($this->akar . '/halo-simpeg/*/*/*') ?: [], 'throttle dicek sebelum unggah');
     }
 
     public function testUnggahDitolakTanpaBarisDanTanpaBerkas(): void
@@ -178,11 +220,12 @@ final class TiketLampiranTest extends DatabaseTestCase
     #[Group('db-isolasi-penuh')]
     public function testHapusTiketBerkasBersamaDanPathBerspasi(): void
     {
-        $bersama = 'arsip/000000000000000012/inbox/lampiran_1_20240101101010.pdf';
-        $spasi   = 'arsip/000000000000000012/inbox/Surat Tugas (1).pdf';
+        $bersama = 'arsip/000000000000000056/inbox/lampiran_1_20240101101010.pdf';
+        $sendiri = 'arsip/000000000000000056/inbox/lampiran_1_20240101101011.pdf';
+        $spasi   = 'arsip/000000000000000056/inbox/Surat Tugas (1).pdf';
         $baru    = 'halo-simpeg/2026/11/' . str_repeat('a', 32) . '.pdf';
 
-        foreach ([$bersama, $spasi, $baru] as $p) {
+        foreach ([$bersama, $sendiri, $spasi, $baru] as $p) {
             @mkdir(dirname($this->akar . '/' . $p), 0700, true);
             file_put_contents($this->akar . '/' . $p, self::pdfHs());
         }
@@ -192,11 +235,13 @@ final class TiketLampiranTest extends DatabaseTestCase
         $this->buatPesanHs($t1, $this->pemilik, 'a', '2024-01-01 00:00:00', $bersama);
         $this->buatPesanHs($t1, $this->pemilik, 'b', '2024-01-01 00:01:00', $spasi);
         $this->buatPesanHs($t1, $this->petugas, 'c', '2024-01-01 00:02:00', $baru);
+        $this->buatPesanHs($t1, $this->pemilik, 'e', '2024-01-01 00:04:00', $sendiri);
         $m2 = $this->buatPesanHs($t2, $this->pemilik, 'd', '2024-01-01 00:03:00', $bersama);
 
         $this->sebagai($this->petugas)->delete(self::URL . "tiket/{$t1}")->assertStatus(200);
 
         $this->assertFileDoesNotExist($this->akar . '/' . $baru, 'berkas baru milik tiket dihapus');
+        $this->assertFileDoesNotExist($this->akar . '/' . $sendiri, 'path legacy sah yang hanya dirujuk tiket ini ikut dihapus');
         $this->assertFileExists($this->akar . '/' . $bersama, 'masih dirujuk tiket kedua');
         $this->assertFileExists($this->akar . '/' . $spasi, 'path legacy berspasi tidak dihapus fisik (dicatat tanpa path)');
         $this->sebagai($this->pemilik)->get(self::URL . "tiket/{$t2}/pesan/{$m2}/lampiran")->assertStatus(200);

@@ -57,7 +57,8 @@ final class TiketEksplainTest extends DatabaseTestCase
         $sql   = (new RingkasanTiket($this->db))->kueriBelumDibacaPetugas($admin, array_slice($kat, 0, 3))->select('COUNT(*) AS n', false)->getCompiledSelect();
         $rinci = $this->eksplain($sql)[0];
         $this->assertSame('idx_dticket_kategori_status_baca', $rinci['key'], $sql);
-        $this->assertGreaterThanOrEqual(9, (int) $rinci['key_len'], 'indeks terpakai sampai is_read_off');
+        // key_len = 5 (id_question_category INT NULL) + 4 (status INT) + 1 (is_read_off TINYINT) = 10 (DBV-028 R2).
+        $this->assertSame(10, (int) $rinci['key_len'], 'indeks terpakai sampai is_read_off');
 
         // Daftar petugas: pesan terakhir lewat idx_dticketmsg_inbox_waktu (subkueri bergantung, tanpa N+1 tambahan).
         (new TiketService($this->db))->daftar($this->authUntukAkun($admin), ['peran' => 'petugas', 'status' => 'open']);

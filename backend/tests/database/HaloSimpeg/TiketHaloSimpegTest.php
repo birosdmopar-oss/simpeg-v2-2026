@@ -6,6 +6,7 @@ namespace Tests\Database\HaloSimpeg;
 
 use App\Constants\Role;
 use App\Libraries\HaloSimpeg\AksesTiket;
+use App\Libraries\HaloSimpeg\RingkasanTiket;
 use App\Libraries\HaloSimpeg\TiketService;
 use CodeIgniter\Test\FeatureTestTrait;
 use CodeIgniter\Test\TestResponse;
@@ -18,7 +19,7 @@ use Tests\Support\Kepegawaian\PegawaiFixtureTrait;
 
 /**
  * MAKE-071 — tiket Halo Simpeg: AC-E03.*, AC-E04.*, AC-E05.*, §7.8 (1)(2)(4) (PRD Fase 8 v1.3 §6.1b, §6.2, §7.3–§7.5, H8-16 (a1),
- * D7 (a)). Data sintetis; lampiran dan transaksi lintas koneksi di `TiketLampiranTest` / `TiketTransaksiTest`.
+ * D7 (a)). Data sintetis; lampiran di `TiketLampiranTest`, kunci lintas koneksi di `TiketKunciTest`, EXPLAIN di `TiketEksplainTest`.
  *
  * @internal
  */
@@ -61,11 +62,12 @@ final class TiketHaloSimpegTest extends DatabaseTestCase
         $this->clearAuthState();
         $this->pasangThrottlerHs();
 
-        $this->k1        = $this->buatKategoriHs('Kepegawaian');
-        $this->k2        = $this->buatKategoriHs('Gaji');
-        $this->pemilik   = $this->akunPegawai('Pelapor Satu', Role::PEGAWAI);
-        $this->pemilik2  = $this->akunPegawai('Pelapor Dua', Role::PPPK);
-        $this->admin     = $this->idAkunRole(Role::SUPER_ADMIN);
+        $this->k1       = $this->buatKategoriHs('Kepegawaian');
+        $this->k2       = $this->buatKategoriHs('Gaji');
+        $this->pemilik  = $this->akunPegawai('Pelapor Satu', Role::PEGAWAI);
+        $this->pemilik2 = $this->akunPegawai('Pelapor Dua', Role::PPPK);
+        $this->admin    = $this->idAkunRole(Role::SUPER_ADMIN);
+        $this->db->table('pengguna')->where('id_pengguna', $this->admin)->update(['name' => 'Admin Kepegawaian Uji']);
         $this->petugasB  = $this->akunPegawai('Petugas Bee', Role::ADMIN_SATKER);
         $this->petugasK2 = $this->akunPegawai('Petugas Gaji', Role::MENTERI);
         $this->nonaktif  = $this->akunPegawai('Petugas Cuti', Role::PTT);
@@ -193,6 +195,8 @@ final class TiketHaloSimpegTest extends DatabaseTestCase
         $this->assertSame([$a], array_column($this->data($this->sebagai($this->pemilik)->get(self::URL . 'tiket?status=closed'))['items'], 'id'));
         $this->assertSame(1, $this->data($this->sebagai($this->pemilik)->get(self::URL . 'tiket?q=' . rawurlencode('subjek ' . $b)))['total']);
         $this->assertSame(0, $this->data($this->sebagai($this->pemilik)->get(self::URL . 'tiket?q=%25'))['total']);
+        $this->buatPesanHs($a, $this->pemilik, 'kata-unik-dalam-isi', '2026-11-17 01:30:00');
+        $this->assertSame([$a], array_column($this->data($this->sebagai($this->pemilik)->get(self::URL . 'tiket?q=kata-unik-dalam'))['items'], 'id'), 'q mencari isi pesan');
         $this->assertSame(4, $this->data($this->sebagai($this->pemilik)->get(self::URL . 'tiket?kategori=' . $this->k1))['total']);
 
         foreach (['peran=x' => 'peran', 'status=0' => 'status', 'baca=x' => 'baca', 'kategori=x' => 'kategori', 'perlu_tindak=1' => 'perlu_tindak'] as $q => $kolom) {
@@ -200,6 +204,17 @@ final class TiketHaloSimpegTest extends DatabaseTestCase
             $res->assertStatus(422);
             $this->assertArrayHasKey($kolom, $this->json($res)['errors'], $q);
         }
+    }
+
+    public function testPesanTerakhirSeriWaktuMemilihIdTerbesar(): void
+    {
+        $t  = $this->tiket($this->pemilik, $this->k1, null);
+        $m1 = $this->buatPesanHs($t, $this->pemilik, 'pertama', '2026-11-17 05:00:00');
+        $m2 = $this->buatPesanHs($t, $this->pemilik, 'kedua', '2026-11-17 05:00:00');
+        $this->assertGreaterThan($m1, $m2);
+        $baris = $this->data($this->sebagai($this->pemilik)->get(self::URL . 'tiket'))['items'][0];
+        $this->assertSame([$m2, 'kedua'], [$baris['pesan_terakhir']['id_inbox_msg'], $baris['pesan_terakhir']['potongan']]);
+        $this->assertSame([$m1, $m2], array_column($this->data($this->sebagai($this->pemilik)->get(self::URL . "tiket/{$t}"))['pesan'], 'id_inbox_msg'));
     }
 
     public function testFilterBacaDanPerluTindakSamaDenganRingkasan(): void
@@ -313,6 +328,52 @@ final class TiketHaloSimpegTest extends DatabaseTestCase
 
     // ================================================================================================== balas
 
+    public function testBalasanDitolakTidakMemakanKuota(): void
+    {
+        $tutup = $this->tiket($this->pemilik, $this->k1, null, ['status' => 1, 'allow_reply' => 0]);
+        $buka  = $this->tiket($this->pemilik, $this->k1, null);
+
+        for ($i = 0; $i < 21; $i++) {
+            $this->sebagai($this->admin)->post(self::URL . "tiket/{$tutup}/pesan", ['msg' => "x{$i}"])->assertStatus(422);
+        }
+
+        $this->sebagai($this->admin)->post(self::URL . "tiket/{$buka}/pesan", ['msg' => 'sah'])->assertStatus(201);
+    }
+
+    /**
+     * K3 #1: petugas status 1 dengan akun nonaktif, akun terhapus, atau role 8 bukan petugas aktif (JWT stateless, jadi
+     * `AksesTiket::kategoriAktif` satu-satunya penjaga).
+     */
+    public function testPetugasBerakunNonaktifTerhapusAtauRole8BukanPenjawab(): void
+    {
+        $t        = $this->tiket($this->pemilik, $this->k1, '2026-11-17 01:00:00', ['is_read_off' => 2]);
+        $nonaktif = $this->akunPegawai('Akun Nonaktif', Role::ADMIN_SATKER);
+        $terhapus = $this->akunPegawai('Akun Terhapus', Role::ADMIN_SATKER);
+        $role8    = $this->akunPegawai('Akun Pimpinan', Role::PIMPINAN);
+
+        foreach ([$nonaktif, $terhapus, $role8] as $akun) {
+            $this->buatPetugasHs($akun, [$this->k1]);
+        }
+
+        $this->db->table('pengguna')->where('id_pengguna', $nonaktif)->update(['status' => '0']);
+        $this->db->table('pengguna')->where('id_pengguna', $terhapus)->update(['deleted_at' => '2026-11-01 00:00:00']);
+
+        foreach ([$nonaktif, $terhapus] as $akun) {
+            foreach ([['get', "tiket/{$t}"], ['post', "tiket/{$t}/baca"], ['post', "tiket/{$t}/tutup"], ['delete', "tiket/{$t}"]] as [$verb, $jalur]) {
+                $this->sebagai($akun)->{$verb}(self::URL . $jalur)->assertStatus(404);
+            }
+
+            $this->sebagai($akun)->post(self::URL . "tiket/{$t}/pesan", ['msg' => 'x'])->assertStatus(404);
+            $this->assertSame(0, $this->data($this->sebagai($akun)->get(self::URL . 'tiket?peran=petugas'))['total']);
+            $this->assertSame(0, $this->data($this->sebagai($akun)->get(self::URL . 'tiket/ringkasan'))['belum_dibaca_petugas']);
+        }
+
+        // Role 8 ditolak filter route (F8-04); di tingkat service pun bukan petugas.
+        $this->sebagai($role8)->get(self::URL . "tiket/{$t}")->assertStatus(403);
+        $this->assertSame([], AksesTiket::kategoriAktif($this->db, $role8));
+        $this->assertSame(0, (new RingkasanTiket($this->db))->hitung($role8)['belum_dibaca_petugas']);
+    }
+
     public function testBalasDitolakTutupTanpaBalasanDanPengingat24Jam(): void
     {
         $tutup = $this->tiket($this->pemilik, $this->k1, null, ['status' => 1, 'allow_reply' => 0]);
@@ -362,9 +423,10 @@ final class TiketHaloSimpegTest extends DatabaseTestCase
         $this->harapGalat($this->sebagai($this->pemilik)->post(self::URL . "tiket/{$id}/tutup"), 422, 'tiket_sudah_ditutup', AksesTiket::PESAN_SUDAH_DITUTUP);
         $this->harapGalat($this->sebagai($this->pemilik)->post(self::URL . "tiket/{$id}/pesan", ['msg' => 'lagi']), 422, 'tiket_ditutup', AksesTiket::PESAN_DITUTUP);
 
-        // ditutup_oleh_label (D7 (a) detail): role 1 → nama; pemilik → "Admin".
+        // ditutup_oleh_label (D7 (a) detail): pemilik/petugas non-role-1 → "Admin"; role 1 → nama penutup (nilai persis).
         $this->assertSame('Admin', $this->data($this->sebagai($this->pemilik)->get(self::URL . "tiket/{$id}"))['ditutup_oleh_label']);
-        $this->assertNotSame('Admin', $this->data($this->sebagai($this->admin)->get(self::URL . "tiket/{$id}"))['ditutup_oleh_label']);
+        $this->assertSame('Admin', $this->data($this->sebagai($this->petugasB)->get(self::URL . "tiket/{$id}"))['ditutup_oleh_label']);
+        $this->assertSame('Admin Kepegawaian Uji', $this->data($this->sebagai($this->admin)->get(self::URL . "tiket/{$id}"))['ditutup_oleh_label']);
         $this->assertSame($inbox, [$this->db->table('inbox')->countAllResults(), $this->db->table('inbox_msg')->countAllResults()], '§7.8 (2)');
 
         // Hapus: pemilik 403, petugas 200 {id}; pesan ikut terhapus dengan audit before.
@@ -373,6 +435,32 @@ final class TiketHaloSimpegTest extends DatabaseTestCase
         $this->assertSame([0, 0], [$this->db->table('disiplin_ticket')->where('id_inbox', $id)->countAllResults(), $this->db->table('disiplin_ticket_msg')->where('id_inbox', $id)->countAllResults()]);
         $this->assertNotNull($this->db->table('audit_logs')->where('entity', 'disiplin_ticket')->where('entity_id', $id)->where('event', 'delete')->get()->getRow('before_json'));
         $this->assertSame(3, $this->db->table('audit_logs')->where('entity', 'disiplin_ticket_msg')->where('event', 'delete')->countAllResults());
+    }
+
+    public function testTiketClosedTanpaPenutupDanIdAkunPetugasTidakDikirim(): void
+    {
+        $t = $this->tiket($this->pemilik, $this->k1, '2026-11-17 01:00:00', ['status' => 1, 'allow_reply' => 0, 'closed_by' => null]);
+
+        foreach ([$this->pemilik, $this->petugasB, $this->admin] as $akun) {
+            $this->assertNull($this->data($this->sebagai($akun)->get(self::URL . "tiket/{$t}"))['ditutup_oleh_label'], 'Closed impor tanpa closed_by');
+        }
+
+        // AC-E04.12: id akun petugas (nilai khas) tidak muncul sebagai nilai di kunci mana pun bagi non-role-1.
+        $khas = $this->buatAkunUntuk($this->buatPegawai(['nama' => 'Petugas Khas']), Role::ADMIN_SATKER, ['id_pengguna' => 987654]);
+        $this->buatPetugasHs($khas, [$this->k1]);
+        $u = $this->tiket($this->pemilik, $this->k1, '2026-11-17 01:00:00');
+        $this->sebagai($khas)->post(self::URL . "tiket/{$u}/pesan", ['msg' => 'jawab'])->assertStatus(201);
+        $this->sebagai($khas)->post(self::URL . "tiket/{$u}/tutup")->assertStatus(200);
+
+        foreach ([$this->pemilik, $this->petugasB] as $akun) {
+            foreach (["tiket/{$u}", 'tiket', 'tiket?peran=petugas'] as $jalur) {
+                $nilai = [];
+                array_walk_recursive($this->json($this->sebagai($akun)->get(self::URL . $jalur))['data'], static function ($v) use (&$nilai): void {
+                    $nilai[] = $v;
+                });
+                $this->assertNotContains($khas, $nilai, "{$jalur} memuat id akun petugas");
+            }
+        }
     }
 
     public function testPemilikMenutupTiketSendiriDanLabelPenutupPemilik(): void
@@ -402,7 +490,9 @@ final class TiketHaloSimpegTest extends DatabaseTestCase
         $t = $this->tiket($this->pemilik, null, '2026-11-17 01:00:00', ['is_read_off' => 2]);
 
         $baris = $this->data($this->sebagai($this->pemilik)->get(self::URL . 'tiket'))['items'][0];
-        $this->assertSame([$t, null, false, true, false], [$baris['id'], $baris['kategori'], $baris['bisa_balas'], $baris['bisa_tutup'], $baris['bisa_hapus']]);
+        $this->assertSame([$t, null, false, true, false, false], [$baris['id'], $baris['kategori'], $baris['bisa_balas'], $baris['bisa_tutup'], $baris['bisa_hapus'], $baris['perlu_tindak']]);
+        $this->assertNotContains($t, array_column($this->data($this->sebagai($this->admin)->get(self::URL . 'tiket?peran=petugas'))['items'], 'id'));
+        $this->assertSame(0, $this->data($this->sebagai($this->admin)->get(self::URL . 'tiket/ringkasan'))['perlu_tindak']);
         $this->assertNull($this->data($this->sebagai($this->pemilik)->get(self::URL . "tiket/{$t}"))['kategori']);
         $this->harapGalat($this->sebagai($this->pemilik)->post(self::URL . "tiket/{$t}/pesan", ['msg' => 'x']), 422, 'tiket_tanpa_kategori', AksesTiket::PESAN_TANPA_KATEGORI);
         $this->harapGalat($this->sebagai($this->pemilik)->delete(self::URL . "tiket/{$t}"), 403, 'bukan_pihak_berwenang', AksesTiket::PESAN_BUKAN_BERWENANG);
@@ -458,17 +548,29 @@ final class TiketHaloSimpegTest extends DatabaseTestCase
         $this->assertSame(['A1', 'A2'], array_column($this->data($this->sebagai($this->pemilik)->get(self::URL . "tiket/{$a}"))['pesan'], 'isi'));
         $this->assertSame(['B1', 'B2'], array_column($this->data($this->sebagai($this->pemilik2)->get(self::URL . "tiket/{$b}"))['pesan'], 'isi'));
 
-        // BP8-1: modul tiket tidak mengimpor notifikasi/inbox.
-        foreach (['AksesTiket', 'RingkasanTiket', 'TiketService'] as $kelas) {
+        // BP8-1: seluruh modul Halo Simpeg (library, controller, model; termasuk chatbot) tidak mengimpor notifikasi/inbox.
+        $berkas = [];
+
+        foreach (['Libraries/HaloSimpeg', 'Controllers/Api/HaloSimpeg', 'Models/HaloSimpeg'] as $folder) {
+            foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(APPPATH . $folder, \FilesystemIterator::SKIP_DOTS)) as $f) {
+                if ($f->getExtension() === 'php') {
+                    $berkas[] = $f->getPathname();
+                }
+            }
+        }
+
+        $this->assertGreaterThan(10, count($berkas));
+
+        foreach ($berkas as $path) {
             $kode = '';
 
             // Komentar/docblock diabaikan (pola PusatNotifikasiArsitekturTest): yang dicek hanya kode.
-            foreach (token_get_all((string) file_get_contents(APPPATH . "Libraries/HaloSimpeg/{$kelas}.php")) as $tok) {
+            foreach (token_get_all((string) file_get_contents($path)) as $tok) {
                 $kode .= is_array($tok) ? (in_array($tok[0], [T_COMMENT, T_DOC_COMMENT], true) ? '' : $tok[1]) : $tok;
             }
 
-            foreach (['NotifikasiService', 'InboxModel', "'inbox'", "'inbox_msg'"] as $kata) {
-                $this->assertStringNotContainsString($kata, $kode, "{$kelas} memuat {$kata}");
+            foreach (['NotifikasiService', 'InboxModel', "'inbox'", "'inbox_msg'", '"inbox"', '"inbox_msg"'] as $kata) {
+                $this->assertStringNotContainsString($kata, $kode, "{$path} memuat {$kata}");
             }
         }
     }
