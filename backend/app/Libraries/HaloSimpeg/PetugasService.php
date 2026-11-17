@@ -21,7 +21,7 @@ use CodeIgniter\Database\Exceptions\DatabaseException;
  * - **Label akun** (§7.2): akun role 1 → nama akun; akun lain ber-pegawai → "NIP - nama bergelar - jabatan" [K `LS:470-491`];
  *   tanpa data pegawai → nama akun. Dipakai daftar petugas dan kandidat.
  * - **Kandidat** (F8-07): akun role 1 aktif + akun aktif milik pegawai aktif di satker kepegawaian
- *   (`WebConfigService::value('id_satker_kepegawaian')`, bukan literal `'101'` [K `LS:476-484`]). Satker belum diatur → hanya
+ *   (`WebConfigService::satkerKepegawaian()`, bukan literal `'101'` [K `LS:476-484`]). Satker belum diatur → hanya
  *   akun role 1 + `peringatan` (pola `PetugasLayananService::PERINGATAN_SATKER_KOSONG`). Kandidat = syarat `id_user` saat tambah
  *   atau saat `id_user` diganti (petugas lama tetap bisa diubah walau tidak lagi memenuhi syarat).
  * - **K-A4 (1')** (Horii 16-11-2026): hapus → 422 `petugas_terakhir` bila petugas itu petugas **terakhir** (aktif atau nonaktif)
@@ -110,7 +110,7 @@ final class PetugasService extends MasterHaloSimpeg
         $admin = $this->kueriAdmin()->groupStart()->like('u.name', $like, 'both', null, true)->orLike('u.username', $like, 'both', null, true)->groupEnd()
             ->orderBy('u.name', 'ASC')->orderBy('u.id_pengguna', 'ASC')->limit($maks)->get()->getResultArray();
 
-        $satker  = $this->satkerKepegawaian();
+        $satker  = service('webConfigService')->satkerKepegawaian();
         $pegawai = [];
 
         if ($satker !== null) {
@@ -615,7 +615,7 @@ final class PetugasService extends MasterHaloSimpeg
             return true;
         }
 
-        $satker = $this->satkerKepegawaian();
+        $satker = service('webConfigService')->satkerKepegawaian();
 
         return $satker !== null && $this->kueriPegawai($satker)->where('u.id_pengguna', $idUser)->countAllResults() > 0;
     }
@@ -637,12 +637,5 @@ final class PetugasService extends MasterHaloSimpeg
             ->join('pengguna u', 'u.nip = p.nip', 'inner')
             ->where('p.status', 1)->where('pmj.id_satker', $satker)
             ->where('u.status', '1')->where('u.deleted_at', null)->whereIn('u.user_level', self::ROLE_PETUGAS);
-    }
-
-    private function satkerKepegawaian(): ?int
-    {
-        $satker = service('webConfigService')->value('id_satker_kepegawaian');
-
-        return is_scalar($satker) && ctype_digit((string) $satker) ? (int) $satker : null;
     }
 }
