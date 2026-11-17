@@ -1,0 +1,9 @@
+{
+    "status": "success",
+    "data": {
+        "petugas": false,
+        "aktif": false,
+        "kategori": [],
+        "bisa_ekspor": false
+    }
+}

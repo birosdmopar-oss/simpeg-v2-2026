@@ -1,0 +1,16 @@
+{
+    "status": "success",
+    "data": {
+        "items": [
+            {
+                "id_user": 11,
+                "label": "Admin Kepegawaian"
+            },
+            {
+                "id_user": 12,
+                "label": "000000000000000012 - Pegawai Contoh, S.Kom. - Analis Kepegawaian"
+            }
+        ],
+        "peringatan": null
+    }
+}

@@ -1,0 +1,28 @@
+{
+    "status": "success",
+    "data": {
+        "items": [
+            {
+                "id": 1,
+                "nama": "Helpdesk SDM",
+                "kontak": "0800100100",
+                "email": "helpdesk@contoh.test",
+                "status": 1,
+                "dibuat_pada": "2026-11-17T01:00:00Z",
+                "diubah_pada": "2026-11-17T01:00:00Z"
+            },
+            {
+                "id": 3,
+                "nama": "Kontak Lama",
+                "kontak": "0800300300",
+                "email": null,
+                "status": 0,
+                "dibuat_pada": "2026-11-17T01:10:00Z",
+                "diubah_pada": null
+            }
+        ],
+        "total": 2,
+        "page": 1,
+        "per_page": 20
+    }
+}
