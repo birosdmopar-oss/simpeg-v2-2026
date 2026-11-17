@@ -66,4 +66,13 @@ class HaloSimpeg extends BaseConfig
 
     /** @var list<string> */
     public array $lampiranEkstensi = ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'doc', 'docx', 'xls', 'xlsx'];
+
+    /** Ekspor rekap petugas (E-09, MAKE-074): baris pesan maksimum per berkas, dihitung `COUNT` sebelum membangun berkas (§7.3a). */
+    public int $eksporMaksBaris = 10000;
+
+    /**
+     * Ekspor: `SUM(CHAR_LENGTH(msg))` maksimum per berkas (§7.3a). Ambang dari pengukuran memori nyata
+     * (`EksporTiketVolumeTest`, hasil di README bagian ekspor dan `docs/progress/08-HaloSimpeg.md`).
+     */
+    public int $eksporMaksKarakter = 5000000;
 }

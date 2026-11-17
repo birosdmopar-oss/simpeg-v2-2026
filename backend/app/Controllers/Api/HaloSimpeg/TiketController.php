@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers\Api\HaloSimpeg;
 
 use App\Libraries\Auth\AuthContext;
+use App\Libraries\HaloSimpeg\EksporTiketService;
 use App\Libraries\HaloSimpeg\TiketService;
 use CodeIgniter\HTTP\Files\UploadedFile;
 use CodeIgniter\HTTP\ResponseInterface;
@@ -54,6 +55,31 @@ final class TiketController extends HaloSimpegController
     public function delete(int|string $id): ResponseInterface
     {
         return $this->respondSuccess($this->service()->hapus($this->auth(), $this->idValid($id)));
+    }
+
+    /**
+     * Ekspor rekap petugas (E-09, MAKE-074): ada data → xlsx attachment (diaudit di service); periode kosong → 200 JSON
+     * `{kosong: true, jumlah: 0}` + `message`, tanpa `Content-Disposition` dan tanpa audit (AC-E09.5).
+     */
+    public function ekspor(): ResponseInterface
+    {
+        $hasil = (new EksporTiketService())->ekspor($this->auth(), $this->query());
+
+        if ($hasil['kosong']) {
+            return $this->tanpaCache($this->response->setStatusCode(200)->setJSON([
+                'status'  => 'success',
+                'data'    => ['kosong' => true, 'jumlah' => 0],
+                'message' => $hasil['message'],
+            ]));
+        }
+
+        return $this->response
+            ->setStatusCode(200)
+            ->setContentType($hasil['mime'], '')
+            ->setHeader('Content-Disposition', 'attachment; filename="' . $hasil['nama'] . '"')
+            ->setHeader('X-Content-Type-Options', 'nosniff')
+            ->setHeader('Cache-Control', 'private, no-store')
+            ->setBody($hasil['isi']);
     }
 
     /** Unduh lampiran lama/baru sesudah cek akses (AC-E04.7, F8-17): header aman, nama `lampiran-{id}-{idPesan}.{ext}`. */
