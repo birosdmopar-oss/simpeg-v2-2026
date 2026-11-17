@@ -1,7 +1,7 @@
 /**
  * Klien API master Halo Simpeg memakai `api` asli (interceptor amplop v2) dengan adapter tiruan — pelajaran amplop CR-059:
  * service tidak boleh membaca `res.data.data`. Fixture di `fixtures/` = SALINAN contoh respons sintetis BE
- * `backend/tests/_support/HaloSimpeg/*.json` (README beku MAKE-070 @cd706a31). Salin ulang bila kontrak berubah lewat CR.
+ * `backend/tests/_support/HaloSimpeg/*.json` (README beku MAKE-070 di `main` @56a700b1). Salin ulang bila kontrak berubah lewat CR.
  */
 import { AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -31,7 +31,8 @@ import { isApiError } from '@/lib/axios'
 import { galatPerKolom } from '@/shared/utils/galatKolom'
 
 import { KontrakHaloError } from '../schemas'
-import { kategoriHaloService, kodeGalat, kontakHaloService, petugasHaloService } from '../services/master.service'
+import { TEKS_GALAT_MASTER } from '../constants'
+import { kategoriHaloService, kodeGalat, kontakHaloService, petugasHaloService, queryDaftar } from '../services/master.service'
 import galat404 from './fixtures/galat-404-master.json'
 import galat422Duplikat from './fixtures/galat-422-kategori-duplikat.json'
 import galat422 from './fixtures/galat-422-master.json'
@@ -186,5 +187,30 @@ describe('kontak (fixture kontrak MAKE-070)', () => {
     jawab({ status: 'success', data: kontakDaftar.data.items[0] }, 201)
     await kontakHaloService.tambah({ nama: ' Helpdesk ', kontak: ' 0812 ', email: '', status: 1 })
     expect(server.panggilan[0]?.body).toEqual({ name: 'Helpdesk', contact: '0812', email: '', status: 1 })
+  })
+})
+
+describe('paginasi & galat query (README master final S3, MAKE-070 @56a700b1)', () => {
+  it('queryDaftar: page dibulatkan ke 1..1.000.000, per_page ke 1..100; NaN tidak dikirim', () => {
+    expect(queryDaftar({ page: 0, per_page: 500 })).toEqual({ page: 1, per_page: 100 })
+    expect(queryDaftar({ page: 2.7, per_page: 0 })).toEqual({ page: 2, per_page: 1 })
+    expect(queryDaftar({ page: 5_000_000, per_page: 20 })).toEqual({ page: 1_000_000, per_page: 20 })
+    expect(queryDaftar({ page: Number.NaN, per_page: Number.POSITIVE_INFINITY, status: 0 })).toEqual({ status: 0 })
+  })
+
+  it('daftar mengirim query ternormalisasi', async () => {
+    jawab(kontakDaftar)
+    await kontakHaloService.list({ page: -3, per_page: 1000, q: ' a ' })
+    expect(server.panggilan[0]?.params).toEqual({ page: 1, per_page: 100, q: 'a' })
+  })
+
+  it.each([
+    ['page', TEKS_GALAT_MASTER.halamanTidakValid],
+    ['status', TEKS_GALAT_MASTER.statusTidakValid],
+  ])('422 errors.%s dari query → pesan BE per kolom', async (kolom, teks) => {
+    jawab({ status: 'error', message: teks, errors: { [kolom]: [teks] } }, 422)
+    const e = await galatDari(kategoriHaloService.list())
+    expect(isApiError(e) && e.message).toBe(teks)
+    expect(galatPerKolom(e)).toEqual({ [kolom]: teks })
   })
 })

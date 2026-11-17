@@ -1,6 +1,6 @@
 /**
  * Skema master Halo Simpeg vs fixture kontrak MAKE-070. Fixture di `fixtures/` = SALINAN contoh respons sintetis BE
- * `backend/tests/_support/HaloSimpeg/*.json` (README beku `fase8/make-070-master-halo` @cd706a31; tanpa `*.php`). Salin
+ * `backend/tests/_support/HaloSimpeg/*.json` (README beku di `main` @56a700b1 (MAKE-070); tanpa `*.php`). Salin
  * ulang bila kontrak berubah lewat CR. Form: nilai batas PRD §7.3a (= batas lolos, batas+1 ditolak), pesan = teks BE.
  */
 import { describe, expect, it } from 'vitest'

@@ -9,6 +9,7 @@ import type { z } from 'zod'
 
 import { api, isApiError } from '@/lib/axios'
 
+import { PAGE_MAKS, PER_PAGE_MAKS } from '../constants'
 import {
   halaman,
   hapusSchema,
@@ -56,6 +57,21 @@ function params(filter: object): Record<string, string | number> {
   return hasil
 }
 
+const bulatDalam = (n: number, min: number, maks: number): number => Math.min(maks, Math.max(min, Math.trunc(n)))
+
+/**
+ * Filter daftar master → query (README final S3): `page` dibulatkan ke 1..1.000.000 dan `per_page` ke 1..100 agar UI tidak
+ * memicu 422 `errors.page`; nilai bukan angka hingga tidak dikirim (bawaan BE). `status` hanya 0/1 (tipe).
+ */
+export function queryDaftar(filter: FilterMaster): Record<string, string | number> {
+  const { page, per_page, ...lain } = filter
+  return params({
+    ...lain,
+    page: typeof page === 'number' && Number.isFinite(page) ? bulatDalam(page, 1, PAGE_MAKS) : undefined,
+    per_page: typeof per_page === 'number' && Number.isFinite(per_page) ? bulatDalam(per_page, 1, PER_PAGE_MAKS) : undefined,
+  })
+}
+
 async function get<S extends z.ZodTypeAny>(path: string, schema: S, query?: object): Promise<z.output<S>> {
   const { data } = await api.get<unknown>(`${BASIS_HALO}/${path}`, query ? { params: params(query) } : undefined)
   return parse(schema, data, path)
@@ -96,7 +112,8 @@ function crudMaster<S extends z.AnyZodObject, T extends z.AnyZodObject, Form, P 
   const skemaPut = (putSchema ?? schema) as P
   return {
     async list(filter: FilterMaster = {}): Promise<Halaman<z.output<S>>> {
-      return get(jalur, halaman(schema), filter)
+      const { data } = await api.get<unknown>(`${BASIS_HALO}/${jalur}`, { params: queryDaftar(filter) })
+      return parse(halaman(schema), data, jalur)
     },
     async tambah(form: Form): Promise<z.output<S>> {
       const { data } = await api.post<unknown>(`${BASIS_HALO}/${jalur}`, body(form))

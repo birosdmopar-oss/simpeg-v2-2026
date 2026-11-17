@@ -37,8 +37,10 @@ export const BATAS_MASTER = {
   cariKandidatMaks: 50,
 } as const
 
-/** Bawaan `per_page` daftar master (README beku: 1..100, bawaan 20). */
+/** Paginasi master (README final S3): `page` bulat 1..1.000.000 (di luar → 422 `errors.page`); `per_page` 1..100, bawaan 20. */
 export const PER_PAGE_MASTER = 20
+export const PER_PAGE_MAKS = 100
+export const PAGE_MAKS = 1_000_000
 
 /** Bawaan filter baca per tab (✔ Horii 16-11-2026): "Tiket saya" = semua [V2], antrean petugas = belum [K `VI:51`]. */
 export const BACA_BAWAAN_SAYA = 'semua'
@@ -69,6 +71,13 @@ export const TEKS_GALAT_MASTER = {
   kontakMaks: 'Nomor kontak maksimal 20 karakter.',
   cariMin: 'Kata kunci minimal 2 karakter.',
   cariMaks: 'Kata kunci maksimal 50 karakter.',
+  // README master final (MAKE-070 @56a700b1): teks galat BE yang tidak punya validasi klien padanan; ditampilkan dari amplop.
+  kategoriTidakTersedia: 'Kategori tidak tersedia.',
+  statusTidakValid: 'Status tidak valid.',
+  halamanTidakValid: 'Halaman harus berupa angka bulat 1 sampai 1000000.',
+  parameterDaftar: 'Parameter daftar tidak valid.',
+  isianTeks: 'Isian harus berupa teks.',
+  idTidakValid: 'ID tidak valid.',
 } as const
 
 /** Nilai `?tab=` tab antrean petugas di `/halo-simpeg` (tab pemilik = bawaan tanpa query). */
