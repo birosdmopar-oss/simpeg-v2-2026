@@ -11,6 +11,8 @@
 --   WAJIB_0 = harus 0; > 0 di salinan legacy menghentikan impor T12b sampai diputus Horii/DB Validator (konstrain v2 tidak
 --             dibersihkan impor).
 --   INFO    = dilaporkan; baris dibuang/dicatat oleh impor atau runbook, tidak memblokir.
+--   BERHENTI sebelum T12b = dilaporkan; > 0 di salinan legacy menghentikan runbook sebelum T12b sampai diputus Horii/DB
+--             Validator (impor sendiri gagal bila panjang melebihi kolom v2, DBV-028 Q2).
 --
 -- Cara pakai (akun baca saja):
 --   mysql --table -vvv --default-character-set=utf8mb4 --user=<akun_baca> -p <db_salinan_legacy> \

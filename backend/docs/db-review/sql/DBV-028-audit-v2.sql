@@ -14,6 +14,8 @@
 --   WAJIB_0 = harus 0. Di v2 butir WAJIB_0 (blok A) dijamin konstrain UNIQUE DBV-028; > 0 di DB gladi berarti impor atau
 --             skema menyimpang dan diputus Horii/DB Validator sebelum cutover.
 --   INFO    = dilaporkan; baris dibuang/dicatat oleh impor atau runbook, tidak memblokir.
+--   BERHENTI sebelum T12b = dilaporkan; > 0 di salinan legacy menghentikan runbook sebelum T12b sampai diputus Horii/DB
+--             Validator (impor sendiri gagal bila panjang melebihi kolom v2, DBV-028 Q2).
 --
 -- Cara pakai (akun baca saja):
 --   mysql --table -vvv --default-character-set=utf8mb4 --user=<akun_baca> -p <db_v2_gladi> \

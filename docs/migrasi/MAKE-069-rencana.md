@@ -114,9 +114,11 @@ dikonversi R1a dan semua kolom teks ikut `stripslashes` bawaan. Kolom `siasn_lu`
   petugas yang dibuang di atas) atau ke kategori (Q-H5) → dibuang + dicatat per kolom (`id_support_officer …` /
   `id_question_category yatim dibuang (K-M12)`); satu baris dihitung sekali walau yatim dua arah. Jumlahnya tampil di laporan
   impor (DBV-028 Q9). Pasangan ganda (Q-H3 WAJIB_0) bila tetap ada → dibuang + `MAKE-089 kunci ganda`; kunci NULL tidak
-  dihitung ganda.
+  dihitung ganda. Kunci NULL kembar (sama sesudah COALESCE ke sentinel, hanya untuk kolom yang NULLABLE di salinan) yang
+  terbelah batas batch terlewat keyset dan membuat rekonsiliasi `officer_category` **gagal keras** (`ImporGagal`, tier 12
+  di-rollback; tidak ada data hilang diam-diam). Pra-cek Q-H3 menyaring ganda lebih dulu.
 - **N1:** `support_officer.email` NULL → `''` + dicatat `N1 email NULL→''` **hanya untuk baris yang ditulis** (petugas yang
-  dibuang tidak dihitung). Email lain di-trim; spasi-saja menjadi `''` tanpa kode. Petugas tetap diimpor (penugasan kategori
+  dibuang tidak dihitung). Semua email yang tidak NULL di-trim tanpa kode koreksi ([V2]; mis. `'  a@x.id  '` → `'a@x.id'`); spasi-saja menjadi `''`. Petugas tetap diimpor (penugasan kategori
   tidak hilang); admin melengkapi email lewat menu petugas.
 - **N2:** `created_at`/`updated_at` ikut aturan umum R1a: `--zona-sumber` dari bukti GAP-2 (`NOW()` salinan = WIB → −7 jam;
   TIMESTAMP apa adanya). Zona salinan legacy dicek dan ditulis di lembar hasil sebelum T12b.
@@ -151,10 +153,13 @@ dikonversi R1a dan semua kolom teks ikut `stripslashes` bawaan. Kolom `siasn_lu`
    `id_question_category yatim dibuang (K-M12)`, `MAKE-089 kunci ganda (setara INSERT IGNORE)`, koreksi `N1 email NULL→''`.
    Pencocokan dengan audit langkah 2:
    - `support_officer` dibuang ≈ Q-H17 + akun legacy yang tidak ikut T8;
-   - `officer_category` dibuang (yatim + rujukan kosong) **≥ |Q-H4 ∪ Q-H5| = Q-H4 + Q-H5 − irisan** (jadi juga ≥ max(Q-H4,
+   - `officer_category` dibuang (yatim + rujukan kosong + ganda; baris ganda yang juga yatim tercatat sebagai kunci ganda) **≥ |Q-H4 ∪ Q-H5| = Q-H4 + Q-H5 − irisan** (jadi juga ≥ max(Q-H4,
      Q-H5)), dan ≤ Q-H4 + Q-H5 + baris milik petugas yang dibuang + baris ganda;
    - koreksi N1 **≤ Q-H10**; selisihnya = email `''`/spasi yang disalin apa adanya (menjadi `''` tanpa kode) + petugas ber-email
-     NULL yang dibuang.
+     NULL yang dibuang. Email lain di-trim tanpa kode ([V2]).
+   - Bila rekonsiliasi `officer_category` gagal (`ImporGagal` "rekonsiliasi"): tier 12 sudah di-rollback. Jalankan ulang Q-H3
+     dan Q-H4/Q-H5 di salinan, catat angkanya, lalu **berhenti** dan laporkan ke Horii/DBV (jangan ubah salinan atau ukuran batch
+     sendiri).
 4. **Sesudah T13 (tiket lama): audit gladi v2** (tanpa `--force`):
    `mysql --table -vvv --default-character-set=utf8mb4 --user=<akun_baca> -p <db_gladi_v2> < backend/docs/db-review/sql/DBV-028-audit-v2.sql > <KERJA>/hasil_audit_dbv028_v2.txt 2>&1`
    (bila DB gladi memakai `DBPrefix`, sesuaikan nama tabel di salinan berkas kerja, bukan di repo). Catat:
@@ -165,7 +170,9 @@ dikonversi R1a dan semua kolom teks ikut `stripslashes` bawaan. Kolom `siasn_lu`
      menugaskan petugas sebelum go-live;
    - Q-H11, Q-H16.
 5. **Syarat DBV Q8 (a), wajib di gladi sebelum cutover** (hasil disalin ke runbook penutup MAKE-074):
-   - Ambil angka Q-H19 dari langkah 4 dan petugas yang menghasilkannya (id saja): kategori aktif milik petugas itu =
+   - Ambil angka Q-H19 dari langkah 4, lalu id petugasnya (baca-saja, bentuk sama dengan subkueri Q-H19):
+     `SELECT so.id_support_officer, COUNT(*) AS n FROM support_officer so JOIN pengguna p ON p.id_pengguna = so.id_user AND p.status = '1' AND p.deleted_at IS NULL JOIN officer_category oc ON oc.id_support_officer = so.id_support_officer JOIN disiplin_ticket t ON t.id_question_category = oc.id_question_category WHERE so.status = 1 GROUP BY so.id_support_officer ORDER BY n DESC LIMIT 1;`
+   - Kategori milik petugas itu =
      `SELECT GROUP_CONCAT(oc.id_question_category) FROM officer_category oc JOIN support_officer so ON so.id_support_officer = oc.id_support_officer WHERE so.id_support_officer = <id_petugas>;`
    - Jalankan kueri daftar `peran=petugas` DBV-028 §4.3 (bentuk akhir di README beku MAKE-071 bila sudah di `main`) dengan
      `<filter peran/status>` = `t.id_question_category IN (<kategori di atas>)`, dua kali: tanpa filter status dan dengan
