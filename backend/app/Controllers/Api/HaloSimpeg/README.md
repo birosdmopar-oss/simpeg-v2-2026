@@ -5,8 +5,8 @@ route di-group `api/v1/...` dengan filter `jwt` + `role:*`. Chatbot "Vanya" puny
 
 Dokumen ini = **kontrak BEKU** helpdesk untuk FE (B1 Worker Muse, MAKE-073). Acuan: PRD Fase 8 v1.3 §6.1, §6.1b, §7.2, §7.3a.
 Bagian **master** beku di MAKE-070; bagian **tiket** ditambahkan MAKE-071. Perubahan sesudah beku = CR yang disepakati kedua
-jalur lewat reviewer. Contoh respons sintetis: `backend/tests/_support/HaloSimpeg/*.json` (bentuknya diuji sama dengan respons
-nyata oleh `MasterHaloSimpegTest::testBentukResponsSamaDenganFixture`; FE menyalinnya ke
+jalur lewat reviewer. Contoh respons sintetis: `backend/tests/_support/HaloSimpeg/*.json` (bentuk ke-17 fixture master diuji sama
+dengan respons nyata oleh `MasterHaloSimpegTest` lewat `cocokFixtureHs`; FE menyalinnya ke
 `frontend/src/features/halo-simpeg/__tests__/fixtures/`, tanpa `*.php`).
 
 ## Konvensi
@@ -22,8 +22,12 @@ nyata oleh `MasterHaloSimpegTest::testBentukResponsSamaDenganFixture`; FE menyal
 - Teks di-trim; panjang = jumlah karakter (code point) sesudah trim. Teks dikirim polos.
 - Waktu ISO-8601 UTC berakhiran `Z` (`dibuat_pada`, `diubah_pada`), atau `null` bila kosong.
 - **Status master: `0` Tidak Aktif, `1` Aktif** (berbeda dari chatbot 1/2). FE memetakan Aktifkan = 1, Nonaktifkan = 0.
-- `Halaman<T> = {items: T[], total, page, per_page}`. `page` ≥ 1; `per_page` 1..100 (lebih dari 100 dipotong ke 100), bawaan 20
-  (`Config\HaloSimpeg`). Parameter query berbentuk array → 422 "Parameter daftar tidak valid.".
+- `Halaman<T> = {items: T[], total, page, per_page}` (`Config\HaloSimpeg`, bawaan `per_page` 20):
+  - `page` wajib bilangan bulat 1..1.000.000 bila dikirim, selain itu → 422 `errors.page`;
+  - `per_page` > 100 → 100; `per_page` < 1 atau bukan angka → 1;
+  - filter `status` selain `0`/`1` → 422 `errors.status`;
+  - parameter berbentuk array → 422 "Parameter daftar tidak valid.";
+  - `q`/`search` dicari sebagai teks biasa (`%` dan `_` bukan wildcard).
 - Urutan daftar master: `created_at` naik [K], pemutus seri `id` naik (DBV-028 N3).
 - Semua tulis tercatat di `audit_logs` (AC-E02.6). Ubah status lewat `PATCH …/{id}/status` (K-A1); PUT tetap payload penuh dan
   boleh membawa `status` (tanpa `status` = nilai lama).
@@ -54,7 +58,8 @@ Tidak ada `GET {jalur}/{id}`: form Edit memakai baris dari daftar.
 
 **`label` akun** (PRD §7.2):
 - akun role 1 → nama akun;
-- akun lain yang punya data pegawai → `"NIP - nama bergelar - jabatan"` (pemisah legacy `LS:485-490`; tanpa jabatan → `"NIP - nama"`);
+- akun lain yang punya data pegawai → `"NIP - nama bergelar - jabatan"` (pemisah dan nama bergelar legacy `LS:485-490`; tanpa
+  jabatan → `"NIP - nama bergelar"`);
 - selain itu → nama akun, atau username bila nama kosong.
 
 ## Kategori
@@ -72,7 +77,7 @@ Aturan:
 - `question_category` wajib, maks 250 karakter, unik (trim, huruf besar/kecil diabaikan) [K `LS:392-424`]. Keunikan dijaga
   aplikasi, tanpa UNIQUE DB (DBV-028 Q3).
 - Hapus fisik [K]. Bila kategori dipakai tiket atau petugas → 422 `kategori_dipakai` (sarankan Nonaktifkan, B-12). Aturan ini
-  sama dengan `bisa_hapus`.
+  sama dengan `bisa_hapus`, dicek di dalam transaksi berkunci; pemakaian yang muncul bersamaan (FK RESTRICT) → 422 yang sama.
 
 ## Petugas
 
@@ -89,8 +94,8 @@ Aturan:
 **Kandidat** (F8-07):
 - Yang termasuk kandidat:
   - akun role 1 aktif;
-  - akun **aktif** milik pegawai `status = 1` di satker kepegawaian (`web_config.id_satker_kepegawaian`) [K `LS:468-491`; syarat
-    akun aktif = V2].
+  - akun **aktif** ber-role **1–7** milik pegawai `status = 1` di satker kepegawaian (`web_config.id_satker_kepegawaian`)
+    [K `LS:468-491`; akun aktif = PRD §7.3a; role 1–7 = S12].
 - Urutan: akun role 1 dulu (urut nama), lalu pegawai (urut nama, NIP). Maksimal 20 hasil, tanpa duplikat akun.
 - Petugas yang sudah terdaftar ikut tampil (ikut legacy). Menyimpannya ditolak 422 `petugas_duplikat`.
 - Bila satker kepegawaian belum diatur, hanya akun role 1 yang muncul, ditambah `peringatan` = "Satker kepegawaian belum diatur di
@@ -98,7 +103,7 @@ Aturan:
 
 **`petugas/saya`:**
 - Bila akun bukan petugas → `{petugas: false, aktif: false, kategori: [], bisa_ekspor: false}`.
-- `aktif` = `support_officer.status = 1` dan akun aktif (F8-06). `bisa_ekspor` = `aktif`.
+- `aktif` = `support_officer.status = 1`, akun aktif, dan akun ber-role 1–7 (F8-06, S12). `bisa_ekspor` = `aktif`.
 - `id_support_officer` tidak dikirim.
 - FE memakai endpoint ini untuk tab antrean dan panel "Perlu ditindak".
 
@@ -120,8 +125,10 @@ Aturan:
 - **PUT** yang membuat sebuah kategori ber-tiket Open kehilangan petugas aktif terakhirnya (kategori itu dilepas dari set, atau
   `status` diubah ke 0) tetap disimpan → 200 + `peringatan` dengan teks yang sama seperti Nonaktifkan (S8 (b), keputusan Horii
   17-11-2026). Selain itu `peringatan: null`. Hanya hapus permanen yang diblok.
-- "Petugas aktif" pada aturan peringatan = `status = 1` dan akun aktif (F8-06). Petugas yang sudah nonaktif bukan penjawab, jadi
-  perubahan atas petugas nonaktif tidak memberi peringatan.
+- "Petugas aktif" pada aturan peringatan = `status = 1`, akun aktif, dan akun ber-role 1–7 (F8-06, S12). Petugas yang tidak aktif
+  bukan penjawab, jadi perubahan atasnya tidak memberi peringatan, dan ia tidak dihitung sebagai "petugas aktif lain".
+- Cek hapus dan peringatan dihitung di dalam transaksi sesudah baris petugas dan kategori terkait dikunci, sehingga dua admin yang
+  bersamaan menghapus/menonaktifkan dua petugas terakhir tidak bisa sama-sama lolos.
 
 ## Kontak
 
@@ -156,7 +163,7 @@ Aturan:
 | 422 | `petugas_duplikat` | "Akun ini sudah terdaftar sebagai petugas." (`errors.id_user`) |
 | 422 | `petugas_terakhir` | "Petugas ini petugas terakhir pada kategori {nama, dipisah koma} yang masih memiliki tiket terbuka. Tambahkan petugas lain lebih dulu." |
 | 422 | `kontak_duplikat` | "Nomor kontak sudah terdaftar." (`errors.contact`) |
-| 422 | — | per kolom (di bawah) |
+| 422 | — | per kolom (di bawah), termasuk "Parameter daftar tidak valid." untuk parameter query berbentuk array |
 
 | Kolom | Teks |
 |---|---|
@@ -171,6 +178,9 @@ Aturan:
 | `contact` | "Nomor kontak wajib diisi." / "Nomor kontak maksimal 20 karakter." |
 | `search` | "Kata kunci minimal 2 karakter." / "Kata kunci maksimal 50 karakter." |
 | `id` (path) | "ID tidak valid." |
+| `page` (query) | "Halaman harus berupa angka bulat 1 sampai 1000000." |
+| `status` (query) | "Status tidak valid." |
+| kolom teks/id mana pun (masukan berbentuk array/objek/boolean) | "Isian harus berupa teks." |
 
 ## Fixture master (`backend/tests/_support/HaloSimpeg/`)
 
@@ -194,11 +204,13 @@ Aturan:
 |---|---|---|
 | S1 | `GET petugas/kandidat` → `{items: PetugasKandidat[], peringatan}`, penyesuaian bentuk `PetugasKandidat` dari PRD §6.1b (array polos). Alasan: F8-07 meminta peringatan bila satker kepegawaian kosong (pola `PetugasLayananService`) | [V2] |
 | S2 | Filter `status` + `q` juga untuk daftar `kategori` dan `petugas` (aditif). Pencarian NIP/email hanya di endpoint role 1, LIKE ter-escape | [V2] |
-| S3 | `per_page` > 100 dipotong ke 100 (perilaku `ListQuery`, sama dengan chatbot). Hanya parameter berbentuk array yang 422 (PRD §7.3a) | [V2] |
+| S3 | Paginasi ikut `ListQuery` (sama dengan chatbot): `per_page` > 100 → 100, `per_page` < 1 atau bukan angka → 1; `page` bukan bulat 1..1.000.000 → 422 `errors.page`; filter `status` ≠ 0/1 → 422 `errors.status`; parameter berbentuk array → 422 (PRD §7.3a) | [V2] |
 | S4 | Teks 422 tambahan: "Kategori tidak tersedia." (`category`), "Kata kunci maksimal 50 karakter." (`search`), "ID tidak valid." (`id`) | [V2] |
 | S5 | Kandidat: akun aktif (sesuai PRD §7.3a "akun aktif"); akun role 1 dulu lalu pegawai, maks 20; petugas terdaftar tidak disaring [K] (simpan → 422 `petugas_duplikat`); syarat diperiksa hanya saat tambah/ganti `id_user`, sehingga petugas lama yang pegawainya pindah satker tetap tercatat sampai diedit | [V2] / [K] |
-| S6 | Pemisah label `" - "` [K `LS:485-490`] (PRD menulis "–") | [K] |
+| S6 | Label `"NIP - nama bergelar - jabatan"`: pemisah `" - "` dan nama bergelar [K `LS:485-490`] (PRD menulis "–"); tanpa jabatan → `"NIP - nama bergelar"` | [K] |
 | S7 | Ganti set kategori = lepas + sisip selisih dalam satu transaksi. `created_at` relasi lama tetap (legacy delete + insert), sehingga urutan petugas yang diurutkan `created_at` naik + `id` naik (N3) bisa sedikit berbeda dari legacy | [V2] |
 | S8 | PUT petugas → `Petugas & {peringatan}` bila perubahan membuat kategori ber-tiket Open kehilangan petugas aktif terakhir (setara Nonaktifkan, K-A4 (1')); tidak 422 | [V2], keputusan Horii 17-11-2026 |
 | S9 | Tidak ada `GET {jalur}/{id}` (FE memakai baris daftar); DELETE → 200 `{id}` | [V2] |
 | S10 | Fixture tambahan: `kandidat-peringatan`, `petugas-put-peringatan`, `galat-422-master`, `galat-422-kategori-duplikat`, `galat-422-petugas-terakhir`, `galat-404-master`; `petugas-saya` dipecah tiga berkas | [V2] |
+| S11 | `status` opsional pada POST master, bawaan 1 (legacy: wajib di form) | [V2] |
+| S12 | Petugas/penjawab dibatasi akun ber-role 1–7: kandidat pegawai, syarat `id_user`, definisi petugas aktif (peringatan, `petugas/saya`). Role 8 tidak punya route helpdesk (F8-04); legacy menerima role apa pun [K `LS:476-484`] | [V2], keputusan reviewer M1 (dilaporkan ke Horii) |
