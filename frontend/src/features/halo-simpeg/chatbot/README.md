@@ -37,7 +37,9 @@ Simpeg: tidak memakai service, store, route, atau komponen helpdesk.
 - **Keputusan tampilan [V2] PN8-8** (Horii 17-11-2026, "ikut rekomendasi"; pembanding tangkapan layar widget dev). Butir di
   bawah ini disengaja, **bukan cacat QA**:
   - avatar tetap ilustrasi SVG `VanyaAvatar`; foto avatar dev tidak dipakai (PN8-7) dan tidak disalin ke repo;
-  - aksen **biru `brand-tertiary`** (bukan pink dev) untuk chip, balon pengguna, tombol kirim, dan denyut launcher;
+  - aksen **biru `brand-tertiary`** (bukan pink dev) untuk chip topik, balon pengguna, tombol kirim, dan denyut launcher;
+    chip pertanyaan/populer dan tombol footer Topik/Populer tetap `brand-primary`; headset pada SVG avatar tetap pink dev
+    (`VanyaAvatar.vue:41-45`);
   - saat jawaban dimuat (termasuk GET topik/populer): tombol kirim, chip, dan tombol footer **disabled** dengan indikator mengetik
     (perilaku v2);
   - tombol kirim pudar (`disabled`) selama kotak ketik kosong;
