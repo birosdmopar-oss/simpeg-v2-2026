@@ -12,6 +12,11 @@ use App\Libraries\Integrasi\Http\FakeTransport;
 use App\Libraries\Integrasi\Http\KlienHttp;
 use App\Libraries\Push\FcmV1Adapter;
 use App\Libraries\Push\MockFcmAdapter;
+use Closure;
+use CodeIgniter\Queue\Entities\QueueJob;
+use CodeIgniter\Queue\Interfaces\QueueInterface;
+use CodeIgniter\Queue\Payloads\PayloadMetadata;
+use CodeIgniter\Queue\QueuePushResult;
 use CodeIgniter\Test\FeatureTestTrait;
 use CodeIgniter\Test\Mock\MockCache;
 use Config\Services;
@@ -23,6 +28,7 @@ use Tests\Support\HaloSimpeg\HaloSimpegFixtureTrait;
 use Tests\Support\Integrasi\KunciRsaUji;
 use Tests\Support\Integrasi\LogIntegrasiTiruan;
 use Tests\Support\Kepegawaian\PegawaiFixtureTrait;
+use Throwable;
 
 /**
  * MAKE-072 — notifikasi push tiket (PRD Fase 8 v1.4 §6.4, §7.6, AC-E06.1..AC-E06.7, F8-13..F8-16, H8-14 (a)). Job `push-pesan`
@@ -111,7 +117,7 @@ final class TiketNotifTest extends DatabaseTestCase
         $this->sebagai($this->pemilik)->post(self::URL . "tiket/{$id2}/tutup")->assertStatus(200);
         $this->assertSame([['akun' => $petugasK1, 'isi' => TicketNotifService::ISI_DITUTUP]], $this->antreanBaru());
 
-        $this->assertSame($inbox, [$this->db->table('inbox')->countAllResults(), $this->db->table('inbox_msg')->countAllResults()], 'AC-E06.6 / §7.8 (3)');
+        $this->assertSame($inbox, [$this->db->table('inbox')->countAllResults(), $this->db->table('inbox_msg')->countAllResults()], 'AC-E06.6 / §7.8 (2); §7.8 (3) dibuktikan NotifikasiTidakKeTicketingTest');
     }
 
     public function testPetugasYangPemilikTidakMenerimaPushBuatannyaSendiri(): void
@@ -154,18 +160,105 @@ final class TiketNotifTest extends DatabaseTestCase
 
     public function testGagalAntreTidakMenggagalkanPesan(): void
     {
-        Services::injectMock('queue', new class () {
-            public function push(): never
+        // R4: mock mengimplementasikan QueueInterface, sehingga yang diuji benar-benar push() yang melempar (bukan TypeError).
+        $antrean = new class () implements QueueInterface {
+            public int $dipanggil = 0;
+
+            public function push(string $queue, string $job, array $data, ?PayloadMetadata $metadata = null): QueuePushResult
             {
+                $this->dipanggil++;
+
                 throw new RuntimeException('antrean mati');
             }
-        });
+
+            public function pop(string $queue, array $priorities): ?QueueJob
+            {
+                return null;
+            }
+
+            public function later(QueueJob $queueJob, int $seconds): bool
+            {
+                return false;
+            }
+
+            public function failed(QueueJob $queueJob, Throwable $err, bool $keepJob): bool
+            {
+                return false;
+            }
+
+            public function done(QueueJob $queueJob): bool
+            {
+                return false;
+            }
+
+            public function clear(?string $queue = null): bool
+            {
+                return false;
+            }
+
+            public function retry(?int $id, ?string $queue): int
+            {
+                return 0;
+            }
+
+            public function forget(int $id): bool
+            {
+                return false;
+            }
+
+            public function flush(?int $hours, ?string $queue): bool
+            {
+                return false;
+            }
+
+            public function listFailed(?string $queue): array
+            {
+                return [];
+            }
+
+            public function setDelay(int $delay): static
+            {
+                return $this;
+            }
+
+            public function setPriority(string $priority): static
+            {
+                return $this;
+            }
+
+            public function chain(Closure $callback): QueuePushResult
+            {
+                throw new RuntimeException('tidak dipakai');
+            }
+        };
+        Services::injectMock('queue', $antrean);
 
         $res = $this->sebagai($this->pemilik)->post(self::URL . 'tiket', ['id_question_category' => $this->k1, 'subject' => 'Tetap', 'msg' => 'Tersimpan']);
         $res->assertStatus(201);
         $id = $this->json($res)['data']['id'];
         $this->sebagai($this->ptt)->post(self::URL . "tiket/{$id}/pesan", ['msg' => 'Balas'])->assertStatus(201);
         $this->assertSame(2, $this->db->table('disiplin_ticket_msg')->where('id_inbox', $id)->countAllResults(), 'AC-E06.3');
+        $this->assertSame(2, $antrean->dipanggil, 'push() benar-benar dipanggil dan melempar');
+        $this->assertLogContains('warning', 'Job push-pesan gagal diantre: antrean mati');
+    }
+
+    /**
+     * R4: penentuan penerima gagal (baris tiket tanpa `sender`) → tidak ada exception yang keluar; peringatan dicatat.
+     */
+    public function testPenentuanPenerimaGagalTidakMelempar(): void
+    {
+        (new TicketNotifService($this->db))->balasan(['id_inbox' => 77, 'id_question_category' => $this->k1], $this->ptt, 'Pesan');
+        $this->assertSame([], $this->antrean());
+        $this->assertLogContains('warning', 'Notifikasi push Halo Simpeg gagal diantre (tiket 77)');
+    }
+
+    /**
+     * R1: pesan yang hanya berisi spasi Unicode (lolos validasi `msg`) → isi push memakai teks cadangan, bukan kosong.
+     */
+    public function testIsiPushCadanganUntukPesanSpasiUnicode(): void
+    {
+        $this->sebagai($this->pemilik)->post(self::URL . 'tiket', ['id_question_category' => $this->k1, 'subject' => 'Spasi', 'msg' => "\u{00A0}\u{3000}"])->assertStatus(201);
+        $this->assertSame([['akun' => [$this->adminTanpaNip, $this->ptt], 'isi' => TicketNotifService::ISI_CADANGAN]], $this->antreanBaru());
     }
 
     /**
@@ -204,10 +297,13 @@ final class TiketNotifTest extends DatabaseTestCase
         $this->assertSame(PushPesanJob::HASIL_TERKIRIM, (new PushPesanJob($data))->process());
         $this->assertSame(0, $this->db->table('firebase_token')->where('fcm_token', 'tok-web-mati')->countAllResults(), 'token UNREGISTERED dihapus');
         $this->assertSame(1, $this->db->table('firebase_token')->where('fcm_token', 'tok-web-sah')->countAllResults());
+        $this->assertSame(0, $transport->sisaAntrean(), 'satu token akses + satu kiriman per token');
 
+        // Retry terbatas: nilai yang dibaca worker (getTries), bukan hanya konstanta.
+        $this->assertSame(3, (new PushPesanJob([]))->getTries());
         $this->pasangFcm((new FakeTransport())->antreJson(200, ['access_token' => 'akses-uji', 'expires_in' => 3599])->antreJson(500, ['error' => ['code' => 500, 'status' => 'INTERNAL', 'message' => 'galat']]));
         $this->expectException(RuntimeException::class);
-        $this->assertSame(3, PushPesanJob::TRIES);
+        $this->expectExceptionMessageMatches('/^Push pesan gagal: /');
         (new PushPesanJob(['akun' => [$this->adminTanpaNip]] + $data))->process();
     }
 
