@@ -1,0 +1,20 @@
+{
+    "status": "success",
+    "data": {
+        "petugas": true,
+        "aktif": true,
+        "kategori": [
+            {
+                "id": 1,
+                "nama": "Cuti",
+                "status": 1
+            },
+            {
+                "id": 3,
+                "nama": "Gaji",
+                "status": 1
+            }
+        ],
+        "bisa_ekspor": true
+    }
+}

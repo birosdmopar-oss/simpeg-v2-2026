@@ -1,0 +1,17 @@
+{
+    "status": "success",
+    "data": [
+        {
+            "id": 1,
+            "nama": "Helpdesk SDM",
+            "kontak": "0800100100",
+            "email": "helpdesk@contoh.test"
+        },
+        {
+            "id": 2,
+            "nama": "Layanan Gaji",
+            "kontak": "0800200200",
+            "email": null
+        }
+    ]
+}
