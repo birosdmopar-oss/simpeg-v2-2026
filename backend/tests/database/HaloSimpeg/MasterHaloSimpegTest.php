@@ -9,7 +9,10 @@ use App\Libraries\CacheService;
 use App\Libraries\HaloSimpeg\PetugasService;
 use CodeIgniter\Test\FeatureTestTrait;
 use CodeIgniter\Test\TestResponse;
+use Config\Database;
 use Config\Services;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\AuthSeeder;
 use Tests\Support\DatabaseTestCase;
@@ -289,10 +292,11 @@ final class MasterHaloSimpegTest extends DatabaseTestCase
 
     public function testStatusTerpisahIdempotenDomainDanAudit(): void
     {
-        $k      = $this->buatKategoriHs('Kenaikan Pangkat', 0);
-        $kontak = $this->buatKontakHs('Helpdesk', '0800100');
+        $k       = $this->buatKategoriHs('Kenaikan Pangkat', 0);
+        $kontak  = $this->buatKontakHs('Helpdesk', '0800100');
+        $petugas = $this->buatPetugasHs($this->admin, [$this->buatKategoriHs('Tanpa Tiket')]);
 
-        foreach (['kategori' => [$k, 'question_category'], 'kontak' => [$kontak, 'help_desk_contact']] as $jalur => [$id, $entitas]) {
+        foreach (['kategori' => [$k, 'question_category'], 'kontak' => [$kontak, 'help_desk_contact'], 'petugas' => [$petugas, 'support_officer']] as $jalur => [$id, $entitas]) {
             $this->harapGalat($this->kirim('patch', "{$jalur}/{$id}/status", ['status' => 2]), 422, null, 'Status tidak valid.');
             $this->harapGalat($this->kirim('patch', "{$jalur}/{$id}/status", []), 422, null, 'Status tidak valid.');
             $this->harapGalat($this->kirim('patch', "{$jalur}/999999/status", ['status' => 1]), 404, null, 'Data tidak ditemukan.');
@@ -366,6 +370,248 @@ final class MasterHaloSimpegTest extends DatabaseTestCase
         $this->cocokFixtureHs('galat-422-master', $this->kirim('post', 'kategori', ['question_category' => '']), 422);
         $this->cocokFixtureHs('galat-422-kategori-duplikat', $this->kirim('post', 'kategori', ['question_category' => 'cuti']), 422);
         $this->cocokFixtureHs('galat-404-master', $this->kirim('put', 'kontak/999999', ['name' => 'A', 'contact' => '1']), 404);
+    }
+
+    // -------------------------------------------------------------------- M6: batas field §7.3a (data per kolom)
+
+    /**
+     * @return iterable<string, array{0: string, 1: string, 2: string, 3: string, 4: string}>
+     */
+    public static function batasKolom(): iterable
+    {
+        $email = static fn (int $n): string => str_repeat('a', 64) . '@' . str_repeat('b', 60) . '.' . str_repeat('c', $n - 64 - 1 - 60 - 1 - 5) . '.test';
+
+        yield 'kategori nama' => ['kategori', 'question_category', str_repeat('é', 250), str_repeat('é', 251), 'Nama kategori maksimal 250 karakter.'];
+        yield 'petugas email' => ['petugas', 'email', $email(150), $email(151), 'Email maksimal 150 karakter.'];
+        yield 'petugas no_hp' => ['petugas', 'no_hp', str_repeat('8', 20), str_repeat('8', 21), 'Nomor HP maksimal 20 karakter.'];
+        yield 'kontak nama' => ['kontak', 'name', str_repeat('ñ', 150), str_repeat('ñ', 151), 'Nama maksimal 150 karakter.'];
+        yield 'kontak nomor' => ['kontak', 'contact', str_repeat('7', 20), str_repeat('7', 21), 'Nomor kontak maksimal 20 karakter.'];
+        yield 'kontak email' => ['kontak', 'email', $email(150), $email(151), 'Email maksimal 150 karakter.'];
+    }
+
+    #[DataProvider('batasKolom')]
+    public function testBatasKolomLolosDiBatasDitolakLewatBatas(string $jalur, string $kolom, string $pas, string $lewat, string $pesan): void
+    {
+        $dasar = match ($jalur) {
+            'kategori' => ['question_category' => 'Dasar'],
+            'petugas'  => ['id_user' => $this->admin, 'category' => [$this->buatKategoriHs('Satu')], 'email' => 'a@contoh.test'],
+            default    => ['name' => 'Dasar', 'contact' => '0800999'],
+        };
+
+        $this->assertSame([$pesan], $this->json($this->kirim('post', $jalur, [$kolom => $lewat] + $dasar))['errors'][$kolom]);
+        $this->kirim('post', $jalur, [$kolom => $pas] + $dasar)->assertStatus(201);
+    }
+
+    public function testWajibKosongNonTeksDanIdTidakSah(): void
+    {
+        $k = $this->buatKategoriHs('Satu');
+        $this->assertSame(
+            ['question_category' => ['Nama kategori wajib diisi.']],
+            $this->json($this->kirim('post', 'kategori', ['question_category' => '   ']))['errors'],
+        );
+        $this->assertSame(
+            ['name' => ['Nama wajib diisi.'], 'contact' => ['Nomor kontak wajib diisi.']],
+            $this->json($this->kirim('post', 'kontak', []))['errors'],
+        );
+        $this->assertSame(
+            ['category' => ['Minimal satu kategori.'], 'id_user' => ['Akun petugas wajib dipilih.'], 'email' => ['Email wajib diisi.']],
+            $this->json($this->kirim('post', 'petugas', []))['errors'],
+        );
+
+        // M4: isian bukan teks → 422 per kolom, bukan dianggap kosong.
+        $galat = $this->json($this->kirim('post', 'petugas', ['id_user' => [$this->admin], 'category' => [$k], 'email' => [], 'no_hp' => ['x' => 1]]))['errors'];
+        $this->assertSame([['Isian harus berupa teks.'], ['Isian harus berupa teks.'], ['Isian harus berupa teks.']], [$galat['id_user'], $galat['email'], $galat['no_hp']]);
+        $this->assertSame(['Isian harus berupa teks.'], $this->json($this->kirim('post', 'kontak', ['name' => ['a'], 'contact' => '1', 'email' => true]))['errors']['name']);
+        $this->assertSame(['Isian harus berupa teks.'], $this->json($this->kirim('post', 'kategori', ['question_category' => ['a']]))['errors']['question_category']);
+
+        $this->harapGalat($this->kirim('put', 'kategori/0', ['question_category' => 'A']), 422, null, 'ID tidak valid.');
+        $this->harapGalat($this->kirim('patch', 'petugas/0/status', ['status' => 1]), 422, null, 'ID tidak valid.');
+    }
+
+    // -------------------------------------------------------------------- M6: paginasi, filter, LIKE (S3), kandidat (S5)
+
+    public function testParameterDaftarDanLikeLiteral(): void
+    {
+        for ($i = 1; $i <= 3; $i++) {
+            $this->buatKategoriHs("Kategori {$i}");
+        }
+
+        $this->buatKategoriHs('Diskon 100% pegawai');
+        $this->buatKontakHs('Promo 50%', '0800500');
+        $this->buatKontakHs('Biasa', '0800600');
+
+        $this->assertSame([100, 1], [$this->data($this->kirim('get', 'kategori?per_page=500'))['per_page'], $this->data($this->kirim('get', 'kategori?page=1'))['page']]);
+        $this->assertSame(1, $this->data($this->kirim('get', 'kategori?per_page=abc'))['per_page']);
+        $this->assertSame(2, count($this->data($this->kirim('get', 'kategori?per_page=2&page=2'))['items']));
+        $this->kirim('get', 'kategori?page[]=1')->assertStatus(422);
+        $this->assertArrayHasKey('page', $this->json($this->kirim('get', 'kontak?page=0'))['errors']);
+        $this->assertSame(['Status tidak valid.'], $this->json($this->kirim('get', 'petugas?status=x'))['errors']['status']);
+
+        // `%` dicari sebagai karakter, bukan wildcard.
+        $this->assertSame(1, $this->data($this->kirim('get', 'kategori?q=%25'))['total']);
+        $this->assertSame(1, $this->data($this->kirim('get', 'kontak?q=%25'))['total']);
+        $this->assertSame(0, $this->data($this->kirim('get', 'kategori?q=_'))['total']);
+        $this->assertSame([], $this->data($this->kirim('get', 'petugas/kandidat?search=%25%25'))['items']);
+    }
+
+    public function testKandidatMemuatPetugasTerdaftarTetapiSimpanDitolak(): void
+    {
+        $this->db->table('pengguna')->where('id_pengguna', $this->admin)->update(['name' => 'Admin Kepegawaian Uji']);
+        $this->buatPetugasHs($this->admin, [$this->buatKategoriHs('Satu')]);
+
+        $this->assertSame([$this->admin], array_column($this->data($this->kirim('get', 'petugas/kandidat?search=kepegawaian%20uji'))['items'], 'id_user'));
+        $this->harapGalat($this->kirim('post', 'petugas', ['id_user' => $this->admin, 'category' => [$this->buatKategoriHs('Dua')], 'email' => 'a@contoh.test']), 422, 'petugas_duplikat', 'Akun ini sudah terdaftar sebagai petugas.');
+        $this->assertSame(
+            'Satker kepegawaian belum diatur di Web Config; hanya akun Super Admin yang dapat dipilih.',
+            PetugasService::PERINGATAN_SATKER_KOSONG,
+        );
+    }
+
+    // -------------------------------------------------------------------- M1 (S12): role 8 bukan petugas
+
+    public function testAkunRole8BukanKandidatDanBukanPetugasAktif(): void
+    {
+        $nip  = $this->buatPegawaiDiSatker($this->satkerKepeg, ['nama' => 'Pimpinan Kandidat']);
+        $akun = $this->buatAkunUntuk($nip, Role::PIMPINAN);
+        $k    = $this->buatKategoriHs('Kepegawaian');
+
+        $this->assertSame([], $this->data($this->kirim('get', 'petugas/kandidat?search=pimpinan'))['items']);
+        $this->harapGalat($this->kirim('post', 'petugas', ['id_user' => $akun, 'category' => [$k], 'email' => 'p@contoh.test']), 422, null, 'Akun tidak memenuhi syarat petugas.');
+
+        // Petugas role 8 hasil impor tidak dihitung penjawab aktif → menonaktifkan petugas lain memberi peringatan.
+        $this->buatTiketHs($k, $akun, 0);
+        $a = $this->buatPetugasHs($this->admin, [$k]);
+        $this->buatPetugasHs($akun, [$k]);
+        $this->assertSame(PetugasService::peringatanAktifTerakhir(['Kepegawaian']), $this->data($this->kirim('patch', "petugas/{$a}/status", ['status' => 0]))['peringatan']);
+    }
+
+    // -------------------------------------------------------------------- M6: AC-E02.8 cabang aktif, teks literal, akun nonaktif
+
+    public function testPetugasTerakhirAktifDanTeksLiteralDuaKategori(): void
+    {
+        $k1     = $this->buatKategoriHs('Cuti');
+        $k2     = $this->buatKategoriHs('Gaji');
+        [, $u2] = $this->pegawaiKandidat('Pemilik Tiket');
+        $this->buatTiketHs($k1, $u2, 0);
+        $this->buatTiketHs($k2, $u2, 0);
+        $a = $this->buatPetugasHs($this->admin, [$k1, $k2]);
+
+        $pesan = 'Petugas ini petugas terakhir pada kategori Cuti, Gaji yang masih memiliki tiket terbuka. Tambahkan petugas lain lebih dulu.';
+        $this->assertSame([false, $pesan], array_values(array_intersect_key($this->data($this->kirim('get', 'petugas'))['items'][0], array_flip(['bisa_hapus', 'alasan_tidak_bisa_hapus']))));
+        $this->harapGalat($this->kirim('delete', "petugas/{$a}"), 422, 'petugas_terakhir', $pesan);
+    }
+
+    public function testPetugasBerakunNonaktifBukanPenjawabTanpaPeringatan(): void
+    {
+        $k      = $this->buatKategoriHs('Kepegawaian');
+        $lain   = $this->buatKategoriHs('Lain');
+        [, $u2] = $this->pegawaiKandidat('Petugas Dua');
+        $this->buatTiketHs($k, $u2, 0);
+        $a = $this->buatPetugasHs($u2, [$k, $lain]);
+        $this->db->table('pengguna')->where('id_pengguna', $u2)->update(['status' => '0']);
+
+        $this->assertNull($this->data($this->kirim('put', "petugas/{$a}", ['id_user' => $u2, 'category' => [$lain], 'email' => 'a@contoh.test']))['peringatan']);
+        $this->assertNull($this->data($this->kirim('patch', "petugas/{$a}/status", ['status' => 0]))['peringatan']);
+    }
+
+    // -------------------------------------------------------------------- M6: AC-E02.6 audit per event
+
+    public function testAuditPerEventPetugasRelasiDanKontak(): void
+    {
+        $k1 = $this->buatKategoriHs('Satu');
+        $k2 = $this->buatKategoriHs('Dua');
+        $id = $this->data($this->kirim('post', 'petugas', ['id_user' => $this->admin, 'category' => [$k1], 'email' => 'a@contoh.test']))['id'];
+        $this->kirim('put', "petugas/{$id}", ['id_user' => $this->admin, 'category' => [$k2], 'email' => 'b@contoh.test'])->assertStatus(200);
+        $this->kirim('delete', "petugas/{$id}")->assertStatus(200);
+        $kontak = $this->data($this->kirim('post', 'kontak', ['name' => 'A', 'contact' => '0800100']))['id'];
+        $this->kirim('put', "kontak/{$kontak}", ['name' => 'B', 'contact' => '0800100'])->assertStatus(200);
+        $this->kirim('delete', "kontak/{$kontak}")->assertStatus(200);
+
+        $this->assertSame(['create' => 1, 'delete' => 1, 'update' => 1], $this->eventAudit('support_officer'));
+        $this->assertSame(['create' => 2, 'delete' => 2], $this->eventAudit('officer_category'), 'sisip k1, lepas k1 + sisip k2, hapus k2');
+        $this->assertSame(['create' => 1, 'delete' => 1, 'update' => 1], $this->eventAudit('help_desk_contact'));
+
+        foreach (['support_officer', 'officer_category', 'help_desk_contact'] as $entitas) {
+            foreach ($this->db->table('audit_logs')->where('entity', $entitas)->where('event', 'delete')->get()->getResultArray() as $baris) {
+                $this->assertNotNull($baris['before_json'], "{$entitas}: delete menyimpan before");
+                $this->assertSame($this->admin, (int) $baris['id_pengguna_actor']);
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------- M2/M3: transaksi, kunci, galat DB
+
+    #[Group('db-isolasi-penuh')]
+    public function testRelasiGagalMembatalkanSemuaDan1062KunciLainTidakDisamarkan(): void
+    {
+        $k1  = $this->buatKategoriHs('Satu');
+        $k2  = $this->buatKategoriHs('Dua');
+        $id  = $this->buatPetugasHs($this->admin, [$k1], 1, 'lama@contoh.test');
+        $trg = $this->db->prefixTable('trg_uji_m070_oc');
+        $this->db->query("DROP TRIGGER IF EXISTS {$trg}");
+        $this->db->query("CREATE TRIGGER {$trg} BEFORE INSERT ON " . $this->db->prefixTable('officer_category')
+            . " FOR EACH ROW SIGNAL SQLSTATE '23000' SET MYSQL_ERRNO = 1062, MESSAGE_TEXT = 'Duplicate entry for key uk_officer_category'");
+
+        try {
+            $audit = $this->db->table('audit_logs')->countAllResults();
+            // Galat asli 1062 kunci relasi diteruskan (→ 500 di produksi), bukan diterjemahkan menjadi petugas_duplikat palsu (M3).
+            $this->assertSame(1062, $this->kodeGalatDb(fn () => $this->kirim('put', "petugas/{$id}", ['id_user' => $this->admin, 'category' => [$k2], 'email' => 'baru@contoh.test'])));
+            $this->assertSame('lama@contoh.test', $this->db->table('support_officer')->where('id_support_officer', $id)->get()->getRow('email'), 'update dibatalkan');
+            $this->assertSame([$k1], array_map('intval', array_column($this->db->table('officer_category')->where('id_support_officer', $id)->get()->getResultArray(), 'id_question_category')), 'relasi lama utuh');
+            $this->assertSame($audit, $this->db->table('audit_logs')->countAllResults(), 'audit ikut batal');
+        } finally {
+            $this->db->query("DROP TRIGGER IF EXISTS {$trg}");
+        }
+    }
+
+    #[Group('db-isolasi-penuh')]
+    public function testBalapanDuplikatKontakDanHapusKategoriDiterjemahkan(): void
+    {
+        $k     = $this->buatKategoriHs('Satu');
+        $trgK  = $this->db->prefixTable('trg_uji_m070_kontak');
+        $trgQc = $this->db->prefixTable('trg_uji_m070_qc');
+        $this->db->query("DROP TRIGGER IF EXISTS {$trgK}");
+        $this->db->query("DROP TRIGGER IF EXISTS {$trgQc}");
+        $this->db->query("CREATE TRIGGER {$trgK} BEFORE INSERT ON " . $this->db->prefixTable('help_desk_contact')
+            . " FOR EACH ROW SIGNAL SQLSTATE '23000' SET MYSQL_ERRNO = 1062, MESSAGE_TEXT = 'Duplicate entry for key uk_help_desk_contact_contact'");
+        $this->db->query("CREATE TRIGGER {$trgQc} BEFORE DELETE ON " . $this->db->prefixTable('question_category')
+            . " FOR EACH ROW SIGNAL SQLSTATE '23000' SET MYSQL_ERRNO = 1451, MESSAGE_TEXT = 'Cannot delete or update a parent row'");
+
+        try {
+            $this->harapGalat($this->kirim('post', 'kontak', ['name' => 'A', 'contact' => '0800100']), 422, 'kontak_duplikat', 'Nomor kontak sudah terdaftar.');
+            $this->harapGalat($this->kirim('delete', "kategori/{$k}"), 422, 'kategori_dipakai', 'Kategori masih dipakai tiket atau petugas. Nonaktifkan kategori ini.');
+        } finally {
+            $this->db->query("DROP TRIGGER IF EXISTS {$trgK}");
+            $this->db->query("DROP TRIGGER IF EXISTS {$trgQc}");
+        }
+    }
+
+    /**
+     * M2: hapus petugas dan Nonaktifkan menunggu kunci kategori yang dipegang transaksi lain (jalur FOR UPDATE terpanggil), sehingga
+     * cek petugas terakhir tidak bisa dilangkahi balapan; sesudah kunci lepas, aksi berjalan normal.
+     */
+    #[Group('db-isolasi-penuh')]
+    public function testHapusDanNonaktifkanMenungguKunciKategori(): void
+    {
+        $k    = $this->buatKategoriHs('Satu');
+        $id   = $this->buatPetugasHs($this->admin, [$k]);
+        $lain = Database::connect('tests', false);
+        $lain->transBegin();
+        $lain->query('SELECT id_question_category FROM ' . $lain->escapeIdentifiers($lain->prefixTable('question_category')) . ' WHERE id_question_category = ? FOR UPDATE', [$k]);
+        $this->db->query('SET SESSION innodb_lock_wait_timeout = 1');
+
+        try {
+            $this->assertSame(1205, $this->kodeGalatDb(fn () => $this->asRole(Role::SUPER_ADMIN)->delete(self::URL . "petugas/{$id}")), 'hapus menunggu kunci');
+            $this->assertSame(1205, $this->kodeGalatDb(fn () => $this->kirim('patch', "petugas/{$id}/status", ['status' => 0])), 'nonaktifkan menunggu kunci');
+
+            $this->assertSame([1, 1], [$this->db->table('support_officer')->where('id_support_officer', $id)->countAllResults(), (int) $this->db->table('support_officer')->where('id_support_officer', $id)->get()->getRow('status')]);
+        } finally {
+            $lain->transRollback();
+            $lain->close();
+            $this->db->query('SET SESSION innodb_lock_wait_timeout = 50');
+        }
+
+        $this->kirim('delete', "petugas/{$id}")->assertStatus(200);
     }
 
     // -------------------------------------------------------------------- petugas/saya
@@ -457,6 +703,29 @@ final class MasterHaloSimpegTest extends DatabaseTestCase
     private function idAkunRole(int $role): int
     {
         return (int) $this->db->table('pengguna')->where('username', AuthSeeder::nipForRole($role))->get()->getRow('id_pengguna');
+    }
+
+    /** Kode galat DB yang dilempar `$aksi` (null bila tidak ada galat). */
+    private function kodeGalatDb(callable $aksi): ?int
+    {
+        try {
+            $aksi();
+        } catch (\CodeIgniter\Database\Exceptions\DatabaseException $e) {
+            return (int) $e->getCode();
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array<string, int> event => jumlah, urut kunci
+     */
+    private function eventAudit(string $entitas): array
+    {
+        $e = array_map('intval', array_column($this->db->table('audit_logs')->select('event, COUNT(*) AS n')->where('entity', $entitas)->groupBy('event')->get()->getResultArray(), 'n', 'event'));
+        ksort($e);
+
+        return $e;
     }
 
     private function jumlahAudit(string $entitas): int
