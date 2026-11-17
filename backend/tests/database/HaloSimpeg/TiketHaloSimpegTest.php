@@ -383,6 +383,18 @@ final class TiketHaloSimpegTest extends DatabaseTestCase
         $this->assertSame('Petugas Gaji', $this->data($this->sebagai($this->petugasB)->get(self::URL . "tiket/{$t}"))['ditutup_oleh_label']);
     }
 
+    /**
+     * T2 (b): pemilik tiket tidak bisa menghapus tiketnya walau ia petugas aktif kategori itu; petugas lain kategori itu bisa.
+     */
+    public function testPemilikYangPetugasKategoriItuTidakBisaMenghapus(): void
+    {
+        $t = $this->tiketMilik($this->petugasB, $this->k1);
+        $this->assertFalse($this->data($this->sebagai($this->petugasB)->get(self::URL . "tiket/{$t}"))['bisa_hapus']);
+        $this->harapGalat($this->sebagai($this->petugasB)->delete(self::URL . "tiket/{$t}"), 403, 'bukan_pihak_berwenang', AksesTiket::PESAN_BUKAN_BERWENANG);
+        $this->assertTrue($this->data($this->sebagai($this->admin)->get(self::URL . "tiket/{$t}"))['bisa_hapus']);
+        $this->sebagai($this->admin)->delete(self::URL . "tiket/{$t}")->assertStatus(200);
+    }
+
     // ================================================================================================== H8-16 (a1)
 
     public function testTiketKategoriNullHanyaPemilik(): void
@@ -418,6 +430,7 @@ final class TiketHaloSimpegTest extends DatabaseTestCase
             'pemilik petugas kat. lain' => [$this->pemilik2, $this->pemilik2, $this->k1],
             'pemilik tiket NULL'        => [$this->pemilik, $this->pemilik, null],
             'petugas kategori lain'     => [$this->petugasK2, $this->pemilik, $this->k1],
+            'pemilik petugas kat. itu'  => [$this->petugasB, $this->petugasB, $this->k1],
         ];
 
         foreach ($skenario as $nama => [$aktor, $pemilikTiket, $kat]) {

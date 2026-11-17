@@ -20,7 +20,8 @@ use CodeIgniter\Database\BaseConnection;
  *   (422 `tiket_tanpa_balasan`) [K `LS:1116-1123`]. Pemilik selalu boleh membalas tiketnya, termasuk bila ia petugas kategori
  *   lain (B-19).
  * - Tutup: pemilik atau petugas tiket (F8-08); sudah Closed → 422 `tiket_sudah_ditutup`.
- * - Hapus: hanya petugas tiket (F8-09); pemilik yang bukan petugas tiket itu → 403 `bukan_pihak_berwenang`.
+ * - Hapus: hanya petugas tiket yang **bukan pemilik** (F8-09 harfiah, B-11; keputusan Horii 17-11-2026, T2 (b)); pemilik → 403
+ *   `bukan_pihak_berwenang`, termasuk bila ia petugas aktif kategori tiket itu.
  */
 final class AksesTiket
 {
@@ -113,7 +114,7 @@ final class AksesTiket
      */
     public function bisaHapus(array $t): bool
     {
-        return $this->petugasTiket($t);
+        return $this->petugasTiket($t) && ! $this->pemilik($t);
     }
 
     /**
