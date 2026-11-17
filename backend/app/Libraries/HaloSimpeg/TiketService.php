@@ -18,6 +18,7 @@ use App\Models\HaloSimpeg\DisiplinTicketModel;
 use App\Models\HaloSimpeg\DisiplinTicketMsgModel;
 use CodeIgniter\Database\BaseBuilder;
 use CodeIgniter\Database\BaseConnection;
+use CodeIgniter\Database\Exceptions\DatabaseException;
 use CodeIgniter\HTTP\Files\UploadedFile;
 use CodeIgniter\Throttle\ThrottlerInterface;
 use Config\HaloSimpeg;
@@ -285,6 +286,15 @@ final class TiketService extends MasterHaloSimpeg
 
         try {
             $id = (int) $this->dalamTransaksi(function () use ($akses, $pegawai, $kategori, $subjek, $pesan, $path, $now): int {
+                // K2: kategori aktif dicek ulang di bawah kunci bersama (LOCK IN SHARE MODE — MariaDB 10.4 tidak mengenal FOR SHARE),
+                // sebagai baca pertama transaksi (pelajaran W1), agar tidak bisa dinonaktifkan/dihapus di sela cek dan INSERT.
+                $qc  = $this->db->escapeIdentifiers($this->db->prefixTable('question_category'));
+                $ada = $this->db->query("SELECT id_question_category FROM {$qc} WHERE id_question_category = ? AND status = ? LOCK IN SHARE MODE", [(int) $kategori, self::STATUS_AKTIF])->getRowArray();
+
+                if (! is_array($ada)) {
+                    throw self::galatKategoriTidakTersedia();
+                }
+
                 $id = (int) (new DisiplinTicketModel($this->db))->insert([
                     'id_question_category' => (int) $kategori,
                     'subject'              => $subjek,
@@ -315,7 +325,7 @@ final class TiketService extends MasterHaloSimpeg
                 ]);
 
                 return $id;
-            });
+            }, static fn (DatabaseException $e): ?ApiException => $e->getCode() === 1452 ? self::galatKategoriTidakTersedia() : null);
         } finally {
             $penjaga->selesaikan();
         }
@@ -753,6 +763,11 @@ final class TiketService extends MasterHaloSimpeg
         $penjaga->catat($path, 'disiplin_ticket_msg', 'attachments');
 
         return $path;
+    }
+
+    private static function galatKategoriTidakTersedia(): ValidationException
+    {
+        return ValidationException::forField('id_question_category', 'Kategori tidak tersedia.');
     }
 
     private function wajibThrottle(string $kunci, int $kapasitas, int $detik, string $pesan): void
