@@ -13,6 +13,8 @@ vi.mock('../services/master.service', async (asli) => ({
   petugasHaloService: svc,
 }))
 
+import { useAuthStore } from '@/features/auth/stores/auth.store'
+
 import { bisaEkspor, haloState, muatPetugasSaya, petugasAktif, resetHaloSimpeg } from '../stores/haloSimpeg'
 import type { PetugasSaya } from '../types'
 import sayaAktif from './fixtures/petugas-saya-aktif.json'
@@ -90,4 +92,13 @@ describe('state helpdesk — petugas/saya', () => {
     expect(petugasAktif.value).toBe(false)
   })
 
+  it('clearSession() (logout) memanggil resetHaloSimpeg (AC-E08.8)', async () => {
+    svc.saya.mockResolvedValue(AKTIF)
+    await muatPetugasSaya()
+    expect(petugasAktif.value).toBe(true)
+    useAuthStore().clearSession()
+    expect(haloState.petugasSaya).toBeNull()
+    expect(haloState.ringkasan).toBeNull()
+    expect(haloState.statusPetugasSaya).toBe('awal')
+  })
 })

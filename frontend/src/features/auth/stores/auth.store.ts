@@ -8,6 +8,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
 import { resetChatbot } from '@/features/halo-simpeg/chatbot/stores/percakapan'
+import { resetHaloSimpeg } from '@/features/halo-simpeg/stores/haloSimpeg'
 import { lepasTokenPush } from '@/features/integrasi/composables/notifikasiPush'
 import { resetPengingatCuti } from '@/features/layanan/composables/pengingatCuti'
 import { kosongkanFolderArsip } from '@/features/kepegawaian/arsip.cache'
@@ -54,6 +55,7 @@ export const useAuthStore = defineStore('auth', () => {
     kosongkanFolderArsip()
     cabutObjectUrlArsip()
     resetChatbot()
+    resetHaloSimpeg()
     user.value = null
     claims.value = null
     status.value = 'guest'
