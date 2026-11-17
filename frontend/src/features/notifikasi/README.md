@@ -7,7 +7,7 @@ Kontrak API: `backend/app/Controllers/Api/Notifikasi/README.md`. PRD Fase 7 v2.0
 |---|---|
 | `services/notifikasi.service.ts` | Klien `notifikasi*`. `api` sudah membuka amplop, jadi dibaca `res.data` (CR-059); nilai dinormalkan |
 | `composables/useRingkasanNotifikasi.ts` | Ringkasan lonceng: SATU instance bersama, polling 60 detik saat tab terlihat, berhenti saat pemakai terakhir dilepas; galat mempertahankan nilai terakhir; `null` sumber ≠ 0 |
-| `views/NotifikasiPage.vue` | `/notifikasi?tab=notifikasi\|butuh-approval\|histori-approval`; tab per role (`roles.ts`, Q7-29) |
+| `views/NotifikasiPage.vue` | `/notifikasi?tab=notifikasi\|butuh-approval\|histori-approval`; tab per role (`roles.ts`, Q7-29); di atas tab entri "Tiket Halo Simpeg (n)" (H8-15 (b), MAKE-073): angka `tiket_belum_dibaca`, tujuan `tujuanEntriTiket` (`features/halo-simpeg/entriTiket.ts`, SEMENTARA sampai README MAKE-071 beku), hanya `NOTIFIKASI_ROLES` dan bila > 0 |
 | `components/*Tab.vue` | Daftar (⋮ Buka → Tandai dibaca → Hapus + ConfirmDialog), Butuh Approval (grup + riwayat, ⋮ Proses), Histori (bulan, ⋮ Buka) |
 | `roles.ts` | Role ikut legacy, sama dengan filter route backend |
 | `index.ts` | Ekspor publik untuk modul lain |
