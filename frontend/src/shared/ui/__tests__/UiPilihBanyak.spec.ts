@@ -3,7 +3,7 @@
  * keterkaitan petunjuk & galat, fokus keyboard, penyaringan, dan mempertahankan nilai yang tidak ada di opsi.
  */
 import { enableAutoUnmount, mount } from '@vue/test-utils'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, ref } from 'vue'
 
 import UiPilihBanyak, { type OpsiPilihBanyak } from '../UiPilihBanyak.vue'
@@ -132,5 +132,21 @@ describe('UiPilihBanyak', () => {
   it('cari=false menyembunyikan kotak pencarian', () => {
     pasang([], { cari: false })
     expect(document.querySelectorAll('[data-testid="uji-pilih"] input[type="search"]')).toHaveLength(0)
+  })
+  it('Enter di kotak cari tidak mengirim form induk', async () => {
+    const kirim = vi.fn((e: Event) => e.preventDefault())
+    const Host = defineComponent({
+      render: () =>
+        h('form', { onSubmit: kirim }, [
+          h(UiPilihBanyak, { modelValue: [], opsi: OPSI, legend: 'Kategori', labelCari: 'Cari kategori', teksKosong: '-', testid: 'uji-pilih' }),
+        ]),
+    })
+    const w = mount(Host, { attachTo: document.body })
+    const cari = w.get('input[type="search"]')
+    const ev = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
+    cari.element.dispatchEvent(ev)
+    await w.vm.$nextTick()
+    expect(ev.defaultPrevented).toBe(true)
+    expect(kirim).not.toHaveBeenCalled()
   })
 })

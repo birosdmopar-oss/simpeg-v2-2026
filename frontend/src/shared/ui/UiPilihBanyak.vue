@@ -76,7 +76,10 @@ function ubah(id: number, centang: boolean): void {
     <legend class="px-1 text-body2 font-medium text-slate-700">
       {{ legend }} <span class="font-normal text-slate-500">({{ modelValue.length }} dipilih)</span>
     </legend>
-    <UiSearchInput v-if="cari" v-model="kunci" :placeholder="placeholderCari ?? labelCari" :label="labelCari" class="mb-1" />
+    <!-- Enter di kotak cari hanya menyaring, tidak mengirim form induk. -->
+    <div v-if="cari" class="mb-1" @keydown.enter.prevent>
+      <UiSearchInput v-model="kunci" :placeholder="placeholderCari ?? labelCari" :label="labelCari" />
+    </div>
     <p v-if="petunjuk" :id="idPetunjuk" class="mb-2 text-caption text-slate-500">{{ petunjuk }}</p>
     <ul class="scrollbar-slim max-h-48 space-y-1 overflow-y-auto pr-1">
       <li v-if="terlihat.length === 0" class="py-2 text-sm text-slate-500" data-kosong>{{ teksKosong }}</li>
