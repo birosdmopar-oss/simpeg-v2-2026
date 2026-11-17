@@ -1,7 +1,10 @@
 /**
  * Badge menu Halo Simpeg (AC-E08.12, ✔ Horii D8 (a)): angka = `Ringkasan.badge` (distinct belum dibaca ∪ `perlu_tindak`),
- * bukan `total` (angka lonceng). Fungsi murni dipakai computed `groups` di `RedesignShell.vue`; `buildNav` tidak diubah.
- * Sumber angka (`GET tiket/ringkasan`) + gerbang polling menyusul saat README MAKE-071 beku.
+ * bukan `total` (angka lonceng). Fungsi murni; `buildNav` tidak diubah.
+ * SEMENTARA: belum dipasang. Dipakai computed `groups` `RedesignShell.vue` sesudah README MAKE-071 beku, bersama
+ * `GET tiket/ringkasan` + gerbang polling AC-E08.11 (`ACTIVE_PHASE >= 8`, role 1–7, `!mustChangePassword`; `watch` atas
+ * syarat + `resetHaloSimpeg()` saat syarat berubah). Masih terbuka untuk bagian tiket: test gaya `VanyaShell` (role 8, wajib
+ * ganti password, `ACTIVE_PHASE` 5 → tanpa request; role 2 → satu request).
  */
 import type { NavGroup } from '@/shared/layouts/nav.config'
 

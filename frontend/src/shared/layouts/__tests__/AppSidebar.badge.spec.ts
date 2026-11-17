@@ -1,7 +1,8 @@
 /**
  * Badge item menu `AppSidebar` (MAKE-073, AC-E08.12): sidebar penuh menampilkan angka; sidebar ciut (desktop) menampilkan
- * titik penanda di ikon + jumlah `sr-only` (sebelumnya badge hilang saat ciut). Berlaku untuk semua item ber-badge; di `main`
- * belum ada item ber-badge selain Halo Simpeg (`sisipBadgeHalo`).
+ * titik penanda di ikon + jumlah `sr-only` (sebelumnya badge hilang saat ciut). Berlaku untuk semua item ber-badge. Di `main`
+ * belum ada item ber-badge; badge Halo Simpeg (`sisipBadgeHalo`) baru dipasang di `RedesignShell.vue` sesudah README MAKE-071
+ * beku, jadi test ini memakai `groups` tiruan.
  */
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { MessageCircle } from 'lucide-vue-next'
