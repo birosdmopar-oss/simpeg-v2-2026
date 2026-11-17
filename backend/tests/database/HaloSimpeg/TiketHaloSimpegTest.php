@@ -456,9 +456,10 @@ final class TiketHaloSimpegTest extends DatabaseTestCase
             foreach (["tiket/{$u}", 'tiket', 'tiket?peran=petugas'] as $jalur) {
                 $nilai = [];
                 array_walk_recursive($this->json($this->sebagai($akun)->get(self::URL . $jalur))['data'], static function ($v) use (&$nilai): void {
-                    $nilai[] = $v;
+                    $nilai[] = is_scalar($v) ? (string) $v : '';
                 });
-                $this->assertNotContains($khas, $nilai, "{$jalur} memuat id akun petugas");
+                // Dibandingkan sebagai teks: id akun yang dikirim sebagai string pun tertangkap.
+                $this->assertNotContains((string) $khas, $nilai, "{$jalur} memuat id akun petugas");
             }
         }
     }

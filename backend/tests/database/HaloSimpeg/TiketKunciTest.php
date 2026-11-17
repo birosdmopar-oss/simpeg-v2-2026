@@ -52,14 +52,14 @@ final class TiketKunciTest extends DatabaseTestCase
         $t = $this->buatTiketHs($k, $pemilik);
         $this->buatPesanHs($t, $pemilik, 'tanya', '2026-11-17 01:00:00');
 
-        $lain = Database::connect('tests', false);
-        $lain->transBegin();
-        $lain->query('SELECT id_inbox FROM ' . $lain->escapeIdentifiers($lain->prefixTable('disiplin_ticket')) . ' WHERE id_inbox = ? FOR UPDATE', [$t]);
         $tunggu = (int) $this->db->query('SELECT @@SESSION.innodb_lock_wait_timeout AS t')->getRow('t');
-        $this->db->query('SET SESSION innodb_lock_wait_timeout = 1');
-        $sidik = $this->sidik($t);
+        $lain   = Database::connect('tests', false);
 
         try {
+            $lain->transBegin();
+            $lain->query('SELECT id_inbox FROM ' . $lain->escapeIdentifiers($lain->prefixTable('disiplin_ticket')) . ' WHERE id_inbox = ? FOR UPDATE', [$t]);
+            $this->db->query('SET SESSION innodb_lock_wait_timeout = 1');
+            $sidik = $this->sidik($t);
             $this->assertSame(1205, $this->kode(fn () => $this->sebagai($admin)->post(self::URL . "tiket/{$t}/pesan", ['msg' => 'jawab'])), 'balas menunggu kunci');
             $this->assertSame(1205, $this->kode(fn () => $this->sebagai($pemilik)->post(self::URL . "tiket/{$t}/tutup")), 'tutup menunggu kunci');
             $this->assertSame(1205, $this->kode(fn () => $this->sebagai($admin)->delete(self::URL . "tiket/{$t}")), 'hapus menunggu kunci');
@@ -73,6 +73,70 @@ final class TiketKunciTest extends DatabaseTestCase
         $this->sebagai($admin)->post(self::URL . "tiket/{$t}/pesan", ['msg' => 'jawab'])->assertStatus(201);
         $this->sebagai($pemilik)->post(self::URL . "tiket/{$t}/tutup")->assertStatus(200);
         $this->sebagai($admin)->delete(self::URL . "tiket/{$t}")->assertStatus(200);
+    }
+
+    /**
+     * L1 (a), K2: buat tiket menunggu kunci kategori (LOCK IN SHARE MODE) yang dipegang FOR UPDATE transaksi lain — 1205 tanpa
+     * tiket/pesan tertulis dan tanpa sisa berkas unggahan; sesudah kunci lepas → 201.
+     */
+    public function testBuatTiketMenungguKunciKategori(): void
+    {
+        $this->pasangThrottlerHs();
+        $akar    = $this->pasangStorageHs();
+        $k       = $this->buatKategoriHs('Kepegawaian');
+        $pemilik = $this->buatAkunUntuk($this->buatPegawai(['nama' => 'Pelapor Kunci']), Role::PEGAWAI);
+        $tunggu  = (int) $this->db->query('SELECT @@SESSION.innodb_lock_wait_timeout AS t')->getRow('t');
+        $lain    = Database::connect('tests', false);
+
+        try {
+            $lain->transBegin();
+            $lain->query('SELECT id_question_category FROM ' . $lain->escapeIdentifiers($lain->prefixTable('question_category')) . ' WHERE id_question_category = ? FOR UPDATE', [$k]);
+            $this->db->query('SET SESSION innodb_lock_wait_timeout = 1');
+            $tmp = $this->unggahHs('Surat.pdf', self::pdfHs());
+
+            try {
+                $this->assertSame(1205, $this->kode(fn () => $this->sebagai($pemilik)->post(self::URL . 'tiket', ['id_question_category' => $k, 'subject' => 'S', 'msg' => 'M'])));
+            } finally {
+                $this->lepasUnggahHs($tmp);
+            }
+
+            $this->assertSame([0, 0], [$this->db->table('disiplin_ticket')->countAllResults(), $this->db->table('disiplin_ticket_msg')->countAllResults()]);
+            $this->assertSame([], glob($akar . '/halo-simpeg/*/*/*') ?: [], 'berkas unggahan dikompensasi PenjagaBerkas');
+        } finally {
+            $lain->transRollback();
+            $lain->close();
+            $this->db->query('SET SESSION innodb_lock_wait_timeout = ' . $tunggu);
+        }
+
+        try {
+            $this->sebagai($pemilik)->post(self::URL . 'tiket', ['id_question_category' => $k, 'subject' => 'S', 'msg' => 'M'])->assertStatus(201);
+        } finally {
+            self::hapusFolderHs($akar);
+        }
+    }
+
+    /**
+     * L1 (b), K2: FK 1452 saat INSERT tiket (kategori lenyap di sela cek — ditiru trigger SIGNAL) melewati callback galat DB
+     * `TiketService` → 422 `errors.id_question_category` "Kategori tidak tersedia.", tanpa baris tertulis.
+     */
+    public function testGalatFk1452BuatTiketDiterjemahkan422(): void
+    {
+        $this->pasangThrottlerHs();
+        $k       = $this->buatKategoriHs('Kepegawaian');
+        $pemilik = $this->buatAkunUntuk($this->buatPegawai(['nama' => 'Pelapor Fk']), Role::PEGAWAI);
+        $trg     = $this->db->prefixTable('trg_uji_m071_fk');
+        $this->db->query("DROP TRIGGER IF EXISTS {$trg}");
+        $this->db->query("CREATE TRIGGER {$trg} BEFORE INSERT ON " . $this->db->prefixTable('disiplin_ticket')
+            . " FOR EACH ROW SIGNAL SQLSTATE '23000' SET MYSQL_ERRNO = 1452, MESSAGE_TEXT = 'Cannot add or update a child row'");
+
+        try {
+            $res = $this->sebagai($pemilik)->post(self::URL . 'tiket', ['id_question_category' => $k, 'subject' => 'S', 'msg' => 'M']);
+            $res->assertStatus(422);
+            $this->assertSame(['id_question_category' => ['Kategori tidak tersedia.']], $this->json($res)['errors']);
+            $this->assertSame([0, 0], [$this->db->table('disiplin_ticket')->countAllResults(), $this->db->table('disiplin_ticket_msg')->countAllResults()]);
+        } finally {
+            $this->db->query("DROP TRIGGER IF EXISTS {$trg}");
+        }
     }
 
     private function kode(callable $aksi): ?int
