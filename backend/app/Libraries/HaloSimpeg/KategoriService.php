@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Libraries\HaloSimpeg;
 
+use App\Exceptions\ApiException;
 use App\Libraries\ListQuery;
 use App\Models\HaloSimpeg\QuestionCategoryModel;
 use CodeIgniter\Database\BaseBuilder;
+use CodeIgniter\Database\Exceptions\DatabaseException;
 
 /**
  * Master kategori pertanyaan Halo Simpeg (E-02, MAKE-070; PRD Fase 8 v1.3 §6.1, §6.1b `Kategori`/`KategoriOpsi`, §7.2;
@@ -124,12 +126,19 @@ final class KategoriService extends MasterHaloSimpeg
      */
     public function hapus(int $id): array
     {
-        // Satu sumber dengan `bisa_hapus` (dipakai tiket atau petugas).
-        if (! $this->baris($this->ambil($id))['bisa_hapus']) {
-            throw self::galatKode('kategori_dipakai', self::PESAN_DIPAKAI);
-        }
+        $this->ambil($id);
 
-        (new QuestionCategoryModel($this->db))->delete($id);
+        // Cek di dalam transaksi sesudah baris dikunci (M2); balapan yang lolos (FK RESTRICT 1451) → 422 yang sama.
+        $this->dalamTransaksi(function () use ($id): void {
+            $this->kunci('question_category', 'id_question_category', [$id]);
+
+            // Satu sumber dengan `bisa_hapus` (dipakai tiket atau petugas).
+            if (! $this->baris($this->ambil($id))['bisa_hapus']) {
+                throw self::galatKode('kategori_dipakai', self::PESAN_DIPAKAI);
+            }
+
+            (new QuestionCategoryModel($this->db))->delete($id);
+        }, static fn (DatabaseException $e): ?ApiException => $e->getCode() === 1451 ? self::galatKode('kategori_dipakai', self::PESAN_DIPAKAI) : null);
 
         return ['id' => $id];
     }
@@ -153,10 +162,12 @@ final class KategoriService extends MasterHaloSimpeg
     private function validasi(array $in, ?array $lama): array
     {
         $errors = [];
-        $nama   = self::teks($in['question_category'] ?? null);
+        $nama   = self::teksDari($in, 'question_category', $errors);
         $status = array_key_exists('status', $in) ? self::statusDari($in['status']) : ($lama === null ? self::STATUS_AKTIF : (int) $lama['status']);
 
-        if ($nama === '') {
+        if (isset($errors['question_category'])) {
+            // Bukan teks (M4).
+        } elseif ($nama === '') {
             $errors['question_category'] = 'Nama kategori wajib diisi.';
         } elseif (mb_strlen($nama) > $this->config->maksNamaKategori) {
             $errors['question_category'] = "Nama kategori maksimal {$this->config->maksNamaKategori} karakter.";

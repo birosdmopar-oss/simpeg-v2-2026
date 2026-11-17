@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Libraries\HaloSimpeg;
 
 use App\Constants\Role;
+use App\Exceptions\ApiException;
 use App\Exceptions\ValidationException;
 use App\Libraries\Kepegawaian\Struktur\StrukturService;
 use App\Libraries\ListQuery;
 use App\Models\HaloSimpeg\OfficerCategoryModel;
 use App\Models\HaloSimpeg\SupportOfficerModel;
 use CodeIgniter\Database\BaseBuilder;
+use CodeIgniter\Database\Exceptions\DatabaseException;
 
 /**
  * Master petugas Halo Simpeg (E-02, MAKE-070; PRD Fase 8 v1.3 §6.1, §6.1b `Petugas`/`PetugasKandidat`/`PetugasSaya`, §7.2;
@@ -25,7 +27,11 @@ use CodeIgniter\Database\BaseBuilder;
  * - **K-A4 (1')** (Horii 16-11-2026): hapus → 422 `petugas_terakhir` bila petugas itu petugas **terakhir** (aktif atau nonaktif)
  *   sebuah kategori yang masih punya tiket Open; Nonaktifkan petugas **aktif** terakhir boleh → 200 + `peringatan`.
  *   `bisa_hapus`/`alasan_tidak_bisa_hapus` dihitung dari kueri yang sama dengan penegakan.
- * - **Petugas aktif** (F8-06) = `support_officer.status = 1` dan akun `pengguna` aktif.
+ * - **Petugas aktif** (F8-06) = `support_officer.status = 1`, akun `pengguna` aktif, dan akun ber-role 1–7 (S12 [V2], keputusan
+ *   reviewer M1: satu sumber dengan F8-04 — role 8 tidak punya route helpdesk sehingga tidak bisa menjadi penjawab). Kandidat
+ *   pegawai juga dibatasi role 1–7.
+ * - Cek K-A4 dan peringatan dihitung **di dalam transaksi** sesudah baris petugas dan kategori terkait dikunci (FOR UPDATE, M2),
+ *   sehingga tidak bisa dilangkahi balapan hapus/nonaktifkan dua petugas terakhir.
  * - Set kategori diganti dalam satu transaksi: baris yang dilepas dihapus, yang baru disisip (setara hapus + sisip [K `LS:627-629`],
  *   audit per baris yang berubah). Urutan daftar `created_at` naik [K `LS:441`] + `id` naik (DBV-028 N3); kategori per petugas urut
  *   `id` [K `LS:449`].
@@ -35,6 +41,9 @@ final class PetugasService extends MasterHaloSimpeg
     public const PESAN_DUPLIKAT = 'Akun ini sudah terdaftar sebagai petugas.';
 
     public const PERINGATAN_SATKER_KOSONG = 'Satker kepegawaian belum diatur di Web Config; hanya akun Super Admin yang dapat dipilih.';
+
+    /** Role yang boleh menjadi petugas/penjawab (F8-04: role 8 tanpa akses helpdesk). */
+    public const ROLE_PETUGAS = [1, 2, 3, 4, 5, 6, 7];
 
     private const KOLOM = 'so.id_support_officer, so.id_user, so.email, so.no_hp, so.status, so.created_at, so.updated_at, '
         . 'u.user_level, u.name AS nama_akun, u.username, u.nip, u.status AS status_akun, u.deleted_at AS akun_dihapus, '
@@ -86,7 +95,7 @@ final class PetugasService extends MasterHaloSimpeg
      */
     public function kandidat(array $query): array
     {
-        $cari = self::teks(ListQuery::from($query, ['search'])->string('search'));
+        $cari = trim(ListQuery::from($query, ['search'])->string('search'));
 
         if (mb_strlen($cari) < $this->config->kandidatCariMin) {
             throw ValidationException::forField('search', "Kata kunci minimal {$this->config->kandidatCariMin} karakter.");
@@ -130,7 +139,7 @@ final class PetugasService extends MasterHaloSimpeg
     public function saya(?int $idPengguna): array
     {
         $so = $idPengguna === null ? null : $this->db->table('support_officer so')
-            ->select('so.id_support_officer, so.status, u.status AS status_akun, u.deleted_at')
+            ->select('so.status, u.status AS status_akun, u.deleted_at AS akun_dihapus, u.user_level, so.id_support_officer')
             ->join('pengguna u', 'u.id_pengguna = so.id_user', 'inner')
             ->where('so.id_user', $idPengguna)->get()->getRowArray();
 
@@ -138,7 +147,7 @@ final class PetugasService extends MasterHaloSimpeg
             return ['petugas' => false, 'aktif' => false, 'kategori' => [], 'bisa_ekspor' => false];
         }
 
-        $aktif = (int) $so['status'] === self::STATUS_AKTIF && (string) $so['status_akun'] === '1' && $so['deleted_at'] === null;
+        $aktif = self::aktif($so);
 
         return [
             'petugas'     => true,
@@ -163,7 +172,7 @@ final class PetugasService extends MasterHaloSimpeg
             $this->tulisKategori($id, $kategori, $now);
 
             return $id;
-        }, static fn () => self::galatKode('petugas_duplikat', self::PESAN_DUPLIKAT, 'id_user'));
+        }, self::galatDuplikat(...));
 
         return $this->detail($id);
     }
@@ -178,20 +187,23 @@ final class PetugasService extends MasterHaloSimpeg
      */
     public function ubah(int $id, array $in): array
     {
-        $lama              = $this->ambil($id);
-        [$data, $kategori] = $this->validasi($in, $lama);
+        [$data, $kategori] = $this->validasi($in, $this->ambil($id));
         $now               = self::sekarang();
-        $ditinggal         = [];
 
-        if (self::aktif($lama)) {
-            $terakhir  = $this->kategoriTerakhir([$id], true, true)[$id] ?? [];
-            $ditinggal = $data['status'] === self::STATUS_NONAKTIF ? $terakhir : array_diff_key($terakhir, array_flip($kategori));
-        }
+        $ditinggal = $this->dalamTransaksi(function () use ($id, $data, $kategori, $now): array {
+            $lama      = $this->kunciPetugas($id, $kategori);
+            $ditinggal = [];
 
-        $this->dalamTransaksi(function () use ($id, $data, $kategori, $now): void {
+            if (self::aktif($lama)) {
+                $terakhir  = $this->kategoriTerakhir([$id], true)[$id] ?? [];
+                $ditinggal = $data['status'] === self::STATUS_NONAKTIF ? $terakhir : array_diff_key($terakhir, array_flip($kategori));
+            }
+
             (new SupportOfficerModel($this->db))->update($id, $data + ['updated_at' => $now]);
             $this->tulisKategori($id, $kategori, $now);
-        }, static fn () => self::galatKode('petugas_duplikat', self::PESAN_DUPLIKAT, 'id_user'));
+
+            return $ditinggal;
+        }, self::galatDuplikat(...));
 
         return $this->detail($id) + ['peringatan' => self::peringatanAktifTerakhir(array_values($ditinggal))];
     }
@@ -204,17 +216,23 @@ final class PetugasService extends MasterHaloSimpeg
      */
     public function setStatus(int $id, mixed $status): array
     {
-        $lama       = $this->ambil($id);
-        $baru       = self::statusDari($status) ?? throw self::galatStatus();
-        $peringatan = null;
+        $this->ambil($id);
+        $baru = self::statusDari($status) ?? throw self::galatStatus();
 
-        if ($baru !== (int) $lama['status']) {
-            if ($baru === self::STATUS_NONAKTIF && self::aktif($lama)) {
-                $peringatan = self::peringatanAktifTerakhir(array_values($this->kategoriTerakhir([$id], true, true)[$id] ?? []));
+        $peringatan = $this->dalamTransaksi(function () use ($id, $baru): ?string {
+            $lama = $this->kunciPetugas($id, []);
+
+            if ($baru === (int) $lama['status']) {
+                return null;
             }
 
+            $peringatan = $baru === self::STATUS_NONAKTIF && self::aktif($lama)
+                ? self::peringatanAktifTerakhir(array_values($this->kategoriTerakhir([$id], true)[$id] ?? []))
+                : null;
             (new SupportOfficerModel($this->db))->update($id, ['status' => $baru, 'updated_at' => self::sekarang()]);
-        }
+
+            return $peringatan;
+        });
 
         return $this->detail($id) + ['peringatan' => $peringatan];
     }
@@ -226,13 +244,17 @@ final class PetugasService extends MasterHaloSimpeg
      */
     public function hapus(int $id): array
     {
-        $petugas = $this->detail($id);
-
-        if (! $petugas['bisa_hapus']) {
-            throw self::galatKode('petugas_terakhir', (string) $petugas['alasan_tidak_bisa_hapus']);
-        }
+        $this->ambil($id);
 
         $this->dalamTransaksi(function () use ($id): void {
+            $this->kunciPetugas($id, []);
+            $blok = array_values($this->kategoriTerakhir([$id], false)[$id] ?? []);
+
+            // Satu sumber dengan `bisa_hapus`/`alasan_tidak_bisa_hapus`; dicek sesudah kunci (M2).
+            if ($blok !== []) {
+                throw self::galatKode('petugas_terakhir', self::pesanTerakhir($blok));
+            }
+
             $relasi = array_map('intval', array_column($this->db->table('officer_category')->select('id')->where('id_support_officer', $id)->get()->getResultArray(), 'id'));
 
             if ($relasi !== []) {
@@ -277,10 +299,38 @@ final class PetugasService extends MasterHaloSimpeg
 
     // ------------------------------------------------------------------------------------------------------------
 
-    /** Petugas aktif (F8-06): status 1 dan akun aktif. */
+    /**
+     * Petugas aktif (F8-06): status 1, akun aktif, dan akun ber-role 1–7 (S12, M1).
+     *
+     * @param array<string, mixed> $r kolom `status`, `status_akun`, `akun_dihapus`, `user_level`
+     */
     private static function aktif(array $r): bool
     {
-        return (int) $r['status'] === self::STATUS_AKTIF && (string) $r['status_akun'] === '1' && $r['akun_dihapus'] === null;
+        return (int) $r['status'] === self::STATUS_AKTIF && (string) $r['status_akun'] === '1' && $r['akun_dihapus'] === null
+            && in_array((int) $r['user_level'], self::ROLE_PETUGAS, true);
+    }
+
+    /**
+     * Kunci baris petugas lalu kategori yang dipegangnya (+ `$tambahan`, kategori baru pada PUT), urutan tetap: petugas → kategori
+     * id menaik (M2). Mengembalikan baris petugas terkini (dibaca sesudah kunci).
+     *
+     * @param list<int> $tambahan
+     *
+     * @return array<string, mixed>
+     */
+    private function kunciPetugas(int $id, array $tambahan): array
+    {
+        $this->kunci('support_officer', 'id_support_officer', [$id]);
+        $kategori = array_map('intval', array_column($this->db->table('officer_category')->select('id_question_category')->where('id_support_officer', $id)->get()->getResultArray(), 'id_question_category'));
+        $this->kunci('question_category', 'id_question_category', array_values(array_unique([...$kategori, ...$tambahan])));
+
+        return $this->ambil($id);
+    }
+
+    /** 1062 hanya diterjemahkan untuk UNIQUE akun petugas (M3); kunci lain dilempar apa adanya. */
+    private static function galatDuplikat(DatabaseException $e): ?ApiException
+    {
+        return self::duplikatKunci($e, 'uk_support_officer_id_user') ? self::galatKode('petugas_duplikat', self::PESAN_DUPLIKAT, 'id_user') : null;
     }
 
     /**
@@ -292,19 +342,23 @@ final class PetugasService extends MasterHaloSimpeg
     private function validasi(array $in, ?array $lama): array
     {
         $errors   = [];
-        $idUser   = self::teks($in['id_user'] ?? null);
-        $email    = self::teks($in['email'] ?? null);
-        $noHp     = self::teks($in['no_hp'] ?? null);
+        $idUser   = self::teksDari($in, 'id_user', $errors);
+        $email    = self::teksDari($in, 'email', $errors);
+        $noHp     = self::teksDari($in, 'no_hp', $errors);
         $status   = array_key_exists('status', $in) ? self::statusDari($in['status']) : ($lama === null ? self::STATUS_AKTIF : (int) $lama['status']);
         $kategori = $this->kategoriMasukan($in['category'] ?? null, $errors);
 
-        if (preg_match('/^[1-9][0-9]{0,9}\z/', $idUser) !== 1) {
+        if (isset($errors['id_user'])) {
+            // Bukan teks (M4).
+        } elseif (preg_match('/^[1-9][0-9]{0,9}\z/', $idUser) !== 1) {
             $errors['id_user'] = 'Akun petugas wajib dipilih.';
         } elseif (($lama === null || (int) $idUser !== (int) $lama['id_user']) && ! $this->kandidatAda((int) $idUser)) {
             $errors['id_user'] = 'Akun tidak memenuhi syarat petugas.';
         }
 
-        if ($email === '') {
+        if (isset($errors['email'])) {
+            // Bukan teks (M4).
+        } elseif ($email === '') {
             $errors['email'] = 'Email wajib diisi.';
         } elseif (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
             $errors['email'] = 'Format email tidak valid.';
@@ -312,7 +366,7 @@ final class PetugasService extends MasterHaloSimpeg
             $errors['email'] = "Email maksimal {$this->config->maksEmail} karakter.";
         }
 
-        if (mb_strlen($noHp) > $this->config->maksNoHp) {
+        if (! isset($errors['no_hp']) && mb_strlen($noHp) > $this->config->maksNoHp) {
             $errors['no_hp'] = "Nomor HP maksimal {$this->config->maksNoHp} karakter.";
         }
 
@@ -348,7 +402,7 @@ final class PetugasService extends MasterHaloSimpeg
         $id     = [];
 
         foreach ($daftar as $x) {
-            $s = is_scalar($x) ? trim((string) $x) : '';
+            $s = is_string($x) || is_int($x) ? trim((string) $x) : '';
 
             if (preg_match('/^[1-9][0-9]{0,9}\z/', $s) !== 1) {
                 $errors['category'] = 'Kategori tidak tersedia.';
@@ -408,10 +462,9 @@ final class PetugasService extends MasterHaloSimpeg
      *
      * @param list<int> $id
      *
-     * @return array<int, array<int, string>> id petugas => [id kategori => nama kategori] (urut id kategori); `$perId` false →
-     *                                         daftar nama biasa (list)
+     * @return array<int, array<int, string>> id petugas => [id kategori => nama kategori], urut id kategori
      */
-    private function kategoriTerakhir(array $id, bool $aktifSaja, bool $perId = false): array
+    private function kategoriTerakhir(array $id, bool $aktifSaja): array
     {
         if ($id === []) {
             return [];
@@ -424,6 +477,7 @@ final class PetugasService extends MasterHaloSimpeg
         $lain  = $aktifSaja
             ? "SELECT 1 FROM {$oc} o2 JOIN {$so} s2 ON s2.id_support_officer = o2.id_support_officer AND s2.status = 1"
                 . " JOIN {$u} u2 ON u2.id_pengguna = s2.id_user AND u2.status = '1' AND u2.deleted_at IS NULL"
+                . ' AND u2.user_level IN (' . implode(', ', self::ROLE_PETUGAS) . ')'
                 . ' WHERE o2.id_question_category = oc.id_question_category AND o2.id_support_officer <> oc.id_support_officer'
             : "SELECT 1 FROM {$oc} o2 WHERE o2.id_question_category = oc.id_question_category AND o2.id_support_officer <> oc.id_support_officer";
 
@@ -437,11 +491,7 @@ final class PetugasService extends MasterHaloSimpeg
         $hasil = [];
 
         foreach ($rows as $r) {
-            if ($perId) {
-                $hasil[(int) $r['id_support_officer']][(int) $r['id_question_category']] = (string) $r['question_category'];
-            } else {
-                $hasil[(int) $r['id_support_officer']][] = (string) $r['question_category'];
-            }
+            $hasil[(int) $r['id_support_officer']][(int) $r['id_question_category']] = (string) $r['question_category'];
         }
 
         return $hasil;
@@ -486,7 +536,7 @@ final class PetugasService extends MasterHaloSimpeg
 
         return array_map(static function (array $r) use ($kategori, $terakhir): array {
             $i    = (int) $r['id_support_officer'];
-            $blok = $terakhir[$i] ?? [];
+            $blok = array_values($terakhir[$i] ?? []);
 
             return [
                 'id'                      => $i,
@@ -569,7 +619,7 @@ final class PetugasService extends MasterHaloSimpeg
             ->where('u.user_level', Role::SUPER_ADMIN)->where('u.status', '1')->where('u.deleted_at', null);
     }
 
-    /** Akun aktif milik pegawai aktif di satker kepegawaian [K `LS:476-484`; akun aktif = V2 F8-07]. */
+    /** Akun aktif ber-role 1–7 milik pegawai aktif di satker kepegawaian [K `LS:476-484`; akun aktif F8-07, role 1–7 S12 = V2]. */
     private function kueriPegawai(int $satker): BaseBuilder
     {
         return $this->db->table('pegawai p')
@@ -577,7 +627,7 @@ final class PetugasService extends MasterHaloSimpeg
             ->join('pegawai_mutasi_jabatan pmj', 'pmj.nip = p.nip', 'inner')
             ->join('pengguna u', 'u.nip = p.nip', 'inner')
             ->where('p.status', 1)->where('pmj.id_satker', $satker)
-            ->where('u.status', '1')->where('u.deleted_at', null);
+            ->where('u.status', '1')->where('u.deleted_at', null)->whereIn('u.user_level', self::ROLE_PETUGAS);
     }
 
     private function satkerKepegawaian(): ?int

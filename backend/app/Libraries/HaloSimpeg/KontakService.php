@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Libraries\HaloSimpeg;
 
+use App\Exceptions\ApiException;
 use App\Libraries\ListQuery;
 use App\Models\HaloSimpeg\HelpDeskContactModel;
 use CodeIgniter\Database\BaseBuilder;
+use CodeIgniter\Database\Exceptions\DatabaseException;
 
 /**
  * Master kontak helpdesk Halo Simpeg (E-07, MAKE-070; PRD Fase 8 v1.3 §6.1, §6.1b `Kontak`, §7.2, F8-18; [K `LS:14-210`,
@@ -87,7 +89,7 @@ final class KontakService extends MasterHaloSimpeg
         $now  = self::sekarang();
         $id   = (int) $this->dalamTransaksi(
             fn () => (new HelpDeskContactModel($this->db))->insert($data + ['created_at' => $now, 'updated_at' => $now], true),
-            static fn () => self::galatKode('kontak_duplikat', self::PESAN_DUPLIKAT, 'contact'),
+            static fn (DatabaseException $e): ?ApiException => self::duplikatKunci($e, 'uk_help_desk_contact_contact') ? self::galatKode('kontak_duplikat', self::PESAN_DUPLIKAT, 'contact') : null,
         );
 
         return $this->detail($id);
@@ -103,7 +105,7 @@ final class KontakService extends MasterHaloSimpeg
         $data = $this->validasi($in, $this->ambil($id));
         $this->dalamTransaksi(
             fn () => (new HelpDeskContactModel($this->db))->update($id, $data + ['updated_at' => self::sekarang()]),
-            static fn () => self::galatKode('kontak_duplikat', self::PESAN_DUPLIKAT, 'contact'),
+            static fn (DatabaseException $e): ?ApiException => self::duplikatKunci($e, 'uk_help_desk_contact_contact') ? self::galatKode('kontak_duplikat', self::PESAN_DUPLIKAT, 'contact') : null,
         );
 
         return $this->detail($id);
@@ -154,24 +156,30 @@ final class KontakService extends MasterHaloSimpeg
     private function validasi(array $in, ?array $lama): array
     {
         $errors = [];
-        $nama   = self::teks($in['name'] ?? null);
-        $kontak = self::teks($in['contact'] ?? null);
-        $email  = self::teks($in['email'] ?? null);
+        $nama   = self::teksDari($in, 'name', $errors);
+        $kontak = self::teksDari($in, 'contact', $errors);
+        $email  = self::teksDari($in, 'email', $errors);
         $status = array_key_exists('status', $in) ? self::statusDari($in['status']) : ($lama === null ? self::STATUS_AKTIF : (int) $lama['status']);
 
-        if ($nama === '') {
+        if (isset($errors['name'])) {
+            // Bukan teks (M4).
+        } elseif ($nama === '') {
             $errors['name'] = 'Nama wajib diisi.';
         } elseif (mb_strlen($nama) > $this->config->maksNamaKontak) {
             $errors['name'] = "Nama maksimal {$this->config->maksNamaKontak} karakter.";
         }
 
-        if ($kontak === '') {
+        if (isset($errors['contact'])) {
+            // Bukan teks (M4).
+        } elseif ($kontak === '') {
             $errors['contact'] = 'Nomor kontak wajib diisi.';
         } elseif (mb_strlen($kontak) > $this->config->maksNomorKontak) {
             $errors['contact'] = "Nomor kontak maksimal {$this->config->maksNomorKontak} karakter.";
         }
 
-        if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+        if (isset($errors['email'])) {
+            // Bukan teks (M4).
+        } elseif ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
             $errors['email'] = 'Format email tidak valid.';
         } elseif (mb_strlen($email) > $this->config->maksEmail) {
             $errors['email'] = "Email maksimal {$this->config->maksEmail} karakter.";

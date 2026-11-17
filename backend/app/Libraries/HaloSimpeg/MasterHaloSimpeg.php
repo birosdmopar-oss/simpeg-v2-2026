@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Libraries\HaloSimpeg;
 
+use App\Controllers\Api\ApiController;
 use App\Exceptions\ApiException;
 use App\Exceptions\NotFoundException;
 use App\Exceptions\ValidationException;
@@ -80,10 +81,52 @@ abstract class MasterHaloSimpeg
         return in_array($v, [0, 1, '0', '1'], true) ? (int) $v : null;
     }
 
-    /** Teks masukan sesudah trim; bukan skalar → '' (dicek wajib/panjang oleh pemanggil). */
-    protected static function teks(mixed $v): string
+    /**
+     * Teks masukan `$in[$field]` sesudah trim. Tidak dikirim / null → ''. Nilai bukan teks/angka (array, objek, boolean) → '' dan
+     * `$errors[$field]` = "Isian harus berupa teks." (`ApiController::NON_TEXT_FIELD_MESSAGE`, M4), bukan dianggap kosong.
+     *
+     * @param array<string, mixed>  $in
+     * @param array<string, string> $errors
+     */
+    protected static function teksDari(array $in, string $field, array &$errors): string
     {
-        return is_string($v) || is_int($v) || is_float($v) ? trim((string) $v) : '';
+        $v = $in[$field] ?? null;
+
+        if ($v === null) {
+            return '';
+        }
+
+        if (! is_string($v) && ! is_int($v) && ! is_float($v)) {
+            $errors[$field] = ApiController::NON_TEXT_FIELD_MESSAGE;
+
+            return '';
+        }
+
+        return trim((string) $v);
+    }
+
+    /**
+     * Kunci baris `$tabel` (FOR UPDATE) di dalam transaksi berjalan, urut id menaik agar urutan kunci konsisten (tanpa deadlock).
+     * Mengunci `question_category` juga menahan sisip tiket/relasi baru ke kategori itu (FK mengambil kunci bersama induk).
+     *
+     * @param list<int> $id
+     */
+    protected function kunci(string $tabel, string $pk, array $id): void
+    {
+        if ($id === []) {
+            return;
+        }
+
+        sort($id);
+        $tanda = implode(', ', array_fill(0, count($id), '?'));
+        $this->db->query('SELECT ' . $this->db->escapeIdentifiers($pk) . ' FROM ' . $this->db->escapeIdentifiers($this->db->prefixTable($tabel))
+            . ' WHERE ' . $this->db->escapeIdentifiers($pk) . " IN ({$tanda}) ORDER BY " . $this->db->escapeIdentifiers($pk) . ' FOR UPDATE', $id);
+    }
+
+    /** Galat DB 1062 milik UNIQUE `$namaKunci` (pesan MySQL/MariaDB memuat nama kunci). */
+    protected static function duplikatKunci(DatabaseException $e, string $namaKunci): bool
+    {
+        return $e->getCode() === 1062 && str_contains($e->getMessage(), $namaKunci);
     }
 
     /**
@@ -130,16 +173,18 @@ abstract class MasterHaloSimpeg
     }
 
     /**
-     * Jalankan tulis berganda dalam satu transaksi. Galat API (422/404) diteruskan apa adanya; galat DB 1062 yang lolos cek
-     * aplikasi (balapan) diterjemahkan lewat `$duplikat` bila diberikan.
+     * Jalankan tulis (dan cek yang harus konsisten dengannya) dalam satu transaksi. Galat API (422/404) yang dilempar dari dalam
+     * diteruskan apa adanya sesudah rollback. Galat DB yang lolos cek aplikasi (balapan: 1062, 1451) diterjemahkan lewat
+     * `$galatDb` bila ia mengembalikan ApiException; selain itu galat asli dilempar ulang.
      *
      * @template T
      *
-     * @param callable(): T $tulis
+     * @param callable(): T                                      $tulis
+     * @param (callable(DatabaseException): (ApiException|null))|null $galatDb
      *
      * @return T
      */
-    protected function dalamTransaksi(callable $tulis, ?callable $duplikat = null): mixed
+    protected function dalamTransaksi(callable $tulis, ?callable $galatDb = null): mixed
     {
         $this->db->transBegin();
 
@@ -156,8 +201,12 @@ abstract class MasterHaloSimpeg
         } catch (Throwable $e) {
             $this->db->transRollback();
 
-            if ($duplikat !== null && $e instanceof DatabaseException && $e->getCode() === 1062) {
-                throw $duplikat();
+            if ($galatDb !== null && $e instanceof DatabaseException) {
+                $terjemahan = $galatDb($e);
+
+                if ($terjemahan !== null) {
+                    throw $terjemahan;
+                }
             }
 
             throw $e;
