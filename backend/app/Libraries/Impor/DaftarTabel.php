@@ -511,7 +511,8 @@ final class DaftarTabel
      * sesudah `question_category` (induk `officer_category`) dan sebelum tiket lama T13, supaya nomor tier lain tetap.
      * - `support_officer.id_user` disalin apa adanya (tanpa tabel pemetaan UP-1); id tanpa `pengguna` v2 → baris dibuang +
      *   dicatat; `0`/kosong (→ NULL oleh aturan FK) juga dibuang dengan kode sendiri.
-     * - N1: `email` NULL (NOT NULL di v2) → `''` + dicatat (petugas tetap ada, email dilengkapi admin; pra-cek Q-H10).
+     * - N1: `email` NULL (NOT NULL di v2) → `''` + dicatat hanya untuk baris yang ditulis (petugas tetap ada, email dilengkapi
+     *   admin; pra-cek Q-H10); email di-trim, spasi-saja → `''` tanpa kode.
      * - N2: `created_at`/`updated_at` ikut aturan umum R1a (`--zona-sumber`).
      * - N4: `help_desk_contact.contact` di-trim (`kolomKode`).
      * - Q9: `officer_category` yatim ke petugas (Q-H4, termasuk petugas yang dibuang di atas) / ke kategori (Q-H5) → dibuang +
@@ -539,9 +540,13 @@ final class DaftarTabel
                         return self::KODE_HALO_AKUN_KOSONG;
                     }
 
-                    if (array_key_exists('email', $b) && $b['email'] === null) {
-                        $b['email']       = '';
-                        $b['__koreksi'][] = self::KODE_HALO_EMAIL_NULL;
+                    if (array_key_exists('email', $b)) {
+                        if ($b['email'] === null) {
+                            $b['email']            = '';
+                            $b['__koreksiTulis'][] = self::KODE_HALO_EMAIL_NULL;
+                        } else {
+                            $b['email'] = trim((string) $b['email']); // spasi-saja → '' tanpa kode (R2)
+                        }
                     }
 
                     return $b;

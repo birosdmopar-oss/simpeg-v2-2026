@@ -33,7 +33,8 @@ use Throwable;
  * 10. UPDATE kolom tunda menyertakan kolom ber-`ON UPDATE CURRENT_TIMESTAMP` dengan nilainya sendiri, supaya stempel
  *    hasil R1a tidak tertimpa waktu impor.
  *
- * Aturan khusus tabel boleh mengembalikan kunci `__koreksi` (list kode) untuk dicatat di laporan. Sesudah setiap tier
+ * Aturan khusus tabel boleh mengembalikan kunci `__koreksi` (list kode) untuk dicatat di laporan, atau `__koreksiTulis`
+ * (dicatat hanya bila baris itu benar-benar ditulis, sesudah cek rujukan; MAKE-097). Sesudah setiap tier
  * di-commit, counter AUTO_INCREMENT tujuan disamakan dengan sumber bila lebih kecil (DBV-011 §2.7; PK TINYINT dengan
  * counter ≥ 128 tidak disalin, dicatat PERIKSA). Langkah ini DDL, jadi berjalan di luar transaksi tier.
  *
@@ -672,9 +673,22 @@ final class PengimporLegacy
         $jumlah = (int) $this->kueri($src, 'SELECT COUNT(*) AS n FROM ' . $tabel . $saring)->getRowArray()['n'];
         $this->laporan->mulai($tier, $def, $jumlah, $dryRun ? 'dry-run' : '');
 
-        $pilih        = implode(', ', array_map(static fn (string $k, array $t): string => $src->escapeIdentifiers($t['src']) . ' AS ' . $src->escapeIdentifiers($k), array_keys($rinci['kolom']), $rinci['kolom']));
-        $kunci        = $def->kunciUrut === [] ? [$def->pk] : $def->kunciUrut;
-        $urutPk       = implode(', ', array_map(static fn (string $k): string => $src->escapeIdentifiers($rinci['kolom'][$k]['src']), $kunci));
+        $pilih = implode(', ', array_map(static fn (string $k, array $t): string => $src->escapeIdentifiers($t['src']) . ' AS ' . $src->escapeIdentifiers($k), array_keys($rinci['kolom']), $rinci['kolom']));
+        $kunci = $def->kunciUrut === [] ? [$def->pk] : $def->kunciUrut;
+        // pkSintetis: kunci baca boleh NULL di salinan legacy (mis. `officer_category` tanpa NOT NULL). Keyset `(a, b) > (?, ?)`
+        // dengan NULL bernilai NULL dan memutus pembacaan, jadi NULL diganti sentinel yang urut paling depan (review CR MAKE-097 R1).
+        $sentinel = [];
+        $urutPk   = implode(', ', array_map(static function (string $k) use ($src, $rinci, $def, &$sentinel): string {
+            $kol = $src->escapeIdentifiers($rinci['kolom'][$k]['src']);
+
+            if (! $def->pkSintetis) {
+                return $kol;
+            }
+
+            $sentinel[$k] = in_array($rinci['kolom'][$k]['tipeSumber'], self::TIPE_TEKS, true) ? '' : PHP_INT_MIN;
+
+            return 'COALESCE(' . $kol . ', ' . (is_int($sentinel[$k]) ? (string) $sentinel[$k] : "''") . ')';
+        }, $kunci));
         $buang        = $rinci['buang'];
         $urutan       = [];
         $tunda        = [];
@@ -699,10 +713,11 @@ final class PengimporLegacy
             $tulis = [];
 
             foreach ($baris as $mentah) {
-                $terakhir = array_map(static fn (string $k): mixed => $mentah[$k], $kunci);
-                $idBaris  = $def->pkSintetis ? implode("\x1F", array_map('strval', $terakhir)) : (string) $mentah[$def->pk];
+                $terakhir  = array_map(static fn (string $k): mixed => $mentah[$k] ?? ($sentinel[$k] ?? null), $kunci);
+                $kunciNull = $def->pkSintetis && array_filter($kunci, static fn (string $k): bool => $mentah[$k] === null) !== [];
+                $idBaris   = $def->pkSintetis ? implode("\x1F", array_map('strval', $terakhir)) : (string) $mentah[$def->pk];
 
-                if ($def->pkSintetis) {
+                if ($def->pkSintetis && ! $kunciNull) {
                     if ($idBaris === $kunciSebelum) {
                         $this->laporan->dibuang($def->kunci(), DefinisiTabel::KODE_GANDA);
                         $gandaDibuang++;
@@ -772,6 +787,15 @@ final class PengimporLegacy
             }
 
             $tulis = $this->periksaRujukan($def, $rinci['fk'], $tulis);
+
+            // `__koreksiTulis`: koreksi yang hanya dicatat untuk baris yang benar-benar ditulis (sesudah buang yatim, MAKE-097 R2).
+            foreach ($tulis as $i => $r) {
+                foreach ($r['__koreksiTulis'] ?? [] as $kode) {
+                    $this->laporan->koreksi($def->kunci(), (string) $kode);
+                }
+
+                unset($tulis[$i]['__koreksiTulis']);
+            }
 
             if ($tulis !== [] && ! $dryRun) {
                 if ($this->tujuan->table($def->tabel)->insertBatch($tulis) === false || $this->tujuan->transStatus() === false) {
@@ -955,9 +979,14 @@ final class PengimporLegacy
      */
     private function jumlahGanda(BaseConnection $src, string $tabel, DefinisiTabel $def, array $kolom, string $saring): int
     {
-        $kunci = implode(', ', array_map(static fn (string $k): string => $src->escapeIdentifiers($kolom[$k]['src']), $def->kunciUrut));
+        $kol   = array_map(static fn (string $k): string => $src->escapeIdentifiers($kolom[$k]['src']), $def->kunciUrut);
+        $kunci = implode(', ', $kol);
+        // COUNT(DISTINCT …) melewati baris berkunci NULL; COUNT(*) juga dibatasi ke baris yang semua kuncinya terisi, supaya
+        // baris NULL tidak dihitung ganda (review CR MAKE-097 R1). Baris NULL diputus aturan baris (mis. rujukan kosong).
+        $isi   = implode(' AND ', array_map(static fn (string $k): string => "{$k} IS NOT NULL", $kol));
+        $where = $saring === '' ? " WHERE {$isi}" : "{$saring} AND {$isi}";
 
-        return (int) $this->kueri($src, "SELECT COUNT(*) - COUNT(DISTINCT {$kunci}) AS n FROM {$tabel}{$saring}")->getRowArray()['n'];
+        return (int) $this->kueri($src, "SELECT COUNT(*) - COUNT(DISTINCT {$kunci}) AS n FROM {$tabel}{$where}")->getRowArray()['n'];
     }
 
     /**
