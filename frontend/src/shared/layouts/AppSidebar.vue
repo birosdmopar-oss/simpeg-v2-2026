@@ -11,6 +11,7 @@
  * - Blok profil membuka menu "Ganti Password" / "Keluar"; panel selebar trigger dan item seragam dengan item nav
  *   (CR-060 butir G). Fungsi logout sudah ada sejak Fase 1 sehingga tidak boleh hilang.
  * - Daftar menu = area gulir mandiri (`overflow-y-auto`); tinggi sidebar = viewport (`lg:h-screen`).
+ * - Item ber-`badge`: angka di kanan label; saat ciut berganti titik penanda di ikon + jumlah `sr-only` (MAKE-073, AC-E08.12).
  *
  * ASET SEMENTARA: lencana "S" pada logo adalah placeholder; lambang Kemenpar final belum tersedia.
  */
@@ -247,15 +248,25 @@ const menuItemBase = 'flex w-full cursor-pointer items-center gap-3 rounded-xl p
             <UiTooltip v-else-if="item.to" :content="ciut ? item.label : ''" side="right">
               <RouterLink
                 :to="item.to"
-                :class="[itemBase, ciut ? itemCiut : '', isActive(item) ? itemActive : itemIdle]"
+                :class="[itemBase, 'relative', ciut ? itemCiut : '', isActive(item) ? itemActive : itemIdle]"
                 :aria-current="isActive(item) ? 'page' : undefined"
                 :data-testid="`nav-${item.key}`"
                 @click="closeMobile"
               >
                 <component :is="item.icon" class="h-5 w-5 shrink-0" aria-hidden="true" />
                 <span :class="ciut ? 'sr-only' : 'flex-1 truncate'">{{ item.label }}</span>
+                <!-- Ciut: angka badge tidak muat → titik penanda di sudut ikon + jumlah untuk pembaca layar (AC-E08.12). -->
+                <template v-if="item.badge && ciut">
+                  <span class="sr-only">({{ item.badge }})</span>
+                  <span
+                    class="absolute left-1/2 top-1.5 ml-1 h-2.5 w-2.5 rounded-full bg-danger ring-2 ring-white"
+                    aria-hidden="true"
+                    :data-testid="`nav-${item.key}-titik`"
+                  />
+                </template>
                 <span
                   v-if="item.badge && !ciut"
+                  :data-testid="`nav-${item.key}-badge`"
                   class="inline-flex min-w-5 items-center justify-center rounded-full bg-danger px-1.5 text-caption font-medium text-white"
                 >
                   {{ item.badge }}
