@@ -7,10 +7,15 @@ namespace Tests\Database\HaloSimpeg;
 use App\Constants\Role;
 use App\Libraries\HaloSimpeg\EksporTiketService;
 use CodeIgniter\Config\Factories;
+use CodeIgniter\Database\Query;
+use CodeIgniter\Events\Events;
 use CodeIgniter\Test\FeatureTestTrait;
 use CodeIgniter\Test\TestResponse;
+use Config\Database;
 use Config\HaloSimpeg;
 use Config\Services;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use SimpleXMLElement;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\AuthSeeder;
@@ -243,6 +248,77 @@ final class EksporTiketTest extends DatabaseTestCase
         $this->assertSame(EksporTiketService::MAKS_SEL, mb_strlen($isi));
         $this->assertStringEndsWith(EksporTiketService::PENANDA_POTONG, $isi);
         $this->assertSame('Pendek', $sel[self::BARIS_HEADER + 2][5]);
+    }
+
+    /**
+     * V12: pesan yang masuk di antara kueri agregat dan kueri data → baris dan karakter dicek ulang; lewat → 422 tanpa audit.
+     *
+     * @return array<string, array{0: string, 1: int, 2: string}>
+     */
+    public static function balapanProvider(): array
+    {
+        return ['baris' => ['eksporMaksBaris', 2, 'x'], 'karakter' => ['eksporMaksKarakter', 20, 'pesan lima belas']];
+    }
+
+    /**
+     * Pesan disisipkan lewat koneksi KEDUA (autocommit) tepat sesudah kueri agregat, sehingga hanya kueri data yang melihatnya. Sisip
+     * lewat koneksi yang sama di dalam listener akan menimpa hasil kueri agregat, jadi test ini butuh isolasi penuh.
+     */
+    #[DataProvider('balapanProvider')]
+    #[Group('db-isolasi-penuh')]
+    public function testCekUlangSesudahDataDiambil(string $batas, int $nilai, string $sisipan): void
+    {
+        config(HaloSimpeg::class)->{$batas} = $nilai;
+
+        // 2 baris, 10 karakter: lolos agregat untuk kedua batas.
+        $t = $this->tiket($this->k1, '2026-11-10 03:00:00', 'Tanya');
+        $this->buatPesanHs($t, $this->petugas, 'Jawab', '2026-11-10 04:00:00');
+        $lain    = Database::connect('tests', false);
+        $pemilik = $this->pemilik;
+        $sekali  = false;
+        $balap   = static function (Query $q) use ($lain, $t, $pemilik, $sisipan, &$sekali): void {
+            if (! $sekali && str_contains($q->getQuery(), 'COUNT(*) AS jumlah')) {
+                $sekali = true;
+                $lain->table('disiplin_ticket_msg')->insert(['id_inbox' => $t, 'msg_sender' => $pemilik, 'msg_sender_name' => 'Penanya Ekspor', 'msg_receiver' => 0, 'msg' => $sisipan, 'created_at' => '2026-11-10 05:00:00']);
+            }
+        };
+        Events::on('DBQuery', $balap);
+
+        try {
+            $r = $this->ekspor($this->petugas);
+        } finally {
+            Events::removeListener('DBQuery', $balap);
+            $lain->close();
+        }
+
+        $this->assertTrue($sekali);
+        $this->assertSame(3, $this->db->table('disiplin_ticket_msg')->where('id_inbox', $t)->countAllResults());
+        $this->assertSame('ekspor_terlalu_besar', $this->json($this->st($r, 422))['code']);
+        $this->assertSame(0, $this->jumlahAudit());
+    }
+
+    /**
+     * V10: penanda termasuk dalam 32.767 unit UTF-16; pasangan surrogate (emoji) tidak terbelah di titik potong.
+     */
+    public function testPotongSelEmojiDiBatas(): void
+    {
+        $unit = static fn (string $s): int => intdiv(strlen((string) mb_convert_encoding($s, 'UTF-16LE', 'UTF-8')), 2);
+        $sisa = EksporTiketService::MAKS_SEL - $unit(EksporTiketService::PENANDA_POTONG);
+
+        // Tepat 32.767 unit dengan emoji di ujung → tidak dipotong.
+        $pas = str_repeat('a', EksporTiketService::MAKS_SEL - 2) . "\u{1F600}";
+        $this->assertSame($pas, EksporTiketService::potongSel($pas));
+
+        // Titik potong jatuh di tengah emoji → emoji dibuang utuh (tidak terbelah), total 32.766 unit.
+        $hasil = EksporTiketService::potongSel(str_repeat('a', $sisa - 1) . "\u{1F600}" . str_repeat('z', 20));
+        $this->assertSame(str_repeat('a', $sisa - 1) . EksporTiketService::PENANDA_POTONG, $hasil);
+        $this->assertTrue(mb_check_encoding($hasil, 'UTF-8'));
+        $this->assertSame(EksporTiketService::MAKS_SEL - 1, $unit($hasil));
+
+        // Emoji pas mengisi sisa → ikut utuh, total tepat 32.767 unit.
+        $hasil = EksporTiketService::potongSel(str_repeat('a', $sisa - 2) . "\u{1F600}" . str_repeat('z', 20));
+        $this->assertStringEndsWith("\u{1F600}" . EksporTiketService::PENANDA_POTONG, $hasil);
+        $this->assertSame(EksporTiketService::MAKS_SEL, $unit($hasil));
     }
 
     public function testPotongSelMenghitungUnitUtf16(): void
