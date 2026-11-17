@@ -3,8 +3,9 @@
  * - `/halo-simpeg` (nama `halo-simpeg`): halaman pemilik + petugas, role 1–7 (role 8 tanpa akses).
  * - `/halo-simpeg/tiket/:id` (nama `halo-tiket`): rute = keadaan panel kanan master-detail (deep-link lonceng/push, tombol
  *   kembali browser); `id` hanya angka.
- * - `/halo-simpeg/admin/:bagian` (nama `halo-admin-<bagian>`): master Kategori | Petugas | Kontak, role 1;
- *   `/halo-simpeg/admin` → kategori.
+ * - `/halo-simpeg-admin/:bagian` (nama `halo-admin-<bagian>`): master Kategori | Petugas | Kontak, role 1;
+ *   `/halo-simpeg-admin` → kategori. Prefiks sendiri (pola `/chatbot-manager`, keputusan reviewer V2): `AppSidebar` mencocokkan
+ *   prefiks path, jadi di bawah `/halo-simpeg/` layar admin akan ikut mengaktifkan item `halo` sesudah CR-135.
  * Menu `halo` tetap `phase: 8` tanpa `to`/`roles` sampai CR-135 (H8-11 (a)); selama `ACTIVE_PHASE < 8` QA lewat URL langsung.
  * Guard FE hanya UX (ADR-024); backend tetap menegakkan role.
  */
@@ -44,10 +45,10 @@ export const haloRoutes: RouteRecordRaw[] = [
     props: (route) => ({ idTiket: idTiketDariParam(route.params.id) }),
     meta: { roles: HALO_ROLES, title: 'Halo Simpeg' },
   },
-  { path: '/halo-simpeg/admin', redirect: { name: 'halo-admin-kategori' } },
+  { path: '/halo-simpeg-admin', redirect: { name: 'halo-admin-kategori' } },
   ...(Object.keys(BAGIAN_ADMIN_HALO) as BagianAdminHalo[]).map(
     (bagian): RouteRecordRaw => ({
-      path: `/halo-simpeg/admin/${bagian}`,
+      path: `/halo-simpeg-admin/${bagian}`,
       name: `halo-admin-${bagian}`,
       component: halamanAdmin,
       props: { bagian },

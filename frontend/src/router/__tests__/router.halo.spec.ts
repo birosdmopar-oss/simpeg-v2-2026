@@ -30,14 +30,23 @@ beforeEach(async () => {
 })
 
 describe('route Halo Simpeg', () => {
-  it('terdaftar dengan role: pemilik/petugas 1–7, admin 1; /halo-simpeg/admin → kategori', () => {
+  it('terdaftar dengan role: pemilik/petugas 1–7, admin 1; /halo-simpeg-admin → kategori', () => {
     expect(HALO_ROLES).toEqual([1, 2, 3, 4, 5, 6, 7])
     for (const nama of ['halo-simpeg', 'halo-tiket']) expect(router.getRoutes().find((r) => r.name === nama)?.meta.roles).toEqual(HALO_ROLES)
     for (const b of ['kategori', 'petugas', 'kontak']) {
       expect(router.getRoutes().find((r) => r.name === `halo-admin-${b}`)?.meta.roles).toEqual(HALO_ADMIN_ROLES)
     }
-    expect(router.resolve('/halo-simpeg/admin').matched.at(-1)?.redirect).toEqual({ name: 'halo-admin-kategori' })
+    expect(router.resolve('/halo-simpeg-admin').matched.at(-1)?.redirect).toEqual({ name: 'halo-admin-kategori' })
     expect(haloRoutes).toHaveLength(6)
+  })
+
+  it('admin di prefiks sendiri: /halo-simpeg-admin/* tidak cocok prefiks /halo-simpeg/ (aria-current item halo, CR-135)', () => {
+    for (const b of ['kategori', 'petugas', 'kontak']) {
+      const path = router.resolve({ name: `halo-admin-${b}` }).path
+      expect(path).toBe(`/halo-simpeg-admin/${b}`)
+      expect(path.startsWith('/halo-simpeg/')).toBe(false)
+      expect(path === '/halo-simpeg').toBe(false)
+    }
   })
 
   it('/halo-simpeg/tiket/:id hanya angka; props idTiket angka', () => {
@@ -70,13 +79,13 @@ describe('route Halo Simpeg', () => {
 
   it('admin master: role 1 boleh', async () => {
     login(Role.SUPER_ADMIN)
-    await router.push('/halo-simpeg/admin/petugas')
+    await router.push('/halo-simpeg-admin/petugas')
     expect(router.currentRoute.value.name).toBe('halo-admin-petugas')
   })
 
   it('admin master: role 2 → 403', async () => {
     login(Role.PEGAWAI)
-    await router.push('/halo-simpeg/admin/kontak')
+    await router.push('/halo-simpeg-admin/kontak')
     expect(router.currentRoute.value.name).toBe('forbidden')
   })
 })
