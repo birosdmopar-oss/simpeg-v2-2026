@@ -82,7 +82,7 @@ Aturan:
 | `GET petugas/kandidat` | `search` (2..50 karakter) | `{items: PetugasKandidat[], peringatan: string\|null}` |
 | `GET petugas/saya` | — | `PetugasSaya` (selalu 200) |
 | `POST petugas` | `{id_user, category[], email, no_hp?, status?}` (status bawaan 1) | 201 `Petugas` |
-| `PUT petugas/{id}` | `{id_user, category[], email, no_hp?, status?}` | 200 `Petugas` |
+| `PUT petugas/{id}` | `{id_user, category[], email, no_hp?, status?}` | 200 `Petugas & {peringatan: string\|null}` |
 | `PATCH petugas/{id}/status` | `{status: 0\|1}` | 200 `Petugas & {peringatan: string\|null}` |
 | `DELETE petugas/{id}` | — | 200 `{id}` |
 
@@ -117,7 +117,11 @@ Aturan:
 - Menonaktifkan petugas **aktif terakhir** (petugas lain di kategori itu tidak ada yang aktif) sebuah kategori ber-tiket Open tetap
   boleh → 200 + `peringatan` = "Petugas ini adalah petugas aktif terakhir pada kategori {nama, dipisah koma}. Tiket terbuka pada
   kategori tersebut tidak memiliki penjawab sampai petugas lain diaktifkan.". Selain itu `peringatan: null`.
-- PUT yang mengeluarkan petugas terakhir dari sebuah kategori ber-tiket Open **tidak** dijaga aturan ini (lihat Selisih S8).
+- **PUT** yang membuat sebuah kategori ber-tiket Open kehilangan petugas aktif terakhirnya (kategori itu dilepas dari set, atau
+  `status` diubah ke 0) tetap disimpan → 200 + `peringatan` dengan teks yang sama seperti Nonaktifkan (S8 (b), keputusan Horii
+  17-11-2026). Selain itu `peringatan: null`. Hanya hapus permanen yang diblok.
+- "Petugas aktif" pada aturan peringatan = `status = 1` dan akun aktif (F8-06). Petugas yang sudah nonaktif bukan penjawab, jadi
+  perubahan atas petugas nonaktif tidak memberi peringatan.
 
 ## Kontak
 
@@ -175,23 +179,26 @@ Aturan:
 | `kategori-daftar` | `GET kategori` |
 | `kategori-opsi` | `GET kategori/opsi` |
 | `petugas-daftar` | `GET petugas` (termasuk `bisa_hapus=false` + alasan) |
-| `kandidat` | `GET petugas/kandidat` |
+| `kandidat`, `kandidat-peringatan` | `GET petugas/kandidat` (tanpa / dengan `peringatan` satker kosong) |
 | `petugas-saya-aktif`, `petugas-saya-nonaktif`, `petugas-saya-bukan` | `GET petugas/saya` |
 | `kontak-aktif` | `GET kontak/aktif` |
 | `kontak-daftar` | `GET kontak` |
 | `status-patch` | `PATCH kategori/{id}/status` (`peringatan: null`) |
 | `status-patch-peringatan` | `PATCH petugas/{id}/status` (Nonaktifkan petugas aktif terakhir) |
+| `petugas-put-peringatan` | `PUT petugas/{id}` (melepas kategori aktif terakhir) |
 | `galat-422-master`, `galat-422-kategori-duplikat`, `galat-422-petugas-terakhir`, `galat-404-master` | galat master |
 
-## Selisih terhadap PRD v1.3 (dilaporkan ke reviewer sebelum beku)
+## Selisih terhadap PRD v1.3 (diterima reviewer 17-11-2026; PRD diralat lewat CR-138)
 
-- **S1:** `petugas/kandidat` → `{items, peringatan}`, bukan array polos (F8-07 meminta peringatan bila satker kosong).
-- **S2:** filter `status`/`q` juga untuk daftar `kategori` dan `petugas` (aditif).
-- **S3:** `per_page` > 100 dipotong ke 100 (perilaku `ListQuery`), bukan 422.
-- **S4:** teks tambahan: "Kategori tidak tersedia." (`category[]`) dan "Kata kunci maksimal 50 karakter." (`search`).
-- **S5:** kandidat mensyaratkan akun aktif [V2]; petugas terdaftar tidak disaring.
-- **S6:** pemisah label " - " (legacy).
-- **S7:** ganti set kategori = lepas + sisip selisih (setara hapus + sisip [K]).
-- **S8:** PUT yang mengeluarkan petugas terakhir dari kategori ber-tiket Open tidak dijaga K-A4; menunggu keputusan reviewer.
-- **S9:** tidak ada `GET {jalur}/{id}`.
-- **S10:** fixture galat master tambahan; `petugas-saya` dipecah menjadi tiga berkas.
+| No | Selisih | Label |
+|---|---|---|
+| S1 | `GET petugas/kandidat` → `{items: PetugasKandidat[], peringatan}`, penyesuaian bentuk `PetugasKandidat` dari PRD §6.1b (array polos). Alasan: F8-07 meminta peringatan bila satker kepegawaian kosong (pola `PetugasLayananService`) | [V2] |
+| S2 | Filter `status` + `q` juga untuk daftar `kategori` dan `petugas` (aditif). Pencarian NIP/email hanya di endpoint role 1, LIKE ter-escape | [V2] |
+| S3 | `per_page` > 100 dipotong ke 100 (perilaku `ListQuery`, sama dengan chatbot). Hanya parameter berbentuk array yang 422 (PRD §7.3a) | [V2] |
+| S4 | Teks 422 tambahan: "Kategori tidak tersedia." (`category`), "Kata kunci maksimal 50 karakter." (`search`), "ID tidak valid." (`id`) | [V2] |
+| S5 | Kandidat: akun aktif (sesuai PRD §7.3a "akun aktif"); akun role 1 dulu lalu pegawai, maks 20; petugas terdaftar tidak disaring [K] (simpan → 422 `petugas_duplikat`); syarat diperiksa hanya saat tambah/ganti `id_user`, sehingga petugas lama yang pegawainya pindah satker tetap tercatat sampai diedit | [V2] / [K] |
+| S6 | Pemisah label `" - "` [K `LS:485-490`] (PRD menulis "–") | [K] |
+| S7 | Ganti set kategori = lepas + sisip selisih dalam satu transaksi. `created_at` relasi lama tetap (legacy delete + insert), sehingga urutan petugas yang diurutkan `created_at` naik + `id` naik (N3) bisa sedikit berbeda dari legacy | [V2] |
+| S8 | PUT petugas → `Petugas & {peringatan}` bila perubahan membuat kategori ber-tiket Open kehilangan petugas aktif terakhir (setara Nonaktifkan, K-A4 (1')); tidak 422 | [V2], keputusan Horii 17-11-2026 |
+| S9 | Tidak ada `GET {jalur}/{id}` (FE memakai baris daftar); DELETE → 200 `{id}` | [V2] |
+| S10 | Fixture tambahan: `kandidat-peringatan`, `petugas-put-peringatan`, `galat-422-master`, `galat-422-kategori-duplikat`, `galat-422-petugas-terakhir`, `galat-404-master`; `petugas-saya` dipecah tiga berkas | [V2] |

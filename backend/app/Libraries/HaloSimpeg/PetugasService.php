@@ -37,7 +37,8 @@ final class PetugasService extends MasterHaloSimpeg
     public const PERINGATAN_SATKER_KOSONG = 'Satker kepegawaian belum diatur di Web Config; hanya akun Super Admin yang dapat dipilih.';
 
     private const KOLOM = 'so.id_support_officer, so.id_user, so.email, so.no_hp, so.status, so.created_at, so.updated_at, '
-        . 'u.user_level, u.name AS nama_akun, u.username, u.nip, p.glr_awal, p.nama, p.glr_akhir, pmj.jabatan';
+        . 'u.user_level, u.name AS nama_akun, u.username, u.nip, u.status AS status_akun, u.deleted_at AS akun_dihapus, '
+        . 'p.glr_awal, p.nama, p.glr_akhir, pmj.jabatan';
 
     /**
      * @param array<string, mixed> $query `status` (0/1), `q` (nama/NIP/email), `page`, `per_page`
@@ -168,21 +169,31 @@ final class PetugasService extends MasterHaloSimpeg
     }
 
     /**
+     * PUT: respons `Petugas & {peringatan}` (S8 (b), keputusan Horii 17-11-2026). `peringatan` terisi bila perubahan (lepas
+     * kategori atau status 0) membuat kategori ber-tiket Open kehilangan petugas aktif terakhirnya — teks sama dengan PATCH status.
+     *
      * @param array<string, mixed> $in `id_user`, `category[]`, `email`, `no_hp?`, `status?` (bawaan nilai lama)
      *
      * @return array<string, mixed>
      */
     public function ubah(int $id, array $in): array
     {
-        [$data, $kategori] = $this->validasi($in, $this->ambil($id));
+        $lama              = $this->ambil($id);
+        [$data, $kategori] = $this->validasi($in, $lama);
         $now               = self::sekarang();
+        $ditinggal         = [];
+
+        if (self::aktif($lama)) {
+            $terakhir  = $this->kategoriTerakhir([$id], true, true)[$id] ?? [];
+            $ditinggal = $data['status'] === self::STATUS_NONAKTIF ? $terakhir : array_diff_key($terakhir, array_flip($kategori));
+        }
 
         $this->dalamTransaksi(function () use ($id, $data, $kategori, $now): void {
             (new SupportOfficerModel($this->db))->update($id, $data + ['updated_at' => $now]);
             $this->tulisKategori($id, $kategori, $now);
         }, static fn () => self::galatKode('petugas_duplikat', self::PESAN_DUPLIKAT, 'id_user'));
 
-        return $this->detail($id);
+        return $this->detail($id) + ['peringatan' => self::peringatanAktifTerakhir(array_values($ditinggal))];
     }
 
     /**
@@ -198,10 +209,8 @@ final class PetugasService extends MasterHaloSimpeg
         $peringatan = null;
 
         if ($baru !== (int) $lama['status']) {
-            if ($baru === self::STATUS_NONAKTIF) {
-                $kategori   = $this->kategoriTerakhir([$id], true)[$id] ?? [];
-                $peringatan = $kategori === [] ? null : 'Petugas ini adalah petugas aktif terakhir pada kategori ' . implode(', ', $kategori)
-                    . '. Tiket terbuka pada kategori tersebut tidak memiliki penjawab sampai petugas lain diaktifkan.';
+            if ($baru === self::STATUS_NONAKTIF && self::aktif($lama)) {
+                $peringatan = self::peringatanAktifTerakhir(array_values($this->kategoriTerakhir([$id], true, true)[$id] ?? []));
             }
 
             (new SupportOfficerModel($this->db))->update($id, ['status' => $baru, 'updated_at' => self::sekarang()]);
@@ -244,14 +253,35 @@ final class PetugasService extends MasterHaloSimpeg
         return $this->susun([$this->ambil($id)])[0];
     }
 
-    /** Teks 422 `petugas_terakhir` (juga `alasan_tidak_bisa_hapus`). */
+    /**
+     * Teks 422 `petugas_terakhir` (juga `alasan_tidak_bisa_hapus`).
+     *
+     * @param list<string> $kategori
+     */
     public static function pesanTerakhir(array $kategori): string
     {
         return 'Petugas ini petugas terakhir pada kategori ' . implode(', ', $kategori)
             . ' yang masih memiliki tiket terbuka. Tambahkan petugas lain lebih dulu.';
     }
 
+    /**
+     * Teks `peringatan` (PATCH status / PUT): null bila tidak ada kategori yang ditinggal.
+     *
+     * @param list<string> $kategori
+     */
+    public static function peringatanAktifTerakhir(array $kategori): ?string
+    {
+        return $kategori === [] ? null : 'Petugas ini adalah petugas aktif terakhir pada kategori ' . implode(', ', $kategori)
+            . '. Tiket terbuka pada kategori tersebut tidak memiliki penjawab sampai petugas lain diaktifkan.';
+    }
+
     // ------------------------------------------------------------------------------------------------------------
+
+    /** Petugas aktif (F8-06): status 1 dan akun aktif. */
+    private static function aktif(array $r): bool
+    {
+        return (int) $r['status'] === self::STATUS_AKTIF && (string) $r['status_akun'] === '1' && $r['akun_dihapus'] === null;
+    }
 
     /**
      * @param array<string, mixed>      $in
@@ -378,9 +408,10 @@ final class PetugasService extends MasterHaloSimpeg
      *
      * @param list<int> $id
      *
-     * @return array<int, list<string>> id petugas => nama kategori (urut id kategori)
+     * @return array<int, array<int, string>> id petugas => [id kategori => nama kategori] (urut id kategori); `$perId` false →
+     *                                         daftar nama biasa (list)
      */
-    private function kategoriTerakhir(array $id, bool $aktifSaja): array
+    private function kategoriTerakhir(array $id, bool $aktifSaja, bool $perId = false): array
     {
         if ($id === []) {
             return [];
@@ -396,7 +427,7 @@ final class PetugasService extends MasterHaloSimpeg
                 . ' WHERE o2.id_question_category = oc.id_question_category AND o2.id_support_officer <> oc.id_support_officer'
             : "SELECT 1 FROM {$oc} o2 WHERE o2.id_question_category = oc.id_question_category AND o2.id_support_officer <> oc.id_support_officer";
 
-        $rows = $this->db->table('officer_category oc')->select('oc.id_support_officer, qc.question_category')
+        $rows = $this->db->table('officer_category oc')->select('oc.id_support_officer, qc.id_question_category, qc.question_category')
             ->join('question_category qc', 'qc.id_question_category = oc.id_question_category', 'inner')
             ->whereIn('oc.id_support_officer', $id)
             ->where("EXISTS (SELECT 1 FROM {$tiket} t WHERE t.id_question_category = oc.id_question_category AND t.status = 0)", null, false)
@@ -406,7 +437,11 @@ final class PetugasService extends MasterHaloSimpeg
         $hasil = [];
 
         foreach ($rows as $r) {
-            $hasil[(int) $r['id_support_officer']][] = (string) $r['question_category'];
+            if ($perId) {
+                $hasil[(int) $r['id_support_officer']][(int) $r['id_question_category']] = (string) $r['question_category'];
+            } else {
+                $hasil[(int) $r['id_support_officer']][] = (string) $r['question_category'];
+            }
         }
 
         return $hasil;

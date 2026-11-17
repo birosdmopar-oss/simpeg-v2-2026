@@ -196,6 +196,7 @@ final class MasterHaloSimpegTest extends DatabaseTestCase
         $this->resetWebConfig();
         $kosong = $this->data($this->kirim('get', 'petugas/kandidat?search=zaenal'));
         $this->assertSame([[], PetugasService::PERINGATAN_SATKER_KOSONG], [$kosong['items'], $kosong['peringatan']]);
+        $this->cocokFixtureHs('kandidat-peringatan', $this->kirim('get', 'petugas/kandidat?search=kepegawaian%20uji'), 200);
     }
 
     // -------------------------------------------------------------------- K-A4 (1') (AC-E02.8) + peringatan
@@ -250,6 +251,38 @@ final class MasterHaloSimpegTest extends DatabaseTestCase
         $this->assertNull($this->data($this->kirim('patch', "petugas/{$a}/status", ['status' => 1]))['peringatan']);
         $this->assertSame($audit + 1, $this->jumlahAudit('support_officer'));
         $this->assertNull($this->data($this->kirim('patch', "petugas/{$c}/status", ['status' => 0]))['peringatan'], 'k2 masih dijawab petugas a');
+    }
+
+    public function testUbahPetugasMelepasKategoriAktifTerakhirMemberiPeringatan(): void
+    {
+        $open   = $this->buatKategoriHs('Kepegawaian');
+        $lain   = $this->buatKategoriHs('Gaji');
+        $tutup  = $this->buatKategoriHs('Selesai');
+        $cuti   = $this->buatKategoriHs('Cuti');
+        [, $u2] = $this->pegawaiKandidat('Petugas Dua');
+        [, $u3] = $this->pegawaiKandidat('Petugas Tiga');
+        $this->buatTiketHs($open, $u3, 0);
+        $this->buatTiketHs($lain, $u3, 0);
+        $this->buatTiketHs($tutup, $u3, 1);
+        $a = $this->buatPetugasHs($this->admin, [$open, $lain, $tutup, $cuti]);
+        $this->buatPetugasHs($u2, [$open], 0);
+        $this->buatPetugasHs($u3, [$lain]);
+        $isi = ['id_user' => $this->admin, 'email' => 'a@contoh.test'];
+
+        // Tetap memegang semua kategori → null; lepas kategori yang masih dijawab petugas aktif lain / hanya tiket Closed → null.
+        $this->assertNull($this->data($this->kirim('put', "petugas/{$a}", $isi + ['category' => [$open, $lain, $tutup, $cuti]]))['peringatan']);
+        $this->assertNull($this->data($this->kirim('put', "petugas/{$a}", $isi + ['category' => [$open, $cuti]]))['peringatan']);
+
+        // Lepas kategori ber-tiket Open yang petugas lainnya hanya nonaktif → peringatan (perubahan tetap disimpan, bukan 422).
+        $res = $this->kirim('put', "petugas/{$a}", $isi + ['category' => [$cuti]]);
+        $this->cocokFixtureHs('petugas-put-peringatan', $res, 200);
+        $this->assertSame(PetugasService::peringatanAktifTerakhir(['Kepegawaian']), $this->data($res)['peringatan']);
+        $this->assertSame([$cuti], array_column($this->data($res)['kategori'], 'id'));
+
+        // Nonaktifkan lewat PUT sama dengan PATCH status.
+        $this->kirim('put', "petugas/{$a}", $isi + ['category' => [$open, $cuti]])->assertStatus(200);
+        $this->assertSame(PetugasService::peringatanAktifTerakhir(['Kepegawaian']), $this->data($this->kirim('put', "petugas/{$a}", $isi + ['category' => [$open, $cuti], 'status' => 0]))['peringatan']);
+        $this->assertNull($this->data($this->kirim('put', "petugas/{$a}", $isi + ['category' => [$cuti]]))['peringatan'], 'petugas nonaktif bukan penjawab');
     }
 
     // -------------------------------------------------------------------- status terpisah (AC-E02.9)
