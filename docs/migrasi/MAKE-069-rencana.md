@@ -145,6 +145,7 @@ dikonversi R1a dan semua kolom teks ikut `stripslashes` bawaan. Kolom `siasn_lu`
      Cocokkan nama PK `officer_category` (Q10). Untuk rumus langkah 3, hitung juga irisan Q-H4 ∩ Q-H5 (salinan legacy):
      `SELECT COUNT(*) FROM officer_category oc WHERE NOT EXISTS (SELECT 1 FROM support_officer so WHERE so.id_support_officer = oc.id_support_officer) AND NOT EXISTS (SELECT 1 FROM question_category qc WHERE qc.id_question_category = oc.id_question_category);`
    - Kueri hanya dijalankan di salinan/gladi, tidak di server dev dari repo.
+   - Gladi: cek `IS_NULLABLE` kolom `kunciUrut` tabel tier 14 (`news_flag`, `user_popup`, `user_banner`, form digital) di salinan legacy; bila nullable, COALESCE aktif (hasil benar, lebih lambat), catat waktunya.
 3. **Impor** tier 12 (memuat T12b) seperti langkah 2 Bagian 6; dry-run dulu. Angka yatim (`… yatim dibuang (K-M12)`)
    hanya muncul di **run tulis**: dry-run tidak memeriksa rujukan, dan koreksi N1 di dry-run masih menghitung semua baris.
    Laporan per tabel `help_desk_contact`, `support_officer`, `officer_category` wajib memenuhi
