@@ -194,7 +194,10 @@ final class SkemaHaloSimpegTest extends DatabaseTestCase
             $this->assertSame(1, $this->db->table('officer_category')->where('id', 7)->countAllResults(), 'tabel lama + barisnya utuh');
             $this->assertSame(['id' => 'int'], $this->skemaColumns('officer_category'), 'struktur tabel lama tidak disentuh');
         } finally {
-            $this->db->query('DROP TABLE IF EXISTS ' . $this->skemaQuoted('officer_category'));
+            // Bersihkan juga sisa run itu bila rollback rusak, agar test berikutnya tidak ikut merah (anak dulu).
+            foreach (array_reverse(CreateHaloSimpegFase8::TABEL) as $tabel) {
+                $this->db->query('DROP TABLE IF EXISTS ' . $this->skemaQuoted($tabel));
+            }
         }
     }
 
@@ -220,7 +223,13 @@ final class SkemaHaloSimpegTest extends DatabaseTestCase
             $this->assertSame(['id_question_category'], $tiket['fk_id_question_category_i_qc'] ?? null, 'KEY DBV-022 utuh');
             $this->assertSame(['id_inbox'], $pesan['fk_id_inbox_im_qc'] ?? null, 'KEY DBV-022 utuh');
         } finally {
-            $this->db->query('ALTER TABLE ' . $this->skemaQuoted('disiplin_ticket_msg') . ' DROP INDEX `idx_dticketmsg_inbox_waktu`');
+            // Lepas semua indeks DBV-028 yang masih ada (termasuk sisa rollback rusak); cek dulu agar galat 1091 tidak menimpa
+            // pesan assertion asli.
+            foreach (AlterDisiplinTicketIndeksFase8::INDEKS as $nama => [$tabel]) {
+                if (isset($this->skemaIndexes($tabel)[1][$nama])) {
+                    $this->db->query('ALTER TABLE ' . $this->skemaQuoted($tabel) . ' DROP INDEX ' . $this->db->escapeIdentifiers($nama));
+                }
+            }
         }
     }
 
@@ -270,7 +279,7 @@ final class SkemaHaloSimpegTest extends DatabaseTestCase
         $this->assertStringContainsString('Q-H17', $legacy);
         $this->assertStringNotContainsString('Q-H11', $legacy);
         $this->assertStringNotContainsString('Q-H17', $v2);
-        $this->assertCount(12, $this->kueri($legacy));
+        $this->assertCount(14, $this->kueri($legacy));
 
         // Data uji: Q-H13 menangkap segmen `.`/`..` dan karakter di luar pola; Q-H15 menghitung akun nonaktif sebagai tanpa petugas.
         $akun = $this->akun('dbv028.audit');
@@ -284,14 +293,16 @@ final class SkemaHaloSimpegTest extends DatabaseTestCase
         }
 
         $hasil = $this->jalankanAudit($v2);
-        $this->assertCount(18, $hasil);
+        $this->assertCount(20, $hasil);
         $this->assertSame(1, $hasil['Q-H19'], 'satu tiket di kategori petugas aktif');
         $this->assertSame(3, $hasil['Q-H13'], 'lampiran ../x.pdf, arsip/./x.pdf, a b.pdf');
         $this->assertSame(4, $hasil['Q-H14']);
         $this->assertSame(0, $hasil['Q-H15'], 'petugas + akun aktif');
 
         $this->db->table('pengguna')->where('id_pengguna', $akun)->update(['status' => '0']);
-        $this->assertSame(1, $this->jalankanAudit($v2)['Q-H15'], 'akun nonaktif → kategori tanpa petugas aktif');
+        $nonaktif = $this->jalankanAudit($v2);
+        $this->assertSame(1, $nonaktif['Q-H15'], 'akun nonaktif → kategori tanpa petugas aktif');
+        $this->assertSame(0, $nonaktif['Q-H19'], 'akun nonaktif → bukan petugas aktif');
     }
 
     /**
