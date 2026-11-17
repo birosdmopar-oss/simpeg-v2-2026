@@ -168,7 +168,7 @@ final class TiketNotifTest extends DatabaseTestCase
             {
                 $this->dipanggil++;
 
-                throw new RuntimeException('antrean mati');
+                throw new RuntimeException('antrean mati tiket-notif');
             }
 
             public function pop(string $queue, array $priorities): ?QueueJob
@@ -239,7 +239,7 @@ final class TiketNotifTest extends DatabaseTestCase
         $this->sebagai($this->ptt)->post(self::URL . "tiket/{$id}/pesan", ['msg' => 'Balas'])->assertStatus(201);
         $this->assertSame(2, $this->db->table('disiplin_ticket_msg')->where('id_inbox', $id)->countAllResults(), 'AC-E06.3');
         $this->assertSame(2, $antrean->dipanggil, 'push() benar-benar dipanggil dan melempar');
-        $this->assertLogContains('warning', 'Job push-pesan gagal diantre: antrean mati');
+        $this->assertLogContains('warning', 'Job push-pesan gagal diantre: antrean mati tiket-notif');
     }
 
     /**
