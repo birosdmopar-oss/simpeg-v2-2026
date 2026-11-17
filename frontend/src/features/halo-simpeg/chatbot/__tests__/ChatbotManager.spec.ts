@@ -220,6 +220,25 @@ describe('Chatbot Manager — QnA', () => {
     void w
   })
 
+  it('CR-134 T-02: pesan kategori Dihapus tidak tampil ganda — notice awal, lalu galat field saja sesudah submit', async () => {
+    svc.qna.detail.mockResolvedValue({ ...qna[1]!, jawaban: '<p>x</p>' })
+    svc.qna.simpan.mockRejectedValueOnce(apiError(422, galat422Qna.message, galat422Qna.errors))
+    const w = await pasang(QnaChatbotView)
+    await selectRowAction(w, 'chatbot-qna-actions-11', 'edit')
+    await flushPromises()
+    const form = () => document.querySelector('[data-testid="chatbot-qna-form"]') as HTMLFormElement
+    // Elemen daun yang teksnya persis pesan itu (notice atas form, galat field, notice peringatan).
+    const jumlah = () =>
+      [...form().querySelectorAll('*')].filter((el) => el.children.length === 0 && el.textContent?.trim() === galat422Qna.message).length
+    expect(jumlah()).toBe(1)
+    expect(document.querySelector('[data-testid="chatbot-qna-kategori-induk"]')).not.toBeNull()
+    form().dispatchEvent(new Event('submit'))
+    await flushPromises()
+    expect(jumlah()).toBe(1)
+    expect(document.querySelector('[data-testid="chatbot-qna-kategori-induk"]')).toBeNull()
+    void w
+  })
+
   it('Unduh template dan Impor Excel (ringkasan hasil; galat → tidak ada yang tersimpan)', async () => {
     svc.qna.template.mockResolvedValue({ blob: new Blob(['x']), nama: 'Template_Import_QnA.xlsx' })
     svc.qna.impor.mockResolvedValueOnce({ ditambah: 0, kategori_baru: 0, tag_baru: 0, dilewati: [], galat: [{ baris: 3, alasan: 'Kategori wajib diisi.' }] })
