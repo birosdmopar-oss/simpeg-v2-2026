@@ -442,3 +442,35 @@ Fixture ekspor (`galat-403-bukan-petugas`, `galat-422-ekspor`, `ekspor-kosong`) 
 | T11 | `q` = subjek atau isi pesan | [V2] |
 | T12 | Nama pengirim dan penutup = nama bergelar bila ada data pegawai | [V2] |
 | T13 | Q8 (c) dicatat sebagai ambang gladi, tidak diukur waktunya di CI | [V2] |
+
+---
+
+# Bagian notifikasi push (MAKE-072)
+
+Acuan: PRD Fase 8 v1.4 §6.4, §7.6, F8-13..F8-16, H8-14 (a). Tidak ada endpoint baru; notifikasi diantre `TicketNotifService`
+**sesudah commit** tulis tiket. Gagal menentukan penerima atau mengantre hanya dicatat log, dan pesan/tiket tetap tersimpan
+(AC-E06.3).
+
+| Kejadian | Penerima |
+|---|---|
+| Tiket baru | petugas aktif kategori tiket |
+| Balasan pemilik | petugas aktif kategori tiket |
+| Balasan petugas | pemilik tiket |
+| Tutup oleh pemilik | petugas aktif kategori tiket (F8-14) |
+| Tutup oleh petugas | pemilik tiket (F8-14) |
+
+- **Petugas aktif** = `support_officer.status = 1`, akun aktif, role 1–7 (F8-06, S12). Petugas nonaktif, akun nonaktif/terhapus, dan
+  akun role 8 tidak menerima.
+- **Pelaku dikecualikan**, termasuk petugas yang membuat atau membalas tiketnya sendiri.
+- Tiket berkategori NULL tidak punya petugas penerima (H8-16 (a1)).
+- Antrean: `AntrePushPesan::antreAkun(id_pengguna[])` → job `push-pesan` (CR-137), kanal `semua` (F8-15). Token web per akun
+  (termasuk petugas role 1 tanpa NIP, AC-E06.7) dan token Android lewat NIP akun bila ada; token yang sama dikirim sekali; token
+  tidak sah (`UNREGISTERED`) dihapus; job yang semua kirimannya gagal dicoba ulang terbatas (`PushPesanJob::TRIES` = 3). Catatan
+  percobaan ke `integrasi_log` dilakukan adapter FCM (`KlienHttp`, layanan `fcm`).
+- **Payload terbatas F8-16** (H8-8 belum ada; uji push real ke perangkat dicatat ke DEPLOY-001.1):
+  - judul `"Halo Simpeg"`;
+  - isi = teks pesan, spasi dirapatkan, maksimal 100 karakter + `…`; untuk tutup: `"Percakapan Halo Simpeg telah ditutup."`;
+  - `data = {modul: "halo-simpeg", id_inbox: "<id>", url: "/halo-simpeg/tiket/<id>", link: "/halo-simpeg/tiket/<id>"}`
+    (`link` dibuka service worker web, `url` untuk klien lain);
+  - tanpa NIP, jabatan, satker, token, atau isi pesan lengkap (AC-E06.5). Kunci kompatibilitas Android menunggu PN8-1.
+- BP8-1: alur ini tidak menulis `inbox`/`inbox_msg` (AC-E06.6, §7.8 (3)).
