@@ -206,8 +206,8 @@ const kelasChip =
             </p>
             <span class="mt-0.5 text-[0.6rem] text-slate-400" aria-hidden="true" data-testid="vanya-jam">{{ p.jam }}</span>
           </div>
-          <div v-else class="flex max-w-[92%] items-end gap-2">
-            <span class="mb-4 h-7 w-7 shrink-0 overflow-hidden rounded-full"><VanyaAvatar :size="28" /></span>
+          <div v-else class="flex max-w-[92%] items-start gap-2">
+            <span class="h-7 w-7 shrink-0 overflow-hidden rounded-full"><VanyaAvatar :size="28" /></span>
             <div class="flex min-w-0 flex-col">
               <div
                 class="flex min-w-0 flex-col gap-2"
@@ -267,7 +267,7 @@ const kelasChip =
             </div>
           </div>
         </template>
-        <div v-if="state.mengetik" class="flex items-end gap-2" data-testid="vanya-mengetik">
+        <div v-if="state.mengetik" class="flex items-start gap-2" data-testid="vanya-mengetik">
           <span class="h-7 w-7 shrink-0 overflow-hidden rounded-full"><VanyaAvatar :size="28" /></span>
           <p
             class="flex items-center gap-1 rounded-2xl rounded-bl-sm border border-slate-200 bg-white px-3 py-3"

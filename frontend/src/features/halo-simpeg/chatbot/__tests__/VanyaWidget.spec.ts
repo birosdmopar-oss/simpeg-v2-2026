@@ -559,3 +559,24 @@ describe('VanyaWidget — lintas halaman & logout', () => {
     expect(w2.findAll('[data-pesan="user"]')).toHaveLength(0)
   })
 })
+
+describe('VanyaWidget — tata letak gelembung bot (CR-134)', () => {
+  it('[K] avatar mini bot rata atas pada gelembung dan indikator mengetik', async () => {
+    let lepas: (v: BalasanWidget) => void = () => {}
+    svc.balas.mockImplementationOnce(() => new Promise<BalasanWidget>((r) => (lepas = r)))
+    const w = await pasang()
+    await bukaChat(w)
+    // Gelembung → kolom isi → baris (avatar + kolom isi).
+    const baris = w.get('[data-pesan="sistem"]').element.parentElement!.parentElement as HTMLElement
+    expect(baris.classList.contains('items-start')).toBe(true)
+    expect(baris.classList.contains('items-end')).toBe(false)
+    expect((baris.firstElementChild as HTMLElement).classList.contains('mb-4')).toBe(false)
+
+    await w.get('[data-testid="vanya-input"]').setValue('cuti')
+    await w.get('[data-testid="vanya-form"]').trigger('submit')
+    await flushPromises()
+    expect(w.get('[data-testid="vanya-mengetik"]').classes()).toContain('items-start')
+    lepas(cocok())
+    await flushPromises()
+  })
+})
