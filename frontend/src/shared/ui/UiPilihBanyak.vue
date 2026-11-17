@@ -3,7 +3,8 @@
  * Pilihan ganda berupa daftar kotak ceklis dengan pencarian (CR-134, R10 langkah 1): pengganti `<select multiple>` bawaan
  * browser (AGENTS.md bagian 3). Dipakai tag QnA chatbot dan kategori petugas Halo Simpeg.
  *
- * - `fieldset` + `legend` (jumlah terpilih ikut dibacakan); petunjuk dan galat terhubung lewat `aria-describedby`.
+ * - `fieldset` + `legend` (jumlah terpilih ikut dibacakan); petunjuk dan galat terhubung lewat `aria-describedby`. Saat galat,
+ *   tiap kotak ceklis `aria-invalid` + `aria-describedby` ke pesan galat (role group tidak mendukung `aria-invalid`).
  * - Tiap opsi `UiCheckbox` (input asli tersembunyi, tetap fokusable: Tab berpindah opsi, Spasi mencentang).
  * - `disabled` hanya mengunci kotak ceklis; kotak cari tetap aktif agar fokus tidak lepas saat form dikirim.
  * - Penyaringan hanya menyembunyikan opsi; nilai terpilih yang tidak cocok kata kunci atau tidak ada di `opsi`
@@ -71,7 +72,6 @@ function ubah(id: number, centang: boolean): void {
   <fieldset
     class="rounded-lg border p-3"
     :class="error ? 'border-danger' : 'border-slate-300'"
-    :aria-invalid="error ? 'true' : undefined"
     :aria-describedby="describedBy"
     :data-testid="testid"
   >
@@ -93,6 +93,7 @@ function ubah(id: number, centang: boolean): void {
           :label="o.label"
           :disabled="disabled"
           :invalid="Boolean(error)"
+          :described-by="error ? idGalat : undefined"
           @update:model-value="ubah(o.id, $event)"
         />
         <UiBadge v-if="o.badge" tone="neutral" size="sm" :data-status="o.badge.status">{{ o.badge.teks }}</UiBadge>

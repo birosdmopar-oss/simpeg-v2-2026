@@ -105,20 +105,26 @@ describe('UiPilihBanyak', () => {
     expect(badge?.textContent).toBe('Tidak Aktif')
   })
 
-  it('petunjuk dan galat terhubung lewat aria-describedby; galat = role alert + aria-invalid', () => {
+  it('petunjuk dan galat terhubung lewat aria-describedby; galat = role alert, aria-invalid di tiap kotak ceklis', () => {
     pasang([], { petunjuk: 'Minimal satu kategori.', error: 'Kategori wajib dipilih.' })
     const fs = document.querySelector('[data-testid="uji-pilih"]')!
-    expect(fs.getAttribute('aria-invalid')).toBe('true')
+    expect(fs.hasAttribute('aria-invalid')).toBe(false)
     const ids = (fs.getAttribute('aria-describedby') ?? '').split(' ')
     expect(ids).toHaveLength(2)
     expect(ids.map((id) => document.getElementById(id)?.textContent)).toEqual(['Minimal satu kategori.', 'Kategori wajib dipilih.'])
     expect(document.querySelector('[role="alert"]')?.textContent).toBe('Kategori wajib dipilih.')
-    expect(kotak(1).getAttribute('aria-invalid')).toBe('true')
+    const idGalat = document.querySelector('[role="alert"]')!.id
+    for (const id of [1, 2, 3]) {
+      expect(kotak(id).getAttribute('aria-invalid')).toBe('true')
+      expect(kotak(id).getAttribute('aria-describedby')).toBe(idGalat)
+    }
   })
 
   it('tanpa petunjuk/galat: tanpa aria-describedby', () => {
     pasang()
     expect(document.querySelector('[data-testid="uji-pilih"]')!.hasAttribute('aria-describedby')).toBe(false)
+    expect(kotak(1).hasAttribute('aria-invalid')).toBe(false)
+    expect(kotak(1).hasAttribute('aria-describedby')).toBe(false)
   })
 
   it('disabled mengunci kotak ceklis saja; kotak cari tetap aktif', () => {
