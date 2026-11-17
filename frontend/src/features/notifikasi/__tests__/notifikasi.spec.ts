@@ -16,6 +16,7 @@ vi.mock('@/features/auth/services/auth.service', () => ({
 }))
 
 import { Role, type RoleCode } from '@/features/auth/types'
+import { resetHaloSimpeg, setRingkasanHalo } from '@/features/halo-simpeg/stores/haloSimpeg'
 import { api } from '@/lib/axios'
 import { rowMenuActions, selectRowAction } from '@/shared/components/__tests__/rowActionsMenu.helpers'
 import RedesignShell from '@/shared/layouts/RedesignShell.vue'
@@ -56,6 +57,7 @@ function routerUji() {
   router.addRoute({ path: '/notifikasi', name: 'notifikasi', component: stub })
   router.addRoute({ path: '/pegawai/:nip/x', component: stub })
   router.addRoute({ path: '/layanan/cuti/:id', component: stub })
+  router.addRoute({ path: '/halo-simpeg', name: 'halo-simpeg', component: stub })
   return router
 }
 
@@ -179,6 +181,43 @@ describe('NotifikasiPage — tab per role (Q7-29)', () => {
     expect(await tabUntuk(Role.PEGAWAI)).toEqual(['Notifikasi', 'Butuh Approval', 'Histori Approval'])
     expect(await tabUntuk(Role.PTT)).toEqual([])
     expect(await tabUntuk(Role.SUPER_ADMIN)).toEqual(['Butuh Approval', 'Histori Approval'])
+  })
+})
+
+describe('NotifikasiPage — entri Tiket Halo Simpeg (H8-15 (b), MAKE-073)', () => {
+  async function pasang(role: RoleCode, tiket: number | null) {
+    get.mockImplementation(async (path: string) => ({ data: path === '/notifikasi/ringkasan' ? { ...RINGKASAN, tiket_belum_dibaca: tiket } : jawab(path) }) as never)
+    loginAs(role)
+    const router = routerUji()
+    await router.push('/notifikasi')
+    const wrapper = mount(NotifikasiPage, { global: { plugins: [router] }, attachTo: document.body })
+    await flushPromises()
+    return { wrapper, router }
+  }
+
+  afterEach(() => resetHaloSimpeg())
+
+  it.each([0, null])('tiket_belum_dibaca %s → entri tidak tampil', async (n) => {
+    const { wrapper } = await pasang(Role.PEGAWAI, n)
+    expect(wrapper.find('[data-testid="notifikasi-entri-tiket"]').exists()).toBe(false)
+  })
+
+  it('tampil di atas tab dengan angka; tanpa ringkasan sisi petugas → /halo-simpeg', async () => {
+    const { wrapper, router } = await pasang(Role.PEGAWAI, 3)
+    const entri = wrapper.get('[data-testid="notifikasi-entri-tiket"]')
+    expect(entri.text()).toBe('Tiket Halo Simpeg (3)')
+    expect(entri.element.compareDocumentPosition(wrapper.get('[data-testid="notifikasi-tabs"]').element) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    await entri.trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.fullPath).toBe('/halo-simpeg')
+  })
+
+  it('sisi petugas punya angka → tab antrean', async () => {
+    setRingkasanHalo({ belum_dibaca_saya: 0, belum_dibaca_petugas: 0, perlu_tindak: 1, badge: 1, total: 0 })
+    const { wrapper, router } = await pasang(Role.SUPER_ADMIN, 2)
+    await wrapper.get('[data-testid="notifikasi-entri-tiket"]').trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.fullPath).toBe('/halo-simpeg?tab=antrean')
   })
 })
 
