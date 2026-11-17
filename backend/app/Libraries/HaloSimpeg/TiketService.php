@@ -71,11 +71,14 @@ final class TiketService extends MasterHaloSimpeg
 
     private readonly ThrottlerInterface $throttler;
 
-    public function __construct(?BaseConnection $db = null, ?HaloSimpeg $config = null, ?StorageAdapterInterface $storage = null, ?ThrottlerInterface $throttler = null)
+    private readonly TicketNotifService $notif;
+
+    public function __construct(?BaseConnection $db = null, ?HaloSimpeg $config = null, ?StorageAdapterInterface $storage = null, ?ThrottlerInterface $throttler = null, ?TicketNotifService $notif = null)
     {
         parent::__construct($db, $config);
         $this->storage   = $storage ?? service('storageAdapter');
         $this->throttler = $throttler ?? Services::throttler();
+        $this->notif     = $notif ?? new TicketNotifService($this->db, null, $this->config);
     }
 
     // ================================================================================================== baca
@@ -330,6 +333,9 @@ final class TiketService extends MasterHaloSimpeg
             $penjaga->selesaikan();
         }
 
+        // Sesudah commit (F8-13, MAKE-072): petugas aktif kategori; gagal antre tidak menggagalkan tiket.
+        $this->notif->tiketBaru($this->ambilTiket($id) ?? ['id_inbox' => $id, 'sender' => $akses->idPengguna, 'id_question_category' => (int) $kategori], $akses->idPengguna, $pesan);
+
         return $this->susunDetail($this->ambilBaris($id) ?? throw new NotFoundException(AksesTiket::PESAN_404), $akses);
     }
 
@@ -401,7 +407,9 @@ final class TiketService extends MasterHaloSimpeg
             $penjaga->selesaikan();
         }
 
-        $t         = $this->ambilBaris($id) ?? throw new NotFoundException(AksesTiket::PESAN_404);
+        $t = $this->ambilBaris($id) ?? throw new NotFoundException(AksesTiket::PESAN_404);
+        // Sesudah commit (F8-13, MAKE-072): pihak lawan pembalas.
+        $this->notif->balasan($t, $akses->idPengguna, $pesan);
         $pesanList = $this->susunPesan($t, $akses);
         $satu      = array_values(array_filter($pesanList, static fn (array $p): bool => $p['id_inbox_msg'] === $idPesan));
 
@@ -449,6 +457,8 @@ final class TiketService extends MasterHaloSimpeg
         });
 
         $t = $this->ambilBaris($id) ?? throw new NotFoundException(AksesTiket::PESAN_404);
+        // Sesudah commit (F8-14, MAKE-072): pihak lawan penutup.
+        $this->notif->ditutup($t, $akses->idPengguna);
 
         return $this->baris($t, $akses, $this->sisiPetugas($t, $akses));
     }

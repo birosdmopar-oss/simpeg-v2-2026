@@ -19,6 +19,10 @@ use Throwable;
  * {keterangan}", data = baris popup + `file_url`] milik modul Popup Fase 7 (F-04) — memakai titik ini saat modul itu
  * dibangun; TIDAK dikirim di B5 (review MAKE-066 P1).
  *
+ * CR-137 (PRD Fase 8 v1.4 F8-13, H8-14 (a)): {@see self::antreAkun} — penerima per `id_pengguna` (aditif): token web per akun
+ * dan token Android lewat `pengguna.nip` bila ada, sehingga akun tanpa NIP (mis. petugas role 1) tetap menerima push web. Jalur
+ * {@see self::antre} (`nip[]`) dan job yang sudah antre tidak berubah.
+ *
  * Kanal: `android` (bawaan, ikut legacy `andr_notif_queue`), `web`, atau `semua`. Job diantre untuk driver apa pun, sama
  * dengan push inbox Fase 4 (driver `mock` hanya mencatat payload). Kegagalan mengantre dicatat sebagai peringatan dan TIDAK
  * dilempar.
@@ -39,6 +43,22 @@ final class AntrePushPesan
     }
 
     /**
+     * Penerima per akun (CR-137): data job `{akun: list<int>, judul, isi, data, kanal}`; id kosong/≤ 0 dibuang, ganda digabung.
+     *
+     * @param list<int>             $idPengguna id akun penerima
+     * @param array<string, string> $data       data tambahan (pasangan string)
+     * @param string                $kanal      salah satu {@see self::KANAL}
+     *
+     * @return bool true bila job diantre
+     */
+    public function antreAkun(array $idPengguna, string $judul, string $isi, array $data = [], string $kanal = 'android'): bool
+    {
+        $akun = array_values(array_unique(array_filter(array_map('intval', $idPengguna), static fn (int $i): bool => $i > 0)));
+
+        return $this->kirimJob(['akun' => $akun], $akun === [], $judul, $isi, $data, $kanal);
+    }
+
+    /**
      * @param list<string>          $nips  NIP penerima
      * @param array<string, string> $data  data tambahan (pasangan string; `link` = tautan SPA relatif untuk web)
      * @param string                $kanal salah satu {@see self::KANAL}
@@ -49,13 +69,21 @@ final class AntrePushPesan
     {
         $nips = array_values(array_unique(array_filter(array_map(static fn (mixed $n): string => trim((string) $n), $nips), static fn (string $n): bool => $n !== '')));
 
-        if ($nips === [] || trim($judul) === '' || ! in_array($kanal, self::KANAL, true)) {
+        return $this->kirimJob(['nip' => $nips], $nips === [], $judul, $isi, $data, $kanal);
+    }
+
+    /**
+     * @param array<string, list<int>|list<string>> $penerima `nip` atau `akun`
+     * @param array<string, string>                 $data
+     */
+    private function kirimJob(array $penerima, bool $kosong, string $judul, string $isi, array $data, string $kanal): bool
+    {
+        if ($kosong || trim($judul) === '' || ! in_array($kanal, self::KANAL, true)) {
             return false;
         }
 
         try {
-            $ok = ($this->antrean)()->push(PushPesanJob::ANTREAN, PushPesanJob::NAMA, [
-                'nip'   => $nips,
+            $ok = ($this->antrean)()->push(PushPesanJob::ANTREAN, PushPesanJob::NAMA, $penerima + [
                 'judul' => $judul,
                 'isi'   => $isi,
                 'data'  => array_map('strval', $data),
