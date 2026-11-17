@@ -137,7 +137,9 @@ async function onSubmit(): Promise<void> {
     emit('update:open', false)
   } catch (e) {
     serverErrors.value = galatPerKolom(e, (f) => PETA_GALAT[f] ?? (f.startsWith('tag') ? 'tag' : f))
-    formError.value = isApiError(e) ? e.message : 'Terjadi kesalahan. Silakan coba lagi.'
+    const pesan = isApiError(e) ? e.message : 'Terjadi kesalahan. Silakan coba lagi.'
+    // CR-134 T-02: pesan yang sudah tampil sebagai galat kolom tidak diulang di notice atas form.
+    formError.value = Object.values(serverErrors.value).includes(pesan) ? '' : pesan
   } finally {
     submitting.value = false
   }
@@ -185,7 +187,8 @@ async function onSubmit(): Promise<void> {
             <UiRadioGroup v-model="form.fallback" name="is_fallback_option" label="Opsi Alternatif" :options="YA_TIDAK" />
             <p class="mt-1 text-caption text-slate-500">Ditampilkan di tombol "Pertanyaan Populer" saat bot tidak paham. Maks. 3 QnA unggulan.</p>
           </div>
-          <div v-if="kategoriDihapus || kategoriTidakAktif" :class="FORM_WIDE_CLASS">
+          <!-- CR-134 T-02: penanda keadaan awal; sesudah submit, galat 422 kategori tampil di field saja (tanpa teks ganda). -->
+          <div v-if="(kategoriDihapus || kategoriTidakAktif) && !serverErrors.id_kategori" :class="FORM_WIDE_CLASS">
             <UiNotice :tone="kategoriDihapus ? 'warning' : 'info'" data-testid="chatbot-qna-kategori-induk">
               {{ kategoriDihapus ? 'Kategori QnA sudah dihapus. Pilih kategori lain.' : 'Kategori QnA ini Tidak Aktif; boleh dipertahankan.' }}
             </UiNotice>
