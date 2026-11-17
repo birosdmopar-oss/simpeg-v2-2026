@@ -57,7 +57,7 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
     /**
      * Prefiks modul yang sudah ada di main (Fase 0–3). Route di luar prefiks ini tidak diperiksa.
      */
-    private const PREFIKS_CAKUPAN = '#^api/v1/(health|auth|master|hari-libur|web-config|faq|_rbac|pegawai|biodata|struktur-organisasi|penugasan|konket|lkh|usulan|ak-jf|statistik|dokumen|dashboard|form-digital|survei-layanan|cuti|tb|ib|pmk|layanan|slip-gaji|publik|presensi|integrasi|notifikasi|konten|halo-simpeg/chatbot)(/|$)#';
+    private const PREFIKS_CAKUPAN = '#^api/v1/(health|auth|master|hari-libur|web-config|faq|_rbac|pegawai|biodata|struktur-organisasi|penugasan|konket|lkh|usulan|ak-jf|statistik|dokumen|dashboard|form-digital|survei-layanan|cuti|tb|ib|pmk|layanan|slip-gaji|publik|presensi|integrasi|notifikasi|konten|halo-simpeg)(/|$)#';
 
     /**
      * Master yang dropdown `{key}/options`-nya hanya role 1 (publicOptions false, CR-003): konten FAQ.
@@ -198,6 +198,27 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
             'DELETE api/v1/halo-simpeg/chatbot/qna/([0-9]+)'                    => [1],
             'GET api/v1/halo-simpeg/chatbot/statistik'                          => [1],
             'GET api/v1/halo-simpeg/chatbot/riwayat'                            => [1],
+            // Modul E — Fase 8 helpdesk master (MAKE-070, PRD Fase 8 v1.3 §6.1, A0 §11): baca bersama role 1–7 (F8-04, Matriks
+            // `halo_simpeg` `SC:466`); kelola master role 1 [K `SC:13-438` `['1']`, F8-05]; kontak aktif role 1–7 [V2] (Q8-12, Q-A0-7).
+            'GET api/v1/halo-simpeg/kategori/opsi'              => [1, 2, 3, 4, 5, 6, 7],
+            'GET api/v1/halo-simpeg/petugas/saya'               => [1, 2, 3, 4, 5, 6, 7],
+            'GET api/v1/halo-simpeg/petugas/kandidat'           => [1],
+            'GET api/v1/halo-simpeg/kontak/aktif'               => [1, 2, 3, 4, 5, 6, 7],
+            'GET api/v1/halo-simpeg/kategori'                   => [1],
+            'POST api/v1/halo-simpeg/kategori'                  => [1],
+            'PUT api/v1/halo-simpeg/kategori/([0-9]+)'          => [1],
+            'PATCH api/v1/halo-simpeg/kategori/([0-9]+)/status' => [1],
+            'DELETE api/v1/halo-simpeg/kategori/([0-9]+)'       => [1],
+            'GET api/v1/halo-simpeg/petugas'                    => [1],
+            'POST api/v1/halo-simpeg/petugas'                   => [1],
+            'PUT api/v1/halo-simpeg/petugas/([0-9]+)'           => [1],
+            'PATCH api/v1/halo-simpeg/petugas/([0-9]+)/status'  => [1],
+            'DELETE api/v1/halo-simpeg/petugas/([0-9]+)'        => [1],
+            'GET api/v1/halo-simpeg/kontak'                     => [1],
+            'POST api/v1/halo-simpeg/kontak'                    => [1],
+            'PUT api/v1/halo-simpeg/kontak/([0-9]+)'            => [1],
+            'PATCH api/v1/halo-simpeg/kontak/([0-9]+)/status'   => [1],
+            'DELETE api/v1/halo-simpeg/kontak/([0-9]+)'         => [1],
             // Modul C — Fase 4 C-07 Tugas Belajar (MAKE-024 M5): PRD §5.2, Matriks `hr/rwy/tb/*` = 1, 2, 3, 6 (role 7 → 403,
             // DoD 070-4); aturan pemilik/PIC/lingkup/role 1 di service (TbService::ROLE_ROUTE).
             'GET api/v1/tb'                            => [1, 2, 3, 6],
