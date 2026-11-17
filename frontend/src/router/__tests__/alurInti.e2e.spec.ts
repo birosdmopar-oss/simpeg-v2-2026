@@ -11,7 +11,7 @@
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
 import { createPinia, setActivePinia, type Pinia } from 'pinia'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h } from 'vue'
 import { RouterView } from 'vue-router'
 
@@ -137,7 +137,7 @@ async function pasangAplikasi(path: string) {
   return wrapper
 }
 
-/** Tunggu import halaman (lazy route), request tiruan, dan debounce daftar pegawai (250 ms). */
+/** Tunggu request tiruan dan debounce daftar pegawai (250 ms); import halaman sudah dimuat di `beforeAll`. */
 async function muatTuntas(): Promise<void> {
   await flushPromises()
   await new Promise((resolve) => setTimeout(resolve, 300))
@@ -145,8 +145,8 @@ async function muatTuntas(): Promise<void> {
 }
 
 /**
- * Navigasi yang dipicu UI (submit login, klik tautan) tidak bisa di-await langsung: tunggu sampai route tujuan aktif
- * (import lazy halaman pertama kali bisa lebih dari ratusan ms di Vitest), lalu tunggu data halaman termuat.
+ * Navigasi yang dipicu UI (submit login, klik tautan) tidak bisa di-await langsung: tunggu sampai route tujuan aktif,
+ * lalu tunggu data halaman termuat.
  */
 async function tungguRoute(name: string): Promise<void> {
   await vi.waitFor(() => expect(router.currentRoute.value.name).toBe(name), { timeout: 5000, interval: 20 })
@@ -154,6 +154,31 @@ async function tungguRoute(name: string): Promise<void> {
 }
 
 enableAutoUnmount(afterEach)
+
+/** Path yang dibuka test di file ini (termasuk tujuan redirect guard). */
+const RUTE_DIPAKAI = ['/', '/login', '/master/agama', '/pegawai', `/pegawai/${PEGAWAI.nip}`, '/403']
+
+/**
+ * CR-140: komponen halaman route bersifat lazy (`() => import(…)`); import pertama kali = transform + evaluasi Vite atas
+ * seluruh pohon modul halaman. Terukur saat mesin idle: HomeView (+ RedesignShell + dashboard) ±2,4 s, LoginView
+ * ±0,7 s, DetailPegawai ±0,8 s, seluruh RUTE_DIPAKAI ±4,5 s. Dulu biaya sekali-jalan ini terjadi DI DALAM test dan
+ * memakan batas 5 s per test: di bawah beban CPU penuh test pertama 6,9–8,9 s → timeout di 5 dari 5 run.
+ *
+ * Loader yang sama (dari record router asli) kini dipanggil sekali di sini, sehingga test hanya mengukur alur:
+ * navigasi router tetap memanggil loader-nya sendiri, tetapi modulnya sudah ada di cache modul. Di bawah beban yang
+ * sama test terlama per run 1,0–3,0 s (batas 5 s per test tidak diubah), sedangkan hook ini 11,6–38,7 s (9 run). Batas 120 s
+ * berlaku HANYA untuk hook muat modul ini (±3× angka terburuk), bukan untuk alur test.
+ */
+beforeAll(async () => {
+  const loaders = RUTE_DIPAKAI.flatMap((path) =>
+    router.resolve(path).matched.flatMap((record) => Object.values(record.components ?? {})),
+  )
+  // Berurutan, seperti navigasi asli (satu halaman per waktu). Varian Promise.all sempat melewati 60 s di 3 dari 10
+  // run di bawah beban, sedangkan varian berurutan tidak pernah.
+  for (const loader of loaders) {
+    if (typeof loader === 'function') await (loader as () => Promise<unknown>)()
+  }
+}, 120_000)
 
 beforeEach(async () => {
   pinia = createPinia()
