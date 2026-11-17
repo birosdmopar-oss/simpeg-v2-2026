@@ -93,6 +93,18 @@ export interface FilterMaster {
   per_page?: number
 }
 
+/**
+ * SEMENTARA (bentuk PRD v1.3 §6.1b, §6.2): ringkasan tiket helpdesk. Dicocokkan ulang dengan README MAKE-071 saat beku.
+ * `badge` = distinct(belum dibaca ∪ perlu_tindak) untuk menu; `total` = angka lonceng.
+ */
+export interface RingkasanHalo {
+  belum_dibaca_saya: number
+  belum_dibaca_petugas: number
+  perlu_tindak: number
+  badge: number
+  total: number
+}
+
 // --- form (nama masukan legacy dibentuk di service) --------------------------------------------------------------------
 
 export interface KategoriForm {
