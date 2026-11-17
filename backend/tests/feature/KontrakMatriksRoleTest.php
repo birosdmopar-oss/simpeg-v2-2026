@@ -219,6 +219,18 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
             'PUT api/v1/halo-simpeg/kontak/([0-9]+)'            => [1],
             'PATCH api/v1/halo-simpeg/kontak/([0-9]+)/status'   => [1],
             'DELETE api/v1/halo-simpeg/kontak/([0-9]+)'         => [1],
+            // Modul E — Fase 8 tiket (MAKE-071, PRD Fase 8 v1.3 §6.1, K-A7): Matriks `hr/support/halo_simpeg`, `conversations`,
+            // `add_conversation`, `close_inbox` = 1–7 (`SC:466`, `:498`, `:550`, `:663`, `:710`); buat tiket = UL_PEGAWAI (`SC:608`);
+            // `baca`, lampiran, ringkasan = [V2] 1–7. Kewenangan objek di service (AksesTiket).
+            'GET api/v1/halo-simpeg/tiket/ringkasan'                        => [1, 2, 3, 4, 5, 6, 7],
+            'GET api/v1/halo-simpeg/tiket'                                  => [1, 2, 3, 4, 5, 6, 7],
+            'POST api/v1/halo-simpeg/tiket'                                 => [2, 6, 7],
+            'GET api/v1/halo-simpeg/tiket/([0-9]+)/pesan/([0-9]+)/lampiran' => [1, 2, 3, 4, 5, 6, 7],
+            'POST api/v1/halo-simpeg/tiket/([0-9]+)/pesan'                  => [1, 2, 3, 4, 5, 6, 7],
+            'POST api/v1/halo-simpeg/tiket/([0-9]+)/baca'                   => [1, 2, 3, 4, 5, 6, 7],
+            'POST api/v1/halo-simpeg/tiket/([0-9]+)/tutup'                  => [1, 2, 3, 4, 5, 6, 7],
+            'GET api/v1/halo-simpeg/tiket/([0-9]+)'                         => [1, 2, 3, 4, 5, 6, 7],
+            'DELETE api/v1/halo-simpeg/tiket/([0-9]+)'                      => [1, 2, 3, 4, 5, 6, 7],
             // Modul C — Fase 4 C-07 Tugas Belajar (MAKE-024 M5): PRD §5.2, Matriks `hr/rwy/tb/*` = 1, 2, 3, 6 (role 7 → 403,
             // DoD 070-4); aturan pemilik/PIC/lingkup/role 1 di service (TbService::ROLE_ROUTE).
             'GET api/v1/tb'                            => [1, 2, 3, 6],
