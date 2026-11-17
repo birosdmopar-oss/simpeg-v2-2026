@@ -264,6 +264,38 @@ describe('Chatbot Manager — QnA', () => {
     expect(document.querySelector('[data-testid="impor-daftar-dilewati"]')?.textContent).toContain('Baris 7')
     expect(w.text()).toContain('Data QnA beserta Kategori dan Tag berhasil diimpor!')
   })
+
+  it('CR-134 T-03: galat dan ringkasan unggahan lama hilang saat berkas berganti atau ditolak sisi klien', async () => {
+    svc.qna.impor.mockRejectedValueOnce(apiError(422, 'Berkas harus berformat .xlsx.', { berkas: ['Berkas harus berformat .xlsx.'] }))
+    svc.qna.impor.mockResolvedValueOnce({ ditambah: 0, kategori_baru: 0, tag_baru: 0, dilewati: [], galat: [{ baris: 2, alasan: 'Format template tidak sesuai.' }] })
+    const w = await pasang(QnaChatbotView)
+    await w.get('[data-testid="chatbot-qna-impor"]').trigger('click')
+    await flushPromises()
+    const field = w.findComponent({ name: 'UiFileField' })
+    const kirim = async () => {
+      ;(document.querySelector('[data-testid="chatbot-impor-kirim"]') as HTMLButtonElement).click()
+      await flushPromises()
+    }
+    const galatTampil = () => document.querySelector('[data-testid="chatbot-impor-galat"]')
+    const hasilTampil = () => document.querySelector('[data-testid="chatbot-impor-hasil"]')
+
+    // Berkas A → 422 → pilih berkas B (valid, belum Impor) → galat lama hilang.
+    field.vm.$emit('change', new File(['x'], 'a.xlsx'))
+    await flushPromises()
+    await kirim()
+    expect(galatTampil()?.textContent).toContain('Berkas harus berformat .xlsx.')
+    field.vm.$emit('change', new File(['y'], 'b.xlsx'))
+    await flushPromises()
+    expect(galatTampil()).toBeNull()
+
+    // Ringkasan baris galat → berkas ditolak sisi klien (> 2 MB → null) → ringkasan lama hilang.
+    await kirim()
+    expect(hasilTampil()?.textContent).toContain('Format template tidak sesuai.')
+    field.vm.$emit('change', null)
+    await flushPromises()
+    expect(hasilTampil()).toBeNull()
+    expect(galatTampil()).toBeNull()
+  })
 })
 
 describe('Chatbot Manager — Statistik & Riwayat', () => {
