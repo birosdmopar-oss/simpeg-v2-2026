@@ -72,6 +72,14 @@ export function muatPetugasSaya(paksa = false): Promise<void> {
   return janji
 }
 
+/**
+ * Pasang ringkasan helpdesk (badge menu, tujuan entri lonceng). Sumber = `GET tiket/ringkasan` / respons `POST …/baca`
+ * (MAKE-071); sementara belum ada pemanggil di aplikasi.
+ */
+export function setRingkasanHalo(ringkasan: RingkasanHalo | null): void {
+  state.ringkasan = ringkasan
+}
+
 /** Dipanggil dari `clearSession()` (logout / sesi berganti): kosongkan semua state helpdesk. */
 export function resetHaloSimpeg(): void {
   generasi += 1

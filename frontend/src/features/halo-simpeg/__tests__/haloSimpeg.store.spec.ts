@@ -15,7 +15,7 @@ vi.mock('../services/master.service', async (asli) => ({
 
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 
-import { bisaEkspor, haloState, muatPetugasSaya, petugasAktif, resetHaloSimpeg } from '../stores/haloSimpeg'
+import { bisaEkspor, haloState, muatPetugasSaya, petugasAktif, resetHaloSimpeg, setRingkasanHalo } from '../stores/haloSimpeg'
 import type { PetugasSaya } from '../types'
 import sayaAktif from './fixtures/petugas-saya-aktif.json'
 import sayaBukan from './fixtures/petugas-saya-bukan.json'
@@ -96,6 +96,7 @@ describe('state helpdesk — petugas/saya', () => {
     svc.saya.mockResolvedValue(AKTIF)
     await muatPetugasSaya()
     expect(petugasAktif.value).toBe(true)
+    setRingkasanHalo({ belum_dibaca_saya: 1, belum_dibaca_petugas: 0, perlu_tindak: 0, badge: 1, total: 1 })
     useAuthStore().clearSession()
     expect(haloState.petugasSaya).toBeNull()
     expect(haloState.ringkasan).toBeNull()
