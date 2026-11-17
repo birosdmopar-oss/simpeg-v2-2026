@@ -34,6 +34,18 @@ Simpeg: tidak memakai service, store, route, atau komponen helpdesk.
   frame Figma (dicatat). Teks sapaan, salam, pengantar bubble, fallback, galat, dan penilaian mengikuti dev.
   Jam HH:MM di bawah tiap balon ikut dev (`jam()` waktu lokal). Penyesuaian token v2 (K-11) yang dicatat: launcher 64 px
   (dev `--vanya-ukuran`), warna aksen pink dev → `brand-tertiary`, kepala navy dev → `brand-primary`.
+- **Keputusan tampilan [V2] PN8-8** (Horii 17-11-2026, "ikut rekomendasi"; pembanding tangkapan layar widget dev). Butir di
+  bawah ini disengaja, **bukan cacat QA**:
+  - avatar tetap ilustrasi SVG `VanyaAvatar`; foto avatar dev tidak dipakai (PN8-7) dan tidak disalin ke repo;
+  - aksen **biru `brand-tertiary`** (bukan pink dev) untuk chip, balon pengguna, tombol kirim, dan denyut launcher;
+  - saat jawaban dimuat (termasuk GET topik/populer): tombol kirim, chip, dan tombol footer **disabled** dengan indikator mengetik
+    (perilaku v2);
+  - tombol kirim pudar (`disabled`) selama kotak ketik kosong;
+  - launcher 64 px dan gaya nama "Vanya" di kepala jendela tetap v2;
+  - gradien kepala dari `brand-primary`;
+  - font mengikuti token redesign v2 (bukan font dev).
+
+  Yang **ikut dev [K]**: avatar mini bot rata atas terhadap gelembung dan indikator mengetik (CR-134).
 - **Batas pesan 300** dihitung per code point (sama dengan `mb_strlen` BE), bukan satuan UTF-16 `maxlength` native
   (hanya pengaman 2×): input dipangkas ke 300 code point dan `kirim()` tetap menolak yang lebih panjang.
 - **Fokus:** sesudah memilih chip, Topik/Populer, atau menilai, fokus kembali ke kotak ketik.
