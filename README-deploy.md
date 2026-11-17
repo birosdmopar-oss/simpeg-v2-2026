@@ -732,7 +732,7 @@ repo publik):
 | **B6:** irisan NULL + Open + pengirim yatim | Q-H12 | dicatat; tiket ini tidak terlihat siapa pun (sama dengan legacy). > 0 → Horii dapat memilih tutup otomatis khusus irisan itu saat cutover (keputusan data, di luar Fase 8) | … |
 | **B7:** lampiran ber-path anomali | Q-H13 (pembanding Q-H14) | dicatat; berkasnya tidak dihapus fisik saat tiket dihapus (Q-A0-6 (a')); bandingkan dengan `tidak_sah` `lampiran:manifest` | … |
 | Tiket Open di kategori tanpa petugas aktif | Q-H15 | > 0 → admin menugaskan petugas sebelum go-live | … |
-| Tiket tanpa pesan | Q-H16 | dicatat; tampil di akhir daftar, tidak menghasilkan baris ekspor | … |
+| Tiket tanpa pesan (anomali impor; dicatat bersama B6) | Q-H16 | dicatat; tampil di akhir daftar, tidak menghasilkan baris ekspor (MAKE-074 V6) | … |
 | **Q-H19:** tiket terbanyak yang terlihat satu petugas aktif | Q-H19 | **> 5.000** → kartu DBV `last_msg_at` wajib di `main` sebelum go-live (DBV-028 Q8 (b)) | … |
 | EXPLAIN daftar petugas, tanpa filter status | langkah 5 runbook T12b | catat `key`, `key_len`, baris, waktu (ms); **> 100 ms** → idem Q8 (b) | … |
 | EXPLAIN daftar petugas, Open | idem | idem | … |
@@ -745,8 +745,9 @@ repo publik):
 - Rilis menu Halo Simpeg (CR-135: `ACTIVE_PHASE` 5 → 8, item `halo` diberi `to`/`roles`), sesudah sign-off Fase 8.
 - Ekspor rekap petugas (E-09): batas 10.000 baris pesan dan 5.000.000 karakter per berkas (`haloSimpeg.eksporMaksBaris`,
   `haloSimpeg.eksporMaksKarakter`). Puncak memori terukur ≤ ±106 MB per request di ambang (README ekspor). Syarat
-  `memory_limit` ≥ 256M yang sudah berlaku untuk unduhan PDF (§1) juga mencukupi ekspor ini. Menaikkan ambang di `.env` wajib
-  diukur ulang (`RUN_VOLUME_TEST=1`, `EksporTiketVolumeTest`).
+  `memory_limit` ≥ 256M yang sudah berlaku untuk unduhan PDF (§1) juga mencukupi ekspor ini. **Bila `memory_limit` produksi
+  < 256M, `haloSimpeg.eksporMaksKarakter` wajib diturunkan.** Mengubah ambang di `.env` (naik atau turun) wajib diukur ulang
+  (`RUN_VOLUME_TEST=1`, `EksporTiketVolumeTest`).
 
 ## 2. Cara push (operator deploy)
 
