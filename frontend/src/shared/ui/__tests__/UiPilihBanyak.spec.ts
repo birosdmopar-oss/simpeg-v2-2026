@@ -16,7 +16,7 @@ enableAutoUnmount(afterEach)
 const OPSI: OpsiPilihBanyak[] = [
   { id: 1, label: 'Cuti' },
   { id: 2, label: 'Gaji' },
-  { id: 3, label: 'Kenaikan Pangkat', badge: { teks: 'Tidak Aktif', status: 0 } },
+  { id: 3, label: 'Kenaikan Pangkat', badge: { teks: 'Tidak Aktif', status: 2 } },
 ]
 
 function pasang(awal: number[] = [], props: Record<string, unknown> = {}) {
@@ -101,7 +101,7 @@ describe('UiPilihBanyak', () => {
 
   it('badge opsi tampil dengan data-status', () => {
     pasang()
-    const badge = document.querySelector('[data-testid="uji-pilih-3"] [data-status="0"]')
+    const badge = document.querySelector('[data-testid="uji-pilih-3"] [data-status="2"]')
     expect(badge?.textContent).toBe('Tidak Aktif')
   })
 

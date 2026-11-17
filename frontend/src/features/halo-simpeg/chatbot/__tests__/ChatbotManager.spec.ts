@@ -183,6 +183,7 @@ describe('Chatbot Manager — QnA', () => {
     expect(svc.qna.detail).toHaveBeenCalledWith(12)
     const tagBox = document.querySelector('[data-testid="chatbot-qna-tag"]')!
     expect(tagBox.querySelector('[data-testid="chatbot-qna-tag-6"]')?.textContent).toContain('Tidak Aktif')
+    expect(tagBox.querySelector('[data-testid="chatbot-qna-tag-6"] [data-status="2"]')?.textContent).toBe('Tidak Aktif')
     expect(tagBox.querySelector('[data-testid="chatbot-qna-tag-7"]')).toBeNull()
 
     // Jawaban HTML diisi ke field `html` FormField (textarea + tombol pratinjau SafeHtml bawaan FormField).
