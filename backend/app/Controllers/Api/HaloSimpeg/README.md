@@ -474,3 +474,17 @@ Acuan: PRD Fase 8 v1.4 §6.4, §7.6, F8-13..F8-16, H8-14 (a). Tidak ada endpoint
     (`link` dibuka service worker web, `url` untuk klien lain);
   - tanpa NIP, jabatan, satker, token, atau isi pesan lengkap (AC-E06.5). Kunci kompatibilitas Android menunggu PN8-1.
 - BP8-1: alur ini tidak menulis `inbox`/`inbox_msg` (AC-E06.6, §7.8 (3)).
+
+## Selisih push terhadap PRD v1.4 (diterima reviewer 17-11-2026)
+
+| No | Selisih | Label |
+|---|---|---|
+| U1 | `data.link` (= `url`) ditambahkan karena service worker web v2 membuka `data.link`; tetap tanpa data pribadi | [V2] |
+| U2 | `url` = `/halo-simpeg/tiket/{id}`, cocok dengan rute FE `/halo-simpeg/tiket/:id(\d+)` (MAKE-073) | [V2] |
+| U3 | Isi push tutup = teks tetap; isi tiket baru/balasan = potongan 100 karakter (F8-16, AC-E06.5) | [V2] |
+| U4 | Tutup memberi notifikasi ke pihak lawan (pemilik menutup → petugas aktif; petugas menutup → pemilik) | [V2] F8-14 |
+| U5 | Petugas penerima = petugas aktif versi S12 (status 1, akun aktif, role 1–7); legacy hanya `so.status` + `peng.status` [K B4] | [V2] |
+| U6 | Idempotensi tanpa penanda baru: job dicoba ulang hanya bila semua kiriman gagal, jadi token yang sudah sukses tidak dikirimi ulang | [V2] |
+| U7 | Catatan `integrasi_log` dibuat adapter FCM (`KlienHttp`, layanan `fcm`), bukan `TicketNotifService` | [V2] |
+| U8 | Metode `PenerimaTokenFcm::webAkun` / `androidAkun` (PRD §6.4) + helper `nipAkun` | [V2] |
+| U9 | Kanal bawaan `antreAkun` = `android` (sama dengan `antre`); Halo Simpeg selalu mengirim `semua` | [V2] |
