@@ -321,7 +321,16 @@ final class PetugasService extends MasterHaloSimpeg
     private function kunciPetugas(int $id, array $tambahan): array
     {
         $this->kunci('support_officer', 'id_support_officer', [$id]);
-        $kategori = array_map('intval', array_column($this->db->table('officer_category')->select('id_question_category')->where('id_support_officer', $id)->get()->getResultArray(), 'id_question_category'));
+
+        // Relasi dibaca dengan locking read (FOR UPDATE; MariaDB 10.4 tidak mengenal FOR SHARE). Pada REPEATABLE READ, consistent
+        // read pertama di transaksi membentuk read view; bila itu terjadi di sini (sebelum menunggu kunci kategori), cek petugas
+        // terakhir akan membaca snapshot lama dan balapan hapus dua petugas terakhir lolos (W1). Semua baca sebelum kunci terakhir
+        // harus locking read, sehingga read view baru terbentuk di ambil() sesudah semua kunci didapat.
+        $oc       = $this->db->escapeIdentifiers($this->db->prefixTable('officer_category'));
+        $kategori = array_map('intval', array_column($this->db->query(
+            "SELECT id_question_category FROM {$oc} WHERE id_support_officer = ? ORDER BY id_question_category FOR UPDATE",
+            [$id],
+        )->getResultArray(), 'id_question_category'));
         $this->kunci('question_category', 'id_question_category', array_values(array_unique([...$kategori, ...$tambahan])));
 
         return $this->ambil($id);
