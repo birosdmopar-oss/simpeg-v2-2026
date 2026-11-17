@@ -33,6 +33,9 @@ final class TicketNotifService
 
     public const ISI_DITUTUP = 'Percakapan Halo Simpeg telah ditutup.';
 
+    /** Isi cadangan bila potongan pesan kosong (mis. pesan hanya berisi spasi Unicode NBSP/U+3000) — R1. */
+    public const ISI_CADANGAN = 'Ada pesan baru di Halo Simpeg.';
+
     private readonly AntrePushPesan $antre;
 
     private readonly HaloSimpeg $config;
@@ -129,6 +132,10 @@ final class TicketNotifService
     private function potong(string $pesan): string
     {
         $pesan = trim((string) preg_replace('/\s+/u', ' ', $pesan));
+
+        if ($pesan === '') {
+            return self::ISI_CADANGAN;
+        }
 
         return mb_strlen($pesan) > $this->config->panjangPotongan ? mb_substr($pesan, 0, $this->config->panjangPotongan) . '…' : $pesan;
     }
