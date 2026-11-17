@@ -46,7 +46,7 @@ class PushPesanJob extends BaseJob implements JobInterface
         if (is_array($this->data['akun'] ?? null)) {
             $akun     = array_values(array_map('intval', $this->data['akun']));
             $penerima = array_merge(
-                $kanal === 'web' ? [] : $token->android($token->nipAkun($akun)),
+                $kanal === 'web' ? [] : $token->androidAkun($akun),
                 $kanal === 'android' ? [] : $token->webAkun($akun),
             );
         } else {

@@ -124,6 +124,19 @@ final class PenerimaTokenFcm
     }
 
     /**
+     * CR-137: token Android akun-akun aktif ini lewat NIP-nya (PRD v1.4 §6.4 `androidAkun`); akun tanpa NIP tidak punya token
+     * Android.
+     *
+     * @param list<int> $idPengguna
+     *
+     * @return list<array{id: int, token: string, platform: int}>
+     */
+    public function androidAkun(array $idPengguna): array
+    {
+        return $this->android($this->nipAkun($idPengguna));
+    }
+
+    /**
      * Token web admin yang membawahi pegawai — `getTokenAdmin` [K `FH:474-554`], unit/satker dari `pegawai_mutasi_jabatan`:
      * tanpa baris pmj, unit Lain-lain (7), atau unit kepegawaian (`web_config.id_unit_kepegawaian`) → semua Super Admin (1);
      * baris pmj dengan unit kosong → tanpa penerima (legacy `id_unit=''`, review MAKE-066 S5);
