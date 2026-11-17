@@ -3,7 +3,7 @@
 -- =====================================================================================================================
 -- Dokumen: backend/docs/db-review/DBV-028-skema-helpdesk.md Bagian 6. Sumber: PRD Fase 8 v1.3 §7.1, F8-03, F8-21 (H8-6).
 -- Pasangan: DBV-028-audit-v2.sql (bagian A + B di DB v2). Isi berkas ini:
---   A. MASTER (Q-H1..Q-H10, Q-H18) — memeriksa data legacy terhadap UNIQUE/CHECK/FK [V2] DBV-028.
+--   A. MASTER (Q-H1..Q-H10, Q-H18a..c) — memeriksa data legacy terhadap UNIQUE/CHECK/FK [V2] DBV-028.
 --   C. LEGACY SAJA (Q-H17) — memakai kolom legacy `pengguna.id` (`LS:440`). Di v2 dijamin FK `fk_id_user_so_to_pengguna`;
 --      baris yang dibuang impor dihitung di laporan impor (K-M12).
 --
@@ -23,7 +23,7 @@
 
 
 -- ---------------------------------------------------------------------------------------------------------------------
--- A. MASTER (Q-H1..Q-H10, Q-H18) — nama tabel/kolom SAMA di legacy dan v2. Blok A IDENTIK di DBV-028-audit-legacy.sql dan
+-- A. MASTER (Q-H1..Q-H10, Q-H18a..c) — nama tabel/kolom SAMA di legacy dan v2. Blok A IDENTIK di DBV-028-audit-legacy.sql dan
 --    DBV-028-audit-v2.sql (dijaga SkemaHaloSimpegTest::testKueriAuditBerjalan).
 -- ---------------------------------------------------------------------------------------------------------------------
 -- >>> A MULAI
@@ -75,11 +75,16 @@ SELECT 'Q-H9 INFO panjang melebihi kolom v2' AS butir,
 SELECT 'Q-H10 INFO support_officer.email kosong' AS butir, COUNT(*) AS jumlah
 FROM support_officer WHERE email IS NULL OR TRIM(email) = '';
 
--- Q-H18 stempel created_at master kosong/nol (legacy mengisi lewat DEFAULT DB [I]; impor T12b kelas R1a, DBV-028 N2)
-SELECT 'Q-H18 INFO created_at master NULL/nol' AS butir,
-       (SELECT COUNT(*) FROM help_desk_contact WHERE created_at IS NULL OR CAST(created_at AS CHAR) LIKE '0000-00-00%')
-     + (SELECT COUNT(*) FROM support_officer WHERE created_at IS NULL OR CAST(created_at AS CHAR) LIKE '0000-00-00%')
-     + (SELECT COUNT(*) FROM officer_category WHERE created_at IS NULL OR CAST(created_at AS CHAR) LIKE '0000-00-00%') AS jumlah;
+-- Q-H18a..c stempel created_at master kosong/nol per tabel (legacy mengisi lewat DEFAULT DB [I]; impor T12b kelas R1a,
+-- DBV-028 N2)
+SELECT 'Q-H18a INFO help_desk_contact.created_at NULL/nol' AS butir, COUNT(*) AS jumlah
+FROM help_desk_contact WHERE created_at IS NULL OR CAST(created_at AS CHAR) LIKE '0000-00-00%';
+
+SELECT 'Q-H18b INFO support_officer.created_at NULL/nol' AS butir, COUNT(*) AS jumlah
+FROM support_officer WHERE created_at IS NULL OR CAST(created_at AS CHAR) LIKE '0000-00-00%';
+
+SELECT 'Q-H18c INFO officer_category.created_at NULL/nol' AS butir, COUNT(*) AS jumlah
+FROM officer_category WHERE created_at IS NULL OR CAST(created_at AS CHAR) LIKE '0000-00-00%';
 -- <<< A SELESAI
 
 

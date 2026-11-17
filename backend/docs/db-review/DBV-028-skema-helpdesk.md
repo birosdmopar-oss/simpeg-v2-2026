@@ -9,8 +9,8 @@
 2. DB Validator me-review dan memberi approve.
 3. Reviewer CR me-merge dengan izin Horii.
 
-**Status:** ✔ DBV SETUJU @`9189c696` (WS-2, 17-11-2026), Q1–Q7 diputus (Bagian 8). Revisi review CR (CR-1..CR-12) dan usulan
-Q8–Q10 menunggu cek ulang selisih oleh WS-2.
+**Status:** ✔ DBV SETUJU @`9189c696` (Q1–Q7) dan @`c147f24a` (selisih review CR + Q8–Q10), WS-2 17-11-2026 (Bagian 8, 10).
+Menunggu izin merge Horii.
 
 **Penulis:** Handling Case (pelaksana Jalur BE helpdesk A1, izin `[#9-WorkloadHaloSimpeg]`), 16-11-2026.
 
@@ -171,13 +171,21 @@ Pesan terakhir (subkueri bergantung) memakai `idx_dticketmsg_inbox_waktu` (`ref`
 | `fk_id_question_category_i_qc (id_question_category)` | `idx_dticket_kategori_status_baca` (berawalan sama; FK boleh memakai indeks kiri komposit) | **tidak dibuang di DBV-028** (Q4 SETUJU); boleh menyusul lewat migration ALTER terpisah dengan kartu DBV sendiri |
 | `fk_id_inbox_im_qc (id_inbox)` | `idx_dticketmsg_inbox_waktu` | sama |
 
-Keduanya menambah biaya tulis dan kadang dipilih pengoptimal (EXPLAIN R3 dan R6d memilih `fk_id_question_category_i_qc`).
+Keduanya menambah biaya tulis dan kadang dipilih pengoptimal (EXPLAIN R6d dan R6f memilih `fk_id_question_category_i_qc`).
 Pembuangan nanti cukup satu `ALTER … DROP INDEX` dan tidak mengubah FK; tidak mendesak.
 
 ### 4.3 EXPLAIN daftar `GET tiket` (R6) dan opsi `last_msg_at` (Q8)
 
 **Data uji** (DB scratch 3307, sementara, dibuang sesudah pengukuran): 40 kategori; 40.000 tiket (10% Open, 2% kategori NULL,
 2.000 pengirim ±20 tiket + satu pengirim berat 500 tiket); 77.362 pesan (5% tiket tanpa pesan, waktu acak).
+
+Sebaran dibangkitkan dengan modulo nomor baris `i` (kategori `i % 40 + 1`, Open bila `i % 10 = 0`, pengirim berat bila `i % 80 = 0`,
+kategori NULL bila `i % 50 = 0`), sehingga sebarannya **berkorelasi**:
+- semua 500 tiket pengirim berat Open (`i % 80 = 0` ⇒ `i % 10 = 0`), jadi R6c = R6b = 500;
+- Open hanya jatuh di kategori 1, 11, 21, 31 dan keempatnya seluruhnya Open; kategori 1 berisi 800 tiket (1.000 − 200 yang
+  jatuh ke kategori NULL), jadi R6e (kategori 1–3 + Open) = 800 dan R6g (kategori 1–10 + Closed) = 9.800 − 800 = 9.000.
+
+Angka baris di tabel adalah hitungan nyata data itu, bukan perkiraan 10%.
 
 **Kueri** (urutan PRD v1.3 §6.1b: `pesan_terakhir.waktu DESC` NULL terakhir, lalu `id_inbox DESC`; halaman 20):
 
@@ -209,14 +217,17 @@ sebelum diurutkan. `COUNT(*)` untuk paginasi memakai indeks yang sama tanpa subk
 **Pembanding `last_msg_at`** (kolom sementara di DB scratch, diisi `MAX(created_at)`, indeks `(id_question_category, last_msg_at)`
 dan `(sender, last_msg_at)`): R6b 0,24 ms; R6d 1,5 ms; R6f 4,4 ms; R6g 13,6 ms (pengoptimal memilih scan penuh).
 
-**Usulan Q8: `last_msg_at` TIDAK ditambahkan di DBV-028.** Alasan:
-- daftar pemilik dan petugas dengan ≤ ±3.000 tiket di bawah 35 ms; yang lebih berat hanya petugas dengan banyak kategori dan
-  tanpa filter status;
+**Q8: `last_msg_at` TIDAK ditambahkan di DBV-028** (✔ SETUJU WS-2 dengan syarat, Bagian 8). Data sintetis R6f/R6g (satu petugas,
+10 kategori, 9.000–9.800 tiket, 120–125 ms) **melewati kedua pemicu** di bawah; keputusan tetap "tidak sekarang" karena pemicu
+dinilai pada volume nyata (alasan WS-2 di Bagian 8). Alasan pelaksana:
+- daftar pemilik dan petugas dengan ≤ ±3.000 tiket ≤ 35 ms; yang lebih berat adalah petugas dengan banyak kategori, dengan atau
+  tanpa filter status (R6g `status=closed` 125 ms);
 - kolom turunan menambah kewajiban tulis di setiap sisip pesan (konsistensi transaksi), pengisian ulang saat impor T12b, dan dua
   indeks baru;
 - volume nyata belum diketahui (DDL/D1 tiket legacy tidak diambil untuk DBV-028).
 
-Pemicu terukur: Q-H19 (berkas audit v2) menghitung tiket terbanyak yang terlihat satu petugas aktif sesudah gladi impor. Bila
+Pemicu terukur: Q-H19 (berkas audit v2) menghitung tiket terbanyak yang terlihat satu petugas aktif (petugas status 1 dan akun
+aktif, batas atas karena tiket milik petugas sendiri tidak dikecualikan) sesudah gladi impor. Bila
 Q-H19 > 5.000 **atau** test/EXPLAIN MAKE-071 pada data gladi menunjukkan daftar petugas > 100 ms, `last_msg_at` diajukan lewat
 kartu DBV terpisah (ALTER aditif + indeks + isi ulang), tanpa mengubah kontrak API.
 
@@ -241,8 +252,8 @@ review A0). Dijalankan **tanpa `--force`**: tiap berkas hanya berisi kueri yang 
 
 | Berkas | Tempat menjalankan | Isi |
 |---|---|---|
-| `backend/docs/db-review/sql/DBV-028-audit-legacy.sql` | salinan legacy, sebelum impor T12b | A + C (12 kueri) |
-| `backend/docs/db-review/sql/DBV-028-audit-v2.sql` | DB v2 sesudah impor F-02 + T12b (gladi) | A + B (18 kueri) |
+| `backend/docs/db-review/sql/DBV-028-audit-legacy.sql` | salinan legacy, sebelum impor T12b | A + C (14 kueri) |
+| `backend/docs/db-review/sql/DBV-028-audit-v2.sql` | DB v2 sesudah impor F-02 + T12b (gladi) | A + B (20 kueri) |
 
 Blok A ditulis identik di kedua berkas (diapit penanda `>>> A MULAI` / `<<< A SELESAI`). `SkemaHaloSimpegTest::testKueriAuditBerjalan`
 menegaskan blok A sama persis, bagian C hanya di berkas legacy, dan menjalankan seluruh berkas v2 di skema v2 dengan data uji
@@ -262,7 +273,7 @@ menegaskan blok A sama persis, bagian C hanya di berkas legacy, dan menjalankan 
 | Q-H8 | INFO | nama kategori kembar (Q3) |
 | Q-H9 | INFO | panjang melebihi kolom v2 [I]; hasil > 0 di salinan legacy diputus sebelum impor (Q2) |
 | Q-H10 | INFO | email petugas kosong (N1) |
-| Q-H18 | INFO | `created_at` master NULL / `'0000-00-00 …'` per tabel (CR-9, N2) |
+| Q-H18a / Q-H18b / Q-H18c | INFO | `created_at` NULL / `'0000-00-00 …'` di `help_desk_contact` / `support_officer` / `officer_category` (satu angka per tabel; CR-9, N2) |
 
 **B. Tiket v2 pasca impor** — F-02 + T12b, gladi cutover, bahan runbook MAKE-074:
 
@@ -274,7 +285,7 @@ menegaskan blok A sama persis, bagian C hanya di berkas legacy, dan menjalankan 
 | Q-H14 | INFO | pembanding Q-H13: semua lampiran tidak kosong |
 | Q-H15 | INFO | tiket Open di kategori tanpa petugas aktif (petugas status 1 **dan** akun aktif; C4) |
 | Q-H16 | INFO | tiket tanpa pesan (ditampilkan di akhir daftar, B3) |
-| Q-H19 | INFO | tiket terbanyak yang terlihat satu petugas aktif (pemicu Q8, Bagian 4.3) |
+| Q-H19 | INFO | tiket terbanyak yang terlihat satu petugas aktif = status 1 **dan** akun aktif, sama dengan Q-H15; batas atas (tiket milik petugas sendiri tidak dikecualikan); pemicu Q8, Bagian 4.3 |
 
 **C. Legacy saja** — memakai kolom legacy `pengguna.id` (`LS:440`); di v2 butir ini dijamin FK `fk_id_user_so_to_pengguna`, dan baris
 yang dibuang impor dihitung di laporan impor (K-M12, MAKE-097):
@@ -304,16 +315,16 @@ Dijalankan di DB scratch `simpeg_v2_t_f8be`, MySQL 8.0.30 port 3307, prefix test
 | `testIndeksAditifDisiplinTicket` | tiga indeks aditif ada dengan urutan kolom tepat; KEY DBV-022 tetap |
 | `testDefault` | status DEFAULT 1; auto_increment; waktu tanpa DEFAULT (BP8-8) |
 | `testUniqueFkDanCheckDitegakkan` | 1062 akun/pasangan/kontak ganda; 1452 akun/petugas/kategori tak ada; 1451 hapus kategori/petugas/akun yang dipakai; CHECK status 2; satu petugas ≥ 2 kategori dan satu kategori ≥ 2 petugas (AC-E02.2); email kontak opsional |
-| `testUpGagalMelepasTabelYangDibuatSajaDanTidakMenyentuhTabelLama` | `officer_category` (tabel **terakhir**) sudah ada berisi baris → `up()` gagal dengan kode 1050; `help_desk_contact` + `support_officer` yang sempat dibuat di-DROP; tabel lama + barisnya utuh; pembersihan di `finally` |
-| `testUpIndeksGagalMelepasIndeksYangDibuatSaja` | `idx_dticketmsg_inbox_waktu` (indeks **terakhir**) dipasang manual → `up()` migration indeks gagal dengan kode 1061; dua indeks yang sempat dibuat dilepas; indeks manual dan KEY DBV-022 utuh; pembersihan di `finally` |
+| `testUpGagalMelepasTabelYangDibuatSajaDanTidakMenyentuhTabelLama` | `officer_category` (tabel **terakhir**) sudah ada berisi baris → `up()` gagal dengan kode 1050; `help_desk_contact` + `support_officer` yang sempat dibuat di-DROP; tabel lama + barisnya utuh; `finally` men-DROP ketiga tabel bila masih ada |
+| `testUpIndeksGagalMelepasIndeksYangDibuatSaja` | `idx_dticketmsg_inbox_waktu` (indeks **terakhir**) dipasang manual → `up()` migration indeks gagal dengan kode 1061; dua indeks yang sempat dibuat dilepas; indeks manual dan KEY DBV-022 utuh; `finally` melepas indeks DBV-028 yang masih ada (dicek dulu, tanpa 1091) |
 | `testDownLaluUpKembali` | `down()` men-DROP tiga tabel dan ketiga indeks `AlterDisiplinTicketIndeksFase8::INDEKS`; `question_category`, `disiplin_ticket(_msg)`, `pengguna`, KEY `fk_id_question_category_i_qc` dan `fk_id_inbox_im_qc` tetap; `up()` memasang ulang ketiga indeks dengan urutan kolom tepat |
-| `testKueriAuditBerjalan` | blok A identik di kedua berkas; C hanya di berkas legacy (12 kueri); berkas v2 (18 kueri) berjalan di skema v2, WAJIB_0 = 0; Q-H13 = 3 untuk `../x.pdf`, `arsip/./x.pdf`, `a b.pdf`; Q-H15 berubah 0 → 1 saat akun petugas dinonaktifkan; Q-H19 = 1 |
+| `testKueriAuditBerjalan` | blok A identik di kedua berkas; C hanya di berkas legacy (14 kueri); berkas v2 (20 kueri) berjalan di skema v2, WAJIB_0 = 0; Q-H13 = 3 untuk `../x.pdf`, `arsip/./x.pdf`, `a b.pdf`; saat akun petugas dinonaktifkan Q-H15 berubah 0 → 1 dan Q-H19 1 → 0 |
 
 `SkemaInboxTicketTest` dan `SkemaLayananTest` (Fase 4) tetap hijau (AC-E01.4), karena tidak ada kolom atau FK DBV-022 yang berubah.
 
 ## 8. Keputusan DB Validator
 
-Q1–Q7 diputus WS-2 @`9189c696` (17-11-2026), memakai nomor di tabel ini. Q8–Q10 baru dari review CR, menunggu WS-2.
+Q1–Q7 diputus WS-2 @`9189c696`, Q8–Q10 @`c147f24a` (17-11-2026), memakai nomor di tabel ini.
 
 | No | Pertanyaan | Usulan pelaksana | Keputusan DBV |
 |---|---|---|---|
@@ -324,9 +335,9 @@ Q1–Q7 diputus WS-2 @`9189c696` (17-11-2026), memakai nomor di tabel ini. Q8–
 | DBV-028-Q5 | FK `disiplin_ticket.nip` → `pegawai.nip` (ditahan DBV-022) | tetap ditahan; validasi di aplikasi | ✔ **SETUJU**; ditinjau ulang saat cutover sesudah impor F-02 |
 | DBV-028-Q6 | Bentuk indeks kategori (Bagian 4.1) | B `(kategori, status, is_read_off)` + `status IN (0, 1)` eksplisit di kueri ringkasan petugas | ✔ **SETUJU**; `status IN (0,1)` no-op semantik (CHECK 0/1) dan **wajib dibekukan di README + test EXPLAIN MAKE-071**. `(sender, status)` dan `(id_inbox, created_at)` juga SETUJU |
 | DBV-028-Q7 | `created_at` master | NULL-able tanpa DEFAULT [V2] (BP8-8); stempel legacy dari DEFAULT DB [I], dicek Q-H18 | ✔ **SETUJU** |
-| DBV-028-Q8 | Kolom turunan `disiplin_ticket.last_msg_at` (PRD v1.3 §7.1 "opsi terukur") | **tidak** di DBV-028; pemicu terukur Q-H19 > 5.000 atau daftar petugas > 100 ms → kartu DBV terpisah (Bagian 4.3) | ◻ menunggu WS-2 |
-| DBV-028-Q9 | Kelas Q-H4 (`officer_category` yatim ke petugas) | **INFO**: aksi FK legacy [I] (tanpa DDL; `delete_officer` `LS:711` tidak menyentuh `officer_category`), jadi yatim mungkin ada; dibuang + dicatat impor T12b, simetris dengan Q-H5 (K-M12, F8-21). Bila ditolak, kembali WAJIB_0 | ◻ menunggu WS-2 |
-| DBV-028-Q10 | Nama PK `officer_category.id` [I] | tetap `id`; dicocokkan dengan salinan legacy saat MAKE-097; bila berbeda, impor memetakan kolom tanpa mengubah skema v2 | ◻ menunggu WS-2 |
+| DBV-028-Q8 | Kolom turunan `disiplin_ticket.last_msg_at` (PRD v1.3 §7.1 "opsi terukur") | **tidak** di DBV-028; pemicu terukur Q-H19 > 5.000 atau daftar petugas > 100 ms → kartu DBV terpisah (Bagian 4.3) | ✔ **SETUJU tidak di DBV-028, dengan syarat:** (a) Q-H19 + EXPLAIN daftar petugas **wajib dijalankan di gladi impor sebelum cutover** dan hasilnya dicatat di runbook MAKE-074; (b) bila pemicu terpenuhi, kartu DBV `last_msg_at` **wajib di `main` sebelum go-live**, bukan pasca-cutover; (c) test EXPLAIN MAKE-071 memakai ambang yang sama (100 ms / Q-H19 5.000). Alasan WS-2: biaya linear ±12 µs per tiket membuat ambang 100 ms tercapai di ±8.300 tiket, sehingga Q-H19 > 5.000 (±60 ms) memberi margin; R6f/R6g 120–125 ms berasal dari data sintetis satu petugas, 10 kategori, 9.800 tiket; volume nyata per petugas belum diketahui; jalur umum 0,5–4,4 ms. Pemicu dinilai pada volume nyata (gladi / EXPLAIN MAKE-071), bukan pada data sintetis. Saran produk (bukan DBV) untuk MAKE-071: bawaan daftar petugas = filter Open (R6e 4,4 ms, key_len 9) |
+| DBV-028-Q9 | Kelas Q-H4 (`officer_category` yatim ke petugas) | **INFO**: aksi FK legacy [I] (tanpa DDL; `delete_officer` `LS:711` tidak menyentuh `officer_category`), jadi yatim mungkin ada; dibuang + dicatat impor T12b, simetris dengan Q-H5 (K-M12, F8-21). Bila ditolak, kembali WAJIB_0 | ✔ **SETUJU** (WAJIB_0 → INFO), dengan syarat jumlahnya tampil di laporan impor MAKE-097 |
+| DBV-028-Q10 | Nama PK `officer_category.id` [I] | tetap `id`; dicocokkan dengan salinan legacy saat MAKE-097; bila berbeda, impor memetakan kolom tanpa mengubah skema v2 | ✔ **SETUJU**; dicocokkan saat MAKE-097, impor memetakan kolom atau AUTO_INCREMENT membangkitkan ulang, tanpa mengubah skema v2 (tidak ada FK v2 ke kolom ini) |
 
 ### 8.1 Catatan untuk paket berikut (DBV, non-blok)
 
@@ -339,6 +350,8 @@ Q1–Q7 diputus WS-2 @`9189c696` (17-11-2026), memakai nomor di tabel ini. Q8–
 - **N4 (dok):** Q-H1 men-TRIM kedua sisi, sedangkan UNIQUE `_ci` PAD SPACE hanya mengabaikan spasi akhir; Q-H1 konservatif. Impor
   men-trim `contact`.
 - **N5 (dok):** basis `main` diperbarui (branch memuat `46f4d669`), dan penomoran Q diseragamkan ke nomor tabel ini.
+- **N6 (dok):** definisi Q-H19 disamakan dengan Q-H15 (petugas status 1 dan akun aktif); **diselesaikan dengan JOIN `pengguna`**
+  di berkas audit v2.
 
 ## 9. Syarat merge (⛔)
 
@@ -349,7 +362,7 @@ Q1–Q7 diputus WS-2 @`9189c696` (17-11-2026), memakai nomor di tabel ini. Q8–
 
 ## 10. Checklist DB Validator
 
-**DBV SETUJU @`9189c696` (WS-2, 17-11-2026).** Sesudah revisi review CR, WS-2 hanya mengecek ulang selisihnya plus Q8–Q10.
+**DBV SETUJU @`9189c696` (WS-2, 17-11-2026).** **DBV SETUJU @`c147f24a` (WS-2): selisih CR + Q8–Q10.**
 
 - [x] Kolom dan tipe cocok dengan pemakaian kode legacy, atau deviasinya berlabel [V2]/[I] beralasan (Bagian 2).
 - [x] Status master 0/1 + CHECK + DEFAULT 1.
@@ -360,4 +373,4 @@ Q1–Q7 diputus WS-2 @`9189c696` (17-11-2026), memakai nomor di tabel ini. Q8–
 - [x] Migration lama tidak diedit; `question_category`/`disiplin_ticket(_msg)` tidak dibuat ulang.
 - [x] Kueri audit hanya SELECT, agregat, blok LARANGAN.
 - [x] Keputusan Q1–Q7.
-- [ ] Selisih revisi review CR (CR-1..CR-12) dan keputusan Q8–Q10.
+- [x] Selisih revisi review CR (CR-1..CR-12) dan keputusan Q8–Q10.

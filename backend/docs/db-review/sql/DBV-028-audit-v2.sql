@@ -4,14 +4,15 @@
 -- Dokumen: backend/docs/db-review/DBV-028-skema-helpdesk.md Bagian 6. Sumber: PRD Fase 8 v1.3 §7.1, F8-03, F8-21 (H8-6),
 -- AC-E04.11, AC-E05.7/8; laporan A0 Handling Case §R B6, B7, C4.
 -- Pasangan: DBV-028-audit-legacy.sql (bagian A + C di salinan legacy). Isi berkas ini:
---   A. MASTER (Q-H1..Q-H10, Q-H18) — sama persis dengan berkas legacy.
+--   A. MASTER (Q-H1..Q-H10, Q-H18a..c) — sama persis dengan berkas legacy.
 --   B. TIKET V2 PASCA IMPOR (Q-H11..Q-H16, Q-H19) — memakai `disiplin_ticket(_msg)`/`pengguna` v2; bahan runbook MAKE-074
 --      (H8-16 (a1), Q-A0-6 (a')).
--- Berkas ini berjalan di skema v2 kosong (test SkemaHaloSimpegTest::testKueriAuditBerjalan).
+-- Berkas ini dijalankan test SkemaHaloSimpegTest::testKueriAuditBerjalan di skema v2 dengan data uji kecil (Q-H13, Q-H15,
+-- Q-H19).
 --
 -- Klasifikasi:
---   WAJIB_0 = harus 0; > 0 di salinan legacy menghentikan impor T12b sampai diputus Horii/DB Validator (konstrain v2 tidak
---             dibersihkan impor).
+--   WAJIB_0 = harus 0. Di v2 butir WAJIB_0 (blok A) dijamin konstrain UNIQUE DBV-028; > 0 di DB gladi berarti impor atau
+--             skema menyimpang dan diputus Horii/DB Validator sebelum cutover.
 --   INFO    = dilaporkan; baris dibuang/dicatat oleh impor atau runbook, tidak memblokir.
 --
 -- Cara pakai (akun baca saja):
@@ -25,7 +26,7 @@
 
 
 -- ---------------------------------------------------------------------------------------------------------------------
--- A. MASTER (Q-H1..Q-H10, Q-H18) — nama tabel/kolom SAMA di legacy dan v2. Blok A IDENTIK di DBV-028-audit-legacy.sql dan
+-- A. MASTER (Q-H1..Q-H10, Q-H18a..c) — nama tabel/kolom SAMA di legacy dan v2. Blok A IDENTIK di DBV-028-audit-legacy.sql dan
 --    DBV-028-audit-v2.sql (dijaga SkemaHaloSimpegTest::testKueriAuditBerjalan).
 -- ---------------------------------------------------------------------------------------------------------------------
 -- >>> A MULAI
@@ -77,11 +78,16 @@ SELECT 'Q-H9 INFO panjang melebihi kolom v2' AS butir,
 SELECT 'Q-H10 INFO support_officer.email kosong' AS butir, COUNT(*) AS jumlah
 FROM support_officer WHERE email IS NULL OR TRIM(email) = '';
 
--- Q-H18 stempel created_at master kosong/nol (legacy mengisi lewat DEFAULT DB [I]; impor T12b kelas R1a, DBV-028 N2)
-SELECT 'Q-H18 INFO created_at master NULL/nol' AS butir,
-       (SELECT COUNT(*) FROM help_desk_contact WHERE created_at IS NULL OR CAST(created_at AS CHAR) LIKE '0000-00-00%')
-     + (SELECT COUNT(*) FROM support_officer WHERE created_at IS NULL OR CAST(created_at AS CHAR) LIKE '0000-00-00%')
-     + (SELECT COUNT(*) FROM officer_category WHERE created_at IS NULL OR CAST(created_at AS CHAR) LIKE '0000-00-00%') AS jumlah;
+-- Q-H18a..c stempel created_at master kosong/nol per tabel (legacy mengisi lewat DEFAULT DB [I]; impor T12b kelas R1a,
+-- DBV-028 N2)
+SELECT 'Q-H18a INFO help_desk_contact.created_at NULL/nol' AS butir, COUNT(*) AS jumlah
+FROM help_desk_contact WHERE created_at IS NULL OR CAST(created_at AS CHAR) LIKE '0000-00-00%';
+
+SELECT 'Q-H18b INFO support_officer.created_at NULL/nol' AS butir, COUNT(*) AS jumlah
+FROM support_officer WHERE created_at IS NULL OR CAST(created_at AS CHAR) LIKE '0000-00-00%';
+
+SELECT 'Q-H18c INFO officer_category.created_at NULL/nol' AS butir, COUNT(*) AS jumlah
+FROM officer_category WHERE created_at IS NULL OR CAST(created_at AS CHAR) LIKE '0000-00-00%';
 -- <<< A SELESAI
 
 
@@ -126,10 +132,13 @@ SELECT 'Q-H16 INFO tiket tanpa pesan' AS butir, COUNT(*) AS jumlah
 FROM disiplin_ticket t
 WHERE NOT EXISTS (SELECT 1 FROM disiplin_ticket_msg m WHERE m.id_inbox = t.id_inbox);
 
--- Q-H19 tiket terbanyak yang terlihat oleh satu petugas aktif (pemicu terukur kolom `last_msg_at`, DBV-028 Q8 / Bagian 4.3)
+-- Q-H19 tiket terbanyak yang terlihat oleh satu petugas aktif = petugas status 1 DAN akun aktif (definisi sama dengan Q-H15).
+-- Pemicu terukur kolom `last_msg_at` (DBV-028 Q8 / Bagian 4.3). Tiket milik petugas sendiri tidak dikecualikan, jadi angka ini
+-- batas atas (konservatif).
 SELECT 'Q-H19 INFO tiket maksimum per petugas aktif' AS butir, COALESCE(MAX(x.n), 0) AS jumlah
 FROM (SELECT so.id_support_officer, COUNT(*) AS n
       FROM support_officer so
+      JOIN pengguna p ON p.id_pengguna = so.id_user AND p.status = '1' AND p.deleted_at IS NULL
       JOIN officer_category oc ON oc.id_support_officer = so.id_support_officer
       JOIN disiplin_ticket t ON t.id_question_category = oc.id_question_category
       WHERE so.status = 1

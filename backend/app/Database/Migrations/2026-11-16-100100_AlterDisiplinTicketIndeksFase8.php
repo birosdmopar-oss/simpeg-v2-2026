@@ -23,7 +23,8 @@ use Throwable;
  *   (`ORDER BY created_at DESC, id_inbox_msg DESC LIMIT 1`). Menjadi indeks kiri untuk FK tiket.
  *
  * KEY FK lama `fk_id_question_category_i_qc` dan `fk_id_inbox_im_qc` menjadi redundan tetapi TIDAK dibuang di sini (keputusan
- * DB Validator, DBV-028 Q4: pembuangan boleh menyusul lewat migration ALTER terpisah dengan kartu DBV sendiri). up() gagal → indeks yang sempat dibuat pada run itu di-DROP; down() men-DROP ketiganya.
+ * DB Validator, DBV-028 Q4: pembuangan boleh menyusul lewat migration ALTER terpisah dengan kartu DBV sendiri).
+ * up() gagal → indeks yang sempat dibuat pada run itu di-DROP; down() men-DROP ketiganya.
  */
 class AlterDisiplinTicketIndeksFase8 extends Migration
 {
