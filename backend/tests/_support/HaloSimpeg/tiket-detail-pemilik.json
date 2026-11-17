@@ -8,14 +8,14 @@
             "nama": "Kepegawaian"
         },
         "status": "open",
-        "dibuat_pada": "2026-11-17T07:45:16Z",
+        "dibuat_pada": "2026-11-17T12:26:50Z",
         "pemilik_nama": "Pelapor Contoh",
         "sebagai_petugas": false,
         "belum_dibaca": true,
         "perlu_tindak": false,
         "pesan_terakhir": {
             "id_inbox_msg": 3,
-            "waktu": "2026-11-17T07:45:16Z",
+            "waktu": "2026-11-17T12:26:50Z",
             "potongan": "Tambahan dari petugas lain.",
             "pengirim_label": "Admin",
             "lampiran": null
@@ -30,7 +30,7 @@
         "pesan": [
             {
                 "id_inbox_msg": 1,
-                "waktu": "2026-11-17T07:45:16Z",
+                "waktu": "2026-11-17T12:26:50Z",
                 "isi": "Berapa sisa cuti saya?",
                 "pengirim_label": "Pelapor Contoh",
                 "milik_saya": true,
@@ -44,7 +44,7 @@
             },
             {
                 "id_inbox_msg": 2,
-                "waktu": "2026-11-17T07:45:16Z",
+                "waktu": "2026-11-17T12:26:50Z",
                 "isi": "Sisa cuti 10 hari.",
                 "pengirim_label": "Admin",
                 "milik_saya": false,
@@ -54,7 +54,7 @@
             },
             {
                 "id_inbox_msg": 3,
-                "waktu": "2026-11-17T07:45:16Z",
+                "waktu": "2026-11-17T12:26:50Z",
                 "isi": "Tambahan dari petugas lain.",
                 "pengirim_label": "Admin",
                 "milik_saya": false,

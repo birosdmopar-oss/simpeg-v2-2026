@@ -10,14 +10,14 @@
                     "nama": "Kepegawaian"
                 },
                 "status": "open",
-                "dibuat_pada": "2026-11-17T07:45:16Z",
+                "dibuat_pada": "2026-11-17T12:26:50Z",
                 "pemilik_nama": "Pelapor Contoh",
                 "sebagai_petugas": true,
                 "belum_dibaca": false,
                 "perlu_tindak": false,
                 "pesan_terakhir": {
                     "id_inbox_msg": 3,
-                    "waktu": "2026-11-17T07:45:16Z",
+                    "waktu": "2026-11-17T12:26:50Z",
                     "potongan": "Tambahan dari petugas lain.",
                     "pengirim_label": "Admin",
                     "lampiran": null
@@ -34,7 +34,7 @@
                     "nama": "Kepegawaian"
                 },
                 "status": "open",
-                "dibuat_pada": "2026-11-17T07:45:16Z",
+                "dibuat_pada": "2026-11-17T12:26:50Z",
                 "pemilik_nama": "Pengirim Uji",
                 "sebagai_petugas": true,
                 "belum_dibaca": false,

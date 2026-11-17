@@ -3,9 +3,9 @@
     "data": {
         "pesan": {
             "id_inbox_msg": 2,
-            "waktu": "2026-11-17T07:45:16Z",
+            "waktu": "2026-11-17T12:26:50Z",
             "isi": "Sisa cuti 10 hari.",
-            "pengirim_label": "000000000000000012",
+            "pengirim_label": "Admin Kepegawaian",
             "milik_saya": true,
             "dari_pemilik": false,
             "urutan_pengirim": 1,
@@ -19,14 +19,14 @@
                 "nama": "Kepegawaian"
             },
             "status": "open",
-            "dibuat_pada": "2026-11-17T07:45:16Z",
+            "dibuat_pada": "2026-11-17T12:26:50Z",
             "pemilik_nama": "Pelapor Contoh",
             "sebagai_petugas": true,
             "belum_dibaca": false,
             "perlu_tindak": false,
             "pesan_terakhir": {
                 "id_inbox_msg": 2,
-                "waktu": "2026-11-17T07:45:16Z",
+                "waktu": "2026-11-17T12:26:50Z",
                 "potongan": "Sisa cuti 10 hari.",
                 "pengirim_label": "Admin",
                 "lampiran": null

@@ -1,0 +1,50 @@
+{
+    "status": "success",
+    "data": {
+        "id": 4,
+        "subjek": "Tanpa jabatan",
+        "kategori": {
+            "id": 1,
+            "nama": "Kepegawaian"
+        },
+        "status": "open",
+        "dibuat_pada": "2026-11-17T12:26:50Z",
+        "pemilik_nama": "Pelapor Tanpa Jabatan",
+        "sebagai_petugas": true,
+        "belum_dibaca": true,
+        "perlu_tindak": true,
+        "pesan_terakhir": {
+            "id_inbox_msg": 4,
+            "waktu": "2026-11-17T12:26:50Z",
+            "potongan": "Halo",
+            "pengirim_label": "Pelapor Tanpa Jabatan",
+            "lampiran": null
+        },
+        "bisa_balas": true,
+        "bisa_tutup": true,
+        "bisa_hapus": true,
+        "allow_reply": true,
+        "snapshot": {
+            "nip": "000000000000000034",
+            "jabatan": null,
+            "satker": null
+        },
+        "ditutup_oleh_label": null,
+        "pengingat": {
+            "aktif": false,
+            "jatuh_tempo": null
+        },
+        "pesan": [
+            {
+                "id_inbox_msg": 4,
+                "waktu": "2026-11-17T12:26:50Z",
+                "isi": "Halo",
+                "pengirim_label": "Pelapor Tanpa Jabatan",
+                "milik_saya": false,
+                "dari_pemilik": true,
+                "urutan_pengirim": 0,
+                "lampiran": null
+            }
+        ]
+    }
+}

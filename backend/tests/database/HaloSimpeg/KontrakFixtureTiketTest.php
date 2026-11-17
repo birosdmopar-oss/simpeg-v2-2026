@@ -55,6 +55,7 @@ final class KontrakFixtureTiketTest extends DatabaseTestCase
         $pemilik = $this->buatAkunUntuk($this->buatPegawai(['nama' => 'Pelapor Contoh']), Role::PEGAWAI);
         $admin   = (int) $this->db->table('pengguna')->where('username', AuthSeeder::nipForRole(Role::SUPER_ADMIN))->get()->getRow('id_pengguna');
         $petugas = $this->buatAkunUntuk($this->buatPegawai(['nama' => 'Petugas Contoh']), Role::ADMIN_SATKER);
+        $this->db->table('pengguna')->where('id_pengguna', $admin)->update(['name' => 'Admin Kepegawaian']);
         $this->buatPetugasHs($admin, [$k]);
         $this->buatPetugasHs($petugas, [$k]);
 
@@ -79,8 +80,21 @@ final class KontrakFixtureTiketTest extends DatabaseTestCase
         $this->cocokFixtureHs('tiket-detail-pemilik', $this->sebagai($pemilik)->get(self::URL . "tiket/{$id}"), 200);
         $this->cocokFixtureHs('tiket-detail-petugas', $this->sebagai($petugas)->get(self::URL . "tiket/{$id}"), 200);
         $this->cocokFixtureHs('tiket-detail-role1', $this->sebagai($admin)->get(self::URL . "tiket/{$id}"), 200);
-        $this->cocokFixtureHs('tiket-ringkasan', $this->sebagai($admin)->get(self::URL . 'tiket/ringkasan'), 200);
+        // badge > total: pengingat 24 jam jatuh tempo pada tiket yang sudah dibaca petugas (perlu ditindak tanpa belum dibaca).
+        $tempo = $this->buatTiketHs($k, $pemilik);
+        $this->db->table('disiplin_ticket')->where('id_inbox', $tempo)->update(['is_read_off' => 1, 'notify_pic' => 1, 'notify_at' => '2026-01-01 00:00:00']);
+        $ringkasan = $this->sebagai($admin)->get(self::URL . 'tiket/ringkasan');
+        $this->cocokFixtureHs('tiket-ringkasan', $ringkasan, 200);
+        $this->assertGreaterThan($this->json($ringkasan)['data']['total'], $this->json($ringkasan)['data']['badge']);
         $this->cocokFixtureHs('baca', $this->sebagai($petugas)->post(self::URL . "tiket/{$id}/baca"), 200);
+
+        // Snapshot dengan jabatan/satker null: pelapor tanpa snapshot jabatan.
+        $nipTanpa = '199901012020011099';
+        $this->db->table('pegawai')->insert(['nip' => $nipTanpa, 'nama' => 'Pelapor Tanpa Jabatan', 'tgl_lahir' => '1999-01-01', 'jenis_kelamin' => 1, 'status' => 1]);
+        $tanpaJabatan = $this->buatAkunUntuk($nipTanpa, Role::PEGAWAI);
+        $idTanpa      = $this->json($this->sebagai($tanpaJabatan)->post(self::URL . 'tiket', ['id_question_category' => $k, 'subject' => 'Tanpa jabatan', 'msg' => 'Halo']))['data']['id'];
+        $this->cocokFixtureHs('tiket-detail-tanpa-jabatan', $this->sebagai($petugas)->get(self::URL . "tiket/{$idTanpa}"), 200);
+        $this->assertSame(['jabatan' => null, 'satker' => null], array_intersect_key($this->json($this->sebagai($petugas)->get(self::URL . "tiket/{$idTanpa}"))['data']['snapshot'], ['jabatan' => 0, 'satker' => 0]));
 
         // Tiket NULL (H8-16 (a1)) dan galat tiket.
         $null = $this->buatTiketHs(null, $pemilik);

@@ -8,14 +8,14 @@
             "nama": "Kepegawaian"
         },
         "status": "open",
-        "dibuat_pada": "2026-11-17T07:45:16Z",
+        "dibuat_pada": "2026-11-17T12:26:50Z",
         "pemilik_nama": "Pelapor Contoh",
         "sebagai_petugas": true,
         "belum_dibaca": false,
         "perlu_tindak": false,
         "pesan_terakhir": {
             "id_inbox_msg": 3,
-            "waktu": "2026-11-17T07:45:16Z",
+            "waktu": "2026-11-17T12:26:50Z",
             "potongan": "Tambahan dari petugas lain.",
             "pengirim_label": "Admin",
             "lampiran": null
@@ -25,7 +25,7 @@
         "bisa_hapus": true,
         "allow_reply": true,
         "snapshot": {
-            "nip": "000000000000000012",
+            "nip": "000000000000000034",
             "jabatan": "Analis Kepegawaian",
             "satker": "Biro Sumber Daya Manusia"
         },
@@ -37,7 +37,7 @@
         "pesan": [
             {
                 "id_inbox_msg": 1,
-                "waktu": "2026-11-17T07:45:16Z",
+                "waktu": "2026-11-17T12:26:50Z",
                 "isi": "Berapa sisa cuti saya?",
                 "pengirim_label": "Pelapor Contoh",
                 "milik_saya": false,
@@ -51,7 +51,7 @@
             },
             {
                 "id_inbox_msg": 2,
-                "waktu": "2026-11-17T07:45:16Z",
+                "waktu": "2026-11-17T12:26:50Z",
                 "isi": "Sisa cuti 10 hari.",
                 "pengirim_label": "Admin",
                 "milik_saya": false,
@@ -61,7 +61,7 @@
             },
             {
                 "id_inbox_msg": 3,
-                "waktu": "2026-11-17T07:45:16Z",
+                "waktu": "2026-11-17T12:26:50Z",
                 "isi": "Tambahan dari petugas lain.",
                 "pengirim_label": "Admin",
                 "milik_saya": true,
