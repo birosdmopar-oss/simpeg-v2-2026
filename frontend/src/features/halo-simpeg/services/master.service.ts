@@ -10,30 +10,28 @@ import type { z } from 'zod'
 import { api, isApiError } from '@/lib/axios'
 
 import {
-  denganPeringatan,
   halaman,
   hapusSchema,
   kandidatSchema,
   kategoriOpsiSchema,
   kategoriSchema,
+  kategoriStatusSchema,
   KontrakHaloError,
   kontakAktifSchema,
   kontakSchema,
+  kontakStatusSchema,
+  petugasPeringatanSchema,
   petugasSayaSchema,
   petugasSchema,
 } from '../schemas'
 import type {
-  DenganPeringatan,
   FilterMaster,
   HasilKandidat,
   Halaman,
-  Kategori,
   KategoriForm,
   KategoriOpsi,
-  Kontak,
   KontakAktif,
   KontakForm,
-  Petugas,
   PetugasForm,
   PetugasSaya,
   StatusMaster,
@@ -83,28 +81,34 @@ const bodyPetugas = (f: PetugasForm) => ({
 })
 const bodyKontak = (f: KontakForm) => ({ name: f.nama.trim(), contact: f.kontak.trim(), email: f.email.trim(), status: f.status })
 
-/** CRUD master seragam: daftar `Halaman<T>`, POST 201 baris, PUT 200 baris, PATCH status 200 baris + `peringatan`, DELETE `{id}`. */
-function crudMaster<Row, Form, Put = Row>(
+/**
+ * CRUD master seragam: daftar `Halaman<T>`, POST 201 baris, PUT 200 baris (petugas: + `peringatan`, S8), PATCH status 200
+ * baris + `peringatan`, DELETE `{id}`. Tipe baris = `z.output` skema (bukan cast), sehingga `types.ts` ↔ `schemas.ts` dijaga
+ * vue-tsc lewat `__tests__/kontrakTipe.spec.ts`.
+ */
+function crudMaster<S extends z.AnyZodObject, T extends z.AnyZodObject, Form, P extends z.ZodTypeAny = S>(
   jalur: 'kategori' | 'petugas' | 'kontak',
-  schema: z.AnyZodObject,
+  schema: S,
+  skemaStatus: T,
   body: (f: Form) => object,
-  putSchema: z.ZodTypeAny = schema,
+  putSchema?: P,
 ) {
+  const skemaPut = (putSchema ?? schema) as P
   return {
-    async list(filter: FilterMaster = {}): Promise<Halaman<Row>> {
-      return get(jalur, halaman(schema), filter) as Promise<Halaman<Row>>
+    async list(filter: FilterMaster = {}): Promise<Halaman<z.output<S>>> {
+      return get(jalur, halaman(schema), filter)
     },
-    async tambah(form: Form): Promise<Row> {
+    async tambah(form: Form): Promise<z.output<S>> {
       const { data } = await api.post<unknown>(`${BASIS_HALO}/${jalur}`, body(form))
-      return parse(schema, data, jalur) as Row
+      return parse(schema, data, jalur)
     },
-    async ubah(id: number, form: Form): Promise<Put> {
+    async ubah(id: number, form: Form): Promise<z.output<P>> {
       const { data } = await api.put<unknown>(`${BASIS_HALO}/${jalur}/${id}`, body(form))
-      return parse(putSchema, data, `${jalur}/${id}`) as Put
+      return parse(skemaPut, data, `${jalur}/${id}`)
     },
-    async setStatus(id: number, status: StatusMaster): Promise<DenganPeringatan<Row>> {
+    async setStatus(id: number, status: StatusMaster): Promise<z.output<T>> {
       const { data } = await api.patch<unknown>(`${BASIS_HALO}/${jalur}/${id}/status`, { status })
-      return parse(denganPeringatan(schema), data, `${jalur}/${id}/status`) as DenganPeringatan<Row>
+      return parse(skemaStatus, data, `${jalur}/${id}/status`)
     },
     async hapus(id: number): Promise<number> {
       const { data } = await api.delete<unknown>(`${BASIS_HALO}/${jalur}/${id}`)
@@ -114,7 +118,7 @@ function crudMaster<Row, Form, Put = Row>(
 }
 
 export const kategoriHaloService = {
-  ...crudMaster<Kategori, KategoriForm>('kategori', kategoriSchema, bodyKategori),
+  ...crudMaster('kategori', kategoriSchema, kategoriStatusSchema, bodyKategori),
   /** Kategori aktif untuk form tiket (role 1–7). */
   async opsi(): Promise<KategoriOpsi[]> {
     return get('kategori/opsi', kategoriOpsiSchema.array())
@@ -123,7 +127,7 @@ export const kategoriHaloService = {
 
 export const petugasHaloService = {
   /** S8: PUT petugas membawa `peringatan` (melepas kategori aktif terakhir / menonaktifkan). */
-  ...crudMaster<Petugas, PetugasForm, DenganPeringatan<Petugas>>('petugas', petugasSchema, bodyPetugas, denganPeringatan(petugasSchema)),
+  ...crudMaster('petugas', petugasSchema, petugasPeringatanSchema, bodyPetugas, petugasPeringatanSchema),
   /** S1: `{items, peringatan}`; `search` 2..50 code point (divalidasi pemanggil). */
   async kandidat(search: string): Promise<HasilKandidat> {
     return get('petugas/kandidat', kandidatSchema, { search })
@@ -135,7 +139,7 @@ export const petugasHaloService = {
 }
 
 export const kontakHaloService = {
-  ...crudMaster<Kontak, KontakForm>('kontak', kontakSchema, bodyKontak),
+  ...crudMaster('kontak', kontakSchema, kontakStatusSchema, bodyKontak),
   /** Kontak aktif untuk kartu "Kontak Helpdesk" (role 1–7, array tanpa status/stempel). */
   async aktif(): Promise<KontakAktif[]> {
     return get('kontak/aktif', kontakAktifSchema.array())

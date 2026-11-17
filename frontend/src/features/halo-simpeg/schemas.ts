@@ -25,8 +25,8 @@ export function halaman<S extends z.ZodTypeAny>(item: S) {
   return z.object({ items: z.array(item), total: angka, page: angka, per_page: angka })
 }
 
-/** Respons PATCH status / PUT petugas (S8): baris + `peringatan`. */
-export function denganPeringatan<S extends z.AnyZodObject>(baris: S) {
+/** Respons PATCH status / PUT petugas (S8): baris + `peringatan`. Generik pada shape agar tipe keluaran tetap utuh. */
+export function denganPeringatan<T extends z.ZodRawShape>(baris: z.ZodObject<T>) {
   return baris.extend({ peringatan: teksNull })
 }
 
@@ -79,6 +79,10 @@ export const kontakSchema = z.object({
 })
 
 export const kontakAktifSchema = z.object({ id, nama: teks, kontak: teks, email: teksNull })
+
+export const kategoriStatusSchema = denganPeringatan(kategoriSchema)
+export const petugasPeringatanSchema = denganPeringatan(petugasSchema)
+export const kontakStatusSchema = denganPeringatan(kontakSchema)
 
 export const hapusSchema = z.object({ id })
 
