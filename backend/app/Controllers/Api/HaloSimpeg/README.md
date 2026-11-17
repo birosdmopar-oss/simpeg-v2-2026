@@ -276,7 +276,7 @@ Isi field:
 |---|---|
 | Daftar (`pesan_terakhir`) | nama pengirim bila pengirim = pemilik; selain itu **"Admin" bagi semua peninjau**, termasuk role 1 [K `VI:110-117`] |
 | Detail (`pesan[]`) | nama pengirim bila pengirim = pemilik **atau** peninjau role 1; selain itu "Admin" [K `VD:48-55`] |
-| `ditutup_oleh_label` | `null` bila Open **atau `closed_by` kosong** (tiket Closed hasil impor legacy) [V2]; nama pemilik bila penutup = pemilik; nama penutup bila peninjau role 1; selain itu "Admin" [V2]. FE: `null` pada tiket Closed = tampilkan status Closed tanpa nama penutup |
+| `ditutup_oleh_label` | [V2]: `null` bila Open **atau `closed_by` kosong** (tiket Closed hasil impor legacy); nama pemilik bila penutup = pemilik; nama penutup bila peninjau role 1; selain itu "Admin". FE: `null` pada tiket Closed = tampilkan status Closed tanpa nama penutup |
 
 Nama pengirim pesan baru = nama bergelar bila akun punya data pegawai (B-28), selain itu nama akun/username.
 
@@ -308,6 +308,8 @@ Nama pengirim pesan baru = nama bergelar bila akun punya data pegawai (B-28), se
 - Pelapor wajib akun ber-NIP yang terdaftar di `pegawai` [K `SC:612-617`]; selain itu 422 "Data pegawai tidak ditemukan didalam sistem.".
 - Throttle **5 per 10 menit** per akun, dicek sebelum validasi dan unggah: lewat batas → 429 tanpa baris dan tanpa berkas.
 - `id_question_category` kategori **aktif**; `subject` wajib ≤ 250; `msg` wajib ≤ 5.000 (karakter sesudah trim); `arsip` opsional.
+- Kategori aktif dicek ulang di dalam transaksi di bawah kunci bersama (`LOCK IN SHARE MODE`) sebelum INSERT; kategori yang
+  dinonaktifkan/dihapus di sela itu (termasuk FK 1452) → 422 `errors.id_question_category` "Kategori tidak tersedia.".
 - Tersimpan: `status = 0`, `allow_reply = 1`, `is_read = 1`, `is_read_off = 2`, `notify_pic = 2`, `receiver = 0`, `sender_name` =
   nama bergelar, `nip`, snapshot `jabatan`/`satker` jabatan aktif (AC-E03.8) + pesan pertama, dalam satu transaksi. Tidak menulis
   `inbox`/`inbox_msg` (BP8-1, AC-E03.2).
