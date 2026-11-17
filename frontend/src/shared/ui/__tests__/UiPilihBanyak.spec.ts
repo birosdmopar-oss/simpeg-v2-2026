@@ -149,4 +149,20 @@ describe('UiPilihBanyak', () => {
     expect(ev.defaultPrevented).toBe(true)
     expect(kirim).not.toHaveBeenCalled()
   })
+  it('required: asterisk di legend; saat galat legend dan pesan memakai warna galat (pola UiRadioGroup)', () => {
+    pasang([], { required: true, error: 'Kategori wajib dipilih.' })
+    const legend = document.querySelector('[data-testid="uji-pilih"] legend')!
+    expect(legend.querySelector('.text-danger')?.textContent).toBe(' *')
+    expect(legend.classList.contains('text-danger')).toBe(true)
+    const pesan = document.querySelector('[role="alert"]')!
+    expect(pesan.classList.contains('text-caption')).toBe(true)
+    expect(pesan.classList.contains('text-danger')).toBe(true)
+  })
+
+  it('tanpa required dan tanpa galat: tanpa asterisk, legend netral', () => {
+    pasang()
+    const legend = document.querySelector('[data-testid="uji-pilih"] legend')!
+    expect(legend.textContent).not.toContain('*')
+    expect(legend.classList.contains('text-slate-700')).toBe(true)
+  })
 })

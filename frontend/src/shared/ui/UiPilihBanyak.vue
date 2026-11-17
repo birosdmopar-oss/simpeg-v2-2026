@@ -34,11 +34,13 @@ const props = withDefaults(
     teksKosong: string
     /** false = tanpa kotak pencarian (daftar pendek). */
     cari?: boolean
+    /** Asterisk wajib di legend (pola `UiRadioGroup`/`FormField`). */
+    required?: boolean
     disabled?: boolean
     error?: string
     testid?: string
   }>(),
-  { placeholderCari: undefined, petunjuk: undefined, cari: true, disabled: false, error: undefined, testid: undefined },
+  { placeholderCari: undefined, petunjuk: undefined, cari: true, required: false, disabled: false, error: undefined, testid: undefined },
 )
 const emit = defineEmits<{ 'update:modelValue': [value: number[]] }>()
 
@@ -73,8 +75,10 @@ function ubah(id: number, centang: boolean): void {
     :aria-describedby="describedBy"
     :data-testid="testid"
   >
-    <legend class="px-1 text-body2 font-medium text-slate-700">
-      {{ legend }} <span class="font-normal text-slate-500">({{ modelValue.length }} dipilih)</span>
+    <legend class="px-1 text-body2 font-medium" :class="error ? 'text-danger' : 'text-slate-700'">
+      {{ legend }}<span v-if="required" class="text-danger"> *</span>{{ ' ' }}<span class="font-normal text-slate-500"
+        >({{ modelValue.length }} dipilih)</span
+      >
     </legend>
     <!-- Enter di kotak cari hanya menyaring, tidak mengirim form induk. -->
     <div v-if="cari" class="mb-1" @keydown.enter.prevent>
@@ -94,6 +98,6 @@ function ubah(id: number, centang: boolean): void {
         <UiBadge v-if="o.badge" tone="neutral" size="sm" :data-status="o.badge.status">{{ o.badge.teks }}</UiBadge>
       </li>
     </ul>
-    <p v-if="error" :id="idGalat" class="mt-1 text-body2 text-danger" role="alert">{{ error }}</p>
+    <p v-if="error" :id="idGalat" class="mt-1 text-caption text-danger" role="alert">{{ error }}</p>
   </fieldset>
 </template>
