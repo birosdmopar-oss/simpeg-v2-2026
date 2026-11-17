@@ -1,0 +1,5 @@
+{
+    "status": "error",
+    "code": "petugas_terakhir",
+    "message": "Petugas ini petugas terakhir pada kategori Kepegawaian yang masih memiliki tiket terbuka. Tambahkan petugas lain lebih dulu."
+}

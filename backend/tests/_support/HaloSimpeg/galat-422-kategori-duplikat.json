@@ -1,0 +1,10 @@
+{
+    "status": "error",
+    "code": "kategori_duplikat",
+    "message": "Kategori sudah terdaftar.",
+    "errors": {
+        "question_category": [
+            "Kategori sudah terdaftar."
+        ]
+    }
+}
