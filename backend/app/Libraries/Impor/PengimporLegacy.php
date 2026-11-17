@@ -934,11 +934,6 @@ final class PengimporLegacy
     }
 
     /**
-     * FK tabel tujuan: kolom → tabel induk (ber-prefix) + kolom induk.
-     *
-     * @return array<string, array{tabel: string, kolom: string}>
-     */
-    /**
      * Ekspresi ORDER BY / keyset kunci baca. pkSintetis: kunci yang NULLABLE di sumber (mis. `officer_category` legacy tanpa
      * NOT NULL) dibungkus COALESCE ke sentinel yang urut paling depan, karena `(a, b) > (?, ?)` dengan NULL bernilai NULL dan
      * memutus pembacaan (review CR MAKE-097 R1). Kunci NOT NULL di sumber tetap memakai kolom asli supaya indeks terpakai tanpa
@@ -964,6 +959,11 @@ final class PengimporLegacy
         }, $kunci));
     }
 
+    /**
+     * FK tabel tujuan: kolom → tabel induk (ber-prefix) + kolom induk.
+     *
+     * @return array<string, array{tabel: string, kolom: string}>
+     */
     private function kolomFk(string $tabel): array
     {
         $rows = $this->kueri(
