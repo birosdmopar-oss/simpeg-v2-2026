@@ -5,6 +5,7 @@
  *
  * - `fieldset` + `legend` (jumlah terpilih ikut dibacakan); petunjuk dan galat terhubung lewat `aria-describedby`.
  * - Tiap opsi `UiCheckbox` (input asli tersembunyi, tetap fokusable: Tab berpindah opsi, Spasi mencentang).
+ * - `disabled` hanya mengunci kotak ceklis; kotak cari tetap aktif agar fokus tidak lepas saat form dikirim.
  * - Penyaringan hanya menyembunyikan opsi; nilai terpilih yang tidak cocok kata kunci atau tidak ada di `opsi`
  *   (opsi belum/gagal termuat) tetap dipertahankan.
  * - `testid` = akar; tiap opsi `<testid>-<id>`.
@@ -70,7 +71,6 @@ function ubah(id: number, centang: boolean): void {
     :class="error ? 'border-danger' : 'border-slate-300'"
     :aria-invalid="error ? 'true' : undefined"
     :aria-describedby="describedBy"
-    :disabled="disabled"
     :data-testid="testid"
   >
     <legend class="px-1 text-body2 font-medium text-slate-700">

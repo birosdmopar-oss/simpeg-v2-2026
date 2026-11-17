@@ -116,11 +116,21 @@ describe('UiPilihBanyak', () => {
     expect(kotak(1).getAttribute('aria-invalid')).toBe('true')
   })
 
-  it('tanpa petunjuk/galat: tanpa aria-describedby; cari=false menyembunyikan pencarian; disabled mengunci', () => {
-    pasang([], { cari: false, disabled: true })
-    const fs = document.querySelector('[data-testid="uji-pilih"]')!
-    expect(fs.hasAttribute('aria-describedby')).toBe(false)
-    expect(document.querySelectorAll('[data-testid="uji-pilih"] input:not([type="checkbox"])')).toHaveLength(0)
-    expect(kotak(1).disabled).toBe(true)
+  it('tanpa petunjuk/galat: tanpa aria-describedby', () => {
+    pasang()
+    expect(document.querySelector('[data-testid="uji-pilih"]')!.hasAttribute('aria-describedby')).toBe(false)
+  })
+
+  it('disabled mengunci kotak ceklis saja; kotak cari tetap aktif', () => {
+    pasang([], { disabled: true })
+    expect(document.querySelector('[data-testid="uji-pilih"]')!.hasAttribute('disabled')).toBe(false)
+    for (const id of [1, 2, 3]) expect(kotak(id).disabled).toBe(true)
+    const cari = document.querySelector<HTMLInputElement>('[data-testid="uji-pilih"] input[type="search"]')!
+    expect(cari.disabled).toBe(false)
+  })
+
+  it('cari=false menyembunyikan kotak pencarian', () => {
+    pasang([], { cari: false })
+    expect(document.querySelectorAll('[data-testid="uji-pilih"] input[type="search"]')).toHaveLength(0)
   })
 })
