@@ -226,15 +226,21 @@ ada butir H8 yang terbuka.
 
   | Isi pesan | Byte | Puncak tambahan | Waktu |
   |---|---|---|---|
-  | Latin | 5,2 MB | 50,9 MB | 0,4 s |
-  | CJK 3 byte | 15 MB | 82,7 MB | 0,7 s |
-  | Emoji 4 byte (terburuk) | 20 MB | 105,5 MB | 0,7 s |
+  | Latin | 5,2 MB | 50,7 MB | 0,4 s |
+  | CJK 3 byte | 15 MB | 82,4 MB | 0,7 s |
+  | Emoji 4 byte (terburuk) | 20 MB | 105,3 MB | 0,7 s |
 
   Batas test 128 MB (separuh `memory_limit` 256M di `README-deploy.md` §1). Pengukuran awal di 10.000.000 karakter: Latin 69 MB,
-  tetapi CJK 3 byte 140 MB (lewat batas), jadi ambang diturunkan ke 5.000.000. Isi berulang memampatkan berkas (±0,3 MB); berkas
+  tetapi CJK 3 byte 140 MB (lewat batas), jadi ambang diturunkan ke 5.000.000 (diterima reviewer 18-11-2026). Bila
+  `memory_limit` produksi < 256M, ambang wajib diturunkan. Isi berulang memampatkan berkas (±0,3 MB); berkas
   dari teks nyata lebih besar, dan tambahannya paling banyak sebesar ukuran berkas itu.
+- **Selisih V1–V13 (reviewer 18-11-2026):** V3–V13 diterima (V10 penanda termasuk 32.767 + surrogate utuh; V12 baris **dan**
+  karakter dicek ulang sesudah data diambil). **V1/V2 (cakupan pesan + label pengirim, D7 (a)) menunggu Horii**: (a) ikut legacy
+  penuh atau (b) semua pesan + penyamaran D7 (a) [rekomendasi reviewer]; satu titik keputusan `EksporTiketService::pengirimBaris()`.
+  README ekspor dan fixture bagian ini belum beku.
 - **Test:** `EksporTiketTest` (AC-E09.1..E09.8: 403 bukan petugas/nonaktif/role 8, batas hari WIB, kolom dan urutan, NIP teks,
-  kosong 200 tanpa audit, validasi periode/format, 10.000 vs 10.001 baris, ambang karakter, potong sel, unit UTF-16, rentang UTC),
+  kosong 200 tanpa audit, validasi periode/format, 10.000 vs 10.001 baris, ambang karakter, potong sel, unit UTF-16 dan emoji di
+  batas, rentang UTC, cek ulang baris/karakter saat pesan masuk di antara dua kueri (koneksi kedua, isolasi penuh)),
   baris `KontrakMatriksRoleTest`, fixture `ekspor-kosong`, `galat-422-ekspor`, `galat-422-ekspor-terlalu-besar`,
   `galat-403-bukan-petugas`.
 - **Titipan review MAKE-072:** mock antrean di `TiketNotifTest` memakai pesan unik, sehingga `assertLogContains` tidak bisa
