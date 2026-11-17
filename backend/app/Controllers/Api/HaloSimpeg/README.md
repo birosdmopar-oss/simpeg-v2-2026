@@ -24,7 +24,7 @@ dengan respons nyata oleh `MasterHaloSimpegTest` lewat `cocokFixtureHs`; FE meny
 - **Status master: `0` Tidak Aktif, `1` Aktif** (berbeda dari chatbot 1/2). FE memetakan Aktifkan = 1, Nonaktifkan = 0.
 - `Halaman<T> = {items: T[], total, page, per_page}` (`Config\HaloSimpeg`, bawaan `per_page` 20):
   - `page` wajib bilangan bulat 1..1.000.000 bila dikirim, selain itu → 422 `errors.page`;
-  - `per_page` > 100 → 100; `per_page` < 1 atau bukan angka → 1;
+  - `per_page` diambil sebagai bilangan bulat (cast PHP, mis. `12abc` → 12); < 1 → 1; > 100 → 100;
   - filter `status` selain `0`/`1` → 422 `errors.status`;
   - parameter berbentuk array → 422 "Parameter daftar tidak valid.";
   - `q`/`search` dicari sebagai teks biasa (`%` dan `_` bukan wildcard).
@@ -110,7 +110,8 @@ Aturan:
 **Tulis:**
 - `id_user` wajib dan harus kandidat; syarat kandidat diperiksa saat tambah atau saat `id_user` diganti. Satu akun hanya boleh
   satu petugas (422 `petugas_duplikat`).
-- `category[]` minimal satu, semuanya harus ada.
+- `category[]` minimal satu, semuanya harus ada. Elemen yang bukan id bilangan bulat positif (termasuk array/objek) → "Kategori tidak
+  tersedia." (bukan "Isian harus berupa teks.").
 - `email` wajib, berformat email, maks 150.
 - `no_hp` opsional, maks 20; kosong → `null`.
 - Set kategori diganti dalam satu transaksi: kategori yang dilepas dihapus, yang baru disisip.
@@ -127,8 +128,9 @@ Aturan:
   17-11-2026). Selain itu `peringatan: null`. Hanya hapus permanen yang diblok.
 - "Petugas aktif" pada aturan peringatan = `status = 1`, akun aktif, dan akun ber-role 1–7 (F8-06, S12). Petugas yang tidak aktif
   bukan penjawab, jadi perubahan atasnya tidak memberi peringatan, dan ia tidak dihitung sebagai "petugas aktif lain".
-- Cek hapus dan peringatan dihitung di dalam transaksi sesudah baris petugas dan kategori terkait dikunci, sehingga dua admin yang
-  bersamaan menghapus/menonaktifkan dua petugas terakhir tidak bisa sama-sama lolos.
+- Cek hapus dan peringatan dihitung di dalam transaksi sesudah baris petugas, relasi kategorinya, dan kategori terkait dikunci
+  (semua pembacaan sebelum kunci terakhir = locking read, sehingga cek membaca data terbaru, bukan snapshot sebelum menunggu
+  kunci). Dua admin yang bersamaan menghapus/menonaktifkan dua petugas terakhir tidak bisa sama-sama lolos.
 
 ## Kontak
 
@@ -204,7 +206,7 @@ Aturan:
 |---|---|---|
 | S1 | `GET petugas/kandidat` → `{items: PetugasKandidat[], peringatan}`, penyesuaian bentuk `PetugasKandidat` dari PRD §6.1b (array polos). Alasan: F8-07 meminta peringatan bila satker kepegawaian kosong (pola `PetugasLayananService`) | [V2] |
 | S2 | Filter `status` + `q` juga untuk daftar `kategori` dan `petugas` (aditif). Pencarian NIP/email hanya di endpoint role 1, LIKE ter-escape | [V2] |
-| S3 | Paginasi ikut `ListQuery` (sama dengan chatbot): `per_page` > 100 → 100, `per_page` < 1 atau bukan angka → 1; `page` bukan bulat 1..1.000.000 → 422 `errors.page`; filter `status` ≠ 0/1 → 422 `errors.status`; parameter berbentuk array → 422 (PRD §7.3a) | [V2] |
+| S3 | Paginasi ikut `ListQuery` (sama dengan chatbot): `per_page` diambil sebagai bilangan bulat (cast PHP), < 1 → 1, > 100 → 100; `page` bukan bulat 1..1.000.000 → 422 `errors.page`; filter `status` ≠ 0/1 → 422 `errors.status`; parameter berbentuk array → 422 (PRD §7.3a) | [V2] |
 | S4 | Teks 422 tambahan: "Kategori tidak tersedia." (`category`), "Kata kunci maksimal 50 karakter." (`search`), "ID tidak valid." (`id`) | [V2] |
 | S5 | Kandidat: akun aktif (sesuai PRD §7.3a "akun aktif"); akun role 1 dulu lalu pegawai, maks 20; petugas terdaftar tidak disaring [K] (simpan → 422 `petugas_duplikat`); syarat diperiksa hanya saat tambah/ganti `id_user`, sehingga petugas lama yang pegawainya pindah satker tetap tercatat sampai diedit | [V2] / [K] |
 | S6 | Label `"NIP - nama bergelar - jabatan"`: pemisah `" - "` dan nama bergelar [K `LS:485-490`] (PRD menulis "–"); tanpa jabatan → `"NIP - nama bergelar"` | [K] |
