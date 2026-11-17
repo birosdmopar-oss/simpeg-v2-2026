@@ -11,8 +11,8 @@ import { onMounted, ref, watch } from 'vue'
 import { isApiError } from '@/lib/axios'
 import { formatApiDateTime } from '@/shared/utils/dateTime'
 import { UiBadge, UiButton, UiCard, UiNotice, UiPagination, UiSelect, UiTextField, type SelectOption } from '@/shared/ui'
+import { galatPerKolom } from '@/shared/utils/galatKolom'
 
-import { galatPerKolom } from '../../galat'
 import { statistikChatbotService } from '../../services/chatbot.service'
 import type { FilterRiwayat, NilaiFeedback, RiwayatRow } from '../../types'
 

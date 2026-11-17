@@ -11,8 +11,8 @@ import { computed, nextTick, ref, watch } from 'vue'
 import { isApiError } from '@/lib/axios'
 import { FORM_ALERT_CLASS } from '@/shared/components/formLayout'
 import { UiButton, UiFileField, UiNotice } from '@/shared/ui'
+import { galatPerKolom } from '@/shared/utils/galatKolom'
 
-import { galatPerKolom } from '../../galat'
 import { qnaChatbotService } from '../../services/chatbot.service'
 import type { HasilImpor } from '../../types'
 

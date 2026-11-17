@@ -13,7 +13,7 @@ Simpeg: tidak memakai service, store, route, atau komponen helpdesk.
 | `stores/percakapan.ts` | State percakapan tingkat modul (bukan Pinia): bertahan lintas halaman (RedesignShell dipasang ulang per route), hanya di memori. `resetChatbot()` dipanggil dari `auth.store.ts` `clearSession()` (pesan, status buka, token feedback kosong; respons yang datang sesudah reset dibuang). |
 | `stores/peek.ts` | Peek kartu sapaan sekali per sesi browser (sessionStorage dalam try/catch + cadangan memori). |
 | `components/widget/` | `VanyaWidget` (launcher, kartu sapaan, jendela chat), `VanyaAvatar` (SVG dev di-port), `VanyaPenilaian` (👍/👎). |
-| `components/admin/` | `MasterChatbotFormDialog` (kategori/tag), `QnaFormDialog`, `TagPilihan` (tag ganda: `UiCheckbox` + `UiSearchInput`), `ImporQnaDialog`, `StatusChatbotBadge`. |
+| `components/admin/` | `MasterChatbotFormDialog` (kategori/tag), `QnaFormDialog`, `ImporQnaDialog`, `StatusChatbotBadge`. |
 | `views/ChatbotManagerPage.vue`, `views/admin/*` | Chatbot Manager role 1: Kategori, Tag (+ ekspor xlsx), QnA (+ template & impor), Statistik, Riwayat. |
 | `routes.chatbot.ts` | `/chatbot-manager/:bagian` (kategori, tag, qna, statistik, riwayat; nama route `chatbot-<bagian>`); `/chatbot-manager` → kategori. |
 | `__tests__/` | Vitest widget, admin, route/menu, dan klien API asli dengan `fixtures/` (contoh respons sintetis). |
@@ -34,6 +34,20 @@ Simpeg: tidak memakai service, store, route, atau komponen helpdesk.
   frame Figma (dicatat). Teks sapaan, salam, pengantar bubble, fallback, galat, dan penilaian mengikuti dev.
   Jam HH:MM di bawah tiap balon ikut dev (`jam()` waktu lokal). Penyesuaian token v2 (K-11) yang dicatat: launcher 64 px
   (dev `--vanya-ukuran`), warna aksen pink dev → `brand-tertiary`, kepala navy dev → `brand-primary`.
+- **Keputusan tampilan [V2] PN8-8** (Horii 17-11-2026, "ikut rekomendasi"; pembanding tangkapan layar widget dev). Butir di
+  bawah ini disengaja, **bukan cacat QA**:
+  - avatar tetap ilustrasi SVG `VanyaAvatar`; foto avatar dev tidak dipakai (PN8-7) dan tidak disalin ke repo;
+  - aksen **biru `brand-tertiary`** (bukan pink dev) untuk chip topik, balon pengguna, tombol kirim, dan denyut launcher;
+    chip pertanyaan/populer dan tombol footer Topik/Populer tetap `brand-primary`; headset pada SVG avatar tetap pink dev
+    (`VanyaAvatar.vue:41-45`);
+  - saat jawaban dimuat (termasuk GET topik/populer): tombol kirim, chip, dan tombol footer **disabled** dengan indikator mengetik
+    (perilaku v2);
+  - tombol kirim pudar (`disabled`) selama kotak ketik kosong;
+  - launcher 64 px dan gaya nama "Vanya" di kepala jendela tetap v2;
+  - gradien kepala dari `brand-primary`;
+  - font mengikuti token redesign v2 (bukan font dev).
+
+  Yang **ikut dev [K]**: avatar mini bot rata atas terhadap gelembung dan indikator mengetik (CR-134).
 - **Batas pesan 300** dihitung per code point (sama dengan `mb_strlen` BE), bukan satuan UTF-16 `maxlength` native
   (hanya pengaman 2×): input dipangkas ke 300 code point dan `kirim()` tetap menolak yang lebih panjang.
 - **Fokus:** sesudah memilih chip, Topik/Populer, atau menilai, fokus kembali ke kotak ketik.
@@ -45,8 +59,8 @@ Kontrak beku: README `backend/app/Controllers/Api/HaloSimpeg/Chatbot` (MAKE-094 
 BE); test FE tidak membaca `backend/`, jadi salin ulang bila kontrak berubah lewat CR. Isi QnA dev tidak pernah masuk repo.
 
 Catatan kontrak yang ditangani FE:
-- galat 422 mengikuti amplop v2 `errors: {kolom: [pesan]}` (`message` = pesan pertama) → dibaca lewat `galat.ts` (`galatPerKolom`,
-  toleran string tunggal);
+- galat 422 mengikuti amplop v2 `errors: {kolom: [pesan]}` (`message` = pesan pertama) → dibaca lewat `galatPerKolom`
+  `@/shared/utils/galatKolom` (toleran string tunggal); tag ganda QnA memakai `UiPilihBanyak` `@/shared/ui` (CR-134, R10);
 - POST kategori/tag/QnA tanpa `status` (status awal 1), PUT dengan `status`;
 - riwayat `waktu` ISO-8601 berzona WIB; filter `feedback=0` = belum dinilai;
 - statistik `top_pesan[].pesan_user`; `pertanyaan: null` → `#<id_qna>`.

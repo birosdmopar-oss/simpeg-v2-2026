@@ -1,10 +1,11 @@
 /**
- * Galat 422 per kolom chatbot. Kontrak MAKE-094 mengikuti amplop v2: `errors: {kolom: [pesan, …]}` (fixture `galat-422-*.json`,
- * keputusan reviewer 13-11-2026) → diambil pesan pertama. Tetap toleran terhadap string tunggal agar pesan tidak pernah
+ * Galat 422 per kolom dari amplop v2: `errors: {kolom: [pesan, …]}` → `{kolom: pesan pertama}` (CR-134, R10 langkah 1).
+ * Dipakai bersama chatbot dan helpdesk Halo Simpeg. Tetap toleran terhadap string tunggal agar pesan tidak pernah
  * terpotong menjadi satu huruf (`m[0]` pada string).
  */
 import { isApiError } from '@/lib/axios'
 
+/** Pesan pertama dari satu entri `errors` (array atau string); selain itu string kosong. */
 export function pesanKolom(nilai: unknown): string {
   if (Array.isArray(nilai)) return typeof nilai[0] === 'string' ? nilai[0] : ''
   return typeof nilai === 'string' ? nilai : ''

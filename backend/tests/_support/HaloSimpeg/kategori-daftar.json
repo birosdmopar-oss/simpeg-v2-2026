@@ -1,0 +1,28 @@
+{
+    "status": "success",
+    "data": {
+        "items": [
+            {
+                "id": 1,
+                "nama": "Cuti",
+                "status": 1,
+                "jumlah_petugas": 2,
+                "bisa_hapus": false,
+                "dibuat_pada": "2026-11-17T01:00:00Z",
+                "diubah_pada": "2026-11-17T01:00:00Z"
+            },
+            {
+                "id": 2,
+                "nama": "Kenaikan Pangkat",
+                "status": 0,
+                "jumlah_petugas": 0,
+                "bisa_hapus": true,
+                "dibuat_pada": "2026-11-17T01:05:00Z",
+                "diubah_pada": null
+            }
+        ],
+        "total": 2,
+        "page": 1,
+        "per_page": 20
+    }
+}

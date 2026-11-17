@@ -8,9 +8,9 @@
 import { reactive, readonly } from 'vue'
 
 import { isApiError } from '@/lib/axios'
+import { galatPerKolom } from '@/shared/utils/galatKolom'
 
 import { TEKS_VANYA } from '../constants'
-import { galatPerKolom } from '../galat'
 import { vanyaService } from '../services/chatbot.service'
 import type { NilaiFeedback, PertanyaanWidget, TopikWidget } from '../types'
 
