@@ -59,6 +59,8 @@ class Routing extends BaseRouting
         APPPATH . 'Config/RoutesKonten.php',
         // Modul E — chatbot "Vanya" (Fase 8 E-10, MAKE-094): `api/v1/halo-simpeg/chatbot/*`.
         APPPATH . 'Config/RoutesChatbot.php',
+        // Modul E — helpdesk Halo Simpeg (Fase 8 E-02/E-07 master MAKE-070; tiket MAKE-071): `api/v1/halo-simpeg/*` di luar chatbot.
+        APPPATH . 'Config/RoutesHaloSimpeg.php',
     ];
 
     /**

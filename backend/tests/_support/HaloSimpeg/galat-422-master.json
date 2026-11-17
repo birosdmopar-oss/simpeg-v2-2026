@@ -1,0 +1,9 @@
+{
+    "status": "error",
+    "message": "Nama kategori wajib diisi.",
+    "errors": {
+        "question_category": [
+            "Nama kategori wajib diisi."
+        ]
+    }
+}
