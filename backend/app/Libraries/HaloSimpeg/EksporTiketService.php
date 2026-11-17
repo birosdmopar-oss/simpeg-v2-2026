@@ -14,6 +14,7 @@ use CodeIgniter\Database\BaseConnection;
 use Config\HaloSimpeg;
 use DateTimeImmutable;
 use DateTimeZone;
+use Generator;
 use RuntimeException;
 
 /**
@@ -25,7 +26,8 @@ use RuntimeException;
  *   WIB)` dibandingkan langsung dengan kolom UTC (tanpa `DATE()`); tiket berkategori NULL tidak ikut (H8-16 (a1)). Semua pesan
  *   tiket itu, urut tiket lalu pesan (B-17 diperluas).
  * - Pengaman sebelum membangun berkas: `COUNT` ≤ `eksporMaksBaris` dan `SUM(CHAR_LENGTH(msg))` ≤ `eksporMaksKarakter` → selain
- *   itu 422 `ekspor_terlalu_besar`; jumlah dicek ulang sesudah baris diambil (tulis bersamaan di antara dua kueri).
+ *   itu 422 `ekspor_terlalu_besar`; baris dan karakter dicek ulang sesudah data diambil (tulis bersamaan di antara dua
+ *   kueri).
  * - Sel > 32.767 karakter dipotong dengan penanda "… [dipotong]" [V2] (B-27). Semua sel teks (EksporTabel), NIP tetap teks.
  * - Periode kosong → hasil `kosong` (200 JSON, tanpa audit). Berkas terkirim → audit `dokumen_unduhan` (siapa, periode, jumlah
  *   baris; tanpa isi pesan, nama atau NIP penanya, isi berkas) (AC-E09.7). Baca saja; tidak menulis tabel helpdesk (BP8-1).
@@ -101,33 +103,38 @@ final class EksporTiketService extends MasterHaloSimpeg
         }
 
         $rows = $this->cakupan($kategori, $dari, $ke)
-            ->select('t.id_inbox, qc.question_category AS kategori, m.msg_sender_name, u.nip AS nip_pengirim, m.msg, m.created_at')
+            ->select('t.id_inbox, t.sender, qc.question_category AS kategori, m.msg_sender, m.msg_sender_name, u.nip AS nip_pengirim, m.msg, m.created_at')
             ->orderBy('t.id_inbox', 'ASC')->orderBy('m.id_inbox_msg', 'ASC')
             ->limit($this->config->eksporMaksBaris + 1)->get()->getResultArray();
 
-        if (count($rows) > $this->config->eksporMaksBaris) {
+        $zona     = new DateTimeZone(self::ZONA);
+        $utc      = new DateTimeZone('UTC');
+        $baris    = [];
+        $karakter = 0;
+        $terpilih = $this->barisTerpilih($rows, $idPengguna, $auth->role());
+        unset($rows); // generator memegang satu-satunya salinan dan melepasnya per baris
+
+        foreach ($terpilih as [$r, $pengirim]) {
+            $isi = (string) ($r['msg'] ?? '');
+            $karakter += mb_strlen($isi);
+            $baris[] = array_map(self::potongSel(...), [
+                (string) (count($baris) + 1),
+                (string) $r['id_inbox'],
+                (string) ($r['kategori'] ?? ''),
+                $pengirim[0],
+                $pengirim[1],
+                $isi,
+                self::waktuWib((string) $r['created_at'], $utc, $zona),
+            ]);
+        }
+
+        // V12: cek ulang baris DAN karakter sesudah data diambil (pesan yang masuk di antara kueri agregat dan kueri data).
+        if (count($baris) > $this->config->eksporMaksBaris || $karakter > $this->config->eksporMaksKarakter) {
             throw self::terlaluBesar();
         }
 
-        if ($rows === []) {
+        if ($baris === []) {
             return ['kosong' => true, 'jumlah' => 0, 'message' => self::PESAN_KOSONG];
-        }
-
-        $zona  = new DateTimeZone(self::ZONA);
-        $utc   = new DateTimeZone('UTC');
-        $baris = [];
-
-        foreach ($rows as $i => $r) {
-            $baris[] = array_map(self::potongSel(...), [
-                (string) ($i + 1),
-                (string) $r['id_inbox'],
-                (string) ($r['kategori'] ?? ''),
-                (string) ($r['msg_sender_name'] ?? ''),
-                (string) ($r['nip_pengirim'] ?? ''),
-                (string) ($r['msg'] ?? ''),
-                self::waktuWib((string) $r['created_at'], $utc, $zona),
-            ]);
-            unset($rows[$i]);
         }
 
         $jumlah = count($baris);
@@ -193,6 +200,25 @@ final class EksporTiketService extends MasterHaloSimpeg
         }
 
         return $isi . self::PENANDA_POTONG;
+    }
+
+    /**
+     * SATU titik keputusan cakupan + label baris ekspor (V1/V2, menunggu Horii): pesan yang ikut berkas di-yield bersama [nama, NIP]
+     * untuk kolom NAMA PENANYA / NIP PENANYA; pesan yang tidak ikut cukup dilewati. Baris sumber dilepas satu per satu (memori).
+     * Saat ini (usulan, belum beku): semua pesan tiket ikut; nama/NIP = pengirim pesan baris itu [K `LS:1797-1799`]. Kolom yang
+     * tersedia untuk opsi (a)/(b): `sender` (pemilik tiket), `msg_sender`, `$pengekspor`, `$role` pengekspor.
+     *
+     * @param list<array<string, mixed>> $rows baris kueri data
+     *
+     * @return Generator<int, array{0: array<string, mixed>, 1: array{0: string, 1: string}}>
+     */
+    private function barisTerpilih(array $rows, int $pengekspor, ?int $role): Generator
+    {
+        foreach ($rows as $i => $r) {
+            unset($rows[$i]);
+
+            yield [$r, [(string) ($r['msg_sender_name'] ?? ''), (string) ($r['nip_pengirim'] ?? '')]];
+        }
     }
 
     private static function unitUtf16(string $s): int
