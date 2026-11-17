@@ -1,7 +1,7 @@
 # MAKE-069 — Rencana impor cutover tahap 2
 
 **Status:** DIKERJAKAN (branch `make-069/impor-tahap2`, review CR tuntas): T7–T12, akun, bootstrap admin, berkas lampiran.
-Belum di kode: T12b Halo Simpeg (menunggu DBV-028) dan tiket lama (menunggu sortir F-02).
+T12b Halo Simpeg di kode sejak MAKE-097 (disisipkan di tier 12, sesudah DBV-028 di `main` `a5cb7300`); tiket lama = T13 (MAKE-086).
 **Keputusan:** Horii 03-11-2026 (K-M1, K-M2, K-M3 opsi A, K-M4 opsi 1, K-M12, impor cutover opsi (b)); DBV 03-11-2026 (Z-1); reviewer CR
 03-11-2026 (K-M5, K-M11); DBV-029 (K-M6..K-M10, `backend/docs/db-review/DBV-029-impor-cutover-tahap2.md`, branch
 `docs/dbv-029-impor-tahap2`, ikut kode).
@@ -17,7 +17,7 @@ MAKE-056 memegang tabel jalur Tukin (Tier 1–6). MAKE-069 memegang semua tabel 
 
 Tier dinomori lanjutan MAKE-056. **Nomor di kode saat ini:** T7–T12 seperti tabel di bawah; tiket lama = **T13**
 (MAKE-086 F-02); konten & interaksi Fase 7 = **T14** (MAKE-089); tier SIASN = **T15** (`DaftarTabel::TIER_MAKS`, selalu terakhir — dikunci `UrutanTierTest`). T12b belum
-ada di kode; saat ditambahkan disisipkan SEBELUM tier SIASN dan nomor tier SIASN bergeser. Label "T13" di dokumen DBV-029 =
+disisipkan di tier 12 sesudah `question_category` (MAKE-097), sehingga nomor tier lain tidak bergeser. Label "T13" di dokumen DBV-029 =
 tiket lama (penomoran rencana), bukan tier SIASN di kode.
 
 | Tier | Isi | Tabel |
@@ -28,7 +28,7 @@ tiket lama (penomoran rencana), bukan tier SIASN di kode.
 | T10 | Riwayat non-Tukin | `riwayat_kgb`, `riwayat_pendidikan`, `riwayat_diklat`, `riwayat_seminar`, `riwayat_skp`, `riwayat_lckh`, `riwayat_hukdis`, `riwayat_ak`, `riwayat_ak_siasn`, `konv_ak`, `ignore_konv_ak`, `riwayat_alamat`, `riwayat_karpeg`, `riwayat_kariskarsu`, `riwayat_tanda_jasa`, `riwayat_organisasi`, lalu `document_attachment` paling akhir |
 | T11 | Snapshot | `pegawai_cpns`, `pegawai_pns`, `pegawai_kgb`, `pegawai_pendidikan`, `pegawai_diklat`, `pegawai_hukdis`, `pegawai_ak`, `pegawai_ak_siasn`, `pegawai_keluarga`, `pegawai_alamat`, `pegawai_alamat_kantor`, `pegawai_tanda_jasa`, `pegawai_mutasi_jabatan` |
 | T12 | Layanan sisa (DBV-022 §5) | `jenis_layanan`, `jenis_pa`, `question_category` → `petugas_layanan`, `pa_layanan` → `riwayat_cuti_notif_kt`, `riwayat_ib`, `riwayat_pmk_req` → `riwayat_pmk` → `esign_hist` |
-| T12b | Halo Simpeg master (**skema menyusul DBV-028**) — belum di kode | `help_desk_contact`, `support_officer`, `officer_category` |
+| T12b | Halo Simpeg master (DBV-028, MAKE-097) — di kode sebagai bagian akhir tier 12 | `help_desk_contact`, `support_officer`, `officer_category` |
 | T13 | Tiket lama (sortir Fase 7 F-02, MAKE-086) | `disiplin_ticket` ← legacy `inbox`, `disiplin_ticket_msg` ← legacy `inbox_msg` |
 | T14 | Konten & interaksi Fase 7 (MAKE-089, DBV-032 §10) | `news_category`, `news`, `news_flag`, `jenis_dibo`, `dibo`, `popup`, `user_popup`, `banner`, `user_banner`, `skl` (+ form digital M2) |
 | T15 (terakhir) | SIASN (B3) | `siasn_ref_unor`, `siasn_referensi`, `siasn_upload_arsip`, `double_riwayat_kp` |
@@ -105,11 +105,53 @@ dikonversi R1a dan semua kolom teks ikut `stripslashes` bawaan. Kolom `siasn_lu`
 - Urutan DBV-022 §5. `petugas_layanan`: audit NULL `id_jenis_layanan` dan duplikat (UNIQUE) = 0 lebih dulu (DQ-12/DQ-27).
 - `esign_hist` utuh (append-only, bukti legal); `nik` tidak dilog.
 
-### T12b Halo Simpeg master (skema DBV-028)
-- Sesudah T8 dan `question_category` (T12). Urutan: `help_desk_contact` → `support_officer` → `officer_category`.
-- `support_officer.id_user` disalin langsung ke kolom akun v2 (K-M11: tanpa tabel pemetaan); id yang tidak ada di
-  `pengguna` → baris **dibuang** + jumlah dicatat (K-M12). `officer_category` milik baris yang dibuang ikut dibuang.
-- `status` legacy varchar `'1'`/`'0'` → tinyint; nilai lain → berkas keputusan.
+### T12b Halo Simpeg master (DBV-028, MAKE-097)
+- Di kode: `DaftarTabel::tierMasterHalo`, dijalankan di **tier 12** sesudah `question_category` (satu transaksi tier 12),
+  sesudah T8 `pengguna`. Urutan: `help_desk_contact` → `support_officer` → `officer_category`. Nomor tier lain tetap.
+- `support_officer.id_user` disalin langsung ke kolom akun v2 (K-M11, H8-6: tanpa tabel pemetaan); id yang tidak ada di
+  `pengguna` v2 → baris **dibuang** + dicatat `id_user yatim dibuang (K-M12)`; `0`/kosong → `id_user kosong dibuang (K-M12)`.
+- `officer_category` yatim ke petugas (Q-H4, termasuk petugas yang dibuang di atas) atau ke kategori (Q-H5) → dibuang +
+  dicatat per kolom (`id_support_officer …` / `id_question_category yatim dibuang (K-M12)`); jumlahnya tampil di laporan
+  impor (DBV-028 Q9). Pasangan ganda (Q-H3 WAJIB_0) bila tetap ada → dibuang + `MAKE-089 kunci ganda`.
+- **N1:** `support_officer.email` NULL → `''` + dicatat `N1 email NULL→''`. Petugas tetap diimpor (penugasan kategori
+  tidak hilang); admin melengkapi email lewat menu petugas. Jumlahnya = Q-H10 (pra-cek).
+- **N2:** `created_at`/`updated_at` ikut aturan umum R1a: `--zona-sumber` dari bukti GAP-2 (`NOW()` salinan = WIB → −7 jam;
+  TIMESTAMP apa adanya). Zona salinan legacy dicek dan ditulis di lembar hasil sebelum T12b.
+- **N4:** `help_desk_contact.contact` di-trim (`kolomKode`; karakter tak terlihat dibuang dan dicatat).
+- **Q10:** PK `officer_category.id` [I]: bila salinan legacy berkolom `id`, nilainya disalin; bila nama PK lain,
+  AUTO_INCREMENT v2 membangkitkan ulang (tidak ada FK v2 ke kolom ini). Skema v2 tidak diubah. Nama PK yang ditemukan dicatat
+  di lembar hasil.
+- **Q2:** teks melebihi panjang kolom v2 → impor gagal (aturan umum); Q-H9 dijalankan lebih dulu (runbook langkah 2).
+- `status` legacy `'1'`/`'0'` → tinyint (domain 0/1); nilai lain → berkas keputusan.
+- Test: `backend/tests/Impor/ImporLegacyMasterHaloTest.php` (data sintetis).
+
+#### Runbook cutover T12b (operator; angka saja, tanpa isi baris)
+1. **Zona (N2):** pakai bukti GAP-2 dari salinan yang sama
+   (`SELECT NOW(), UTC_TIMESTAMP(), @@system_time_zone, @@global.time_zone;`), catat `--zona-sumber` di lembar hasil.
+2. **Audit salinan legacy, sebelum impor** (akun baca-saja, **tanpa `--force`**; berhenti di galat pertama = ada yang salah):
+   `mysql --table -vvv --default-character-set=utf8mb4 --user=<akun_baca> -p <db_salinan_legacy> < backend/docs/db-review/sql/DBV-028-audit-legacy.sql > <KERJA>/hasil_audit_dbv028_legacy.txt 2>&1`
+   - WAJIB_0 (Q-H1, Q-H2, Q-H3) > 0 → **berhenti**, diputus Horii/DBV.
+   - **Q-H9 > 0 → berhenti**, diputus Horii/DBV sebelum T12b (DBV-028 Q2).
+   - Catat Q-H4/Q-H5 (yatim `officer_category`), Q-H10 (email kosong = jumlah koreksi N1), Q-H17 (akun tanpa `pengguna`
+     legacy), Q-H18a..c. Cocokkan nama PK `officer_category` (Q10).
+   - Kueri hanya dijalankan di salinan/gladi, tidak di server dev dari repo.
+3. **Impor** tier 12 (memuat T12b) seperti langkah 2 Bagian 6; dry-run dulu. Laporan per tabel `help_desk_contact`,
+   `support_officer`, `officer_category`: `sumber = ditulis + dibuang`, dengan kode buang/koreksi di atas. Bandingkan:
+   `support_officer` dibuang ≈ Q-H17 + akun legacy yang tidak ikut T8; `officer_category` dibuang ≥ Q-H4 + Q-H5.
+4. **Sesudah T13 (tiket lama): audit gladi v2** (tanpa `--force`):
+   `mysql --table -vvv --default-character-set=utf8mb4 --user=<akun_baca> -p <db_gladi_v2> < backend/docs/db-review/sql/DBV-028-audit-v2.sql > <KERJA>/hasil_audit_dbv028_v2.txt 2>&1`
+   (bila DB gladi memakai `DBPrefix`, sesuaikan nama tabel di salinan berkas kerja, bukan di repo). Catat:
+   - **pra-cek B6 = Q-H12:** irisan tiket kategori NULL + Open + pengirim yatim;
+   - **pra-cek B7 = Q-H13:** lampiran ber-path di luar `^[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$` atau bersegmen `.`/`..`
+     (pembanding Q-H14);
+   - **Q-H15:** tiket Open di kategori tanpa petugas aktif (petugas status 1 dan akun aktif) sesudah impor; > 0 → admin
+     menugaskan petugas sebelum go-live;
+   - Q-H11, Q-H16.
+5. **Syarat DBV Q8 (a):** di gladi, Q-H19 + EXPLAIN daftar tiket petugas (bentuk kueri MAKE-071) **wajib dijalankan sebelum
+   cutover** dan hasilnya dicatat (angka Q-H19, waktu ms, `key`/`key_len`). Pemicu Q-H19 > 5.000 atau > 100 ms → kartu DBV
+   `last_msg_at` wajib di `main` sebelum go-live (Q8 (b)).
+6. **Lampiran tiket lama (T-8):** `lampiran:manifest` (Bagian 4) ikut membaca `disiplin_ticket_msg.attachments`; path di luar
+   aturan dihitung `tidak_sah` (bandingkan dengan Q-H13), lalu `lampiran:tarik` → `lampiran:periksa`.
 
 ### T13 tiket lama
 - **Di kode sejak MAKE-086 (F-02): tier 13** (`DaftarTabel::tierTiketLama`, `AturanTiketLama`; tier SIASN menjadi 14).
@@ -222,7 +264,8 @@ v2 (PDF LKH, tanda terima) tidak disalin. Cara salin, volume, dan jendela waktu:
 ## 6. Urutan runbook cutover
 
 1. `migrate` di DB kosong.
-2. `php spark impor:legacy … --jejak=<KERJA>/jejak.json [--sumber-siasn=<skema>]` — MAKE-056 T1–T6, MAKE-069 T7–T12,
+2. `php spark impor:legacy … --jejak=<KERJA>/jejak.json [--sumber-siasn=<skema>]` — MAKE-056 T1–T6, MAKE-069 T7–T12
+   (T12 memuat T12b Halo Simpeg; audit DBV-028 legacy lebih dulu, runbook T12b),
    lalu tiket lama (T13, sesudah daftar eskalasi F-02 diputus), lalu konten Fase 7 (T14, per tabel + `--jejak`), lalu tier SIASN (T15, terakhir). T10/T11 transaksi per tabel; terhenti → `--tier N --lanjut`.
 3. `integrasi:siapkan-akun-sistem` (sesudah T8 `pengguna`, Z-1).
 4. `akun:bootstrap-admin` bila diperlukan (terminal interaktif).
@@ -235,5 +278,4 @@ K-M4 (opsi 1, tarik lewat URL) dan K-M6..K-M10 (DBV-029) sudah diputus dan dimas
 
 | Kode | Pemutus | Butir |
 |---|---|---|
-| — | DBV-028 | Skema `support_officer`, `officer_category`, `help_desk_contact` |
 | — | Fase 7 F-02 | Hasil sortir `inbox` legacy untuk T13 |
