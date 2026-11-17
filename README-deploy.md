@@ -697,6 +697,57 @@ Penilaian 👍/👎 jawaban Vanya dijaga token HMAC per log (log percakapan anon
 
 Kunci dan token tidak pernah ditulis ke log aplikasi.
 
+### 1n. Cutover Halo Simpeg helpdesk (Fase 8 E-01..E-09, MAKE-074 penutup BE)
+
+Runbook penutup helpdesk. Langkah impor dan kuerinya **tidak** diulang di sini: sumbernya runbook T12b MAKE-097
+(`docs/migrasi/MAKE-069-rencana.md` bagian "Runbook cutover T12b", langkah 1–6) dan berkas audit baca-saja DBV-028
+(`backend/docs/db-review/sql/DBV-028-audit-legacy.sql`, `…/DBV-028-audit-v2.sql`; DBV-028 Bagian 6). Semua kueri **ditulis,
+tidak dijalankan** oleh pelaksana repo di server dev/produksi. Operator menjalankannya di **salinan/gladi** dengan akun baca-saja,
+tanpa `--force`. Hasilnya hanya angka (COUNT), tanpa isi percakapan, nama, atau NIP.
+
+**Urutan gladi (sebelum cutover):**
+1. Impor master T12b (tier 12, MAKE-097):
+   - `support_officer.id_user` **disalin apa adanya**, tanpa tabel pemetaan UP-1 (K-M11);
+   - baris yang `id_user`-nya tidak ada di `pengguna` v2 **dibuang dan dihitung** di laporan impor (K-M12, PRD F8-21, H8-6),
+     beserta `officer_category` miliknya;
+   - pencocokan angka dengan audit legacy mengikuti langkah 2–3 runbook T12b.
+2. Impor tiket lama (T13, MAKE-086), lalu audit v2 (langkah 4 runbook T12b) dan isi lembar hasil di bawah.
+3. Lampiran tiket lama (T-8, MAKE-097): `lampiran:manifest` → `lampiran:tarik` → `lampiran:periksa`. Path lampiran lama tetap
+   ber-path legacy (`arsip/<nip>/inbox/…`). Aplikasi menyajikannya lewat endpoint E-04
+   `GET api/v1/halo-simpeg/tiket/{id}/pesan/{idPesan}/lampiran` (cek akses BP8-2). Berkas yang sama juga ikut tersaji publik lewat
+   alias `/berkas/` §1l (risiko sadar H8-5 (a), PRD R8-6). Saklar `arsip.penyajianBerkasLegacy = privat` tidak memutus akses
+   petugas, karena E-04 tidak memakai URL `/berkas/`.
+4. Syarat DBV-028 Q8 (a) (langkah 5 runbook T12b): Q-H19 + `EXPLAIN ANALYZE` (MySQL 8) / `ANALYZE FORMAT=JSON` (MariaDB)
+   untuk kueri daftar `peran=petugas` (bentuk di README beku `backend/app/Controllers/Api/HaloSimpeg/README.md` bagian tiket),
+   dua varian: tanpa filter status, dan Open.
+
+**Lembar hasil gladi Halo Simpeg** (disalin ke berkas kerja gladi, lalu angkanya dilaporkan ke reviewer/Horii; jangan isi di
+repo publik):
+
+| Butir | Kueri | Ambang / tindak lanjut | Hasil |
+|---|---|---|---|
+| Petugas dibuang impor (yatim/kosong) | laporan impor T12b | dicatat (K-M12) | … |
+| `officer_category` dibuang | laporan impor T12b | rumus rekonsiliasi langkah 3 runbook T12b | … |
+| Tiket berkategori NULL | Q-H11 | dicatat; tetap terlihat dan dapat ditutup pemiliknya saja, tidak ikut ekspor (H8-16 (a1)) | … |
+| **B6:** irisan NULL + Open + pengirim yatim | Q-H12 | dicatat; tiket ini tidak terlihat siapa pun (sama dengan legacy). > 0 → Horii dapat memilih tutup otomatis khusus irisan itu saat cutover (keputusan data, di luar Fase 8) | … |
+| **B7:** lampiran ber-path anomali | Q-H13 (pembanding Q-H14) | dicatat; berkasnya tidak dihapus fisik saat tiket dihapus (Q-A0-6 (a')); bandingkan dengan `tidak_sah` `lampiran:manifest` | … |
+| Tiket Open di kategori tanpa petugas aktif | Q-H15 | > 0 → admin menugaskan petugas sebelum go-live | … |
+| Tiket tanpa pesan | Q-H16 | dicatat; tampil di akhir daftar, tidak menghasilkan baris ekspor | … |
+| **Q-H19:** tiket terbanyak yang terlihat satu petugas aktif | Q-H19 | **> 5.000** → kartu DBV `last_msg_at` wajib di `main` sebelum go-live (DBV-028 Q8 (b)) | … |
+| EXPLAIN daftar petugas, tanpa filter status | langkah 5 runbook T12b | catat `key`, `key_len`, baris, waktu (ms); **> 100 ms** → idem Q8 (b) | … |
+| EXPLAIN daftar petugas, Open | idem | idem | … |
+
+**Butir cutover lain (dicatat, bukan syarat sign-off Fase 8):**
+- Konfirmasi Biro SDM atas satker kepegawaian (Web Config) yang menentukan kandidat petugas (H8-7).
+- Uji push real ke perangkat (payload terbatas F8-16, H8-8 belum ada) = DEPLOY-001.1. Penulis token Android v2 tetap pertanyaan
+  cutover yang sama (§1d butir 5).
+- Kunci token penilaian chatbot (§1m).
+- Rilis menu Halo Simpeg (CR-135: `ACTIVE_PHASE` 5 → 8, item `halo` diberi `to`/`roles`), sesudah sign-off Fase 8.
+- Ekspor rekap petugas (E-09): batas 10.000 baris pesan dan 5.000.000 karakter per berkas (`haloSimpeg.eksporMaksBaris`,
+  `haloSimpeg.eksporMaksKarakter`). Puncak memori terukur ≤ ±106 MB per request di ambang (README ekspor). Syarat
+  `memory_limit` ≥ 256M yang sudah berlaku untuk unduhan PDF (§1) juga mencukupi ekspor ini. Menaikkan ambang di `.env` wajib
+  diukur ulang (`RUN_VOLUME_TEST=1`, `EksporTiketVolumeTest`).
+
 ## 2. Cara push (operator deploy)
 
 Satu kali: tambahkan remote ke bare repo server dev.
