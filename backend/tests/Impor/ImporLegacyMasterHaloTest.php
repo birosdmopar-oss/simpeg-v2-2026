@@ -8,7 +8,9 @@ use App\Libraries\Impor\DaftarTabel;
 use App\Libraries\Impor\DefinisiTabel;
 use App\Libraries\Impor\ImporGagal;
 use App\Libraries\Impor\Keputusan;
+use App\Libraries\Impor\PengimporLegacy;
 use PHPUnit\Framework\Attributes\Group;
+use ReflectionMethod;
 use Tests\Support\Impor\ImporLegacyTestCase;
 
 /**
@@ -213,11 +215,39 @@ final class ImporLegacyMasterHaloTest extends ImporLegacyTestCase
     {
         // R2: petugas yatim ber-email NULL tidak terhitung N1; email spasi-saja → '' tanpa kode.
         $this->src->table('support_officer')->where('id_support_officer', 7)->update(['email' => null]);
-        $this->src->table('support_officer')->where('id_support_officer', 5)->update(['email' => '   ']);
+        $this->src->table('support_officer')->where('id_support_officer', 5)->update(['email' => '  a@x.id  ']);
+        $this->db->table('pengguna')->insert(['id_pengguna' => 23, 'username' => 'make097.c', 'user_level' => 1]);
+        $this->src->table('support_officer')->insert(['id_support_officer' => 9, 'id_user' => 23, 'email' => '   ', 'no_hp' => null, 'status' => 1, 'created_at' => null]);
 
         $so = $this->jalankanImpor([self::TIER])['support_officer'];
 
         $this->assertSame(1, $so['koreksi'][DaftarTabel::KODE_HALO_EMAIL_NULL] ?? null);
-        $this->assertSame('', $this->db->table('support_officer')->where('id_support_officer', 5)->get()->getRow('email'));
+        $this->assertSame('', $this->db->table('support_officer')->where('id_support_officer', 9)->get()->getRow('email'));
+        $this->assertSame('a@x.id', $this->db->table('support_officer')->where('id_support_officer', 5)->get()->getRow('email'), 'V3: spasi tepi di-trim tanpa kode');
+    }
+
+    public function testKeysetPkSintetisHanyaMembungkusKunciNullableDiSumber(): void
+    {
+        // K-1 (review DB MAKE-097): kunci NOT NULL di sumber (mis. tier 14 `news_flag`) tetap kolom asli → indeks terpakai,
+        // tanpa filesort per batch; hanya kunci NULLABLE di sumber yang dibungkus COALESCE ke sentinel.
+        $def   = new DefinisiTabel('news_flag', 'id_news_flag', 'uji K-1', statusDomain: null, kunciUrut: ['id_user', 'id_news'], pkSintetis: true);
+        $kolom = [
+            'id_user' => ['src' => 'id_user', 'tipeSumber' => 'int', 'nullSumber' => false],
+            'id_news' => ['src' => 'id_news', 'tipeSumber' => 'varchar', 'nullSumber' => true],
+        ];
+        $urut = new ReflectionMethod(PengimporLegacy::class, 'urutKunci');
+        /** @var array<string, int|string> $sentinel */
+        $sentinel = [];
+        $sql      = (string) $urut->invokeArgs(null, [$this->src, $kolom, $def, ['id_user', 'id_news'], &$sentinel]);
+
+        $this->assertSame($this->src->escapeIdentifiers('id_user') . ", COALESCE({$this->src->escapeIdentifiers('id_news')}, '')", $sql);
+        $this->assertSame(['id_news' => ''], $sentinel);
+
+        $kolom['id_news']['nullSumber'] = false;
+        /** @var array<string, int|string> $sentinel */
+        $sentinel = [];
+        $sql      = (string) $urut->invokeArgs(null, [$this->src, $kolom, $def, ['id_user', 'id_news'], &$sentinel]);
+        $this->assertStringNotContainsString('COALESCE', $sql);
+        $this->assertSame([], $sentinel);
     }
 }
