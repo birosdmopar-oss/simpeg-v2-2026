@@ -1,0 +1,74 @@
+{
+    "status": "success",
+    "data": {
+        "id": 1,
+        "subjek": "Sisa cuti",
+        "kategori": {
+            "id": 1,
+            "nama": "Kepegawaian"
+        },
+        "status": "closed",
+        "dibuat_pada": "2026-11-17T07:45:16Z",
+        "pemilik_nama": "Pelapor Contoh",
+        "sebagai_petugas": true,
+        "belum_dibaca": false,
+        "perlu_tindak": false,
+        "pesan_terakhir": {
+            "id_inbox_msg": 3,
+            "waktu": "2026-11-17T07:45:16Z",
+            "potongan": "Tambahan dari petugas lain.",
+            "pengirim_label": "Admin",
+            "lampiran": null
+        },
+        "bisa_balas": false,
+        "bisa_tutup": false,
+        "bisa_hapus": true,
+        "allow_reply": false,
+        "snapshot": {
+            "nip": "000000000000000012",
+            "jabatan": "Analis Kepegawaian",
+            "satker": "Biro Sumber Daya Manusia"
+        },
+        "ditutup_oleh_label": "Pelapor Contoh",
+        "pengingat": {
+            "aktif": false,
+            "jatuh_tempo": null
+        },
+        "pesan": [
+            {
+                "id_inbox_msg": 1,
+                "waktu": "2026-11-17T07:45:16Z",
+                "isi": "Berapa sisa cuti saya?",
+                "pengirim_label": "Pelapor Contoh",
+                "milik_saya": false,
+                "dari_pemilik": true,
+                "urutan_pengirim": 0,
+                "lampiran": {
+                    "nama": "lampiran-1-1.pdf",
+                    "tipe": "application/pdf",
+                    "ukuran": null
+                }
+            },
+            {
+                "id_inbox_msg": 2,
+                "waktu": "2026-11-17T07:45:16Z",
+                "isi": "Sisa cuti 10 hari.",
+                "pengirim_label": "000000000000000012",
+                "milik_saya": true,
+                "dari_pemilik": false,
+                "urutan_pengirim": 1,
+                "lampiran": null
+            },
+            {
+                "id_inbox_msg": 3,
+                "waktu": "2026-11-17T07:45:16Z",
+                "isi": "Tambahan dari petugas lain.",
+                "pengirim_label": "Petugas Contoh",
+                "milik_saya": false,
+                "dari_pemilik": false,
+                "urutan_pengirim": 2,
+                "lampiran": null
+            }
+        ]
+    }
+}

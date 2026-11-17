@@ -276,9 +276,9 @@ final class TiketService extends MasterHaloSimpeg
         }
 
         $this->periksaPesan($pesan, $errors);
+        $berkas = $this->periksaBerkas($arsip, $errors);
         self::lemparBilaGalat($errors);
 
-        $berkas  = $this->periksaBerkas($arsip);
         $penjaga = new PenjagaBerkas($this->storage, $this->db);
         $path    = $berkas === null ? null : $this->simpanBerkas($berkas, $penjaga);
         $now     = self::sekarang();
@@ -354,9 +354,9 @@ final class TiketService extends MasterHaloSimpeg
             $errors['ingatkan_24_jam'] = self::PESAN_PENGINGAT;
         }
 
+        $berkas = $this->periksaBerkas($arsip, $errors);
         self::lemparBilaGalat($errors);
 
-        $berkas  = $this->periksaBerkas($arsip);
         $penjaga = new PenjagaBerkas($this->storage, $this->db);
         $path    = $berkas === null ? null : $this->simpanBerkas($berkas, $penjaga);
         $now     = self::sekarang();
@@ -717,15 +717,26 @@ final class TiketService extends MasterHaloSimpeg
     }
 
     /**
+     * Validasi `arsip` (opsional) lewat ValidasiBerkas; galatnya digabung ke `$errors['arsip']` agar satu respons 422 memuat semua
+     * kolom (termasuk `errors.arsip`).
+     *
+     * @param array<string, string> $errors
+     *
      * @return array{isi: string, ekstensi: string}|null
      */
-    private function periksaBerkas(?UploadedFile $arsip): ?array
+    private function periksaBerkas(?UploadedFile $arsip, array &$errors): ?array
     {
         if ($arsip === null || $arsip->getError() === UPLOAD_ERR_NO_FILE) {
             return null;
         }
 
-        $hasil = ValidasiBerkas::periksa($arsip, new AturanLampiran(0, false, $this->config->lampiranMaksMb, $this->config->lampiranEkstensi), 'arsip');
+        try {
+            $hasil = ValidasiBerkas::periksa($arsip, new AturanLampiran(0, false, $this->config->lampiranMaksMb, $this->config->lampiranEkstensi), 'arsip');
+        } catch (ValidationException $e) {
+            $errors['arsip'] = (string) ($e->getErrors()['arsip'][0] ?? $e->getMessage());
+
+            return null;
+        }
 
         return ['isi' => $hasil['isi'], 'ekstensi' => $hasil['ekstensi']];
     }

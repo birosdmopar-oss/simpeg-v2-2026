@@ -1,0 +1,5 @@
+{
+    "status": "error",
+    "code": "tiket_tanpa_kategori",
+    "message": "Pertanyaan ini tidak memiliki kategori. Silakan tambah pertanyaan baru."
+}
