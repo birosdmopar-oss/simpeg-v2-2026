@@ -89,6 +89,41 @@ final class PenerimaTokenFcm
     }
 
     /**
+     * CR-137: token web akun-akun ini (aktif, belum dihapus) tanpa syarat role/NIP — penerima per akun Halo Simpeg (H8-14 (a)).
+     *
+     * @param list<int> $idPengguna
+     *
+     * @return list<array{id: int, token: string, platform: int}>
+     */
+    public function webAkun(array $idPengguna): array
+    {
+        $id = array_values(array_unique(array_filter(array_map('intval', $idPengguna), static fn (int $i): bool => $i > 0)));
+
+        return $id === [] ? [] : $this->baris($this->web()->whereIn('p.id_pengguna', $id));
+    }
+
+    /**
+     * CR-137: NIP akun aktif ini (untuk token Android per NIP); akun tanpa NIP dilewati.
+     *
+     * @param list<int> $idPengguna
+     *
+     * @return list<string>
+     */
+    public function nipAkun(array $idPengguna): array
+    {
+        $id = array_values(array_unique(array_filter(array_map('intval', $idPengguna), static fn (int $i): bool => $i > 0)));
+
+        if ($id === []) {
+            return [];
+        }
+
+        $rows = $this->db->table('pengguna')->select('nip')->whereIn('id_pengguna', $id)->where('status', '1')->where('deleted_at', null)
+            ->where('nip IS NOT NULL', null, false)->get()->getResultArray();
+
+        return $this->bersih(array_map(static fn (array $r): string => (string) $r['nip'], $rows));
+    }
+
+    /**
      * Token web admin yang membawahi pegawai — `getTokenAdmin` [K `FH:474-554`], unit/satker dari `pegawai_mutasi_jabatan`:
      * tanpa baris pmj, unit Lain-lain (7), atau unit kepegawaian (`web_config.id_unit_kepegawaian`) → semua Super Admin (1);
      * baris pmj dengan unit kosong → tanpa penerima (legacy `id_unit=''`, review MAKE-066 S5);
