@@ -15,13 +15,16 @@ use Throwable;
  *
  * Kolom ikut legacy [K]/[I] dari KODE legacy (`libraries/hr/L_support.php`); DDL produksi/dev ketiga tabel tidak tersedia,
  * sehingga tipe/panjang berlabel [I] dan diputus DB Validator. Deviasi [V2]:
- * - `status` TINYINT domain master 0/1 + CHECK (legacy varchar '1'/'0'; sama dengan `question_category` DBV-022 DQ-5);
+ * - `status` TINYINT domain master 0/1 + CHECK; domain 0/1 [K] (form `officer/form.php:28-29`), tipe kolom legacy [I] (DDL tidak
+ *   ada); domain/CHECK/DEFAULT sama dengan `question_category` DBV-022 DQ-5 (di sana INT, di sini TINYINT per F8-03);
  * - `support_officer.id_user` INT UNSIGNED NOT NULL + UNIQUE + FK RESTRICT → `pengguna.id_pengguna` (legacy hanya unik di
  *   aplikasi `LS:765-788`); nama kolom tetap `id_user` agar impor T12b lurus (H8-6, K-M11);
- * - `officer_category` UNIQUE (`id_support_officer`, `id_question_category`) + FK RESTRICT (legacy CASCADE; penggantian set
- *   kategori = hapus + sisip dalam satu transaksi di service, [K `LS:627-629`]);
+ * - `officer_category` UNIQUE (`id_support_officer`, `id_question_category`) + FK RESTRICT. Aksi FK legacy [I]: DDL tidak ada, dan
+ *   `delete_officer` (`LS:711`) / `delete_category` (`LS:365`) tidak menyentuh `officer_category` (DBV-028 Q9). Penggantian set
+ *   kategori = hapus + sisip dalam satu transaksi di service [K `LS:627-629`]. Nama PK `id` [I] (DBV-028 Q10);
  * - `help_desk_contact.contact` UNIQUE (legacy unik di aplikasi `LS:176-197`, B-16);
- * - `updated_at` di `support_officer` (audit); waktu UTC diisi aplikasi (BP8-8), tanpa DEFAULT DB.
+ * - `created_at`/`updated_at` UTC diisi aplikasi tanpa DEFAULT DB [V2] (BP8-8). Legacy tidak pernah mengisi `created_at` dari
+ *   aplikasi, jadi stempel lama kemungkinan dari DEFAULT DB legacy [I]; `updated_at` ketiga tabel [V2].
  *
  * `question_category`, `disiplin_ticket(_msg)` SUDAH ADA (DBV-022) dan tidak dibuat ulang; indeksnya di migration
  * `2026-11-16-100100_AlterDisiplinTicketIndeksFase8`.
@@ -85,9 +88,9 @@ class CreateHaloSimpegFase8 extends Migration
                     `name` VARCHAR(150) NOT NULL COMMENT 'Nama kontak [K] LS:156-200; panjang [I]',
                     `contact` VARCHAR(20) NOT NULL COMMENT 'Nomor kontak, unik [K] LS:176-197 + UNIQUE [V2]; panjang [I]',
                     `email` VARCHAR(150) NULL DEFAULT NULL COMMENT 'Opsional [K] help_desk/form.php:55; panjang [I]',
-                    `status` TINYINT NOT NULL DEFAULT 1 COMMENT '0 Tidak Aktif, 1 Aktif [K] + TINYINT/CHECK [V2]',
-                    `created_at` DATETIME NULL DEFAULT NULL COMMENT 'UTC, diisi aplikasi [K] LS:16',
-                    `updated_at` DATETIME NULL DEFAULT NULL COMMENT 'UTC, diisi aplikasi [I]',
+                    `status` TINYINT NOT NULL DEFAULT 1 COMMENT '0 Tidak Aktif, 1 Aktif: domain [K], tipe legacy [I]; TINYINT/CHECK [V2]',
+                    `created_at` DATETIME NULL DEFAULT NULL COMMENT 'UTC, diisi aplikasi [V2]; legacy dari DEFAULT DB [I], urut LS:16',
+                    `updated_at` DATETIME NULL DEFAULT NULL COMMENT 'UTC, diisi aplikasi [V2]',
                     PRIMARY KEY (`id_help_desk_contact`),
                     UNIQUE KEY `uk_help_desk_contact_contact` (`contact`),
                     KEY `status` (`status`),
@@ -98,8 +101,8 @@ class CreateHaloSimpegFase8 extends Migration
                     `id_user` INT UNSIGNED NOT NULL COMMENT 'Akun petugas → pengguna.id_pengguna [K] LS:440 + FK/UNIQUE [V2]',
                     `email` VARCHAR(150) NOT NULL COMMENT 'Wajib di form [K] LS:756; panjang [I]',
                     `no_hp` VARCHAR(20) NULL DEFAULT NULL COMMENT 'Opsional [K] LS:798; panjang [I]',
-                    `status` TINYINT NOT NULL DEFAULT 1 COMMENT '0 Tidak Aktif, 1 Aktif [K] varchar + TINYINT/CHECK [V2]',
-                    `created_at` DATETIME NULL DEFAULT NULL COMMENT 'UTC, diisi aplikasi [K] LS:441',
+                    `status` TINYINT NOT NULL DEFAULT 1 COMMENT '0 Tidak Aktif, 1 Aktif: domain [K] officer/form.php:28-29, tipe legacy [I]; TINYINT/CHECK [V2]',
+                    `created_at` DATETIME NULL DEFAULT NULL COMMENT 'UTC, diisi aplikasi [V2]; legacy dari DEFAULT DB [I], urut LS:441',
                     `updated_at` DATETIME NULL DEFAULT NULL COMMENT 'UTC, diisi aplikasi [V2]',
                     PRIMARY KEY (`id_support_officer`),
                     UNIQUE KEY `uk_support_officer_id_user` (`id_user`),
@@ -108,10 +111,10 @@ class CreateHaloSimpegFase8 extends Migration
                     CONSTRAINT `chk_support_officer_status` CHECK (`status` IN (0, 1))
                 ) " . self::TABLE_OPTIONS . " COMMENT='Petugas Halo Simpeg (E-02, DBV-028); petugas = penugasan data, bukan role'",
             'officer_category' => "CREATE TABLE {$this->t('officer_category')} (
-                    `id` INT NOT NULL AUTO_INCREMENT COMMENT '[K] LS:803-812',
+                    `id` INT NOT NULL AUTO_INCREMENT COMMENT 'Nama PK [I] (LS:803-812 tidak menyebut PK; DBV-028 Q10)',
                     `id_support_officer` INT NOT NULL COMMENT '[K] LS:807',
                     `id_question_category` INT NOT NULL COMMENT '[K] LS:808',
-                    `created_at` DATETIME NULL DEFAULT NULL COMMENT 'UTC, diisi aplikasi [K] LS:221',
+                    `created_at` DATETIME NULL DEFAULT NULL COMMENT 'UTC, diisi aplikasi [V2]; legacy dari DEFAULT DB [I], urut LS:221',
                     PRIMARY KEY (`id`),
                     UNIQUE KEY `uk_officer_category` (`id_support_officer`, `id_question_category`),
                     KEY `id_question_category` (`id_question_category`),
@@ -136,7 +139,7 @@ class CreateHaloSimpegFase8 extends Migration
         if ($this->db->query($sql) === false) {
             $error = $this->db->error();
 
-            throw new RuntimeException("DBV-028: {$label} gagal (" . $error['code'] . '): ' . $error['message']);
+            throw new RuntimeException("DBV-028: {$label} gagal (" . $error['code'] . '): ' . $error['message'], (int) $error['code']);
         }
     }
 }
