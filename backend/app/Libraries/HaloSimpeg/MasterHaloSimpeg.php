@@ -186,13 +186,18 @@ abstract class MasterHaloSimpeg
      */
     protected function dalamTransaksi(callable $tulis, ?callable $galatDb = null): mixed
     {
-        $this->db->transBegin();
+        // Di dalam transaksi CI4 tidak melempar galat query kecuali transException aktif; tanpa ini kode galat asli (1062/1451/
+        // 1205) hilang dan langkah berikutnya tetap berjalan. Dikembalikan ke bawaan (false) di finally agar tidak menempel di
+        // koneksi bersama.
+        $this->db->transException(true)->transBegin();
 
         try {
             $hasil = $tulis();
 
             if ($this->db->transStatus() === false) {
-                throw new DatabaseException('Simpan data Halo Simpeg gagal (' . $this->db->error()['code'] . ').');
+                $galat = $this->db->error();
+
+                throw new DatabaseException('Simpan data Halo Simpeg gagal: ' . $galat['message'], (int) $galat['code']);
             }
 
             $this->db->transCommit();
@@ -211,6 +216,7 @@ abstract class MasterHaloSimpeg
 
             throw $e;
         } finally {
+            $this->db->transException(false);
             $this->db->resetTransStatus();
         }
     }
