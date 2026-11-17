@@ -7,6 +7,7 @@ namespace Tests\Impor;
 use App\Libraries\Impor\DaftarTabel;
 use App\Libraries\Impor\DefinisiTabel;
 use App\Libraries\Impor\ImporGagal;
+use App\Libraries\Impor\Keputusan;
 use PHPUnit\Framework\Attributes\Group;
 use Tests\Support\Impor\ImporLegacyTestCase;
 
@@ -157,5 +158,66 @@ final class ImporLegacyMasterHaloTest extends ImporLegacyTestCase
         $this->assertSame(0, $this->db->table('support_officer')->countAllResults());
         $this->assertSame(0, $this->db->table('officer_category')->countAllResults());
         $this->assertSame(0, $this->db->table('help_desk_contact')->countAllResults());
+    }
+
+    public function testStatusLegacyStringDanKeputusan(): void
+    {
+        // R4/R6: status legacy varchar '1'/'0' → TINYINT; '2' tanpa keputusan → gagal; dengan `status.support_officer` → lolos.
+        $this->src->query('ALTER TABLE `support_officer` MODIFY `status` VARCHAR(2) NOT NULL');
+        $this->src->query('ALTER TABLE `help_desk_contact` MODIFY `status` VARCHAR(2) NOT NULL');
+        $this->src->table('support_officer')->where('id_support_officer', 6)->update(['status' => '2']);
+
+        try {
+            $this->jalankanImpor([self::TIER], dryRun: true);
+            $this->fail('status di luar 0/1 tanpa keputusan wajib gagal');
+        } catch (ImporGagal $e) {
+            $this->assertStringContainsString('support_officer', $e->getMessage());
+        }
+
+        $this->jalankanImpor([self::TIER], k: Keputusan::dariArray(['status' => ['support_officer' => ['2' => 0]]]));
+
+        $status = array_column($this->db->table('support_officer')->orderBy('id_support_officer')->get()->getResultArray(), 'status', 'id_support_officer');
+        $this->assertSame(['5' => '1', '6' => '0'], array_map('strval', $status));
+        $this->assertSame('0', (string) $this->db->table('help_desk_contact')->where('id_help_desk_contact', 2)->get()->getRow('status'));
+    }
+
+    public function testRujukanKosongDanYatimDuaArahDihitungSekali(): void
+    {
+        // R1/R4: kunci NULL/0 → `rujukan kosong` (sekali, tidak dihitung ganda); yatim dua arah dihitung tepat sekali;
+        // officer_category milik petugas yang dibuang karena id_user 0 ikut dibuang. Batch 2 → NULL di batas batch.
+        $this->src->query('ALTER TABLE `officer_category` MODIFY `id_support_officer` INT NULL, MODIFY `id_question_category` INT NULL');
+        $this->src->table('officer_category')->insertBatch([
+            ['id' => 50, 'id_support_officer' => null, 'id_question_category' => 3, 'created_at' => null],
+            ['id' => 51, 'id_support_officer' => null, 'id_question_category' => 4, 'created_at' => null],
+            ['id' => 52, 'id_support_officer' => 5, 'id_question_category' => null, 'created_at' => null],
+            ['id' => 53, 'id_support_officer' => 0, 'id_question_category' => 3, 'created_at' => null],
+            ['id' => 54, 'id_support_officer' => 99, 'id_question_category' => 77, 'created_at' => null],
+            ['id' => 55, 'id_support_officer' => 8, 'id_question_category' => 4, 'created_at' => null],
+        ]);
+
+        $oc = $this->jalankanImpor([self::TIER])['officer_category'];
+
+        $this->assertSame(12, $oc['sumber']);
+        $this->assertSame(3, $oc['ditulis']);
+        $yatimSo = $oc['dibuang'][DefinisiTabel::kodeYatimBuang('id_support_officer')] ?? 0;
+        $yatimQc = $oc['dibuang'][DefinisiTabel::kodeYatimBuang('id_question_category')] ?? 0;
+        $this->assertSame(4, $oc['dibuang'][DaftarTabel::KODE_HALO_RUJUKAN_KOSONG] ?? null, 'NULL/0 (50–53) sekali, tidak dihitung ganda');
+        $this->assertSame(5, $yatimSo + $yatimQc, 'yatim 43/44/45/54/55: baris dua arah (54) dihitung tepat sekali');
+        $this->assertGreaterThanOrEqual(3, $yatimSo, 'termasuk 55 milik petugas yang dibuang karena id_user 0');
+        $this->assertGreaterThanOrEqual(1, $yatimQc);
+        $this->assertArrayNotHasKey(DefinisiTabel::KODE_GANDA, $oc['dibuang']);
+        $this->assertSame($oc['sumber'], $oc['ditulis'] + $oc['dilewati'] + array_sum($oc['dibuang']));
+    }
+
+    public function testN1HanyaUntukBarisYangDitulis(): void
+    {
+        // R2: petugas yatim ber-email NULL tidak terhitung N1; email spasi-saja → '' tanpa kode.
+        $this->src->table('support_officer')->where('id_support_officer', 7)->update(['email' => null]);
+        $this->src->table('support_officer')->where('id_support_officer', 5)->update(['email' => '   ']);
+
+        $so = $this->jalankanImpor([self::TIER])['support_officer'];
+
+        $this->assertSame(1, $so['koreksi'][DaftarTabel::KODE_HALO_EMAIL_NULL] ?? null);
+        $this->assertSame('', $this->db->table('support_officer')->where('id_support_officer', 5)->get()->getRow('email'));
     }
 }
