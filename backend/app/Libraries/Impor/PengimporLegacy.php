@@ -24,7 +24,8 @@ use Throwable;
  * 7. `kolomKode`: karakter tak terlihat dibuang lalu trim PHP (kode wilayah DBV-011 §2.2 #7; NIP CR-089, dicatat di
  *    laporan). Teks melebihi panjang kolom tujuan → gagal.
  * 8. Rujukan FK dicek per batch terhadap tabel induk di tujuan (audit DBV-019 = 0): yatim → NULL bila kolomnya
- *    `yatimKeNull` (dicatat), selain itu gagal dengan jumlah nilai yatim. Dry-run tidak memeriksa rujukan.
+ *    `yatimKeNull` (dicatat), barisnya dibuang bila kolomnya `yatimBuang` (dicatat, MAKE-097), selain itu gagal dengan
+ *    jumlah nilai yatim. Dry-run tidak memeriksa rujukan.
  *
  * 9. Indeks UNIQUE tujuan (selain PK) dicek di PHP per tabel, juga saat dry-run, terhadap baris seed dan baris yang akan
  *    ditulis: dua baris yang identik sesudah normalisasi (mis. nama beda spasi tengah) → gagal dengan nama tabel + indeks
@@ -32,7 +33,8 @@ use Throwable;
  * 10. UPDATE kolom tunda menyertakan kolom ber-`ON UPDATE CURRENT_TIMESTAMP` dengan nilainya sendiri, supaya stempel
  *    hasil R1a tidak tertimpa waktu impor.
  *
- * Aturan khusus tabel boleh mengembalikan kunci `__koreksi` (list kode) untuk dicatat di laporan. Sesudah setiap tier
+ * Aturan khusus tabel boleh mengembalikan kunci `__koreksi` (list kode) untuk dicatat di laporan, atau `__koreksiTulis`
+ * (dicatat hanya bila baris itu benar-benar ditulis, sesudah cek rujukan; MAKE-097). Sesudah setiap tier
  * di-commit, counter AUTO_INCREMENT tujuan disamakan dengan sumber bila lebih kecil (DBV-011 §2.7; PK TINYINT dengan
  * counter ≥ 128 tidak disalin, dicatat PERIKSA). Langkah ini DDL, jadi berjalan di luar transaksi tier.
  *
@@ -210,7 +212,7 @@ final class PengimporLegacy
      * sesudah commit (DDL = commit implisit); berkas jejak ditulis per tabel yang selesai.
      *
      * @param list<DefinisiTabel> $defs
-     * @param array<string, array{ada: bool, sumber: string, buang: array<int|string, string>, urut: array<int|string, int>, kolom: array<string, array{src: string, tipeSumber: string, tipeTujuan: string, nullable: bool, panjang: int|null}>, fk: array<string, array{tabel: string, kolom: string}>, seed: array<string, string>, unik: array<string, list<string>>, onUpdate: list<string>, barisSeed: list<array<string, mixed>>}|null> $rinci
+     * @param array<string, array{ada: bool, sumber: string, buang: array<int|string, string>, urut: array<int|string, int>, kolom: array<string, array{src: string, tipeSumber: string, tipeTujuan: string, nullable: bool, nullSumber: bool, panjang: int|null}>, fk: array<string, array{tabel: string, kolom: string}>, seed: array<string, string>, unik: array<string, list<string>>, onUpdate: list<string>, barisSeed: list<array<string, mixed>>}|null> $rinci
      */
     private function jalankanKelompok(int $tier, array $defs, array $rinci, bool $dryRun, bool $catatJejak): void
     {
@@ -277,7 +279,7 @@ final class PengimporLegacy
      * `isiUrutan`: 1..n per lingkup, urut nama sesudah normalisasi seperti aplikasi (lalu PK) — hanya bila kolom urutan tidak
      * ada di sumber.
      *
-     * @param array<string, array{src: string, tipeSumber: string, tipeTujuan: string, nullable: bool, panjang: int|null}> $kolom
+     * @param array<string, array{src: string, tipeSumber: string, tipeTujuan: string, nullable: bool, nullSumber: bool, panjang: int|null}> $kolom
      *
      * @return array<int|string, int> PK sumber → urutan
      */
@@ -321,7 +323,7 @@ final class PengimporLegacy
      * skema SIASN) atau berubah oleh `kolomKode` (trim/karakter tak terlihat): ganda dalam satu batch → 1062, ganda di
      * batas batch → terlewat oleh keyset `>`. Gagal dengan jumlah saja, juga saat dry-run.
      *
-     * @param array<string, array{src: string, tipeSumber: string, tipeTujuan: string, nullable: bool, panjang: int|null}> $kolom
+     * @param array<string, array{src: string, tipeSumber: string, tipeTujuan: string, nullable: bool, nullSumber: bool, panjang: int|null}> $kolom
      */
     private function periksaKunciSumber(DefinisiTabel $def, BaseConnection $src, string $namaSumber, array $kolom): void
     {
@@ -527,7 +529,7 @@ final class PengimporLegacy
     }
 
     /**
-     * @return array{ada: bool, sumber: string, buang: array<int|string, string>, urut: array<int|string, int>, kolom: array<string, array{src: string, tipeSumber: string, tipeTujuan: string, nullable: bool, panjang: int|null}>, fk: array<string, array{tabel: string, kolom: string}>, seed: array<string, string>, unik: array<string, list<string>>, onUpdate: list<string>, barisSeed: list<array<string, mixed>>}|null
+     * @return array{ada: bool, sumber: string, buang: array<int|string, string>, urut: array<int|string, int>, kolom: array<string, array{src: string, tipeSumber: string, tipeTujuan: string, nullable: bool, nullSumber: bool, panjang: int|null}>, fk: array<string, array{tabel: string, kolom: string}>, seed: array<string, string>, unik: array<string, list<string>>, onUpdate: list<string>, barisSeed: list<array<string, mixed>>}|null
      */
     private function praCek(DefinisiTabel $def): ?array
     {
@@ -575,6 +577,7 @@ final class PengimporLegacy
                     'tipeSumber' => $kolomSumber[$asal]['tipe'],
                     'tipeTujuan' => $t['tipe'],
                     'nullable'   => $t['nullable'],
+                    'nullSumber' => $kolomSumber[$asal]['nullable'],
                     'panjang'    => $t['panjang'],
                 ];
 
@@ -655,7 +658,7 @@ final class PengimporLegacy
     }
 
     /**
-     * @param array{ada: bool, sumber: string, buang: array<int|string, string>, urut: array<int|string, int>, kolom: array<string, array{src: string, tipeSumber: string, tipeTujuan: string, nullable: bool, panjang: int|null}>, fk: array<string, array{tabel: string, kolom: string}>, seed: array<string, string>, unik: array<string, list<string>>, onUpdate: list<string>, barisSeed: list<array<string, mixed>>}|null $rinci
+     * @param array{ada: bool, sumber: string, buang: array<int|string, string>, urut: array<int|string, int>, kolom: array<string, array{src: string, tipeSumber: string, tipeTujuan: string, nullable: bool, nullSumber: bool, panjang: int|null}>, fk: array<string, array{tabel: string, kolom: string}>, seed: array<string, string>, unik: array<string, list<string>>, onUpdate: list<string>, barisSeed: list<array<string, mixed>>}|null $rinci
      */
     private function imporTabel(int $tier, DefinisiTabel $def, ?array $rinci, bool $dryRun): void
     {
@@ -673,7 +676,8 @@ final class PengimporLegacy
 
         $pilih        = implode(', ', array_map(static fn (string $k, array $t): string => $src->escapeIdentifiers($t['src']) . ' AS ' . $src->escapeIdentifiers($k), array_keys($rinci['kolom']), $rinci['kolom']));
         $kunci        = $def->kunciUrut === [] ? [$def->pk] : $def->kunciUrut;
-        $urutPk       = implode(', ', array_map(static fn (string $k): string => $src->escapeIdentifiers($rinci['kolom'][$k]['src']), $kunci));
+        $sentinel     = [];
+        $urutPk       = self::urutKunci($src, $rinci['kolom'], $def, $kunci, $sentinel);
         $buang        = $rinci['buang'];
         $urutan       = [];
         $tunda        = [];
@@ -698,10 +702,11 @@ final class PengimporLegacy
             $tulis = [];
 
             foreach ($baris as $mentah) {
-                $terakhir = array_map(static fn (string $k): mixed => $mentah[$k], $kunci);
-                $idBaris  = $def->pkSintetis ? implode("\x1F", array_map('strval', $terakhir)) : (string) $mentah[$def->pk];
+                $terakhir  = array_map(static fn (string $k): mixed => $mentah[$k] ?? ($sentinel[$k] ?? null), $kunci);
+                $kunciNull = $def->pkSintetis && array_filter($kunci, static fn (string $k): bool => $mentah[$k] === null) !== [];
+                $idBaris   = $def->pkSintetis ? implode("\x1F", array_map('strval', $terakhir)) : (string) $mentah[$def->pk];
 
-                if ($def->pkSintetis) {
+                if ($def->pkSintetis && ! $kunciNull) {
                     if ($idBaris === $kunciSebelum) {
                         $this->laporan->dibuang($def->kunci(), DefinisiTabel::KODE_GANDA);
                         $gandaDibuang++;
@@ -772,6 +777,15 @@ final class PengimporLegacy
 
             $tulis = $this->periksaRujukan($def, $rinci['fk'], $tulis);
 
+            // `__koreksiTulis`: koreksi yang hanya dicatat untuk baris yang benar-benar ditulis (sesudah buang yatim, MAKE-097 R2).
+            foreach ($tulis as $i => $r) {
+                foreach ($r['__koreksiTulis'] ?? [] as $kode) {
+                    $this->laporan->koreksi($def->kunci(), (string) $kode);
+                }
+
+                unset($tulis[$i]['__koreksiTulis']);
+            }
+
             if ($tulis !== [] && ! $dryRun) {
                 if ($this->tujuan->table($def->tabel)->insertBatch($tulis) === false || $this->tujuan->transStatus() === false) {
                     throw new ImporGagal($this->pesanGagal($this->tujuan, "tulis {$def->tabel}"));
@@ -811,7 +825,7 @@ final class PengimporLegacy
     }
 
     /**
-     * @param array{ada: bool, sumber: string, buang: array<int|string, string>, urut: array<int|string, int>, kolom: array<string, array{src: string, tipeSumber: string, tipeTujuan: string, nullable: bool, panjang: int|null}>, fk: array<string, array{tabel: string, kolom: string}>, seed: array<string, string>, unik: array<string, list<string>>, onUpdate: list<string>, barisSeed: list<array<string, mixed>>} $rinci
+     * @param array{ada: bool, sumber: string, buang: array<int|string, string>, urut: array<int|string, int>, kolom: array<string, array{src: string, tipeSumber: string, tipeTujuan: string, nullable: bool, nullSumber: bool, panjang: int|null}>, fk: array<string, array{tabel: string, kolom: string}>, seed: array<string, string>, unik: array<string, list<string>>, onUpdate: list<string>, barisSeed: list<array<string, mixed>>} $rinci
      * @param array<string, mixed> $mentah
      *
      * @return array<string, mixed>|string
@@ -838,7 +852,7 @@ final class PengimporLegacy
     }
 
     /**
-     * @param array{src: string, tipeSumber: string, tipeTujuan: string, nullable: bool, panjang: int|null} $tipe
+     * @param array{src: string, tipeSumber: string, tipeTujuan: string, nullable: bool, nullSumber: bool, panjang: int|null} $tipe
      * @param array<string, array{tabel: string, kolom: string}>                       $fk
      */
     private function ubahNilai(DefinisiTabel $def, string $kolom, array $tipe, array $fk, mixed $nilai): mixed
@@ -920,6 +934,32 @@ final class PengimporLegacy
     }
 
     /**
+     * Ekspresi ORDER BY / keyset kunci baca. pkSintetis: kunci yang NULLABLE di sumber (mis. `officer_category` legacy tanpa
+     * NOT NULL) dibungkus COALESCE ke sentinel yang urut paling depan, karena `(a, b) > (?, ?)` dengan NULL bernilai NULL dan
+     * memutus pembacaan (review CR MAKE-097 R1). Kunci NOT NULL di sumber tetap memakai kolom asli supaya indeks terpakai tanpa
+     * filesort per batch (review DB MAKE-097 K-1). Sentinel teks `''` membuat NULL dan `''` asli seri; bila seri itu melintasi
+     * batas batch, baris terlewat dan rekonsiliasi gagal keras (bukan diam-diam).
+     *
+     * @param array<string, array{src: string, tipeSumber: string, nullSumber: bool}> $kolom
+     * @param list<string>                                                             $kunci
+     * @param array<string, int|string>                                                $sentinel diisi untuk kunci yang dibungkus
+     */
+    private static function urutKunci(BaseConnection $src, array $kolom, DefinisiTabel $def, array $kunci, array &$sentinel): string
+    {
+        return implode(', ', array_map(static function (string $k) use ($src, $kolom, $def, &$sentinel): string {
+            $kol = $src->escapeIdentifiers($kolom[$k]['src']);
+
+            if (! $def->pkSintetis || ! $kolom[$k]['nullSumber']) {
+                return $kol;
+            }
+
+            $sentinel[$k] = in_array($kolom[$k]['tipeSumber'], self::TIPE_TEKS, true) ? '' : PHP_INT_MIN;
+
+            return 'COALESCE(' . $kol . ', ' . (is_int($sentinel[$k]) ? (string) $sentinel[$k] : "''") . ')';
+        }, $kunci));
+    }
+
+    /**
      * FK tabel tujuan: kolom → tabel induk (ber-prefix) + kolom induk.
      *
      * @return array<string, array{tabel: string, kolom: string}>
@@ -950,13 +990,18 @@ final class PengimporLegacy
     /**
      * Jumlah baris kunci baca ganda (pkSintetis) di sumber: `COUNT(*) - COUNT(DISTINCT kunci)`.
      *
-     * @param array<string, array{src: string, tipeSumber: string, tipeTujuan: string, nullable: bool, panjang: int|null}> $kolom
+     * @param array<string, array{src: string, tipeSumber: string, tipeTujuan: string, nullable: bool, nullSumber: bool, panjang: int|null}> $kolom
      */
     private function jumlahGanda(BaseConnection $src, string $tabel, DefinisiTabel $def, array $kolom, string $saring): int
     {
-        $kunci = implode(', ', array_map(static fn (string $k): string => $src->escapeIdentifiers($kolom[$k]['src']), $def->kunciUrut));
+        $kol   = array_map(static fn (string $k): string => $src->escapeIdentifiers($kolom[$k]['src']), $def->kunciUrut);
+        $kunci = implode(', ', $kol);
+        // COUNT(DISTINCT …) melewati baris berkunci NULL; COUNT(*) juga dibatasi ke baris yang semua kuncinya terisi, supaya
+        // baris NULL tidak dihitung ganda (review CR MAKE-097 R1). Baris NULL diputus aturan baris (mis. rujukan kosong).
+        $isi   = implode(' AND ', array_map(static fn (string $k): string => "{$k} IS NOT NULL", $kol));
+        $where = $saring === '' ? " WHERE {$isi}" : "{$saring} AND {$isi}";
 
-        return (int) $this->kueri($src, "SELECT COUNT(*) - COUNT(DISTINCT {$kunci}) AS n FROM {$tabel}{$saring}")->getRowArray()['n'];
+        return (int) $this->kueri($src, "SELECT COUNT(*) - COUNT(DISTINCT {$kunci}) AS n FROM {$tabel}{$where}")->getRowArray()['n'];
     }
 
     /**
@@ -1070,6 +1115,28 @@ final class PengimporLegacy
             $yatim = array_values(array_diff($nilai, $ada));
 
             if ($yatim === []) {
+                continue;
+            }
+
+            if (in_array($kolom, $def->yatimBuang, true)) {
+                $sisa = [];
+
+                foreach ($tulis as $baris) {
+                    if ($baris[$kolom] !== null && in_array((string) $baris[$kolom], $yatim, true)) {
+                        $this->laporan->dibuang($def->kunci(), DefinisiTabel::kodeYatimBuang($kolom));
+
+                        continue;
+                    }
+
+                    $sisa[] = $baris;
+                }
+
+                if ($sisa === []) {
+                    return [];
+                }
+
+                $tulis = $sisa;
+
                 continue;
             }
 

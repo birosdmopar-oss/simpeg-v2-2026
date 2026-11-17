@@ -47,6 +47,10 @@ final class DefinisiTabel
      *                                                         `COUNT(*) - COUNT(DISTINCT …)`); pra-cek UNIQUE PHP dilewati untuk indeks UNIQUE yang
      *                                                         kolomnya = himpunan `kunciUrut` (dijamin kunci baca, Q-089-6: tanpa memuat jutaan
      *                                                         kunci ke memori). `bolehSeed`/`kolomTunda`/`isiUrutan` tidak didukung bersama opsi ini.
+     * @param list<string>                  $yatimBuang        [MAKE-097] FK yang rujukannya tidak ada di tujuan → BARIS dibuang + dicatat
+     *                                                         `<kolom> yatim dibuang (K-M12)` (master Halo Simpeg T12b: `id_user` tanpa
+     *                                                         `pengguna`, `officer_category` tanpa petugas/kategori; F8-21, DBV-028 Q9).
+     *                                                         Dry-run tidak memeriksa rujukan, sama seperti aturan FK lain.
      */
     public function __construct(
         public readonly string $tabel,
@@ -77,6 +81,7 @@ final class DefinisiTabel
         public readonly array $rujukan = [],
         public readonly bool $hanyaSeed = false,
         public readonly bool $pkSintetis = false,
+        public readonly array $yatimBuang = [],
     ) {
         if ($pkSintetis && ($kunciUrut === [] || $bolehSeed || $kolomTunda !== [] || $isiUrutan !== null)) {
             throw new ImporGagal("Definisi {$tabel}: pkSintetis wajib kunciUrut dan tidak bisa digabung bolehSeed/kolomTunda/isiUrutan.");
@@ -87,6 +92,14 @@ final class DefinisiTabel
      * Kode baris ganda kunci baca (pkSintetis) yang dibuang.
      */
     public const KODE_GANDA = 'MAKE-089 kunci ganda (setara INSERT IGNORE)';
+
+    /**
+     * Kode baris dibuang karena rujukan `yatimBuang` tidak ada di tujuan (MAKE-097, K-M12).
+     */
+    public static function kodeYatimBuang(string $kolom): string
+    {
+        return "{$kolom} yatim dibuang (K-M12)";
+    }
 
     /**
      * Kunci laporan: nama tabel tujuan, ditambah tabel sumber bila beberapa sumber mengisi satu tujuan.

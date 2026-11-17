@@ -14,6 +14,8 @@
 --   WAJIB_0 = harus 0. Di v2 butir WAJIB_0 (blok A) dijamin konstrain UNIQUE DBV-028; > 0 di DB gladi berarti impor atau
 --             skema menyimpang dan diputus Horii/DB Validator sebelum cutover.
 --   INFO    = dilaporkan; baris dibuang/dicatat oleh impor atau runbook, tidak memblokir.
+--   BERHENTI sebelum T12b = dilaporkan; > 0 di salinan legacy menghentikan runbook sebelum T12b sampai diputus Horii/DB
+--             Validator (impor sendiri gagal bila panjang melebihi kolom v2, DBV-028 Q2).
 --
 -- Cara pakai (akun baca saja):
 --   mysql --table -vvv --default-character-set=utf8mb4 --user=<akun_baca> -p <db_v2_gladi> \
@@ -68,9 +70,9 @@ SELECT 'Q-H8 INFO question_category nama kembar' AS butir, COUNT(*) AS jumlah
 FROM (SELECT LOWER(TRIM(question_category)) AS n FROM question_category GROUP BY LOWER(TRIM(question_category))
       HAVING COUNT(*) > 1) x;
 
--- Q-H9 panjang melebihi kolom v2 [I] (email 150, no_hp 20, kontak name 150 / contact 20 / email 150). Hasil > 0 di
+-- Q-H9 BERHENTI sebelum T12b (DBV-028 Q2): panjang melebihi kolom v2 [I] (email 150, no_hp 20, kontak name 150 / contact 20 / email 150). Hasil > 0 di
 -- salinan legacy diputus sebelum impor T12b (DBV-028 Q2)
-SELECT 'Q-H9 INFO panjang melebihi kolom v2' AS butir,
+SELECT 'Q-H9 BERHENTI sebelum T12b (DBV-028 Q2) panjang melebihi kolom v2' AS butir,
        (SELECT COUNT(*) FROM support_officer WHERE CHAR_LENGTH(email) > 150 OR CHAR_LENGTH(no_hp) > 20)
      + (SELECT COUNT(*) FROM help_desk_contact WHERE CHAR_LENGTH(name) > 150 OR CHAR_LENGTH(contact) > 20 OR CHAR_LENGTH(email) > 150) AS jumlah;
 

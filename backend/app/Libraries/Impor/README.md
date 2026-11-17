@@ -73,7 +73,7 @@ DEFAULT dari DB.
 | 6 | `kolomNama`: whitespace → satu spasi, lalu trim | DBV-011 §2.2 #2 |
 | 7 | `status` di luar `statusDomain` (bawaan 1/2/10) dan kolom `domain` lain (CHECK v2) → berkas keputusan, kalau tidak gagal; NULL di kolom nullable dibiarkan | DBV-011 §2.4 #5, B-01/B-02 §6 #3 |
 | 8 | `kolomKode`: karakter tak terlihat (U+200B–U+200F, U+2060, U+FEFF) dibuang lalu trim PHP, jumlah baris dicatat di laporan (`<kolom> karakter tak terlihat dibuang`); teks melebihi panjang kolom tujuan → gagal (mis. NIP > 30) | DBV-011 §2.2 #7, B-01/B-02 §6 #2, CR-089 (UP1-06: NIP berawalan U+200C, legacy `unicode_ci` mengabaikannya) |
-| 9 | Rujukan FK dicek per batch terhadap tabel induk tujuan: yatim → gagal dengan jumlah, kecuali `yatimKeNull` → NULL + dicatat sebagai `koreksi`. Dry-run tidak memeriksa rujukan | DBV-019 audit = 0, B-01/B-02 §6 #6 |
+| 9 | Rujukan FK dicek per batch terhadap tabel induk tujuan: yatim → gagal dengan jumlah, kecuali `yatimKeNull` → NULL + dicatat sebagai `koreksi`, atau `yatimBuang` → baris dibuang + dicatat `<kolom> yatim dibuang (K-M12)` (MAKE-097). Dry-run tidak memeriksa rujukan | DBV-019 audit = 0, B-01/B-02 §6 #6, K-M12 |
 
 ## Aturan khusus tabel (`DefinisiTabel`)
 
@@ -98,7 +98,7 @@ DEFAULT dari DB.
 - `waktuBisnis`: kolom DATETIME berisi waktu kejadian, mis. `absen_ijin.date_start/date_end`,
   `riwayat_skp_periodik.waktu_dinilai` (GAP-9). Kolom ini tidak dikonversi
   R1a, karena tanggal izin akan bergeser sehari bila dikurangi 7 jam.
-- `khusus`: aturan per baris; boleh mengembalikan `__koreksi` (list kode) untuk dicatat. Contoh: `web_config` lewat `WebConfigImport` (G-09 §5); hasil SKIP/REVIEW tidak diimpor
+- `khusus`: aturan per baris; boleh mengembalikan `__koreksi` (list kode) untuk dicatat. `__koreksiTulis` (list kode) dicatat hanya bila baris itu benar-benar ditulis (sesudah buang yatim `yatimBuang`), mis. N1 `support_officer.email` NULL → `''`. Contoh: `web_config` lewat `WebConfigImport` (G-09 §5); hasil SKIP/REVIEW tidak diimpor
   dan dihitung sebagai `dibuang`.
 - `sumber` / `skemaSiasn` / `petaKolom` / `konstanta` (B3): tabel sumber bernama lain (dibaca dari skema
   `--sumber-siasn` bila `skemaSiasn`), kolom sumber bernama lain (`siasn_referensi.id_siasn` ← `ID`), dan kolom tujuan
@@ -112,6 +112,10 @@ DEFAULT dari DB.
   sumber wajib unik sesudah normalisasi untuk tabel ber-`sumber`/`skemaSiasn` atau ber-PK `kolomKode` (ganda → gagal
   dengan jumlah); `praPindai` dijalankan di fase ini. Sesudah tiap tabel, `sumber = ditulis + dilewati + dibuang`
   (rekonsiliasi) — selisih → gagal.
+- Kunci `pkSintetis` (`kunciUrut`): pasangan ganda dihitung hanya atas baris yang semua kuncinya tidak NULL. Kolom kunci yang
+  NULLABLE di sumber dibungkus `COALESCE` ke sentinel (`''` teks / `PHP_INT_MIN` angka) di keyset; kolom NOT NULL tetap
+  kolom asli (indeks terpakai, tanpa filesort per batch). Kunci NULL kembar (seri sesudah sentinel, termasuk NULL vs `''`)
+  yang terbelah batas batch terlewat keyset → rekonsiliasi gagal keras (bukan diam-diam).
 
 ## Berkas keputusan
 
@@ -133,7 +137,7 @@ Contoh ada di `docs/up1/keputusan-impor.contoh.json`. Isi finalnya diputuskan DB
 | 9 | `pegawai_hist` (`flag_update = 1`, satu per NIP id terbesar, K-M9b), `pegawai_foto`, `dm_user_lokasi_presensi` (status 1, JSON wajib terurai, K-M6) | MAKE-069 |
 | 10 | Riwayat non-Tukin (16 tabel) lalu `document_attachment` — **transaksi per tabel + `--jejak`/`--lanjut`** (K-M8) | MAKE-069 |
 | 11 | Snapshot `pegawai_*` lain — transaksi per tabel (K-M8); `id_riwayat_*` NOT NULL yatim → gagal | MAKE-069 |
-| 12 | Layanan sisa DBV-022 §5 (`jenis_layanan`/`jenis_pa` seed, `question_category`, petugas, `pa_layanan`, notifikasi KT, IB, PMK, `esign_hist`) | MAKE-069 |
+| 12 | Layanan sisa DBV-022 §5 (`jenis_layanan`/`jenis_pa` seed, `question_category`, petugas, `pa_layanan`, notifikasi KT, IB, PMK, `esign_hist`) + **T12b master Halo Simpeg** sesudah `question_category`: `help_desk_contact` (`contact` di-trim), `support_officer` (`id_user` apa adanya, yatim/0 → dibuang + dicatat, email NULL → `''` dicatat N1 hanya untuk baris ditulis; email lain di-trim tanpa kode [V2]), `officer_category` (yatim petugas/kategori → dibuang + dicatat, PK `id` disalin bila ada) — `yatimBuang`, DBV-028 N1/N2/N4/Q9/Q10; runbook `docs/migrasi/MAKE-069-rencana.md` T12b | MAKE-069, MAKE-097 |
 | 13 | **Tiket lama Halo Simpeg (F-02, MAKE-086)**: `disiplin_ticket` ← `inbox`, `disiplin_ticket_msg` ← `inbox_msg` (rename 1:1, PK tetap). Semua isi = tiket (penulis tunggal `L_support.php`); `inbox` v2 tidak ditulis (Q7-28). Sortir & eskalasi: bagian **Tiket lama (F-02)** di bawah | MAKE-086 |
 | 14 | **Konten & interaksi Fase 7 (MAKE-089, DBV-032 §10)** — transaksi per tabel + `--jejak`. Isi: `news_category` (status 0→2, `allow_ap` ENUM nilai), `news` (ENUM `status`/`target` dari nilai, isi disanitasi `SanitasiBerita`, lampiran → kunci, `publish_at` R1a), `news_flag` (PK sintetis), `jenis_dibo` (cocok seed), `dibo` (`tahun` 0000→NULL, berkas → kunci), `popup` (video `type≠1` dilewati + anaknya, `tgl_*` waktu bisnis WIB), `user_popup`, `banner`, `user_banner` (PK sintetis, batch), `skl` (UNIQUE ganda → id terkecil). Kolom legacy `target`/`type`/`id_unit_satker`/`unit_satker`/`*_desc`/`news.category`/`unit_satker_target` tidak dibawa. Form digital (M2, `AturanFormDigital`): `form_digital` formBuilder → SkemaForm v2 (lolos `SkemaForm::normalisasi`; tak bisa dikonversi = ambigu), `user_form_digital` (target + turunan `filled_form_digital` yang tak ada di target, Q-089-5), `filled_form_digital` (response dibaca mentah, jawaban ke id v2, berkas → `form-digital/<id_form>/<hex32>.<ext>`, `ukuran: null`). Aturan: `AturanKonten`, `AturanFormDigital` | MAKE-089 |
 | 15 | Tabel kerja SIASN Fase 6 (DBV-027 §13.3): `siasn_ref_unor` ← `REF_UNOR`, `siasn_referensi` ← 7 tabel referensi (skema `--sumber-siasn`, disalin mentah), `double_riwayat_kp`, `siasn_upload_arsip` (semua status) | B3 |
@@ -156,7 +160,7 @@ Contoh ada di `docs/up1/keputusan-impor.contoh.json`. Isi finalnya diputuskan DB
 - Tidak diimpor: `siasn_status_pegawai` (dibangun job data-utama, K-5), `siasn_simpeg.dsp`, `firebase_token`/`fb_token`
   (PRD Fase 6 AC-01.2).
 - **Urutan:** tier SIASN (T15, selalu terakhir) dijalankan sesudah `document_attachment` dan tabel riwayat sumber diimpor dengan PK tetap (MAKE-069).
-  Tiket lama (F-02) = T13 (MAKE-086). T12b Halo Simpeg (DBV-028) dan tier Fase 7 lain disisipkan sebelum tier SIASN.
+  Tiket lama (F-02) = T13 (MAKE-086). T12b Halo Simpeg (DBV-028, MAKE-097) ada di tier 12; tier Fase 7 lain disisipkan sebelum tier SIASN.
 
 **Berkas & JSON tier 14 (MAKE-089, Q-089-1/4).**
 - Kolom berkas diisi kunci DETERMINISTIK `<jenis>/<hex32>.<ext>`, dengan
@@ -267,7 +271,7 @@ Urutan sesudah impor tier (operator; tanpa alamat atau kredensial di repo):
    Password acak tampil sekali, tidak masuk log/berkas/audit; akun wajib ganti password saat login pertama. Admin
    legacy hasil impor tetap bisa login dengan password lamanya (lalu wajib ganti, K-M2).
 3. `php spark lampiran:manifest --keluaran=<KERJA>/manifest.json --konfirmasi=<db>` — path unik dari kolom berkas
-   (`ManifestLampiran::KOLOM`) sesudah impor (sudah `stripslashes`), dinormalisasi seperti `fixArsipPath`
+   (`ManifestLampiran::KOLOM`, termasuk `disiplin_ticket_msg.attachments` lampiran tiket lama sejak MAKE-097 T-8) sesudah impor (sudah `stripslashes`), dinormalisasi seperti `fixArsipPath`
    (`PathLegacy`); path tidak sah hanya dihitung. Manifest berisi nama berkas nyata: folder kerja di luar repo dan di
    luar folder sinkron cloud.
 4. `php spark lampiran:tarik --manifest=<KERJA>/manifest.json [--sumber=arsip|aplikasi]` dengan alamat dasar diisi
@@ -298,6 +302,7 @@ segmen ketat.
 - `tests/Impor/ImporLegacyTier14Test.php` (MAKE-089): skema legacy D1 tiruan, ENUM/status/video/waktu bisnis/kunci berkas/PK sintetis ganda di batas batch/keputusan `<tabel>.f7`.
 - `tests/Impor/ImporLegacyTier14FormTest.php`, `tests/unit/Impor/AturanFormDigitalTest.php` (MAKE-089 M2): konversi skema/jawaban, turunan filled, anak ikut induk.
 - `tests/Impor/BerkasKontenTest.php` (MAKE-089 M3): salin idempoten, kunci = tier 14, isi beda tidak ditimpa, traversal ditolak, sumber tidak berubah.
+- `tests/Impor/ImporLegacyMasterHaloTest.php` (T12b MAKE-097): `id_user` apa adanya, yatim dibuang per tabel, N1/N2/N4, Q9/Q10, Q2.
 - `tests/Impor/ImporLegacyTiketLamaTest.php` (F-02): kelas sortir, eskalasi wajib diputus, manifest seimbang, `inbox` v2 = 0, command `impor:sortir-inbox`.
 - `tests/Impor/ImporLegacyTier1Test.php`, `ImporLegacyTier23Test.php`, `ImporLegacyTier456Test.php`,
   `ImporLegacySiasnTest.php` (B3: kunci ganda SKP, tier SIASN, skema `--sumber-siasn` huruf besar),
