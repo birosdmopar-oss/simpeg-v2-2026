@@ -234,12 +234,13 @@ ada butir H8 yang terbuka.
   tetapi CJK 3 byte 140 MB (lewat batas), jadi ambang diturunkan ke 5.000.000 (diterima reviewer 18-11-2026). Bila
   `memory_limit` produksi < 256M, ambang wajib diturunkan. Isi berulang memampatkan berkas (±0,3 MB); berkas
   dari teks nyata lebih besar, dan tambahannya paling banyak sebesar ukuran berkas itu.
-- **Selisih V1–V13 (reviewer 18-11-2026):** V3–V13 diterima (V10 penanda termasuk 32.767 + surrogate utuh; V12 baris **dan**
-  karakter dicek ulang sesudah data diambil). **V1/V2 (cakupan pesan + label pengirim, D7 (a)) menunggu Horii**: (a) ikut legacy
-  penuh atau (b) semua pesan + penyamaran D7 (a) [rekomendasi reviewer]; satu titik keputusan `EksporTiketService::pengirimBaris()`.
-  README ekspor dan fixture bagian ini belum beku.
+- **Selisih V1–V13 (18-11-2026):** V3–V13 diterima reviewer (V10 penanda termasuk 32.767 + surrogate utuh; V12 baris **dan**
+  karakter dicek ulang sesudah data diambil). **V1/V2 diputus Horii: (a) ikut legacy penuh [K `LS:1626`, `LS:1797-1799`]**: hanya
+  pesan pemilik tiket + pesan petugas pengekspor (balasan petugas lain tidak ikut, termasuk bila pengekspor role 1; COUNT/SUM atas
+  cakupan yang sama); nama/NIP = pengirim baris, tanpa penyamaran. README ekspor dan fixture bagian ini **beku**.
 - **Test:** `EksporTiketTest` (AC-E09.1..E09.8: 403 bukan petugas/nonaktif/role 8, batas hari WIB, kolom dan urutan, NIP teks,
-  kosong 200 tanpa audit, validasi periode/format, 10.000 vs 10.001 baris, ambang karakter, potong sel, unit UTF-16 dan emoji di
+  kosong 200 tanpa audit, validasi periode/format, cakupan V1 (balasan petugas lain tidak ikut; pengekspor role 1 aturan sama, NIP
+  kosong), 10.000 vs 10.001 baris, ambang karakter, potong sel, unit UTF-16 dan emoji di
   batas, rentang UTC, cek ulang baris/karakter saat pesan masuk di antara dua kueri (koneksi kedua, isolasi penuh)),
   baris `KontrakMatriksRoleTest`, fixture `ekspor-kosong`, `galat-422-ekspor`, `galat-422-ekspor-terlalu-besar`,
   `galat-403-bukan-petugas`.
