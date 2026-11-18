@@ -148,8 +148,8 @@ CR-134).
 **Status akhir (18 November 2026, CR-144, reviewer CR):** per `main` `8bc6c509` **semua paket helpdesk di `main`** (DBV-028,
 MAKE-070, MAKE-071, MAKE-097, MAKE-072 + CR-137, MAKE-074 BE + FE, MAKE-073) beserta perbaikan temuan QA CR-143 dan CR-142.
 **QA Lapis 1 Fase 8 selesai** 18-11-2026 pada `main` `e4392507` (bagian B) + verifikasi perbaikan `8bc6c509`, 0 ❌ terbuka
-(checklist `docs/fase8/Checklist_QA_Lapis1_Fase8.md`, laporan `docs/fase8/Laporan_Akhir_Fase8.md`). **Menunggu sign-off Horii**;
-rilis menu CR-135 sesudah sign-off.
+(checklist `docs/fase8/Checklist_QA_Lapis1_Fase8.md`, laporan `docs/fase8/Laporan_Akhir_Fase8.md`). **SIGN-OFF Horii 18-11-2026**
+pada `main` `d8020fc3` (CR-145); rilis menu CR-135 sesudah sign-off (⛔ izin Horii).
 
 Riwayat 18 November 2026 (MAKE-074, Handling Case). Per `main` `64d68377`: DBV-028, MAKE-070, MAKE-071,
 MAKE-097, dan MAKE-072 + CR-137 di `main`; MAKE-074 BE berjalan; status MAKE-073 (FE) diisi Worker Muse. Riwayat 17 November
@@ -172,7 +172,7 @@ helpdesk secara aditif (BE: Handling Case; FE: Worker Muse; T12b: ReadOne). Kont
 | Helper satker | CR-139 | DONE (main `ccb90f78`) | `WebConfigService::satkerKepegawaian()` dipakai `PetugasLayananService` dan `HaloSimpeg\PetugasService` |
 | Temuan QA T-B1 (BE) | CR-143 | DONE (main `4d06a8c6`) | `message` sukses legacy "Berhasil menambahkan data halo simpeg." pada 201 buat tiket |
 | Temuan QA T-B4, T-B3, T-B1 (FE) | CR-142 | DONE (main `8bc6c509`) | ruang bawah halaman + `scroll-padding` agar launcher Vanya tidak menutupi "Kirim"; kolom Aksi sticky kanan; notice sukses tiket baru dari `message` |
-| QA Lapis 1 + laporan akhir | CR-132, CR-144 | QA selesai 18-11-2026; menunggu sign-off Horii | checklist terisi; T-B2 (`Cache-Control` gabungan `tanpaCache`) = kandidat CR sesudah sign-off |
+| QA Lapis 1 + laporan akhir | CR-132, CR-144 | DONE (main `d8020fc3`); QA selesai 18-11-2026; SIGN-OFF Horii 18-11-2026 (CR-145) | checklist terisi; T-B2 (`Cache-Control` gabungan `tanpaCache`) = kandidat CR sesudah sign-off |
 
 **Keputusan Horii 16-11-2026** ("ikut rekomendasi semua", diteruskan reviewer):
 - H8-14 (a): `AntrePushPesan::antreAkun(id_pengguna[])` aditif; berkas Push bersama = **CR-137**, commit terpisah di branch MAKE-072,

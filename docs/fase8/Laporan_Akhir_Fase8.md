@@ -8,11 +8,12 @@ ter-mix", §11 DoD dan exit criteria, §12 register keputusan, Lampiran B anomal
 cutover `README-deploy.md` §1m dan §1n. Disusun reviewer CR 18-11-2026 dari `main` `8bc6c509` (seluruh paket Fase 8 dan perbaikan
 temuan QA sudah di `main`). Setiap SHA di laporan ini dicek dengan `git` terhadap `origin/main`.
 
-> **Status:** **QA Lapis 1 Fase 8 SELESAI 18-11-2026 — menunggu sign-off Horii** (penutup seluruh development, PRD §11).
+> **Status:** **FASE 8 DONE — SIGN-OFF Horii 18-11-2026** pada `main` `d8020fc3` (laporan ini masuk `main` lewat CR-144, CI
+> `quality-gate` #906 hijau; sign-off dicatat CR-145). QA Lapis 1 Fase 8 selesai 18-11-2026; penutup seluruh development (PRD §11).
 > E-01..E-10 di `main`; DBV-028 dan DBV-033 disetujui DB Validator; QA Lapis 1 selesai pada `main` `e4392507` (bagian B) dengan
 > verifikasi perbaikan pada `8bc6c509`: 300 butir sign-off, **0 ❌ terbuka**. Temuan T-01..T-03 (chatbot) dan T-B1, T-B3, T-B4 (helpdesk)
-> diperbaiki (CR-134, CR-143, CR-142) dan diuji ulang; T-B2 menjadi kandidat CR sesudah sign-off. Rilis menu (CR-135) dijalankan
-> sesudah sign-off atas izin Horii. Blocker deploy di §8 bukan syarat sign-off.
+> diperbaiki (CR-134, CR-143, CR-142) dan diuji ulang; T-B2 menjadi kandidat CR sesudah sign-off. Rilis menu (CR-135) sesudah
+> sign-off, ⛔ izin Horii. Blocker deploy di §8 bukan syarat sign-off.
 
 ## 1. Laporan
 
@@ -23,7 +24,7 @@ Status: E-01..E-10 DONE di main (E-10 = DBV-033 + MAKE-094 + MAKE-095, AC-E10.1.
 Branch/SHA/CI: main 8bc6c509 (CR-142, perbaikan QA terakhir); CI `quality-gate` `main` #905 hijau pada SHA ini
                SHA QA bagian B = main e4392507 (seluruh kode Fase 8) — CI quality-gate #899 hijau
                CR-143 @403d19c6 CI #900 hijau, CR-142 @564ebaa5 CI #904 hijau (branch, sebelum merge)
-               Checklist terisi + laporan ini + progres + baris status PRD: docs saja (branch docs/cr-144-laporan-akhir-f8)
+               Checklist terisi + laporan ini + progres + baris status PRD: docs saja, di main d8020fc3 (CR-144, CI #906 hijau)
 Berkas utama: §2
 Test & validasi: §3 (DoD §11 → bukti), §4 (QA Lapis 1), §5 (gate dan CI)
 Deviasi [K]/[V2]/[I] & keputusan: §6
@@ -62,7 +63,7 @@ Handling Case; helpdesk FE dan chatbot FE — Worker Muse; chatbot BE, T12b, dan
 | E-09 FE + penutup FE | Tombol + dialog ekspor rekap (B4), README FE helpdesk (B5) | MAKE-074 (FE), MAKE-073 B5 | merge `e4392507` |
 | Temuan QA T-B1 (BE) | `message` sukses legacy pada 201 buat tiket | CR-143 | merge `4d06a8c6` |
 | Temuan QA T-B4, T-B3, T-B1 (FE) | Ruang bawah halaman untuk launcher + `scroll-padding`, kolom Aksi sticky, notice sukses tiket baru | CR-142 | merge `8bc6c509` |
-| Penutup | Laporan akhir ini, hasil checklist, progres, baris status PRD | CR-144 | ◻ branch docs, menunggu izin merge |
+| Penutup | Laporan akhir ini, hasil checklist, progres, baris status PRD | CR-144 | `d8020fc3` (CI #906 hijau) |
 
 Kode C4 (impor isi QnA dev) tidak dibuat: keluar dari DoD (H8-13 (b)), dilacak DEPLOY-002.
 
@@ -77,8 +78,8 @@ Kode C4 (impor isi QnA dev) tidak dibuat: keluar dari DoD (H8-13 (b)), dilacak D
 | Runbook cutover tercatat (T12b, berkas lampiran lama, kunci token chatbot, tiket NULL/anomali, tiket Open tanpa petugas aktif, Q-H19 + EXPLAIN) | `docs/migrasi/MAKE-069-rencana.md` T12b (MAKE-097); `README-deploy.md` §1m (kunci token) dan §1n (lembar hasil B6/B7/Q-H15/Q-H19/EXPLAIN, ambang ekspor, butir cutover) (MAKE-074); lembar hasil diisi saat gladi (§8) |
 | Fixture `backend/tests/_support/HaloSimpeg/` §6.1b lengkap dan terverifikasi trait | `KontrakFixtureTiketTest`, `HaloSimpegFixtureTrait`, salinan FE `features/halo-simpeg/__tests__/fixtures/` (checklist HG2, CB3) |
 | Laporan akhir (status per paket + SHA, temuan QA, butir yang ditunda ke DEPLOY-002) | Dokumen ini (§2, §4, §8) |
-| Trello DEV-009, QASMTASK-111..118, QASMTASK-123, QASMTASK-124 + Notion E.1..E.6 disinkron final | ◻ Sesudah sign-off (§9) |
-| Sign-off Horii (penutup seluruh development) | ◻ Menunggu |
+| Trello DEV-009, QASMTASK-111..118, QASMTASK-123, QASMTASK-124 + Notion E.1..E.6 disinkron final | ✅ 18-11-2026 sesudah sign-off (§9) |
+| Sign-off Horii (penutup seluruh development) | ✅ 18-11-2026 (`main` `d8020fc3`) |
 
 ## 4. QA Lapis 1 Fase 8
 
@@ -169,6 +170,7 @@ Nomor CI dan hasil gate per paket di bawah = fakta reviewer 17–18-11-2026 (tid
 | CR-143 @`403d19c6` → `4d06a8c6` | CI #900 hijau (branch) |
 | CR-142 @`564ebaa5` → `8bc6c509` | CI #904 hijau (branch) |
 | `8bc6c509` (`main` akhir) | ✔ CI `quality-gate` `main` #905 hijau (18-11-2026) |
+| `d8020fc3` (`main`, CR-144 laporan akhir, docs saja) | ✔ CI `quality-gate` `main` #906 hijau (18-11-2026) |
 
 Angka gate penuh `./check.sh` lokal pada SHA QA (`e4392507`) tidak tercatat di hasil QA; bukti gate untuk SHA QA = CI #899.
 
@@ -215,12 +217,15 @@ README modul, dan progres 08. Ringkas:
 
 | No | Butir | Status |
 |---|---|---|
-| 1 | Merge laporan ini + checklist terisi + progres 08 + baris status PRD ke `main` (CR-144, docs saja) | ◻ Izin Horii |
-| 2 | Nomor dan hasil CI `main` pada `8bc6c509` (sesudah CR-143 + CR-142) dicatat di §5 | ◻ Reviewer CR |
+| 1 | Merge laporan ini + checklist terisi + progres 08 + baris status PRD ke `main` (CR-144, docs saja) | ✔ di `main` `d8020fc3` (CI #906 hijau) |
+| 2 | Nomor dan hasil CI `main` pada `8bc6c509` (sesudah CR-143 + CR-142) dicatat di §5 | ✔ §5: CI `quality-gate` `main` #905 hijau |
 | 3 | Kolom Keputusan §K checklist untuk butir ◻ yang sudah dijalankan sesuai usulan (K-01, K-04, K-05, K-07, K-10..K-19) diperbarui | ◻ Reviewer CR (dokumen) |
-| 4 | Sign-off reviewer CR, lalu sign-off Horii (checklist §E E8) | ◻ |
+| 4 | Sign-off reviewer CR, lalu sign-off Horii (checklist §E E8) | ✔ Horii 18-11-2026 ("Sign-off fase 8"), `main` `d8020fc3`, sesudah laporan reviewer CR (CR-144) |
 
 Tidak ada temuan QA ❌ yang terbuka. T-B2 dan kandidat CR lain (§9) tidak menahan sign-off.
+
+**Sign-off Fase 8: ✔ Horii 18-11-2026** pada `main` `d8020fc3` (CI `quality-gate` #906 hijau), penutup seluruh development
+(PRD §11); dicatat CR-145. Tindak lanjut sesudah sign-off di §9.
 
 ## 8. Blocker deploy / go-live (bukan blocker sign-off Fase 8)
 
@@ -240,7 +245,7 @@ Tidak ada temuan QA ❌ yang terbuka. T-B2 dan kandidat CR lain (§9) tidak mena
    H8-5 (a).
 7. **Isi awal chatbot (PN8-6/K-5, C4, DEPLOY-002):** isi QnA dev dibawa lewat impor sekali jalan atau v2 mulai kosong; diputus Horii
    saat deploy.
-8. **Rilis menu CR-135 (sesudah sign-off, izin Horii):** `ACTIVE_PHASE` 5 → 8, pembersihan `rilis`, item `halo` diberi `to`/`roles`;
+8. **Rilis menu CR-135 (sesudah sign-off, ⛔ izin Horii):** `ACTIVE_PHASE` 5 → 8, pembersihan `rilis`, item `halo` diberi `to`/`roles`;
    kenaikan fase juga membuka menu Fase 6–7 yang masih tersembunyi (checklist §HL).
 
 ## 9. Setelah sign-off
@@ -252,7 +257,9 @@ Tidak ada temuan QA ❌ yang terbuka. T-B2 dan kandidat CR lain (§9) tidak mena
   - test yang memastikan alur TB/IB/PMK tidak menulis `disiplin_ticket(_msg)` (belum ada, celah sejak Fase 4);
   - validasi trim Unicode pada `msg` tiket (saran dari MAKE-072, di luar kontrak beku).
 - Sinkron Trello DEV-009, QASMTASK-111..118, QASMTASK-123, QASMTASK-124 dan Notion baris Fase 8 (E.1..E.6) → selesai.
+  ✔ 18-11-2026: 11 kartu Done (butir "Lolos MTC" dan push real FCM tidak dicentang), komentar blocker deploy di DEPLOY-002 dan
+  DEPLOY-001.1, ISSUE-001 diberi komentar realisasi prasyarat (penutupan menunggu keputusan Horii); Notion E.1..E.6 Selesai.
 - Cabut izin [#9-WorkloadHaloSimpeg] dan [#10-WorkloadQAChatbot] ([#8-WorkloadChatbot] sudah selesai).
 - Tutup lingkungan QA demo: `ACTIVE_PHASE` kembali 5 dan item `halo` tanpa patch lokal, `chatbot.kunciTokenFeedback` dihapus dari
-  `.env` demo, data uji `[QA-F8 …]` dibersihkan saat reset demo.
+  `.env` demo, data uji `[QA-F8 …]` dibersihkan saat reset demo. ✔ 18-11-2026 (kecuali data uji: menunggu reset demo).
 - Bersih-bersih worktree, branch, dan DB scratch Fase 8 hanya dengan izin Horii per objek (pola Fase 7).

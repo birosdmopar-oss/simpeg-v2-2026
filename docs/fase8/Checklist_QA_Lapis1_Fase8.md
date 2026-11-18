@@ -12,8 +12,9 @@ AC-E01..AC-E10 (chatbot §7.10.6 `:1182-1239`, skenario pembanding §7.10.7 `:12
 (`docs/fase6/Checklist_QA_Lapis1_Fase6.md`). Checklist ini **disepakati reviewer CR sebelum QA dimulai**; pertanyaan pra-QA dan
 keputusannya ada di §K.
 
-**Status (18-11-2026, CR-144).** **QA Lapis 1 selesai 18-11-2026 pada `main` `e4392507` (bagian B) + verifikasi perbaikan
-`8bc6c509`; menunggu sign-off Horii.** Bagian A dijalankan pada `67f3303c` (putaran 1, 17-11-2026), `d659acf6` (uji ulang T-02/T-03
+**Status (18-11-2026, CR-144; sign-off CR-145).** **SIGN-OFF Horii 18-11-2026** pada `main` `d8020fc3` (CI `quality-gate` #906
+hijau). **QA Lapis 1 selesai 18-11-2026 pada `main` `e4392507` (bagian B) + verifikasi perbaikan `8bc6c509`.** Bagian A dijalankan
+pada `67f3303c` (putaran 1, 17-11-2026), `d659acf6` (uji ulang T-02/T-03
 dan AW17) dan `e4392507` (sisa 18-11-2026); bagian B pada `e4392507`, dengan build lokal `ACTIVE_PHASE = 8` + item `halo` tanpa
 commit (dibuang sesudah QA). Perbaikan temuan bagian B diverifikasi di demo lalu masuk `main`: CR-143 `4d06a8c6` dan CR-142
 `8bc6c509`. CI `quality-gate` `main` #899 hijau pada `e4392507` dan #905 hijau pada `8bc6c509`. Login akun demo atas izin Horii [#111] dan [#112].
@@ -764,5 +765,5 @@ jumlah ✅ / [test-otomatis] / — / ❌ per bagian, daftar temuan, dan sign-off
 | E5 | Bagian C: CA dan CB hijau di CI `main` pada SHA QA; Vitest chatbot 83/83 sesudah R10 langkah 2 | §CA, §CB, AC-E10.23 | ✅ CA/CB hijau di CI #899 `main` `e4392507` dan CI #905 `main` `8bc6c509` (sesudah CR-143/CR-142); test chatbot 86/86 (≥ baseline 83 sesudah R10 langkah 2, laporan B1 MAKE-073) |
 | E6 | §ABB dan §HBB teramati sesuai | §ABB, §HBB | ✅ sebagian: §ABB teramati (ABB19 sebagian); §HBB teramati kecuali HBB6, HBB14 ([test-otomatis]) dan HBB23 (gugur); HBB11 sebagian (role 5 tidak diuji) |
 | E7 | Semua butir ◻ §K diputus (K-10 H8-7 diputus apakah menahan sign-off); PRD dan Kesiapan disinkron untuk K-02 (PN8-8), K-03 (izin CR-133/134), dan K-08 (H8-10) | §K | ✅ sebagian: K-02, K-03, K-08 disinkron di PRD v1.4 (CR-138 `7ecbe12b`); K-06 tuntas (CR-133); K-10: H8-7 = butir cutover, tidak menahan sign-off (PRD §11 v1.4); butir ◻ lain dijalankan sesuai usulan, kolom Keputusan §K belum diperbarui |
-| E8 | Sign-off reviewer CR, lalu sign-off Horii; hasil dicatat di Status, `docs/fase8/Laporan_Akhir_Fase8.md`, dan `Kesiapan_Fase8.md` | PRD §11 | ◻ menunggu sign-off reviewer CR, lalu Horii; laporan akhir `docs/fase8/Laporan_Akhir_Fase8.md` (CR-144) |
+| E8 | Sign-off reviewer CR, lalu sign-off Horii; hasil dicatat di Status, `docs/fase8/Laporan_Akhir_Fase8.md`, dan `Kesiapan_Fase8.md` | PRD §11 | ✔ sign-off Horii 18-11-2026 ("Sign-off fase 8") pada `main` `d8020fc3`, sesudah laporan reviewer CR `docs/fase8/Laporan_Akhir_Fase8.md` (CR-144); dicatat di Status, laporan akhir, dan `Kesiapan_Fase8.md` (CR-145) |
 | E9 | Sesudah sign-off: §HL dijalankan saat CR-135 (⛔ izin Horii), dicatat terpisah | §K K-18 | — (sesudah sign-off, CR-135) |
