@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * Panel percakapan tiket (B2, E-04; pola gelembung Gambar 33/34, tanpa frame Figma H8-9). Sumber = `tiketSayaState.detail`.
+ * Panel percakapan tiket (B2, E-04; pola gelembung Gambar 33/34, tanpa frame Figma H8-9). Sumber = `detailTiket.detail`.
  * - Header: subjek (menerima fokus saat panel dibuka), kategori ("—" bila NULL), pemilik, tanggal dibuat, status, dan
  *   `ditutup_oleh_label` (null pada tiket Closed = tanpa nama penutup).
  * - Gelembung: `milik_saya` di kanan; `pengirim_label` ditampilkan apa adanya (dihitung BE, D7 (a)); warna per
@@ -23,13 +23,13 @@ import { BATAS_TIKET, EKSTENSI_LAMPIRAN, KODE_GALAT_TIKET, TEKS_GALAT_TIKET } fr
 import { balasFormSchema } from '../schemas'
 import { kodeGalat } from '../services/master.service'
 import { tiketHaloService } from '../services/tiket.service'
-import { balasTiket, bukaTiket, tiketSayaState } from '../stores/tiketSaya'
+import { balasTiket, bukaTiket, detailTiket } from '../stores/tiket'
 import type { Lampiran, LampiranRingkas, Pesan } from '../types'
 
 const props = withDefaults(defineProps<{ idTiket: number; tampilKembali?: boolean }>(), { tampilKembali: false })
 const emit = defineEmits<{ kembali: [] }>()
 
-const detail = computed(() => (tiketSayaState.detail?.id === props.idTiket ? tiketSayaState.detail : null))
+const detail = computed(() => (detailTiket.detail?.id === props.idTiket ? detailTiket.detail : null))
 const judulEl = ref<HTMLElement | null>(null)
 
 /** Fokus pindah ke judul thread saat tiket dibuka (8_2 §3a). */
@@ -129,11 +129,11 @@ async function kirim(): Promise<void> {
       </UiButton>
     </div>
 
-    <p v-if="tiketSayaState.statusDetail === 'memuat' && !detail" class="py-8 text-center text-sm text-slate-500">Memuat...</p>
-    <div v-else-if="tiketSayaState.statusDetail === 'galat'" class="space-y-3 py-6" data-testid="halo-thread-galat">
-      <p class="text-sm text-danger" role="alert">{{ tiketSayaState.galatDetail?.pesan }}</p>
+    <p v-if="detailTiket.statusDetail === 'memuat' && !detail" class="py-8 text-center text-sm text-slate-500">Memuat...</p>
+    <div v-else-if="detailTiket.statusDetail === 'galat'" class="space-y-3 py-6" data-testid="halo-thread-galat">
+      <p class="text-sm text-danger" role="alert">{{ detailTiket.galatDetail?.pesan }}</p>
       <UiButton
-        v-if="(tiketSayaState.galatDetail?.status ?? 500) >= 500 || tiketSayaState.galatDetail?.status === null"
+        v-if="(detailTiket.galatDetail?.status ?? 500) >= 500 || detailTiket.galatDetail?.status === null"
         size="sm"
         variant="secondary"
         appearance="outline"

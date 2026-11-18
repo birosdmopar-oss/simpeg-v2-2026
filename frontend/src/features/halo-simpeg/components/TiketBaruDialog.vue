@@ -18,7 +18,7 @@ import { galatPerKolom } from '@/shared/utils/galatKolom'
 import { BATAS_TIKET, EKSTENSI_LAMPIRAN } from '../constants'
 import { tiketBaruFormSchema } from '../schemas'
 import { kategoriHaloService } from '../services/master.service'
-import { buatTiket } from '../stores/tiketSaya'
+import { buatTiket } from '../stores/tiket'
 import type { KategoriOpsi, TiketDetail } from '../types'
 
 const props = defineProps<{ open: boolean }>()

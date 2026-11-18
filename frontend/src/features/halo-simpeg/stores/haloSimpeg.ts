@@ -126,7 +126,7 @@ export function muatRingkasan(): Promise<void> {
   return janji
 }
 
-/** Store helpdesk lain (mis. `tiketSaya`) mendaftarkan reset-nya di sini agar ikut dikosongkan tanpa import melingkar. */
+/** Store helpdesk lain (mis. `tiket`) mendaftarkan reset-nya di sini agar ikut dikosongkan tanpa import melingkar. */
 const resetTambahan = new Set<() => void>()
 export function daftarkanResetHalo(fn: () => void): void {
   resetTambahan.add(fn)

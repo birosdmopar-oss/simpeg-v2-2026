@@ -1,37 +1,61 @@
 <script setup lang="ts">
 /**
- * Halaman Halo Simpeg (role 1–7) — B2 layar pemilik (MAKE-073). Master-detail ala Gambar 33/34 (tanpa frame Figma, H8-9):
- * - ≥ 1024 px: daftar "Tiket saya" di kiri, thread di kanan; `idTiket` (rute `halo-tiket`) = keadaan panel kanan
- *   (deep-link lonceng/push `/halo-simpeg/tiket/{id}`, tombol kembali browser berfungsi; fokus ke judul thread).
+ * Halaman Halo Simpeg (role 1–7) — B2 pemilik + B3 petugas (MAKE-073). Master-detail ala Gambar 33/34 (tanpa frame Figma, H8-9):
+ * - Tab "Tiket saya" (semua) dan "Antrean" (hanya petugas aktif menurut `GET petugas/saya`, bukan role; `?tab=antrean`).
+ *   Filter/halaman tiap tab terpisah (pabrik store). Tab antrean: panel "Perlu ditindak" + tabel antrean.
+ * - ≥ 1024 px: daftar di kiri, thread di kanan; `idTiket` (rute `halo-tiket`) = keadaan panel kanan (deep-link lonceng/push
+ *   `/halo-simpeg/tiket/{id}`, tombol kembali browser berfungsi; fokus ke judul thread).
  * - < 1024 px: satu panel — daftar, atau thread + "Kembali ke daftar" (perilaku responsif, bukan deviasi).
- * - "Tambah Pertanyaan" hanya role 2/6/7 (`POST tiket`, F8-04). Tab antrean petugas + panel "Perlu ditindak" = B3.
+ * - "Tambah Pertanyaan" hanya role 2/6/7 (`POST tiket`, F8-04).
  * - `idTidakSah` (id 0 / di luar batas) → "Data percakapan tidak ditemukan." (review B1 V3).
  */
 import { ArrowLeft } from 'lucide-vue-next'
-import { computed, nextTick, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { useIsDesktop } from '@/shared/composables/useIsDesktop'
 import RedesignShell from '@/shared/layouts/RedesignShell.vue'
-import { type Crumb, UiButton, UiCard } from '@/shared/ui'
+import { type Crumb, type TabItem, UiButton, UiCard, UiTabs } from '@/shared/ui'
 
-import DaftarTiketSaya from '../components/DaftarTiketSaya.vue'
+import DaftarTiket from '../components/DaftarTiket.vue'
 import KontakHelpdeskCard from '../components/KontakHelpdeskCard.vue'
+import PanelPerluTindak from '../components/PanelPerluTindak.vue'
 import ThreadTiket from '../components/ThreadTiket.vue'
 import TiketBaruDialog from '../components/TiketBaruDialog.vue'
-import { HALO_PEMBUAT_TIKET_ROLES, TEKS_GALAT_TIKET } from '../constants'
-import { bukaTiket, tiketSayaState, tutupPanel } from '../stores/tiketSaya'
+import { HALO_PEMBUAT_TIKET_ROLES, TAB_ANTREAN, TEKS_GALAT_TIKET } from '../constants'
+import { haloState, muatPetugasSaya, petugasAktif } from '../stores/haloSimpeg'
+import { bukaTiket, daftarAntrean, daftarSaya, tutupPanel, type DaftarTiket as Daftar } from '../stores/tiket'
 import type { TiketDetail } from '../types'
 
 const props = defineProps<{ idTiket: number | null; idTidakSah: boolean }>()
 
 const auth = useAuthStore()
+const route = useRoute()
 const router = useRouter()
 const isDesktop = useIsDesktop()
 
 const bolehBuat = computed(() => auth.role !== null && HALO_PEMBUAT_TIKET_ROLES.includes(auth.role))
 const dialogBaru = ref(false)
+
+onMounted(() => {
+  void muatPetugasSaya()
+})
+
+const TAB_SAYA = 'saya'
+const tabs = computed<TabItem[]>(() => [
+  { value: TAB_SAYA, label: 'Tiket Saya' },
+  ...(petugasAktif.value ? [{ value: TAB_ANTREAN, label: 'Antrean' }] : []),
+])
+/** `?tab=antrean` hanya berlaku untuk petugas aktif; selain itu tab "Tiket saya". */
+const tab = computed<string>({
+  get: () => (route.query.tab === TAB_ANTREAN && petugasAktif.value ? TAB_ANTREAN : TAB_SAYA),
+  set: (v) => void router.replace({ name: 'halo-simpeg', query: v === TAB_ANTREAN ? { tab: TAB_ANTREAN } : {} }),
+})
+const diAntrean = computed(() => tab.value === TAB_ANTREAN)
+const daftarAktif = computed<Daftar>(() => (diAntrean.value ? daftarAntrean : daftarSaya))
+const queryTab = computed(() => (diAntrean.value ? { tab: TAB_ANTREAN } : {}))
+const kategoriPetugas = computed(() => (haloState.petugasSaya?.kategori ?? []).map((k) => ({ id: k.id, nama: k.nama })))
 
 const crumbs = computed<Crumb[]>(() => {
   const dasar: Crumb[] = [{ label: 'Home', to: { name: 'home' } }, { label: 'Halo Simpeg', to: { name: 'halo-simpeg' } }]
@@ -52,13 +76,14 @@ async function fokusSesudahKembali(idSebelum: number | null): Promise<void> {
     await new Promise((r) => setTimeout(r, 0))
     const akar = panelDaftarEl.value
     if (!akar) continue
-    const selesaiMuat = tiketSayaState.statusDaftar === 'siap' || tiketSayaState.statusDaftar === 'galat'
+    const st = daftarAktif.value.state
+    const selesaiMuat = st.statusDaftar === 'siap' || st.statusDaftar === 'galat'
     const tombol = idSebelum === null ? null : akar.querySelector<HTMLElement>(`[data-testid="halo-tiket-actions-${idSebelum}"]`)
     if (tombol) {
       tombol.focus()
       return
     }
-    const barisAdaDiData = idSebelum !== null && (tiketSayaState.daftar?.items.some((t) => t.id === idSebelum) ?? false)
+    const barisAdaDiData = idSebelum !== null && (st.daftar?.items.some((t) => t.id === idSebelum) ?? false)
     if (!selesaiMuat || barisAdaDiData) continue
     const judul = akar.querySelector<HTMLElement>('h2, h3')
     if (judul) {
@@ -85,11 +110,15 @@ const tampilDaftar = computed(() => isDesktop.value || !panelThread.value)
 const tampilThread = computed(() => isDesktop.value || panelThread.value)
 
 function kembali(): void {
-  void router.push({ name: 'halo-simpeg' })
+  void router.push({ name: 'halo-simpeg', query: queryTab.value })
 }
 
 function onDibuat(t: TiketDetail): void {
   void router.push({ name: 'halo-tiket', params: { id: t.id } })
+}
+
+function lihatSemuaPerluTindak(): void {
+  void daftarAntrean.ubahFilter({ perlu_tindak: true })
 }
 </script>
 
@@ -97,10 +126,19 @@ function onDibuat(t: TiketDetail): void {
   <RedesignShell :breadcrumbs="crumbs">
     <div class="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]" data-testid="halo-halaman">
       <div v-if="tampilDaftar" ref="panelDaftarEl" class="flex min-w-0 flex-col gap-4" data-testid="halo-panel-daftar">
-        <UiCard title="Tiket Saya">
-          <DaftarTiketSaya :boleh-buat="bolehBuat" :id-aktif="idTiket" @tiket-baru="dialogBaru = true" />
+        <UiCard :title="diAntrean ? 'Antrean' : 'Tiket Saya'">
+          <UiTabs v-if="tabs.length > 1" v-model="tab" :items="tabs" aria-label="Halo Simpeg" class="mb-4" data-testid="halo-tabs" />
+          <template v-if="diAntrean">
+            <PanelPerluTindak class="mb-3" @lihat-semua="lihatSemuaPerluTindak" />
+            <div v-if="daftarAntrean.state.filter.perlu_tindak" class="mb-2 flex items-center gap-2 text-sm" data-testid="halo-filter-perlu-tindak">
+              <span class="rounded-full bg-warning-soft px-2 py-0.5 text-[#8a4f0f]">Hanya perlu ditindak</span>
+              <UiButton size="sm" variant="secondary" appearance="ghost" @click="daftarAntrean.ubahFilter({ perlu_tindak: false })">Hapus filter</UiButton>
+            </div>
+            <DaftarTiket :key="TAB_ANTREAN" :daftar="daftarAntrean" :id-aktif="idTiket" :kategori-petugas="kategoriPetugas" />
+          </template>
+          <DaftarTiket v-else :key="TAB_SAYA" :daftar="daftarSaya" :boleh-buat="bolehBuat" :id-aktif="idTiket" @tiket-baru="dialogBaru = true" />
         </UiCard>
-        <KontakHelpdeskCard />
+        <KontakHelpdeskCard v-if="!diAntrean" />
       </div>
 
       <UiCard v-if="tampilThread" class="min-w-0" data-testid="halo-panel-thread">

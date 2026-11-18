@@ -23,12 +23,14 @@ const svc = vi.hoisted(() => ({
   tiket: { list: vi.fn(), detail: vi.fn(), baca: vi.fn(), tutup: vi.fn(), hapus: vi.fn(), balas: vi.fn(), buat: vi.fn(), lampiran: vi.fn(), ringkasan: vi.fn() },
   kategori: { opsi: vi.fn() },
   kontak: { aktif: vi.fn() },
+  petugas: { saya: vi.fn() },
 }))
 vi.mock('../services/tiket.service', async (asli) => ({ ...(await asli<typeof import('../services/tiket.service')>()), tiketHaloService: svc.tiket }))
 vi.mock('../services/master.service', async (asli) => ({
   ...(await asli<typeof import('../services/master.service')>()),
   kategoriHaloService: svc.kategori,
   kontakHaloService: svc.kontak,
+  petugasHaloService: svc.petugas,
 }))
 const unduhan = vi.hoisted(() => ({ simpan: vi.fn() }))
 vi.mock('@/features/kepegawaian/services/berkasUnduhan', async (asli) => ({
@@ -74,10 +76,10 @@ function buatRouter() {
   })
 }
 
-async function pasang(opsi: { role?: RoleCode; idTiket?: number | null; idTidakSah?: boolean } = {}) {
+async function pasang(opsi: { role?: RoleCode; idTiket?: number | null; idTidakSah?: boolean; query?: string } = {}) {
   useAuthStore().setSession({ username: 'uji', user_level: opsi.role ?? Role.PEGAWAI, must_change_password: false } as User)
   const router = buatRouter()
-  await router.push(opsi.idTiket ? `/halo-simpeg/tiket/${opsi.idTiket}` : '/halo-simpeg')
+  await router.push((opsi.idTiket ? `/halo-simpeg/tiket/${opsi.idTiket}` : '/halo-simpeg') + (opsi.query ?? ''))
   const props = ref({ idTiket: opsi.idTiket ?? null, idTidakSah: opsi.idTidakSah ?? false })
   const Host = defineComponent({ setup: () => () => h(HaloSimpegPage, props.value) })
   const w = mount(Host, { global: { plugins: [router] }, attachTo: document.body })
@@ -95,6 +97,7 @@ beforeEach(() => {
   svc.tiket.detail.mockResolvedValue({ ...DETAIL, belum_dibaca: false })
   svc.kategori.opsi.mockResolvedValue(kategoriOpsi.data)
   svc.kontak.aktif.mockResolvedValue(kontakAktif.data)
+  svc.petugas.saya.mockResolvedValue({ petugas: false, aktif: false, kategori: [], bisa_ekspor: false })
   svc.tiket.ringkasan.mockResolvedValue({ belum_dibaca_saya: 0, belum_dibaca_petugas: 0, perlu_tindak: 0, badge: 0, total: 0 })
 })
 
@@ -546,5 +549,50 @@ describe('perilaku inti (review B2 P6)', () => {
     await flushPromises()
     expect(svc.tiket.lampiran).toHaveBeenLastCalledWith(8, 31)
     expect(unduhan.simpan).toHaveBeenCalledWith({ blob, nama: 'lampiran-8-31.pdf' })
+  })
+})
+
+describe('tab Antrean petugas (B3)', () => {
+  const PETUGAS_AKTIF = { petugas: true, aktif: true, kategori: [{ id: 1, nama: 'Cuti', status: 1 as const }], bisa_ekspor: true }
+
+  it('bukan petugas → tanpa tab; ?tab=antrean diabaikan (tab saya)', async () => {
+    const { w } = await pasang({ query: '?tab=antrean' })
+    expect(w.find('[data-testid="halo-tabs"]').exists()).toBe(false)
+    expect(w.find('[data-testid="halo-daftar-saya"]').exists()).toBe(true)
+    expect(svc.tiket.list).toHaveBeenCalledWith(expect.objectContaining({ peran: 'saya' }))
+  })
+
+  it('petugas aktif + ?tab=antrean: tabel antrean peran=petugas baca belum, kolom Pemilik, panel Perlu ditindak kosong tetap tampil', async () => {
+    svc.petugas.saya.mockResolvedValue(PETUGAS_AKTIF)
+    svc.tiket.list.mockImplementation(async (f: { perlu_tindak?: boolean }) => (f.perlu_tindak ? { ...DAFTAR, items: [], total: 0 } : DAFTAR))
+    const { w } = await pasang({ role: Role.SUPER_ADMIN, query: '?tab=antrean' })
+    expect(w.findAll('[data-testid="halo-tabs"] [role="tab"]').map((t) => t.text())).toEqual(['Tiket Saya', 'Antrean'])
+    expect(svc.tiket.list).toHaveBeenCalledWith(expect.objectContaining({ peran: 'petugas', baca: 'belum' }))
+    expect(svc.tiket.list).toHaveBeenCalledWith(expect.objectContaining({ peran: 'petugas', perlu_tindak: true, per_page: 5 }))
+    expect(w.get('[data-testid="halo-perlu-tindak-kosong"]').text()).toBe('Tidak ada tiket yang perlu ditindak.')
+    const id = DAFTAR.items[0]!.id
+    expect(w.get(`[data-testid="halo-tiket-row-${id}"] [data-kolom="pemilik"]`).text()).toBe(DAFTAR.items[0]!.pemilik_nama)
+    // Petugas 1 kategori → tanpa filter kategori [K VI:31-36].
+    expect(w.find('[data-testid="halo-daftar-antrean"] [aria-label="Filter kategori"]').exists()).toBe(false)
+  })
+
+  it('petugas ≥ 2 kategori → filter kategori tampil di antrean', async () => {
+    svc.petugas.saya.mockResolvedValue({ ...PETUGAS_AKTIF, kategori: [...PETUGAS_AKTIF.kategori, { id: 2, nama: 'Gaji', status: 1 as const }] })
+    const { w } = await pasang({ query: '?tab=antrean' })
+    expect(w.find('[data-testid="halo-daftar-antrean"] [aria-label="Filter kategori"]').exists()).toBe(true)
+  })
+
+  it('panel berisi → Lihat detail menuju tiket dengan ?tab=antrean; ⋮ antrean juga mempertahankan tab', async () => {
+    svc.petugas.saya.mockResolvedValue(PETUGAS_AKTIF)
+    const t = DAFTAR.items[0]!
+    svc.tiket.list.mockResolvedValue({ ...DAFTAR, items: [t], total: 1 })
+    const { w, router } = await pasang({ query: '?tab=antrean' })
+    await w.get(`[data-testid="halo-perlu-tindak-${t.id}"] button`).trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.fullPath).toBe(`/halo-simpeg/tiket/${t.id}?tab=antrean`)
+    await router.push('/halo-simpeg?tab=antrean')
+    await selectRowAction(w, `halo-tiket-actions-${t.id}`, 'detail')
+    await flushPromises()
+    expect(router.currentRoute.value.fullPath).toBe(`/halo-simpeg/tiket/${t.id}?tab=antrean`)
   })
 })

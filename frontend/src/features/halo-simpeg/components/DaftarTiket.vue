@@ -1,11 +1,13 @@
 <script setup lang="ts">
 /**
- * Daftar "Tiket saya" (B2, E-04; master kiri Gambar 33/34, tanpa frame Figma H8-9). `<table>` biasa (bukan listbox); baris
+ * Daftar tiket (B2 "Tiket saya" / B3 "Antrean", E-04; master kiri Gambar 33/34, tanpa frame Figma H8-9). Satu komponen untuk
+ * kedua tab; state dari instance `daftar` (pabrik `buatDaftarTiket`, filter/halaman terpisah per tab). Antrean menambah kolom
+ * Pemilik (`pemilik_nama` [K]) dan filter kategori hanya bila petugas memegang ≥ 2 kategori [K `VI:31-36`]. `<table>` biasa (bukan listbox); baris
  * tidak bisa diklik; aksi per baris lewat ⋮ (AGENTS.md §1): **Lihat detail** (→ rute `/halo-simpeg/tiket/:id`, panel kanan) →
  * **Tutup** (`hidden` bila Closed atau `!bisa_tutup`) → **Unduh lampiran** (lampiran pesan terakhir lewat E-04; `hidden` bila
  * tanpa lampiran, `disabled` saat memproses; review B2 P3) → **Hapus** (`danger`, `hidden` bila `!bisa_hapus`; T2 pemilik selalu
  * tidak bisa — flag dari BE, tidak dihitung ulang). Kolom "Lampiran Terakhir" hanya teks nama berkas. Konfirmasi lewat `ConfirmDialog` dengan teks legacy (`VI:136`, `VI:140`).
- * Filter: cari (subjek/isi), status, baca (bawaan `semua` [V2]), kategori [V2] PRD §7.4.
+ * Filter: cari (subjek/isi), status, baca (bawaan per tab), kategori (tab saya [V2] PRD §7.4).
  */
 import { Plus } from 'lucide-vue-next'
 import { computed, onMounted, ref, watch } from 'vue'
@@ -19,13 +21,27 @@ import type { RowAction } from '@/shared/components/rowActions'
 import { formatApiDateTime } from '@/shared/utils/dateTime'
 import { UiBadge, UiButton, UiNotice, UiPagination, UiSearchInput, UiSelect, type SelectOption } from '@/shared/ui'
 
-import { KODE_GALAT_TIKET, PER_PAGE_MASTER, TEKS_GALAT_TIKET } from '../constants'
+import { KODE_GALAT_TIKET, PER_PAGE_MASTER, TAB_ANTREAN, TEKS_GALAT_TIKET } from '../constants'
 import { kategoriHaloService, kodeGalat } from '../services/master.service'
 import { tiketHaloService } from '../services/tiket.service'
-import { bukaTiket, hapusTiket, muatDaftarSaya, tiketSayaState, tutupTiket, ubahFilterSaya } from '../stores/tiketSaya'
+import { bukaTiket, type DaftarTiket, hapusTiket, tutupTiket } from '../stores/tiket'
 import type { FilterBaca, KategoriOpsi, StatusTiket, TiketBaris } from '../types'
 
-const props = withDefaults(defineProps<{ bolehBuat?: boolean; idAktif?: number | null }>(), { bolehBuat: false, idAktif: null })
+const props = withDefaults(
+  defineProps<{
+    daftar: DaftarTiket
+    bolehBuat?: boolean
+    idAktif?: number | null
+    /** Antrean: opsi filter kategori dari `petugas/saya` (filter tampil bila ≥ 2). Tanpa prop = `kategori/opsi` (tab saya). */
+    kategoriPetugas?: readonly KategoriOpsi[] | null
+  }>(),
+  { bolehBuat: false, idAktif: null, kategoriPetugas: null },
+)
+const st = computed(() => props.daftar.state)
+const antrean = computed(() => props.daftar.peran === 'petugas')
+const bacaBawaan = computed<FilterBaca>(() => (antrean.value ? 'belum' : 'semua'))
+/** Rute panel mempertahankan tab aktif (`?tab=antrean`). */
+const queryTab = computed(() => (antrean.value ? { tab: TAB_ANTREAN } : {}))
 const emit = defineEmits<{ 'tiket-baru': [] }>()
 
 const router = useRouter()
@@ -41,34 +57,37 @@ const FILTER_BACA: SelectOption[] = [
 ]
 
 const kategori = ref<KategoriOpsi[]>([])
-const opsiKategori = computed<SelectOption[]>(() => kategori.value.map((k) => ({ value: String(k.id), label: k.nama })))
+const sumberKategori = computed<readonly KategoriOpsi[]>(() => props.kategoriPetugas ?? kategori.value)
+const opsiKategori = computed<SelectOption[]>(() => sumberKategori.value.map((k) => ({ value: String(k.id), label: k.nama })))
+const tampilFilterKategori = computed(() => (antrean.value ? sumberKategori.value.length >= 2 : true))
 
-const cari = ref(tiketSayaState.filter.q ?? '')
+const cari = ref(props.daftar.state.filter.q ?? '')
 let jedaCari: ReturnType<typeof setTimeout> | null = null
 watch(cari, (v) => {
   if (jedaCari) clearTimeout(jedaCari)
-  jedaCari = setTimeout(() => void ubahFilterSaya({ q: v }), 300)
+  jedaCari = setTimeout(() => void props.daftar.ubahFilter({ q: v }), 300)
 })
 
 const status = computed({
-  get: () => tiketSayaState.filter.status ?? '',
-  set: (v: string | number | null) => void ubahFilterSaya({ status: v === '' || v === null ? null : (String(v) as StatusTiket) }),
+  get: () => st.value.filter.status ?? '',
+  set: (v: string | number | null) => void props.daftar.ubahFilter({ status: v === '' || v === null ? null : (String(v) as StatusTiket) }),
 })
 const baca = computed({
-  get: () => tiketSayaState.filter.baca ?? 'semua',
-  set: (v: string | number | null) => void ubahFilterSaya({ baca: (v ? String(v) : 'semua') as FilterBaca }),
+  get: () => st.value.filter.baca ?? bacaBawaan.value,
+  set: (v: string | number | null) => void props.daftar.ubahFilter({ baca: (v ? String(v) : bacaBawaan.value) as FilterBaca }),
 })
 const kategoriFilter = computed({
-  get: () => (tiketSayaState.filter.kategori ? String(tiketSayaState.filter.kategori) : ''),
-  set: (v: string | number | null) => void ubahFilterSaya({ kategori: v === '' || v === null ? null : Number(v) }),
+  get: () => (st.value.filter.kategori ? String(st.value.filter.kategori) : ''),
+  set: (v: string | number | null) => void props.daftar.ubahFilter({ kategori: v === '' || v === null ? null : Number(v) }),
 })
 const page = computed({
-  get: () => tiketSayaState.filter.page ?? 1,
-  set: (v: number) => void ubahFilterSaya({ page: v }),
+  get: () => st.value.filter.page ?? 1,
+  set: (v: number) => void props.daftar.ubahFilter({ page: v }),
 })
 
 onMounted(async () => {
-  if (tiketSayaState.statusDaftar === 'awal') void muatDaftarSaya()
+  if (st.value.statusDaftar === 'awal') void props.daftar.muat()
+  if (props.kategoriPetugas !== null) return
   try {
     kategori.value = await kategoriHaloService.opsi()
   } catch {
@@ -76,8 +95,8 @@ onMounted(async () => {
   }
 })
 
-const items = computed(() => tiketSayaState.daftar?.items ?? [])
-const total = computed(() => tiketSayaState.daftar?.total ?? 0)
+const items = computed(() => st.value.daftar?.items ?? [])
+const total = computed(() => st.value.daftar?.total ?? 0)
 const waktu = (iso: string | null | undefined): string => (iso ? (formatApiDateTime(iso) ?? iso) : '—')
 
 function aksiBaris(t: TiketBaris): RowAction[] {
@@ -99,7 +118,7 @@ const memproses = ref(false)
 function onAksi(t: TiketBaris, key: string): void {
   notice.value = ''
   galatAksi.value = ''
-  if (key === 'detail') void router.push({ name: 'halo-tiket', params: { id: t.id } })
+  if (key === 'detail') void router.push({ name: 'halo-tiket', params: { id: t.id }, query: queryTab.value })
   else if (key === 'unduh') void unduhTerakhir(t)
   else if (key === 'tutup' || key === 'hapus') {
     konfirmasi.value = { jenis: key, tiket: t }
@@ -118,13 +137,13 @@ async function jalankan(): Promise<void> {
     } else {
       await hapusTiket(k.tiket.id)
       notice.value = 'Percakapan berhasil dihapus.'
-      if (props.idAktif === k.tiket.id) void router.push({ name: 'halo-simpeg' })
+      if (props.idAktif === k.tiket.id) void router.push({ name: 'halo-simpeg', query: queryTab.value })
     }
   } catch (e) {
     galatAksi.value = isApiError(e) ? e.message : 'Tindakan gagal. Silakan coba lagi.'
     // P1 (d): tiket sudah berubah di server (sudah ditutup / tidak ada) → daftar (dan panel bila terbuka) dimuat ulang.
     if (kodeGalat(e) === KODE_GALAT_TIKET.tiketSudahDitutup || (isApiError(e) && e.status === 404)) {
-      void muatDaftarSaya()
+      void props.daftar.muat()
       if (props.idAktif === k.tiket.id) void bukaTiket(k.tiket.id)
     }
   } finally {
@@ -151,19 +170,20 @@ async function unduhTerakhir(t: TiketBaris): Promise<void> {
 }
 
 const teksKosong = computed(() =>
-  tiketSayaState.filter.q || tiketSayaState.filter.status || tiketSayaState.filter.kategori || tiketSayaState.filter.baca !== 'semua'
+  st.value.filter.q || st.value.filter.status || st.value.filter.kategori || st.value.filter.baca !== bacaBawaan.value
     ? 'Tidak ada percakapan yang cocok dengan filter.'
     : 'Belum ada percakapan.',
 )
 </script>
 
 <template>
-  <div class="flex min-h-0 flex-1 flex-col gap-3" data-testid="halo-daftar-saya">
+  <div class="flex min-h-0 flex-1 flex-col gap-3" :data-testid="antrean ? 'halo-daftar-antrean' : 'halo-daftar-saya'">
     <div class="flex flex-wrap items-end gap-3">
       <UiSearchInput v-model="cari" placeholder="Cari subjek atau pesan" label="Cari percakapan" class="min-w-[200px] flex-1" />
       <UiSelect v-model="status" :options="FILTER_STATUS" clearable size="sm" placeholder="Semua status" aria-label="Filter status" class="w-36" />
       <UiSelect v-model="baca" :options="FILTER_BACA" size="sm" aria-label="Filter baca" class="w-40" data-testid="halo-filter-baca" />
       <UiSelect
+        v-if="tampilFilterKategori"
         v-model="kategoriFilter"
         :options="opsiKategori"
         clearable
@@ -188,6 +208,7 @@ const teksKosong = computed(() =>
         <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
           <tr>
             <th class="px-4 py-3">Subjek</th>
+            <th v-if="antrean" class="px-4 py-3">Pemilik</th>
             <th class="px-4 py-3">Kategori</th>
             <th class="px-4 py-3">Status</th>
             <th class="px-4 py-3">Pesan Terakhir</th>
@@ -196,26 +217,26 @@ const teksKosong = computed(() =>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
-          <tr v-if="tiketSayaState.statusDaftar === 'memuat' && items.length === 0">
-            <td colspan="6" class="px-4 py-8 text-center text-slate-500">Memuat...</td>
+          <tr v-if="st.statusDaftar === 'memuat' && items.length === 0">
+            <td :colspan="antrean ? 7 : 6" class="px-4 py-8 text-center text-slate-500">Memuat...</td>
           </tr>
-          <tr v-else-if="tiketSayaState.statusDaftar === 'galat'">
-            <td colspan="6" class="px-4 py-8 text-center" data-testid="halo-daftar-galat">
-              <p class="text-danger" role="alert">{{ tiketSayaState.galatDaftar?.pesan }}</p>
+          <tr v-else-if="st.statusDaftar === 'galat'">
+            <td :colspan="antrean ? 7 : 6" class="px-4 py-8 text-center" data-testid="halo-daftar-galat">
+              <p class="text-danger" role="alert">{{ st.galatDaftar?.pesan }}</p>
               <UiButton
-                v-if="tiketSayaState.galatDaftar?.status !== 403"
+                v-if="st.galatDaftar?.status !== 403"
                 size="sm"
                 variant="secondary"
                 appearance="outline"
                 class="mt-2"
-                @click="muatDaftarSaya()"
+                @click="daftar.muat()"
               >
                 Muat ulang
               </UiButton>
             </td>
           </tr>
           <tr v-else-if="items.length === 0">
-            <td colspan="6" class="px-4 py-8 text-center text-slate-500" data-testid="halo-daftar-kosong">{{ teksKosong }}</td>
+            <td :colspan="antrean ? 7 : 6" class="px-4 py-8 text-center text-slate-500" data-testid="halo-daftar-kosong">{{ teksKosong }}</td>
           </tr>
           <tr
             v-for="t in items"
@@ -230,6 +251,7 @@ const teksKosong = computed(() =>
               <span :class="t.belum_dibaca ? 'font-semibold' : ''">{{ t.subjek }}</span>
               <UiBadge v-if="t.belum_dibaca" tone="info" size="sm" class="ml-1" data-testid="halo-badge-belum-dibaca">Belum dibaca</UiBadge>
             </td>
+            <td v-if="antrean" class="px-4 py-3 text-slate-700" data-kolom="pemilik">{{ t.pemilik_nama }}</td>
             <td class="px-4 py-3 text-slate-600" data-kolom="kategori">{{ t.kategori?.nama ?? '—' }}</td>
             <td class="px-4 py-3">
               <UiBadge :tone="t.status === 'open' ? 'success' : 'neutral'" size="sm" :data-status="t.status">
@@ -257,7 +279,7 @@ const teksKosong = computed(() =>
         </tbody>
       </table>
     </div>
-    <UiPagination v-if="total > (tiketSayaState.filter.per_page ?? PER_PAGE_MASTER)" v-model:page="page" :per-page="tiketSayaState.filter.per_page ?? PER_PAGE_MASTER" :total="total" />
+    <UiPagination v-if="total > (st.filter.per_page ?? PER_PAGE_MASTER)" v-model:page="page" :per-page="st.filter.per_page ?? PER_PAGE_MASTER" :total="total" />
 
     <ConfirmDialog
       :open="dialogTerbuka"
