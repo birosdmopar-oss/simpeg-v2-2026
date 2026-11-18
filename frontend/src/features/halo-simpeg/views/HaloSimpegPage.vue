@@ -218,6 +218,8 @@ function hapusFilterPerluTindak(): void {
     </div>
 
     <TiketBaruDialog v-if="bolehBuat" v-model:open="dialogBaru" @dibuat="onDibuat" />
-    <EksporRekapDialog v-if="bisaEkspor" v-model:open="dialogEkspor" />
+    <!-- Review B4 T1: gerbang `bisaEkspor` hanya di tombol; dialog tetap terpasang selama terbuka agar pesan 403 bukan_petugas
+         (sesudah `petugas/saya` disegarkan → bisa_ekspor false) tetap terbaca. -->
+    <EksporRekapDialog v-if="bisaEkspor || dialogEkspor" v-model:open="dialogEkspor" />
   </RedesignShell>
 </template>

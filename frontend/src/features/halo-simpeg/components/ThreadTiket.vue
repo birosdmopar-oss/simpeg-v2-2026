@@ -107,13 +107,13 @@ const galatKlien = computed<Record<string, string>>(() => {
 })
 /** Centang pengingat hanya untuk petugas tiket bukan pemilik (`pengingat !== null`). */
 const bolehIngatkan = computed(() => detail.value?.pengingat != null)
-/** Jatuh tempo pengingat sudah lewat (perbandingan instan UTC, aman lintas zona). */
 // Review S5: `sekarang` reaktif per menit agar label berganti saat jatuh tempo lewat selagi thread terbuka.
 const sekarang = ref(Date.now())
 const detak = setInterval(() => {
   sekarang.value = Date.now()
 }, 60_000)
 onBeforeUnmount(() => clearInterval(detak))
+/** Jatuh tempo pengingat sudah lewat (perbandingan instan UTC, aman lintas zona). */
 const pengingatLewat = computed(() => {
   const jt = detail.value?.pengingat?.jatuh_tempo
   return jt ? new Date(jt).getTime() <= sekarang.value : false
@@ -122,12 +122,20 @@ const isDesktop = useIsDesktop()
 const idSnapshot = `${useId()}-snapshot`
 /**
  * Review S4 (a): klik "Data pelapor" membuka/menutup tooltip di semua lebar (termasuk layar sentuh ≥ 1024 px). Radix menutup
- * tooltip saat klik pemicu, jadi keadaan dibaca saat pointerdown lalu dibalik saat click.
+ * tooltip saat klik pemicu, jadi keadaan dibaca SEBELUM penutupan itu — saat pointerdown (mouse/sentuh) atau keydown Enter/Spasi
+ * (keyboard, review B4 K1: fokus sudah membuka tooltip, Enter/Spasi menutupnya) — lalu dibalik saat click. Pointerdown yang tidak
+ * berakhir click (`pointercancel`) membuang keadaan tersimpan.
  */
 const snapshotBuka = ref(false)
 let bukaSaatTekan: boolean | null = null
 function tekanSnapshot(): void {
   bukaSaatTekan = snapshotBuka.value
+}
+function tekanTombolSnapshot(e: KeyboardEvent): void {
+  if (e.key === 'Enter' || e.key === ' ') tekanSnapshot()
+}
+function batalTekanSnapshot(): void {
+  bukaSaatTekan = null
 }
 function klikSnapshot(): void {
   snapshotBuka.value = !(bukaSaatTekan ?? snapshotBuka.value)
@@ -216,6 +224,8 @@ async function kirim(): Promise<void> {
                     :aria-describedby="idSnapshot"
                     data-testid="halo-thread-snapshot"
                     @pointerdown="tekanSnapshot"
+                    @pointercancel="batalTekanSnapshot"
+                    @keydown="tekanTombolSnapshot"
                     @click="klikSnapshot"
                   >
                     <Info class="h-3.5 w-3.5" aria-hidden="true" />

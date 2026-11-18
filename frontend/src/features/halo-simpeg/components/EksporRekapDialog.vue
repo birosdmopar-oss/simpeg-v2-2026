@@ -2,10 +2,12 @@
 /**
  * Dialog ekspor rekap petugas Halo Simpeg (B4, MAKE-074 FE; E-09, AC-E08.14). Dibuka dari tab Antrean bila `bisa_ekspor`.
  * - Dua `UiTextField type="date"` (kalender lokal, nilai `YYYY-MM-DD`, tanpa `toISOString()`): maksimum = hari ini WIB [K
- *   legacy `endDate: '0'`]; `ds` ≤ `de` dijaga silang antarpicker [K]. Tanggal ketikan di luar batas ditolak picker bersama
- *   (`UiDatePicker`: nilai dikosongkan + "Tanggal di luar rentang yang diizinkan."), jadi tidak terkirim; BE tetap membalas kosong.
- * - Validasi klien = teks BE §7.3a [V2 terhadap teks legacy "Silahkan isi Tanggal Mulai…"]: "Tanggal awal dan akhir wajib
- *   diisi." / "Tanggal awal tidak boleh melebihi tanggal akhir.".
+ *   legacy `endDate: '0'`]; urutan `ds` ≤ `de` dijaga silang oleh picker [K] (min/max). Tanggal ketikan di luar batas ditolak
+ *   picker bersama (`UiDatePicker`: nilai dikosongkan + "Tanggal di luar rentang yang diizinkan." — pesan yang dilihat pengguna),
+ *   jadi tidak terkirim.
+ * - Validasi klien: kolom kosong → "Tanggal awal dan akhir wajib diisi." (teks BE §7.3a [V2]). Cabang `ds > de` hanya pengaman
+ *   (tak terjangkau lewat picker, review B4 T4); teks BE "Tanggal awal tidak boleh melebihi tanggal akhir." tetap tampil di kolom
+ *   bila 422 datang dari server.
  * - Hasil: kosong (200 JSON) → `UiNotice` pesan BE tanpa unduhan; berkas → `simpanBerkas` + dialog tertutup; 403 `bukan_petugas`
  *   → pesan BE + `petugas/saya` disegarkan; 422 per kolom → galat kolom; 422 `ekspor_terlalu_besar` → pesan BE.
  */
@@ -34,11 +36,18 @@ const kosong = ref('')
 const galatUmum = ref('')
 const galatServer = ref<Record<string, string>>({})
 const maks = ref(hariIniWib())
+/**
+ * Review B4 T2: generasi naik tiap `open` berubah. Respons ekspor dari generasi lama (dialog sudah ditutup lewat Batal/X/Esc atau
+ * dibuka ulang) diabaikan: tanpa unduhan, tanpa pesan. Penutupan tidak dikunci (Batal = batal).
+ */
+let generasi = 0
 
 watch(
   () => props.open,
   (open) => {
+    generasi += 1
     if (!open) return
+    mengunduh.value = false
     form.ds = ''
     form.de = ''
     submitted.value = false
@@ -74,9 +83,11 @@ async function onSubmit(): Promise<void> {
   galatUmum.value = ''
   galatServer.value = {}
   if (Object.keys(galatKlien.value).length > 0 || mengunduh.value) return
+  const gen = generasi
   mengunduh.value = true
   try {
     const hasil = await tiketHaloService.ekspor(form.ds, form.de)
+    if (gen !== generasi) return
     if (hasil.jenis === 'kosong') {
       kosong.value = hasil.pesan
       return
@@ -85,12 +96,13 @@ async function onSubmit(): Promise<void> {
     emit('berhasil', hasil.nama)
     emit('update:open', false)
   } catch (e) {
+    if (gen !== generasi) return
     galatServer.value = galatPerKolom(e)
     const pesan = isApiError(e) ? e.message : 'Ekspor gagal. Silakan coba lagi.'
     galatUmum.value = Object.values(galatServer.value).includes(pesan) ? '' : pesan
     if (kodeGalat(e) === 'bukan_petugas') void muatPetugasSaya(true)
   } finally {
-    mengunduh.value = false
+    if (gen === generasi) mengunduh.value = false
   }
 }
 </script>
@@ -138,9 +150,8 @@ async function onSubmit(): Promise<void> {
             @update:model-value="ubah('de', $event)"
           />
           <UiNotice v-if="kosong" tone="info" class="sm:col-span-2" data-testid="halo-ekspor-kosong">{{ kosong }}</UiNotice>
-          <UiNotice v-if="galatUmum" tone="danger" class="sm:col-span-2">
-            <span role="alert" data-testid="halo-ekspor-galat">{{ galatUmum }}</span>
-          </UiNotice>
+          <!-- Review B4 T5: UiNotice danger sudah role="alert" (tanpa alert bersarang). -->
+          <UiNotice v-if="galatUmum" tone="danger" class="sm:col-span-2" data-testid="halo-ekspor-galat">{{ galatUmum }}</UiNotice>
           <div :class="FORM_ACTIONS_CLASS">
             <DialogClose as-child>
               <UiButton variant="secondary" appearance="soft">Batal</UiButton>
