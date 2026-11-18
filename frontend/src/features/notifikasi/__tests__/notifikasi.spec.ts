@@ -19,7 +19,6 @@ import { Role, type RoleCode } from '@/features/auth/types'
 import { resetHaloSimpeg, setRingkasanHalo } from '@/features/halo-simpeg/stores/haloSimpeg'
 import { api } from '@/lib/axios'
 import { rowMenuActions, selectRowAction } from '@/shared/components/__tests__/rowActionsMenu.helpers'
-import RedesignShell from '@/shared/layouts/RedesignShell.vue'
 import { createShellRouter, loginAs } from '@/shared/layouts/__tests__/shellTestUtils'
 
 import DaftarNotifikasiTab from '../components/DaftarNotifikasiTab.vue'
@@ -221,22 +220,4 @@ describe('NotifikasiPage — entri Tiket Halo Simpeg (H8-15 (b), MAKE-073)', () 
   })
 })
 
-describe('Lonceng topbar (RedesignShell) — ACTIVE_PHASE < FASE_LONCENG', () => {
-  it('lonceng tanpa angka, tanpa polling ringkasan, dan klik tidak berpindah sampai penutup Fase 7', async () => {
-    loginAs(Role.PEGAWAI)
-    const router = routerUji()
-    await router.push('/')
-    await router.isReady()
-    const wrapper = mount(RedesignShell, { global: { plugins: [router] }, attachTo: document.body })
-    await flushPromises()
-
-    const bell = wrapper.get('[data-testid="topbar-bell"]')
-    expect(bell.attributes('aria-label')).toBe('Notifikasi')
-    expect(bell.find('span').exists()).toBe(false)
-    expect(get.mock.calls.filter(([p]) => p === '/notifikasi/ringkasan')).toHaveLength(0)
-
-    await bell.trigger('click')
-    await flushPromises()
-    expect(router.currentRoute.value.path).toBe('/')
-  })
-})
+// CR-135: test "ACTIVE_PHASE < FASE_LONCENG" dipindah ke loncengNonaktif.spec.ts (ACTIVE_PHASE asli kini 8, di sana dimock 6).
