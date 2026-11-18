@@ -76,10 +76,28 @@ export function muatPetugasSaya(paksa = false): Promise<void> {
   return janji
 }
 
-/** Pasang ringkasan (mis. respons `POST …/baca`, BP8-7); muat ringkasan yang masih berjalan tidak menimpanya. */
+/**
+ * Pasang ringkasan secara sinkron; muat ringkasan yang masih berjalan tidak menimpanya. Pemanggil yang memasang sesudah
+ * `await` wajib memeriksa generasi lebih dulu (pakai `bacaTiket` untuk respons `POST …/baca`).
+ */
 export function setRingkasanHalo(ringkasan: Ringkasan | null): void {
   urutanRingkasan += 1
   state.ringkasan = ringkasan
+}
+
+/**
+ * `POST tiket/{id}/baca` (BP8-7) lalu pasang `Ringkasan` dari responsnya — satu-satunya jalur komponen untuk menandai baca
+ * (review B1 N2). Generasi dicatat sebelum request: respons yang tiba sesudah `resetHaloSimpeg()` (logout / ganti akun)
+ * dibuang **tanpa** menaikkan urutan ringkasan, sehingga muat ringkasan sesi baru tidak ikut terbuang.
+ * Galat dilempar ke pemanggil (thread tetap tampil; badge disegarkan polling berikutnya).
+ * @returns ringkasan terpasang, atau `null` bila respons milik sesi lama.
+ */
+export async function bacaTiket(id: number): Promise<Ringkasan | null> {
+  const gen = generasi
+  const hasil = await tiketHaloService.baca(id)
+  if (gen !== generasi) return null
+  setRingkasanHalo(hasil)
+  return hasil
 }
 
 let janjiRingkasan: Promise<void> | null = null

@@ -15,7 +15,7 @@ vi.mock('@/shared/layouts/nav.config', async (asli) => ({
     return fase.aktif
   },
 }))
-const svc = vi.hoisted(() => ({ ringkasan: vi.fn() }))
+const svc = vi.hoisted(() => ({ ringkasan: vi.fn(), baca: vi.fn() }))
 vi.mock('../services/tiket.service', async (asli) => ({
   ...(await asli<typeof import('../services/tiket.service')>()),
   tiketHaloService: svc,
@@ -26,7 +26,7 @@ import { Role, type RoleCode, type User } from '@/features/auth/types'
 
 import { INTERVAL_RINGKASAN_MS } from '../constants'
 import { resetPolling, useRingkasanHalo } from '../composables/useRingkasanHalo'
-import { haloState, muatRingkasan, resetHaloSimpeg, setRingkasanHalo } from '../stores/haloSimpeg'
+import { bacaTiket, haloState, muatRingkasan, resetHaloSimpeg, setRingkasanHalo } from '../stores/haloSimpeg'
 import type { Ringkasan } from '../types'
 import tiketRingkasan from './fixtures/tiket-ringkasan.json'
 
@@ -62,6 +62,7 @@ beforeEach(() => {
   resetPolling()
   resetHaloSimpeg()
   svc.ringkasan.mockReset().mockResolvedValue(RINGKASAN)
+  svc.baca.mockReset()
 })
 
 afterEach(() => {
@@ -166,5 +167,41 @@ describe('store ringkasan', () => {
     t2.lepas(RINGKASAN)
     await muat2
     expect(haloState.ringkasan).toEqual(dariBaca)
+  })
+})
+
+describe('bacaTiket — penjaga generasi (review B1 N2)', () => {
+  it('sukses → ringkasan dari respons POST baca terpasang', async () => {
+    const dariBaca = { ...RINGKASAN, badge: 0, perlu_tindak: 0 }
+    svc.baca.mockResolvedValueOnce(dariBaca)
+    await expect(bacaTiket(5)).resolves.toEqual(dariBaca)
+    expect(svc.baca).toHaveBeenCalledWith(5)
+    expect(haloState.ringkasan).toEqual(dariBaca)
+  })
+
+  it('baca tertunda → reset (logout) → respons tiba → ringkasan tetap null', async () => {
+    const t = tertunda<Ringkasan>()
+    svc.baca.mockReturnValueOnce(t.janji)
+    const baca = bacaTiket(5)
+    resetHaloSimpeg()
+    t.lepas(RINGKASAN)
+    await expect(baca).resolves.toBeNull()
+    expect(haloState.ringkasan).toBeNull()
+  })
+
+  it('baca A tertunda → reset → GET B mulai → baca A tiba → hasil GET B tetap terpasang', async () => {
+    const a = tertunda<Ringkasan>()
+    const b = tertunda<Ringkasan>()
+    svc.baca.mockReturnValueOnce(a.janji)
+    svc.ringkasan.mockReturnValueOnce(b.janji)
+    const bacaA = bacaTiket(5)
+    resetHaloSimpeg()
+    const muatB = muatRingkasan()
+    a.lepas({ ...RINGKASAN, badge: 9 })
+    await bacaA
+    const ringkasanB = { ...RINGKASAN, badge: 2 }
+    b.lepas(ringkasanB)
+    await muatB
+    expect(haloState.ringkasan).toEqual(ringkasanB)
   })
 })
