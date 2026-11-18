@@ -26,14 +26,20 @@ withDefaults(
     /** Jeda (ms) sebelum muncul karena hover; fokus keyboard memunculkannya segera. */
     delay?: number
     disabled?: boolean
+    /**
+     * Opsional (aditif, MAKE-073 review S4): kendalikan buka/tutup dari pemanggil (`v-model:open`), mis. buka lewat klik di
+     * perangkat sentuh. Tanpa prop ini perilaku tetap tak terkendali seperti semula.
+     */
+    open?: boolean
   }>(),
-  { side: 'top', delay: 300, disabled: false },
+  { side: 'top', delay: 300, disabled: false, open: undefined },
 )
+const emit = defineEmits<{ 'update:open': [value: boolean] }>()
 </script>
 
 <template>
   <TooltipProvider :delay-duration="delay" :skip-delay-duration="150">
-    <TooltipRoot :disabled="disabled || content === ''">
+    <TooltipRoot :disabled="disabled || content === ''" :open="open" @update:open="emit('update:open', $event)">
       <TooltipTrigger as-child v-bind="$attrs" :data-tooltip="content || undefined">
         <slot />
       </TooltipTrigger>
