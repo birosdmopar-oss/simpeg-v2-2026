@@ -55,6 +55,12 @@ README sendiri: `chatbot/README.md` (MAKE-095).
   legacy. Baris tidak dapat diklik.
 - "Tambah Pertanyaan" hanya role 2/6/7. Bawaan filter baca tab "Tiket saya" = `semua` **[V2]** (D8 (a)); kolom + filter kategori di
   tab ini **[V2]** (PRD §7.4; legacy hanya untuk petugas multi-kategori). Tiket kategori NULL (H8-16 (a1)): form balas diganti catatan.
+- Sesudah tiket baru: notice sukses berisi `message` amplop 201 (CR-143) atau cadangan legacy "Berhasil menambahkan data halo
+  simpeg." (`message` ditangkap `transformResponse` milik request `buat`, `@/lib/axios` tidak diubah), lalu thread tiket baru
+  dibuka; notice hilang saat pindah tiket atau membuka form baru lagi (CR-142 T-B1).
+- Tabel tiket (pemilik & antrean): kolom Aksi `sticky right-0` + bayangan `useStickyActionsShadow` (pola CR-038) agar ⋮ selalu
+  terlihat walau tabel lebih lebar dari panel (CR-142 T-B3). Halaman memberi ruang bawah `RUANG_LAUNCHER_CLASS` (`pb-24`) agar
+  launcher Vanya (64 px, fixed kanan bawah) tidak menutupi tombol Kirim/lampiran form balas; launcher global tidak diubah (CR-142 T-B4).
 - Thread: label pengirim apa adanya, isi sebagai teks (tanpa `v-html`); lampiran hanya lewat E-04 (blob, nama dari
   `Content-Disposition`); POST baca sekali saat thread dibuka (BP8-7). 422/429 tampil per kolom dari amplop.
 
