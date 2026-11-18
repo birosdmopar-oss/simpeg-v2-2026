@@ -22,6 +22,7 @@ import PetugasFormDialog from '../../components/admin/PetugasFormDialog.vue'
 import { PER_PAGE_MASTER } from '../../constants'
 import type { BagianAdminHalo } from '../../routes.halo'
 import { kategoriHaloService, kontakHaloService, petugasHaloService } from '../../services/master.service'
+import { muatPetugasSaya } from '../../stores/haloSimpeg'
 import type { Kategori, Kontak, Petugas, StatusMaster } from '../../types'
 
 type Row = Kategori | Petugas | Kontak
@@ -107,7 +108,13 @@ function tambah(): void {
   formOpen.value = true
 }
 
+/** Review B3 R4: perubahan petugas (bisa akun admin sendiri) → `petugas/saya` disegarkan agar tab Antrean akurat. */
+function segarkanPetugasSaya(): void {
+  if (props.bagian === 'petugas') void muatPetugasSaya(true)
+}
+
 function onSaved(hasilPeringatan: string | null = null): void {
+  segarkanPetugasSaya()
   notice.value = editing.value === null ? `${JUDUL[props.bagian]} berhasil ditambahkan.` : `${JUDUL[props.bagian]} berhasil diperbarui.`
   peringatan.value = hasilPeringatan ?? ''
   void muat()
@@ -120,6 +127,7 @@ async function ubahStatus(row: Row, status: StatusMaster): Promise<void> {
     const hasil = await svc.value.setStatus(row.id, status)
     notice.value = `${JUDUL[props.bagian]} ${status === 1 ? 'diaktifkan' : 'dinonaktifkan'}.`
     peringatan.value = hasil.peringatan ?? ''
+    segarkanPetugasSaya()
     await muat()
   } catch (e) {
     failure.value = pesan(e, 'Gagal mengubah status.')
@@ -165,6 +173,7 @@ async function konfirmasiHapus(): Promise<void> {
   try {
     await svc.value.hapus(row.id)
     notice.value = `${JUDUL[props.bagian]} berhasil dihapus.`
+    segarkanPetugasSaya()
     await muat()
   } catch (e) {
     // Daftar dimuat ulang (flag bisa_hapus terbaru) lalu pesan BE dipasang — muat() mengosongkan galat sebelumnya.

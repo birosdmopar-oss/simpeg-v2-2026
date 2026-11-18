@@ -59,6 +59,7 @@ beforeEach(() => {
   svc.kategori.opsi.mockResolvedValue(kategoriOpsi.data)
   svc.petugas.list.mockResolvedValue(petugasDaftar.data)
   svc.kontak.list.mockResolvedValue(kontakDaftar.data)
+  svc.petugas.saya.mockResolvedValue({ petugas: false, aktif: false, kategori: [], bisa_ekspor: false })
 })
 
 afterEach(() => {
@@ -203,6 +204,8 @@ describe('admin Petugas (AC-E08.16)', () => {
     await flushPromises()
     expect(svc.petugas.ubah).toHaveBeenCalledWith(bebas.id, expect.objectContaining({ id_user: bebas.id_user }))
     expect(w.get('[data-testid="halo-petugas-peringatan"]').text()).toBe(petugasPutPeringatan.data.peringatan)
+    // R4: perubahan petugas menyegarkan petugas/saya (tab Antrean akun sendiri).
+    expect(svc.petugas.saya).toHaveBeenCalled()
   })
 })
 

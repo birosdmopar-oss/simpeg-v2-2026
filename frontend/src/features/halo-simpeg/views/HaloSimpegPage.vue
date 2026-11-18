@@ -16,7 +16,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { useIsDesktop } from '@/shared/composables/useIsDesktop'
 import RedesignShell from '@/shared/layouts/RedesignShell.vue'
-import { type Crumb, type TabItem, UiButton, UiCard, UiTabs } from '@/shared/ui'
+import { type Crumb, type TabItem, UiButton, UiCard, UiNotice, UiTabs } from '@/shared/ui'
 
 import DaftarTiket from '../components/DaftarTiket.vue'
 import KontakHelpdeskCard from '../components/KontakHelpdeskCard.vue'
@@ -38,8 +38,9 @@ const isDesktop = useIsDesktop()
 const bolehBuat = computed(() => auth.role !== null && HALO_PEMBUAT_TIKET_ROLES.includes(auth.role))
 const dialogBaru = ref(false)
 
+// Review B3 R4: dimuat paksa sekali per kunjungan (admin bisa baru menambah/menonaktifkan dirinya sebagai petugas).
 onMounted(() => {
-  void muatPetugasSaya()
+  void muatPetugasSaya(true)
 })
 
 const TAB_SAYA = 'saya'
@@ -53,6 +54,10 @@ const tab = computed<string>({
   set: (v) => void router.replace({ name: 'halo-simpeg', query: v === TAB_ANTREAN ? { tab: TAB_ANTREAN } : {} }),
 })
 const diAntrean = computed(() => tab.value === TAB_ANTREAN)
+/** Review B3 R5: deep-link `?tab=antrean` sebelum `petugas/saya` selesai → "Memuat..." (jangan memasang tab Saya dulu). */
+const mintaAntrean = computed(() => route.query.tab === TAB_ANTREAN)
+const memuatAntrean = computed(() => mintaAntrean.value && ['awal', 'memuat'].includes(haloState.statusPetugasSaya) && !petugasAktif.value)
+const galatAntrean = computed(() => mintaAntrean.value && haloState.statusPetugasSaya === 'galat')
 const daftarAktif = computed<Daftar>(() => (diAntrean.value ? daftarAntrean : daftarSaya))
 const queryTab = computed(() => (diAntrean.value ? { tab: TAB_ANTREAN } : {}))
 const kategoriPetugas = computed(() => (haloState.petugasSaya?.kategori ?? []).map((k) => ({ id: k.id, nama: k.nama })))
@@ -150,7 +155,18 @@ function hapusFilterPerluTindak(): void {
   <RedesignShell :breadcrumbs="crumbs">
     <div class="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]" data-testid="halo-halaman">
       <div v-if="tampilDaftar" ref="panelDaftarEl" class="flex min-w-0 flex-col gap-4" data-testid="halo-panel-daftar">
-        <UiCard :title="diAntrean ? 'Antrean' : 'Tiket Saya'">
+        <UiCard v-if="memuatAntrean" title="Antrean">
+          <p class="py-6 text-center text-sm text-slate-500" data-testid="halo-antrean-memuat">Memuat...</p>
+        </UiCard>
+        <UiCard v-else-if="galatAntrean" title="Antrean">
+          <UiNotice tone="danger" data-testid="halo-antrean-galat">
+            <span role="alert">{{ haloState.galatPetugasSaya }}</span>
+          </UiNotice>
+          <UiButton size="sm" variant="secondary" appearance="outline" class="mt-3" data-testid="halo-antrean-coba-lagi" @click="muatPetugasSaya(true)">
+            Coba lagi
+          </UiButton>
+        </UiCard>
+        <UiCard v-else :title="diAntrean ? 'Antrean' : 'Tiket Saya'">
           <UiTabs v-if="tabs.length > 1" v-model="tab" :items="tabs" aria-label="Halo Simpeg" class="mb-4" data-testid="halo-tabs" />
           <template v-if="diAntrean">
             <PanelPerluTindak class="mb-3" @lihat-semua="lihatSemuaPerluTindak" />
@@ -162,7 +178,7 @@ function hapusFilterPerluTindak(): void {
           </template>
           <DaftarTiket v-else :key="TAB_SAYA" :daftar="daftarSaya" :boleh-buat="bolehBuat" :id-aktif="idTiket" @tiket-baru="dialogBaru = true" />
         </UiCard>
-        <KontakHelpdeskCard v-if="!diAntrean" />
+        <KontakHelpdeskCard v-if="!diAntrean && !mintaAntrean" />
       </div>
 
       <UiCard v-if="tampilThread" class="min-w-0" data-testid="halo-panel-thread">

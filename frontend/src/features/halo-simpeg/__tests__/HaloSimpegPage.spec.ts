@@ -871,3 +871,32 @@ describe('R3: panel Perlu ditindak dimuat sekali per aksi', () => {
     expect(panelDimuat()).toBe(awal + 1)
   })
 })
+
+describe('R4/R5: petugas/saya disegarkan dan deep-link antrean', () => {
+  const AKTIF = { petugas: true, aktif: true, kategori: [{ id: 1, nama: 'Cuti', status: 1 as const }], bisa_ekspor: true }
+
+  it('R4: kunjungan berikutnya memuat ulang petugas/saya (paksa) → tab Antrean muncul sesudah admin menjadi petugas', async () => {
+    const a = await pasang({ role: Role.SUPER_ADMIN })
+    expect(a.w.find('[data-testid="halo-tabs"]').exists()).toBe(false)
+    a.w.unmount()
+    svc.petugas.saya.mockResolvedValue(AKTIF)
+    const b = await pasang({ role: Role.SUPER_ADMIN })
+    expect(svc.petugas.saya).toHaveBeenCalledTimes(2)
+    expect(b.w.findAll('[data-testid="halo-tabs"] [role="tab"]').map((t) => t.text())).toEqual(['Tiket Saya', 'Antrean'])
+  })
+
+  it('R5: ?tab=antrean saat petugas/saya memuat → "Memuat..." (tab Saya tidak dipasang); galat → notice + Coba lagi', async () => {
+    let tolak: (e: unknown) => void = () => {}
+    svc.petugas.saya.mockReturnValueOnce(new Promise((_r, j) => (tolak = j)))
+    const { w } = await pasang({ query: '?tab=antrean' })
+    expect(w.find('[data-testid="halo-antrean-memuat"]').exists()).toBe(true)
+    expect(w.find('[data-testid="halo-daftar-saya"]').exists()).toBe(false)
+    tolak(apiError(500, { message: 'Terjadi kesalahan server.' }))
+    await flushPromises()
+    expect(w.get('[data-testid="halo-antrean-galat"]').text()).toContain('Terjadi kesalahan server.')
+    svc.petugas.saya.mockResolvedValueOnce(AKTIF)
+    await w.get('[data-testid="halo-antrean-coba-lagi"]').trigger('click')
+    await flushPromises()
+    expect(w.find('[data-testid="halo-daftar-antrean"]').exists()).toBe(true)
+  })
+})

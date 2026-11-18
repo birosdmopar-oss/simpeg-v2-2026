@@ -57,8 +57,9 @@ export function muatPetugasSaya(paksa = false): Promise<void> {
   const urutan = ++urutanMuat
   state.statusPetugasSaya = 'memuat'
   state.galatPetugasSaya = ''
-  const janji = petugasHaloService
-    .saya()
+  // Dibungkus Promise agar galat sinkron pun tidak menggagalkan pemanggil (mis. simpan petugas di layar admin).
+  const janji = Promise.resolve()
+    .then(() => petugasHaloService.saya())
     .then((hasil) => {
       if (gen !== generasi || urutan !== urutanMuat) return
       state.petugasSaya = hasil
