@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Database\HaloSimpeg;
 
 use App\Constants\Role;
+use App\Libraries\HaloSimpeg\TiketService;
 use CodeIgniter\Test\FeatureTestTrait;
 use Config\Services;
 use Tests\Support\AuthTestTrait;
@@ -69,6 +70,7 @@ final class KontrakFixtureTiketTest extends DatabaseTestCase
         }
 
         $this->cocokFixtureHs('tiket-buat', $buat, 201);
+        $this->assertSame(TiketService::PESAN_BUAT, $this->json($buat)['message'], 'CR-143: pesan sukses legacy');
         $id = $this->json($buat)['data']['id'];
         $this->cocokFixtureHs('tiket-balas', $this->sebagai($admin)->post(self::URL . "tiket/{$id}/pesan", ['msg' => 'Sisa cuti 10 hari.', 'ingatkan_24_jam' => 1]), 201);
         $this->sebagai($petugas)->post(self::URL . "tiket/{$id}/pesan", ['msg' => 'Tambahan dari petugas lain.'])->assertStatus(201);

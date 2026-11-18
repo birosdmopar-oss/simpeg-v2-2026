@@ -34,7 +34,10 @@ final class TiketController extends HaloSimpegController
 
     public function create(): ResponseInterface
     {
-        return $this->respondSuccess($this->service()->buat($this->auth(), $this->payload(), $this->berkas()), 201);
+        $tiket = $this->service()->buat($this->auth(), $this->payload(), $this->berkas());
+
+        // CR-143: `message` sukses legacy, aditif; `data` tetap.
+        return $this->response->setStatusCode(201)->setJSON(['status' => 'success', 'data' => $tiket, 'message' => TiketService::PESAN_BUAT]);
     }
 
     public function pesan(int|string $id): ResponseInterface
