@@ -296,3 +296,31 @@ describe('buildNav — grup Layanan Fase 4 per role (PRD Fase 4 §6.11.2, AC-11.
     }
   })
 })
+
+describe('buildNav — admin master Halo Simpeg (MAKE-073)', () => {
+  const adminHalo = (role: RoleCode, fase: number) =>
+    buildNav(role, fase)
+      .flatMap((g) => g.items)
+      .find((i) => i.key === 'halo-admin')
+
+  it('role 1 saja, terbuka saat fase 8 (tersembunyi di ACTIVE_PHASE sekarang); anak Kategori/Petugas/Kontak', () => {
+    expect(adminHalo(Role.SUPER_ADMIN, ACTIVE_PHASE)).toBeUndefined()
+    const item = adminHalo(Role.SUPER_ADMIN, 8)
+    expect(item?.children?.map((c) => [c.label, c.to])).toEqual([
+      ['Kategori', { name: 'halo-admin-kategori' }],
+      ['Petugas', { name: 'halo-admin-petugas' }],
+      ['Kontak', { name: 'halo-admin-kontak' }],
+    ])
+    for (const role of [Role.PEGAWAI, Role.ADMIN_SATKER, Role.ADMIN_VIEW_ESELON1, Role.MENTERI, Role.PTT, Role.PPPK, Role.PIMPINAN]) {
+      expect(adminHalo(role, 8)).toBeUndefined()
+    }
+  })
+
+  it('item `halo` Pusat Bantuan tetap tanpa to/roles (CR-135)', () => {
+    const halo = buildNav(Role.PEGAWAI, 8)
+      .flatMap((g) => g.items)
+      .find((i) => i.key === 'halo')
+    expect(halo?.to).toBeUndefined()
+    expect(halo?.roles).toBeUndefined()
+  })
+})

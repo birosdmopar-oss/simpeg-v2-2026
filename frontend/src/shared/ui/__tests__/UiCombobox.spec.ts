@@ -6,6 +6,7 @@ import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it } from 'vitest'
 import { defineComponent, h, ref } from 'vue'
 
+import UiCombobox from '../UiCombobox.vue'
 import UiTextField from '../UiTextField.vue'
 
 afterEach(() => {
@@ -134,5 +135,42 @@ describe('UiCombobox (UiTextField suggestions)', () => {
     await flushPromises()
     await ketik('pa')
     expect(labels()).toEqual(['Pariwisata'])
+  })
+})
+
+describe('UiCombobox — saringLokal & pilih (MAKE-073 review B3 R8)', () => {
+  function mountLangsung(props: Record<string, unknown>) {
+    return mount(UiCombobox, { props: { name: 'akun', ...props }, attachTo: document.body })
+  }
+  const ketik = async (w: ReturnType<typeof mountLangsung>, v: string) => {
+    const el = w.get('input').element as HTMLInputElement
+    el.value = v
+    await w.get('input').trigger('input')
+    await w.setProps({ modelValue: v })
+    await flushPromises()
+  }
+
+  it('saringLokal=false: saran yang tidak memuat teks ketikan tetap tampil (hasil server)', async () => {
+    const w = mountLangsung({ suggestions: ['Admin Kepegawaian', 'Budi Santoso'], saringLokal: false, modelValue: '' })
+    await ketik(w, 'budis')
+    expect(opts().map((o) => o.textContent?.trim())).toEqual(['Admin Kepegawaian', 'Budi Santoso'])
+  })
+
+  it('bawaan (saringLokal=true) tetap menyaring seperti sebelumnya', async () => {
+    const w = mountLangsung({ suggestions: ['Admin Kepegawaian', 'Budi Santoso'], modelValue: '' })
+    await ketik(w, 'budi')
+    expect(opts().map((o) => o.textContent?.trim())).toEqual(['Budi Santoso'])
+  })
+
+  it('pilih memancarkan indeks asal; label kembar dibedakan lewat indeks (klik dan Enter)', async () => {
+    const w = mountLangsung({ suggestions: ['Sama', 'Sama'], saringLokal: false, modelValue: '' })
+    await ketik(w, 'sa')
+    opts()[1]!.click()
+    await flushPromises()
+    expect(w.emitted('pilih')?.at(-1)).toEqual([1])
+    await ketik(w, 'sa')
+    await w.get('input').trigger('keydown', { key: 'ArrowDown' })
+    await w.get('input').trigger('keydown', { key: 'Enter' })
+    expect(w.emitted('pilih')?.at(-1)).toEqual([0])
   })
 })

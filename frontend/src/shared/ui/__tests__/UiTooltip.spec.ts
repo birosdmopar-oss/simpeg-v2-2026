@@ -105,4 +105,16 @@ describe('UiTooltip', () => {
     await flushPromises()
     expect(tooltip()).toBeNull()
   })
+
+  it('MAKE-073 S4: prop open opsional (v-model:open) — true menampilkan, false menyembunyikan; Esc memancarkan update:open false', async () => {
+    const w = mountTip({ open: true })
+    await flushPromises()
+    expect(tooltip()?.textContent).toContain('Nama berkas lengkap.pdf')
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    await flushPromises()
+    expect(w.emitted('update:open')?.at(-1)).toEqual([false])
+    await w.setProps({ open: false })
+    await flushPromises()
+    expect(tooltip()).toBeNull()
+  })
 })

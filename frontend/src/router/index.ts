@@ -21,6 +21,7 @@ import { HARI_LIBUR_READ_ROLES } from '@/features/master-data/hariLibur.types'
 import { MASTER_DATA_ROLES } from '@/features/master-data/types'
 import { formDigitalRoutes } from '@/features/form-digital/routes'
 import { chatbotRoutes } from '@/features/halo-simpeg/chatbot/routes.chatbot'
+import { haloRoutes } from '@/features/halo-simpeg/routes.halo'
 import { kontenRoutes } from '@/features/konten/routes.konten'
 import { surveiLayananRoutes } from '@/features/survei-layanan/routes'
 import { notifikasiRoutes } from '@/features/notifikasi/routes.notifikasi'
@@ -131,6 +132,8 @@ const routes: RouteRecordRaw[] = [
   ...integrasiRoutes,
   // Modul E — Fase 8 E-10 Chatbot Manager "Vanya" (MAKE-095), role 1.
   ...chatbotRoutes,
+  // Modul E — Fase 8 helpdesk Halo Simpeg (MAKE-073): role 1–7, admin master role 1.
+  ...haloRoutes,
   // Modul D — Fase 5A Presensi & Slip Gaji (MAKE-034), termasuk rute publik `/verify/slip/:token`.
   ...presensiRoutes,
   // Modul C — Fase 4 Layanan & Approval (MAKE-026): route ditambah per paket di routes.layanan.ts.

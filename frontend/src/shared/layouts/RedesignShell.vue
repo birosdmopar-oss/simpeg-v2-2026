@@ -15,6 +15,8 @@ import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { ROLE_LABELS } from '@/features/auth/types'
 import InteraksiPopupHost from '@/features/form-digital/components/InteraksiPopupHost.vue'
 import VanyaWidget from '@/features/halo-simpeg/chatbot/components/widget/VanyaWidget.vue'
+import { useRingkasanHalo } from '@/features/halo-simpeg/composables/useRingkasanHalo'
+import { sisipBadgeHalo } from '@/features/halo-simpeg/navBadge'
 import NotifikasiPushShell from '@/features/integrasi/components/NotifikasiPushShell.vue'
 import PengingatCutiShell from '@/features/layanan/components/PengingatCutiShell.vue'
 import { resetPengingatCuti } from '@/features/layanan/composables/pengingatCuti'
@@ -104,7 +106,14 @@ watch(collapsed, (value) => {
   }
 })
 
-const groups = computed(() => (auth.mustChangePassword ? [] : buildNav(auth.role, undefined, auth.user?.nip ?? null)))
+/**
+ * Badge menu Halo Simpeg (MAKE-073, AC-E08.11/12): angka `Ringkasan.badge` dari `useRingkasanHalo` (bergerbang fase 8,
+ * role 1–7, tidak wajib ganti password), disisipkan ke item `halo` tanpa mengubah `buildNav`.
+ */
+const ringkasanHalo = useRingkasanHalo()
+const groups = computed(() =>
+  auth.mustChangePassword ? [] : sisipBadgeHalo(buildNav(auth.role, undefined, auth.user?.nip ?? null), ringkasanHalo.badge.value),
+)
 const userName = computed(() => auth.user?.name ?? auth.user?.username ?? 'Pengguna')
 const userSubtitle = computed(() => auth.user?.nip ?? (auth.role ? ROLE_LABELS[auth.role] : ''))
 
@@ -121,6 +130,8 @@ watch(
   () => router.currentRoute.value.fullPath,
   () => {
     if (lonceng !== null && !auth.mustChangePassword) void lonceng.muatUlang()
+    // Muat ulang lembut ringkasan helpdesk (tanpa efek bila gerbang tertutup).
+    ringkasanHalo.muatUlang()
   },
 )
 

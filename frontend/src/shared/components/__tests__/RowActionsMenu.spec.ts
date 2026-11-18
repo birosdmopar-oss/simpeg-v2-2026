@@ -180,3 +180,72 @@ describe('RowActionsMenu', () => {
     expect(wrapper.emitted('select')).toBeUndefined()
   })
 })
+
+describe('RowActionsMenu — keterangan opsional (MAKE-073 review B3 R2)', () => {
+  it('keterangan dirender di bawah label item dan ditautkan lewat aria-describedby', async () => {
+    const wrapper = mountMenu([
+      { key: 'edit', label: 'Edit', icon: Pencil },
+      { key: 'delete', label: 'Hapus', icon: Trash2, danger: true, disabled: true, keterangan: 'Masih dipakai tiket.' },
+    ])
+    const menu = await openRowMenu(wrapper, TESTID)
+    const item = menu.querySelector<HTMLElement>('[data-action="delete"]')!
+    const id = item.getAttribute('aria-describedby')
+    expect(id).toBeTruthy()
+    expect(document.getElementById(id!)?.textContent).toBe('Masih dipakai tiket.')
+    expect(renderedActions(menu).find((a) => a.key === 'delete')).toMatchObject({ label: 'Hapus', keterangan: 'Masih dipakai tiket.', disabled: true })
+  })
+
+  it('tanpa keterangan: tanpa aria-describedby dan tanpa elemen keterangan (DOM tidak berubah)', async () => {
+    const wrapper = mountMenu([{ key: 'edit', label: 'Edit', icon: Pencil }])
+    const menu = await openRowMenu(wrapper, TESTID)
+    const item = menu.querySelector<HTMLElement>('[data-action="edit"]')!
+    expect(item.hasAttribute('aria-describedby')).toBe(false)
+    expect(item.querySelector('[data-keterangan]')).toBeNull()
+    expect(item.textContent?.trim()).toBe('Edit')
+  })
+})
+
+describe('RowActionsMenu — item nonaktif berketerangan tetap bisa difokus (MAKE-073 review S1)', () => {
+  const tekan = async (key: string) => {
+    ;(document.activeElement as HTMLElement).dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }))
+    await flushPromises()
+  }
+  const aktif = () => document.activeElement as HTMLElement
+
+  it('ArrowDown berhenti di Hapus berketerangan: aria-disabled, nama = label, keterangan lewat describedby; Enter/klik tanpa select', async () => {
+    const wrapper = mountMenu([
+      { key: 'edit', label: 'Edit', icon: Pencil },
+      { key: 'delete', label: 'Hapus', icon: Trash2, danger: true, disabled: true, keterangan: 'Masih dipakai tiket.' },
+    ])
+    await wrapper.get(`[data-testid="${TESTID}"]`).trigger('keydown', { key: 'Enter' })
+    await flushPromises()
+    expect(aktif().dataset.action).toBe('edit')
+    await tekan('ArrowDown')
+    expect(aktif().dataset.action).toBe('delete')
+    expect(aktif().getAttribute('aria-disabled')).toBe('true')
+    expect(aktif().hasAttribute('data-disabled')).toBe(false)
+    expect(document.getElementById(aktif().getAttribute('aria-labelledby')!)?.textContent).toBe('Hapus')
+    expect(document.getElementById(aktif().getAttribute('aria-describedby')!)?.textContent).toBe('Masih dipakai tiket.')
+    // Keterangan tidak di dalam elemen ber-opacity (kontras teks sekunder biasa).
+    expect(aktif().querySelector('[data-keterangan]')!.closest('.opacity-40')).toBeNull()
+    await tekan('Enter')
+    aktif().click()
+    await flushPromises()
+    expect(wrapper.emitted('select')).toBeUndefined()
+    expect(menuOnPage()).not.toBeNull()
+  })
+
+  it('item disabled TANPA keterangan tetap dilewati panah (perilaku lama)', async () => {
+    const wrapper = mountMenu([
+      { key: 'edit', label: 'Edit', icon: Pencil },
+      { key: 'up', label: 'Naikkan urutan', disabled: true },
+      { key: 'delete', label: 'Hapus', icon: Trash2, danger: true },
+    ])
+    await wrapper.get(`[data-testid="${TESTID}"]`).trigger('keydown', { key: 'Enter' })
+    await flushPromises()
+    expect(aktif().dataset.action).toBe('edit')
+    await tekan('ArrowDown')
+    expect(aktif().dataset.action).toBe('delete')
+    expect(menuOnPage()!.querySelector('[data-action="up"]')!.hasAttribute('data-disabled')).toBe(true)
+  })
+})

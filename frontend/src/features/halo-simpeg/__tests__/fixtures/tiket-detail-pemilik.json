@@ -1,0 +1,67 @@
+{
+    "status": "success",
+    "data": {
+        "id": 1,
+        "subjek": "Sisa cuti",
+        "kategori": {
+            "id": 1,
+            "nama": "Kepegawaian"
+        },
+        "status": "open",
+        "dibuat_pada": "2026-11-17T12:26:50Z",
+        "pemilik_nama": "Pelapor Contoh",
+        "sebagai_petugas": false,
+        "belum_dibaca": true,
+        "perlu_tindak": false,
+        "pesan_terakhir": {
+            "id_inbox_msg": 3,
+            "waktu": "2026-11-17T12:26:50Z",
+            "potongan": "Tambahan dari petugas lain.",
+            "pengirim_label": "Admin",
+            "lampiran": null
+        },
+        "bisa_balas": true,
+        "bisa_tutup": true,
+        "bisa_hapus": false,
+        "allow_reply": true,
+        "snapshot": null,
+        "ditutup_oleh_label": null,
+        "pengingat": null,
+        "pesan": [
+            {
+                "id_inbox_msg": 1,
+                "waktu": "2026-11-17T12:26:50Z",
+                "isi": "Berapa sisa cuti saya?",
+                "pengirim_label": "Pelapor Contoh",
+                "milik_saya": true,
+                "dari_pemilik": true,
+                "urutan_pengirim": 0,
+                "lampiran": {
+                    "nama": "lampiran-1-1.pdf",
+                    "tipe": "application/pdf",
+                    "ukuran": null
+                }
+            },
+            {
+                "id_inbox_msg": 2,
+                "waktu": "2026-11-17T12:26:50Z",
+                "isi": "Sisa cuti 10 hari.",
+                "pengirim_label": "Admin",
+                "milik_saya": false,
+                "dari_pemilik": false,
+                "urutan_pengirim": 1,
+                "lampiran": null
+            },
+            {
+                "id_inbox_msg": 3,
+                "waktu": "2026-11-17T12:26:50Z",
+                "isi": "Tambahan dari petugas lain.",
+                "pengirim_label": "Admin",
+                "milik_saya": false,
+                "dari_pemilik": false,
+                "urutan_pengirim": 2,
+                "lampiran": null
+            }
+        ]
+    }
+}

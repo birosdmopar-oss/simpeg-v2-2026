@@ -1,0 +1,13 @@
+{
+    "status": "success",
+    "data": [
+        {
+            "id": 1,
+            "nama": "Cuti"
+        },
+        {
+            "id": 3,
+            "nama": "Gaji"
+        }
+    ]
+}

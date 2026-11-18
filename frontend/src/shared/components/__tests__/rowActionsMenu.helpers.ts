@@ -21,6 +21,8 @@ export interface RenderedRowAction {
   label: string
   disabled: boolean
   danger: boolean
+  /** Keterangan opsional item (`RowAction.keterangan`); hanya ada bila item membawanya (bentuk objek lain tidak berubah). */
+  keterangan?: string
 }
 
 type Root = Pick<VueWrapper, 'get'>
@@ -63,12 +65,19 @@ export async function closeRowMenu(testid: string): Promise<void> {
 
 /** Item yang dirender di menu terbuka, berurutan. */
 export function renderedActions(menu: HTMLElement): RenderedRowAction[] {
-  return Array.from(menu.querySelectorAll<HTMLElement>('[role="menuitem"]')).map((item) => ({
-    key: item.dataset.action ?? '',
-    label: (item.textContent ?? '').trim(),
-    disabled: item.hasAttribute('data-disabled'),
-    danger: item.classList.contains('text-red-600'),
-  }))
+  return Array.from(menu.querySelectorAll<HTMLElement>('[role="menuitem"]')).map((item) => {
+    const ket = item.querySelector<HTMLElement>('[data-keterangan]')
+    const teks = (item.textContent ?? '').trim()
+    const keterangan = (ket?.textContent ?? '').trim()
+    return {
+      key: item.dataset.action ?? '',
+      label: keterangan ? teks.slice(0, teks.length - keterangan.length).trim() : teks,
+      // Item nonaktif berketerangan tetap bisa difokus (MAKE-073 S1): ditandai `aria-disabled`, bukan `data-disabled`.
+      disabled: item.hasAttribute('data-disabled') || item.getAttribute('aria-disabled') === 'true',
+      danger: item.classList.contains('text-red-600'),
+      ...(keterangan ? { keterangan } : {}),
+    }
+  })
 }
 
 /** Buka menu ⋮, baca daftar itemnya, lalu tutup kembali (state tabel tidak berubah). */

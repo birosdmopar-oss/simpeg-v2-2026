@@ -47,6 +47,7 @@ import type { RouteLocationRaw } from 'vue-router'
 import { USER_MANAGEMENT_ROLES, type RoleCode } from '@/features/auth/types'
 import { DOKUMEN_ROLES } from '@/features/dokumen/types'
 import { CHATBOT_ADMIN_ROLES } from '@/features/halo-simpeg/chatbot/constants'
+import { HALO_ADMIN_ROLES } from '@/features/halo-simpeg/constants'
 import { INTEGRASI_ADMIN_ROLES } from '@/features/integrasi/integrasi.types'
 import {
   AK_JF_ROLES,
@@ -308,6 +309,20 @@ const NAV: NavGroup[] = [
           { key: 'chatbot-qna', label: 'QnA', to: { name: 'chatbot-qna' } },
           { key: 'chatbot-statistik', label: 'Statistik', to: { name: 'chatbot-statistik' } },
           { key: 'chatbot-riwayat', label: 'Riwayat', to: { name: 'chatbot-riwayat' } },
+        ],
+      },
+      // MAKE-073 (PRD Fase 8 v1.3 §7.2, 8_2 §1a): master helpdesk Halo Simpeg, role 1. `phase: 8` tanpa `rilis`; sebelum
+      // ACTIVE_PHASE ≥ 8 QA lewat URL langsung. Item `halo` di Pusat Bantuan tetap tanpa `to`/`roles` (CR-135).
+      {
+        key: 'halo-admin',
+        label: 'Halo Simpeg',
+        icon: MessageCircle,
+        roles: HALO_ADMIN_ROLES,
+        phase: 8,
+        children: [
+          { key: 'halo-admin-kategori', label: 'Kategori', to: { name: 'halo-admin-kategori' } },
+          { key: 'halo-admin-petugas', label: 'Petugas', to: { name: 'halo-admin-petugas' } },
+          { key: 'halo-admin-kontak', label: 'Kontak', to: { name: 'halo-admin-kontak' } },
         ],
       },
     ],

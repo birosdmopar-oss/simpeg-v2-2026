@@ -7,7 +7,7 @@ Kontrak API: `backend/app/Controllers/Api/Notifikasi/README.md`. PRD Fase 7 v2.0
 |---|---|
 | `services/notifikasi.service.ts` | Klien `notifikasi*`. `api` sudah membuka amplop, jadi dibaca `res.data` (CR-059); nilai dinormalkan |
 | `composables/useRingkasanNotifikasi.ts` | Ringkasan lonceng: SATU instance bersama, polling 60 detik saat tab terlihat, berhenti saat pemakai terakhir dilepas; galat mempertahankan nilai terakhir; `null` sumber ≠ 0 |
-| `views/NotifikasiPage.vue` | `/notifikasi?tab=notifikasi\|butuh-approval\|histori-approval`; tab per role (`roles.ts`, Q7-29) |
+| `views/NotifikasiPage.vue` | `/notifikasi?tab=notifikasi\|butuh-approval\|histori-approval`; tab per role (`roles.ts`, Q7-29); di atas tab entri "Tiket Halo Simpeg (n)" (H8-15 (b), MAKE-073): angka `tiket_belum_dibaca`, tujuan `tujuanEntriTiket` (`features/halo-simpeg/entriTiket.ts`: tab antrean bila sisi petugas `Ringkasan` helpdesk > 0, selain itu `/halo-simpeg`), hanya `NOTIFIKASI_ROLES` dan bila > 0 |
 | `components/*Tab.vue` | Daftar (⋮ Buka → Tandai dibaca → Hapus + ConfirmDialog), Butuh Approval (grup + riwayat, ⋮ Proses), Histori (bulan, ⋮ Buka) |
 | `roles.ts` | Role ikut legacy, sama dengan filter route backend |
 | `index.ts` | Ekspor publik untuk modul lain |
@@ -34,4 +34,7 @@ Kontrak API: `backend/app/Controllers/Api/Notifikasi/README.md`. PRD Fase 7 v2.0
   (AGENTS.md §3.6).
 - "Buka" menandai dibaca lalu membuka `url_fe` (Q7-31). Hapus hanya untuk notifikasi riwayat (`dapat_dihapus`, Q7-33).
 
-Catatan: `berita_belum_dibaca` kini angka (sumber berita F-07 aktif); hanya `tiket_belum_dibaca` yang null sampai Fase 8.
+Catatan: `berita_belum_dibaca` kini angka (sumber berita F-07 aktif). `tiket_belum_dibaca` diisi BE sejak MAKE-071 (binding
+`RingkasanTiketInterface`) = `Ringkasan.total` helpdesk (`belum_dibaca_saya + belum_dibaca_petugas`, AC-E06.9; role 8 = 0);
+`null` hanya bila sumber tidak tersedia. Lonceng tetap memuat ulang sendiri (polling + pindah halaman); badge menu Halo Simpeg
+memakai `Ringkasan.badge` dari `features/halo-simpeg/composables/useRingkasanHalo.ts`, bukan angka lonceng.

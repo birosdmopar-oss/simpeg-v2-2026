@@ -31,6 +31,15 @@ vi.mock('@/features/notifikasi', async (asli) => {
   const a = await asli<typeof import('@/features/notifikasi')>()
   return { ...a, FASE_LONCENG: 99 }
 })
+// MAKE-073: shell juga memasang ringkasan helpdesk Halo Simpeg (GET tiket/ringkasan di fase 8). Stub agar test widget Vanya
+// tetap hermetik; perilaku polling ringkasan diuji di `features/halo-simpeg/__tests__/HaloShell.spec.ts`.
+vi.mock('@/features/halo-simpeg/composables/useRingkasanHalo', async () => {
+  const { computed } = await import('vue')
+  return {
+    useRingkasanHalo: () => ({ badge: computed(() => 0), aktif: computed(() => false), muatUlang: () => undefined }),
+    resetPolling: () => undefined,
+  }
+})
 vi.mock('../services/chatbot.service', async (asli) => ({
   ...(await asli<typeof import('../services/chatbot.service')>()),
   vanyaService: { topik: vi.fn(), pertanyaan: vi.fn(), populer: vi.fn(), balas: vi.fn(), feedback: vi.fn() },

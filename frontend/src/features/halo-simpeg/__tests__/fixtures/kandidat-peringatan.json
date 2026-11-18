@@ -1,0 +1,12 @@
+{
+    "status": "success",
+    "data": {
+        "items": [
+            {
+                "id_user": 11,
+                "label": "Admin Kepegawaian"
+            }
+        ],
+        "peringatan": "Satker kepegawaian belum diatur di Web Config; hanya akun Super Admin yang dapat dipilih."
+    }
+}

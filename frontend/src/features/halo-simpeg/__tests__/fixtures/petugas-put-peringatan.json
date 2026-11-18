@@ -1,0 +1,21 @@
+{
+    "status": "success",
+    "data": {
+        "id": 2,
+        "id_user": 12,
+        "label": "000000000000000012 - Pegawai Contoh, S.Kom. - Analis Kepegawaian",
+        "email": "pegawai@contoh.test",
+        "no_hp": null,
+        "status": 1,
+        "kategori": [
+            {
+                "id": 1,
+                "nama": "Cuti",
+                "status": 1
+            }
+        ],
+        "bisa_hapus": true,
+        "alasan_tidak_bisa_hapus": null,
+        "peringatan": "Petugas ini adalah petugas aktif terakhir pada kategori Kepegawaian. Tiket terbuka pada kategori tersebut tidak memiliki penjawab sampai petugas lain diaktifkan."
+    }
+}

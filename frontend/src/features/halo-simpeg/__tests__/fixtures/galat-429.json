@@ -1,0 +1,5 @@
+{
+    "status": "error",
+    "code": "throttle",
+    "message": "Terlalu banyak pesan. Coba lagi dalam satu menit."
+}

@@ -1,0 +1,49 @@
+{
+    "status": "success",
+    "data": {
+        "items": [
+            {
+                "id": 1,
+                "id_user": 11,
+                "label": "Admin Kepegawaian",
+                "email": "admin@contoh.test",
+                "no_hp": null,
+                "status": 1,
+                "kategori": [
+                    {
+                        "id": 1,
+                        "nama": "Cuti",
+                        "status": 1
+                    },
+                    {
+                        "id": 3,
+                        "nama": "Gaji",
+                        "status": 1
+                    }
+                ],
+                "bisa_hapus": true,
+                "alasan_tidak_bisa_hapus": null
+            },
+            {
+                "id": 2,
+                "id_user": 12,
+                "label": "000000000000000012 - Pegawai Contoh, S.Kom. - Analis Kepegawaian",
+                "email": "pegawai@contoh.test",
+                "no_hp": "081200000000",
+                "status": 0,
+                "kategori": [
+                    {
+                        "id": 4,
+                        "nama": "Kepegawaian",
+                        "status": 1
+                    }
+                ],
+                "bisa_hapus": false,
+                "alasan_tidak_bisa_hapus": "Petugas ini petugas terakhir pada kategori Kepegawaian yang masih memiliki tiket terbuka. Tambahkan petugas lain lebih dulu."
+            }
+        ],
+        "total": 2,
+        "page": 1,
+        "per_page": 20
+    }
+}
