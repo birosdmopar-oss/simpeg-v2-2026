@@ -57,7 +57,7 @@ class HaloSimpeg extends BaseConfig
     /** `disiplin_ticket.subject` VARCHAR(250) [K]. */
     public int $maksSubjek = 250;
 
-    /** `msg` maksimum (code point sesudah trim); kolom TEXT jauh lebih besar (§7.3a). */
+    /** `msg` maksimum (code point sesudah trim Unicode, CR-148); kolom TEXT jauh lebih besar (§7.3a). */
     public int $maksPesan = 5000;
 
     /** Potongan isi pesan terakhir di daftar (code point). */

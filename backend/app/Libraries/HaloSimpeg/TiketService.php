@@ -724,6 +724,19 @@ final class TiketService extends MasterHaloSimpeg
     }
 
     /**
+     * Pangkas spasi Unicode di tepi (CR-148): pemisah `\p{Z}` (NBSP, U+2000–U+200A, U+202F, U+205F, U+3000, …), spasi ASCII, serta
+     * karakter lebar-nol U+180E, U+200B–U+200D, U+2060, U+FEFF. Hanya untuk validasi; isi yang disimpan tidak diubah. UTF-8 tidak
+     * sah → nilai asli (dipangkas ASCII oleh `teksDari`).
+     */
+    private static function trimUnicode(string $s): string
+    {
+        return preg_replace('/^[\p{Z}\s\x{180E}\x{200B}-\x{200D}\x{2060}\x{FEFF}]+|[\p{Z}\s\x{180E}\x{200B}-\x{200D}\x{2060}\x{FEFF}]+$/u', '', $s) ?? $s;
+    }
+
+    /**
+     * Pesan wajib dan batas panjang `maksPesan` dihitung sesudah trim Unicode (CR-148); pesan yang hanya berisi spasi Unicode → 422
+     * dengan teks yang sama seperti `msg` kosong.
+     *
      * @param array<string, string> $errors
      */
     private function periksaPesan(string $pesan, array &$errors): void
@@ -732,9 +745,11 @@ final class TiketService extends MasterHaloSimpeg
             return;
         }
 
-        if ($pesan === '') {
+        $inti = self::trimUnicode($pesan);
+
+        if ($inti === '') {
             $errors['msg'] = 'Pesan wajib diisi.';
-        } elseif (mb_strlen($pesan) > $this->config->maksPesan) {
+        } elseif (mb_strlen($inti) > $this->config->maksPesan) {
             $errors['msg'] = 'Pesan maksimal ' . number_format($this->config->maksPesan, 0, ',', '.') . ' karakter.';
         }
     }
