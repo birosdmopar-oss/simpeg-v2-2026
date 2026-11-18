@@ -59,6 +59,7 @@ import detailPemilik from './fixtures/tiket-detail-pemilik.json'
 import detailPetugas from './fixtures/tiket-detail-petugas.json'
 import detailTanpaJabatan from './fixtures/tiket-detail-tanpa-jabatan.json'
 import detailTanpaKategori from './fixtures/tiket-detail-tanpa-kategori.json'
+import tiketBuat from './fixtures/tiket-buat.json'
 
 const DAFTAR = daftarPemilik.data as Halaman<TiketBaris>
 const DETAIL = detailPemilik.data as TiketDetail
@@ -1249,7 +1250,7 @@ describe('CR-142 T-B1: notice sukses sesudah tiket baru', () => {
   }
 
   it.each([
-    ['message BE (CR-143)', 'Berhasil menambahkan data halo simpeg.', 'Berhasil menambahkan data halo simpeg.'],
+    ['message BE (fixture tiket-buat CR-143)', tiketBuat.message, tiketBuat.message],
     ['tanpa message → cadangan legacy', null, 'Berhasil menambahkan data halo simpeg.'],
     ['message BE lain dipakai apa adanya', 'Tiket terkirim.', 'Tiket terkirim.'],
   ])('%s → notice sukses; thread tiket baru dibuka; pindah tiket → notice hilang', async (_n, pesan, teks) => {
