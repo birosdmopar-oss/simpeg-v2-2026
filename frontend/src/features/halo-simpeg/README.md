@@ -67,7 +67,7 @@ README sendiri: `chatbot/README.md` (MAKE-095).
 - Panel "Perlu ditindak" = daftar server `perlu_tindak=1` (5 baris; kosong tetap tampil, pengganti popup login legacy F8-12).
   "Lihat semua" = `perlu_tindak=1` + `baca=semua` tanpa filter lain; "Hapus filter" → bawaan antrean. Panel dimuat ulang saat
   `Ringkasan.perlu_tindak` berubah (satu pemicu per aksi); bila ringkasan belum ada sebelum baca, panel disegarkan sesudah baca.
-- Snapshot pelapor di header thread [K `VD:21-26`]: desktop = tombol "Data pelapor" + `UiTooltip` (hover, fokus, atau klik), isi
+- Snapshot pelapor di header thread [K `VD:21-26`]: desktop = tombol "Data pelapor" + `UiTooltip` (hover, fokus, klik, atau Enter/Spasi), isi
   hanya lewat `aria-describedby`; layar sempit = teks kecil.
 - Centang "Ingatkan Saya Kembali?" hanya bila `pengingat !== null`; pengingat aktif → petunjuk pembatalan + jatuh tempo; label
   berganti ke "Pengingat jatuh tempo" saat waktunya lewat (detak per menit).
@@ -87,11 +87,15 @@ README sendiri: `chatbot/README.md` (MAKE-095).
 
 - Tombol "Ekspor Rekap" hanya di tab Antrean dan hanya bila `bisaEkspor` (`petugas/saya.bisa_ekspor`, bukan role) →
   `EksporRekapDialog`: dua `UiTextField type="date"` (nilai `YYYY-MM-DD`, kalender lokal).
-- Batas picker maks = hari ini **WIB** (`hariIniWib()`, `Asia/Jakarta`, tanpa `toISOString()`) [K `endDate: '0'`]; `ds` ≤ `de`
-  dijaga silang antarpicker [K]. Ketikan di luar batas ditolak `UiDatePicker` bersama (nilai dikosongkan + pesan rentang), jadi
-  tidak terkirim (deviasi dari rancangan B4 "dikirim apa adanya"; komponen bersama tidak diubah).
-- Teks validasi klien = teks BE ("Tanggal awal dan akhir wajib diisi." / "Tanggal awal tidak boleh melebihi tanggal akhir.")
-  **[V2]** terhadap teks legacy.
+- Batas picker maks = hari ini **WIB** (`hariIniWib()`, `Asia/Jakarta`, tanpa `toISOString()`) [K `endDate: '0'`]; urutan `ds` ≤ `de`
+  dijaga silang oleh picker [K] (min/max). Ketikan di luar batas ditolak `UiDatePicker` bersama (nilai dikosongkan + "Tanggal di luar
+  rentang yang diizinkan.", pesan yang dilihat pengguna), jadi tidak terkirim (deviasi dari rancangan B4 "dikirim apa adanya";
+  komponen bersama tidak diubah).
+- Validasi klien: kolom kosong → "Tanggal awal dan akhir wajib diisi." (teks BE **[V2]** terhadap teks legacy). Cabang `ds > de`
+  di klien hanya pengaman (tak terjangkau lewat picker); teks BE "Tanggal awal tidak boleh melebihi tanggal akhir." tampil di kolom
+  bila 422 datang dari server.
+- Dialog: generasi naik tiap dibuka/ditutup, jadi hasil ekspor yang tiba sesudah Batal/X/Esc atau buka ulang diabaikan (tanpa
+  unduhan); gerbang `bisaEkspor` hanya di tombol, dialog tetap terpasang selama terbuka (pesan 403 tetap terbaca).
 - `GET tiket/ekspor?ds&de&format=xlsx` lewat `ambilBerkas` (tidak diubah): 200 `Content-Type` JSON = periode kosong → notice pesan BE
   tanpa unduhan; selain itu berkas → `simpanBerkas`. 403 `bukan_petugas` → pesan BE + `petugas/saya` dimuat ulang paksa; 422 per
   kolom → galat kolom; 422 `ekspor_terlalu_besar` → pesan BE.
