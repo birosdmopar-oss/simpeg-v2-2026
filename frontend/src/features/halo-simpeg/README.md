@@ -22,6 +22,12 @@ Komponen yang dipakai modul kedua dipindah ke `src/shared/`.
   filter kategori hanya bila ≥ 2 kategori [K `VI:31-36`]; panel "Perlu ditindak" = daftar server `perlu_tindak=1` (kosong tetap tampil,
   pengganti popup login legacy F8-12); snapshot pelapor di header thread lewat `UiTooltip`; centang "Ingatkan Saya Kembali?" hanya bila
   `pengingat !== null`. Store `stores/tiket.ts` = pabrik daftar per peran (filter/halaman terpisah) + detail & aksi bersama.
-- Admin master (B3, role 1): `/halo-simpeg-admin/:bagian` (Kategori | Petugas | Kontak); Hapus `disabled` dari `bisa_hapus` +
-  keterangan BE; `peringatan` Nonaktifkan/PUT petugas → notice peringatan.
+- Layar petugas (lanjutan): "Lihat semua" Perlu ditindak = `perlu_tindak=1` + `baca=semua` tanpa filter lain; "Hapus filter" →
+  bawaan antrean. Panel dimuat ulang saat `Ringkasan.perlu_tindak` berubah (satu pemicu per aksi). Snapshot: desktop = tombol
+  "Data pelapor" + tooltip (`aria-describedby`), layar sempit = teks kecil. Pengingat aktif → petunjuk pembatalan + jatuh tempo.
+- Admin master (B3, role 1): `/halo-simpeg-admin/:bagian` (Kategori | Petugas | Kontak); `:bagian` tidak dikenal → Kategori.
+  ⋮ Edit → Aktifkan/Nonaktifkan → Hapus. Hapus `disabled` dari `bisa_hapus`; alasannya = `RowAction.keterangan` di item ⋮
+  (`alasan_tidak_bisa_hapus` BE untuk Petugas, teks FE **[V2]** untuk Kategori); kolom Status hanya badge (AGENTS.md §1 butir 5).
+  `peringatan` Nonaktifkan/PUT petugas (S8) → notice peringatan. Kandidat petugas: hasil server tanpa saring lokal, dipilih lewat
+  id (`UiCombobox` `saringLokal=false` + `pilih`).
 - **Tanpa frame Figma** (H8-9): layar pemilik/petugas/admin mengikuti pola redesign (Gambar 33/34, Master Data); dicatat di B5.
