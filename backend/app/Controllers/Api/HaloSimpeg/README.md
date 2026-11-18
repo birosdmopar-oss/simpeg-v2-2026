@@ -497,7 +497,8 @@ Acuan: PRD Fase 8 v1.4 §6.4, §7.6, F8-13..F8-16, H8-14 (a). Tidak ada endpoint
 # Bagian ekspor rekap petugas (MAKE-074)
 
 Acuan: PRD Fase 8 v1.4 §7.9 (E-09), F8-20, §6.1b, §7.3a, AC-E09.1..AC-E09.8 [K `LS:1600-1830`, `SC:751-786`]. Sumber kontrak tombol
-ekspor FE (B4, Worker Muse). Service: `App\Libraries\HaloSimpeg\EksporTiketService`.
+ekspor FE (B4, Worker Muse). Service: `App\Libraries\HaloSimpeg\EksporTiketService`. Bagian ini **beku** di MAKE-074 (V1–V13 diputus
+18-11-2026); perubahan sesudah beku = CR yang disepakati BE dan FE.
 
 `GET api/v1/halo-simpeg/tiket/ekspor?ds=YYYY-MM-DD&de=YYYY-MM-DD&format=xlsx` — role 1–7 (filter route; role 8 → 403 filter).
 
@@ -521,17 +522,20 @@ Urutan cek: 403 `bukan_petugas` → validasi periode/format (422) → hitung (ko
 - Tiket = tiket di kategori yang dipegang petugas (`AksesTiket::kategoriAktif`), tanggal tiket (`disiplin_ticket.created_at`, UTC) di
   `[ds 00:00 WIB, de+1 00:00 WIB)` dibandingkan langsung dengan kolom (tanpa `DATE()`). Tiket berkategori NULL dan kategori lain tidak
   ikut (H8-16 (a1), AC-E09.3). Status tiket apa pun. Kategori nonaktif yang masih dipegang petugas tetap ikut.
-- Baris = pesan tiket itu, urut `id_inbox` lalu `id_inbox_msg` [K urutan]; tiket tanpa balasan petugas tetap ikut. Tiket tanpa pesan
-  sama sekali (anomali impor, hitungan Q-H16 di runbook `README-deploy.md` §1n) tidak menghasilkan baris (V6).
-- ⏳ **Cakupan pesan dan label pengirim menunggu Horii (V1/V2)**; bagian ini belum beku. Opsi: (a) ikut legacy penuh = hanya pesan
-  pemilik + pesan petugas pengekspor, nama/NIP pengirim [K]; (b) semua pesan + penyamaran D7 (a) seperti detail (baris pemilik →
-  nama + NIP pemilik; baris pengekspor → nama + NIP pengekspor [K `LS:1797`]; baris petugas lain → "Admin" + NIP kosong, kecuali
-  pengekspor role 1). Kode: satu titik keputusan `EksporTiketService::pengirimBaris()`; sementara = semua pesan + pengirim apa
-  adanya.
+- Baris = pesan tiket itu dalam cakupan V1 di bawah, urut `id_inbox` lalu `id_inbox_msg` [K urutan]. Tiket yang cocok periode tetap
+  ikut walau pengekspor belum menulis (baris pesan pemilik saja; perbaikan F8-20). Tiket tanpa pesan sama sekali (anomali impor,
+  hitungan Q-H16 di runbook `README-deploy.md` §1n) tidak menghasilkan baris (V6).
+- **Cakupan pesan (V1, keputusan Horii 18-11-2026, opsi (a) ikut legacy penuh [K `LS:1626`]):** hanya pesan **pemilik tiket**
+  (`msg_sender = sender`) dan pesan **petugas yang mengekspor** (`msg_sender` = akun pengekspor). Balasan petugas lain di kategori
+  yang sama **tidak** ikut. Pengekspor role 1 mengikuti aturan yang sama. Batas baris dan karakter (COUNT/SUM) dihitung atas cakupan
+  yang sama. Kode: `EksporTiketService::cakupan()`.
+- **Label pengirim (V2, keputusan Horii 18-11-2026, opsi (a) [K `LS:1797-1799`]):** `NAMA PENANYA` / `NIP PENANYA` = nama/NIP
+  pengirim pesan baris itu. Tanpa penyamaran D7 (a), karena hanya baris pemilik dan pengekspor sendiri yang tampil. Kode:
+  `EksporTiketService::barisTerpilih()`.
 - Berkas (`EksporTabel::xlsx`, semua sel teks `inlineStr`, anti formula injection), sheet "Rekap Halo SIMPEG":
   - baris 1 "REKAP PIC HALO SIMPEG {nama akun}", baris 2 "Periode: {ds} - {de}" (format "1 November 2026"), baris 3 kosong;
   - baris 4 header: `NO`, `ID PERTANYAAN`, `KATEGORI`, `NAMA PENANYA`, `NIP PENANYA`, `PERTANYAAN / JAWABAN`, `TIMESTAMP` [K];
-  - `NAMA PENANYA` / `NIP PENANYA` = label pengirim baris itu (⏳ V1/V2 di atas); akun tanpa NIP → kosong; NIP tetap teks
+  - `NAMA PENANYA` / `NIP PENANYA` = nama/NIP pengirim baris itu (V2); pengirim tanpa NIP (mis. akun role 1) → NIP kosong; NIP tetap teks
     (AC-E09.4);
   - `TIMESTAMP` = waktu pesan dalam WIB, `d/m/Y H:i` [K];
   - isi sel > 32.767 unit UTF-16 (batas sel Excel; emoji = 2 unit) dipotong dengan penanda "… [dipotong]" [V2] (B-27, pengecualian
@@ -575,12 +579,12 @@ pengekspor. Tanpa isi pesan, nama/NIP penanya, atau isi berkas. Ekspor kosong, 4
 
 Bentuk fixture = respons nyata, diuji `EksporTiketTest` (`cocokFixtureHs`).
 
-## Selisih ekspor terhadap PRD v1.4 (diputus reviewer 18-11-2026; V1/V2 menunggu Horii)
+## Selisih ekspor terhadap PRD v1.4 (diputus 18-11-2026: V1/V2 Horii, V3–V13 reviewer)
 
 | No | Selisih | Label |
 |---|---|---|
-| V1 | Cakupan pesan: ⏳ menunggu Horii (opsi (a)/(b) di atas) | — |
-| V2 | Label nama/NIP pengirim: ⏳ menunggu Horii (D7 (a)) | — |
+| V1 | Cakupan pesan = pesan pemilik + pesan pengekspor saja (legacy penuh); batas COUNT/SUM atas cakupan yang sama; tiket tanpa balasan pengekspor tetap ikut (perbaikan F8-20) | [K], keputusan Horii 18-11-2026 |
+| V2 | Nama/NIP = pengirim baris, tanpa penyamaran D7 (a); NIP kosong bila pengirim tanpa NIP | [K], keputusan Horii 18-11-2026 |
 | V3 | `format` kosong = xlsx; nilai lain → 422 `errors.format` "Format ekspor tidak didukung." | [V2] |
 | V4 | Tanggal tak valid → teks `DaftarLogIntegrasi`; kosong dan `ds` > `de` → teks §7.3a | [V2] |
 | V5 | 403 `bukan_petugas` dicek sebelum validasi periode | [V2] |
