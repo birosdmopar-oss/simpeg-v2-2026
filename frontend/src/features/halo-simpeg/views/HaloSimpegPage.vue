@@ -141,9 +141,24 @@ function kembali(): void {
   void router.push({ name: 'halo-simpeg', query: queryTab.value })
 }
 
-function onDibuat(t: TiketDetail): void {
+/**
+ * CR-142 T-B1: sesudah tiket baru → notice sukses (pesan BE / cadangan legacy) lalu thread dibuka seperti biasa (fokus judul, Q3).
+ * Notice hilang saat pengguna pindah ke tiket lain atau membuka form tiket baru lagi.
+ */
+const suksesBaru = ref<{ id: number; pesan: string } | null>(null)
+function onDibuat(t: TiketDetail, pesan: string): void {
+  suksesBaru.value = { id: t.id, pesan }
   void router.push({ name: 'halo-tiket', params: { id: t.id } })
 }
+watch(
+  () => props.idTiket,
+  (id) => {
+    if (suksesBaru.value && id !== suksesBaru.value.id) suksesBaru.value = null
+  },
+)
+watch(dialogBaru, (buka) => {
+  if (buka) suksesBaru.value = null
+})
 
 /**
  * Review B3 R1: "Lihat semua" menampilkan SEMUA tiket perlu ditindak — `baca` = semua dan filter lain dikosongkan, agar tiket
@@ -161,6 +176,7 @@ function hapusFilterPerluTindak(): void {
 
 <template>
   <RedesignShell :breadcrumbs="crumbs">
+    <UiNotice v-if="suksesBaru" tone="success" class="mb-4" data-testid="halo-tiket-baru-sukses">{{ suksesBaru.pesan }}</UiNotice>
     <div class="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]" :class="RUANG_LAUNCHER_CLASS" data-testid="halo-halaman">
       <div v-if="tampilDaftar" ref="panelDaftarEl" class="flex min-w-0 flex-col gap-4" data-testid="halo-panel-daftar">
         <UiCard v-if="memuatAntrean" title="Antrean">

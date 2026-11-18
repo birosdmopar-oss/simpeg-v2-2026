@@ -6,10 +6,12 @@
  * - Kode galat bisnis (`tiket_ditutup`, `throttle`, …) dibaca lewat `kodeGalat()`; teks galat dari amplop.
  */
 import { ambilBerkas, type BerkasUnduhan } from '@/features/kepegawaian/services/berkasUnduhan'
+import type { AxiosResponseTransformer } from 'axios'
+
 import { api } from '@/lib/axios'
 
 import { eksporKosongSchema, halaman, hapusSchema, hasilBalasSchema, KontrakHaloError, ringkasanSchema, tiketBarisSchema, tiketDetailSchema } from '../schemas'
-import type { BalasForm, FilterTiket, Halaman, HasilBalas, HasilEkspor, Ringkasan, TiketBaris, TiketBaruForm, TiketDetail } from '../types'
+import type { BalasForm, FilterTiket, Halaman, HasilBalas, HasilBuatTiket, HasilEkspor, Ringkasan, TiketBaris, TiketBaruForm, TiketDetail } from '../types'
 import { BASIS_HALO, parse, queryDaftar } from './master.service'
 
 const BASIS_TIKET = `${BASIS_HALO}/tiket`
@@ -56,10 +58,21 @@ export const tiketHaloService = {
     const { data } = await api.get<unknown>(`${BASIS_TIKET}/${id}`)
     return parse(tiketDetailSchema, data, `tiket/${id}`)
   },
-  /** E-03 (role 2/6/7): 201 `TiketDetail`. */
-  async buat(form: TiketBaruForm): Promise<TiketDetail> {
-    const { data } = await api.post<unknown>(BASIS_TIKET, formTiketBaru(form))
-    return parse(tiketDetailSchema, data, 'tiket')
+  /**
+   * E-03 (role 2/6/7): 201 `TiketDetail` + `message` amplop (CR-142 T-B1 / CR-143). Interceptor membuang amplop, jadi `message`
+   * ditangkap di `transformResponse` tambahan milik request ini saja (`@/lib/axios` tidak diubah); bukan string → `null`.
+   */
+  async buat(form: TiketBaruForm): Promise<HasilBuatTiket> {
+    let pesan: string | null = null
+    const tangkapPesan: AxiosResponseTransformer = (body: unknown) => {
+      const m = body !== null && typeof body === 'object' ? (body as { message?: unknown }).message : undefined
+      pesan = typeof m === 'string' && m.trim() !== '' ? m : null
+      return body
+    }
+    const bawaan = api.defaults.transformResponse
+    const transformResponse = [...(Array.isArray(bawaan) ? bawaan : bawaan ? [bawaan] : []), tangkapPesan]
+    const { data } = await api.post<unknown>(BASIS_TIKET, formTiketBaru(form), { transformResponse })
+    return { tiket: parse(tiketDetailSchema, data, 'tiket'), pesan }
   },
   /** E-04: 201 `{pesan, tiket}` (T9). */
   async balas(id: number, form: BalasForm): Promise<HasilBalas> {

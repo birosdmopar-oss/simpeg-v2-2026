@@ -18,7 +18,7 @@ import { isApiError } from '@/lib/axios'
 
 import { BACA_BAWAAN_ANTREAN, BACA_BAWAAN_SAYA, PER_PAGE_MASTER } from '../constants'
 import { tiketHaloService } from '../services/tiket.service'
-import type { BalasForm, FilterTiket, Halaman, PeranTiket, Pesan, TiketBaris, TiketBaruForm, TiketDetail } from '../types'
+import type { BalasForm, FilterTiket, Halaman, HasilBuatTiket, PeranTiket, Pesan, TiketBaris, TiketBaruForm, TiketDetail } from '../types'
 import { bacaTiket, daftarkanResetHalo, haloState, muatRingkasan, type StatusMuat } from './haloSimpeg'
 
 export interface GalatMuat {
@@ -231,16 +231,17 @@ export async function hapusTiket(id: number): Promise<void> {
 }
 
 /** E-03: tiket baru menjadi detail terbuka; daftar "Tiket saya" dimuat ulang (urutan pesan terakhir). */
-export async function buatTiket(form: TiketBaruForm): Promise<TiketDetail | null> {
+export async function buatTiket(form: TiketBaruForm): Promise<HasilBuatTiket | null> {
   const gen = generasiDetail
-  const detail = await tiketHaloService.buat(form)
+  const hasil = await tiketHaloService.buat(form)
+  const detail = hasil.tiket
   if (gen !== generasiDetail) return null
   urutanDetail += 1
   detailState.idDibuka = detail.id
   detailState.detail = detail
   detailState.statusDetail = 'siap'
   void daftarSaya.muat()
-  return detail
+  return hasil
 }
 
 /** E-04: pesan baru ditambahkan ke thread; baris tiket diperbarui (T9). Balasan petugas memuat ulang detail (pengingat). */

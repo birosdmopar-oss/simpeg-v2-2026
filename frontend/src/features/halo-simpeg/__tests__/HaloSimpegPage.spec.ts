@@ -470,7 +470,7 @@ describe('perilaku inti (review B2 P6)', () => {
     await flushPromises()
     expect(judul()?.textContent?.trim()).toBe('Tiket 2')
     expect(document.activeElement).toBe(judul())
-    svc.tiket.buat.mockResolvedValueOnce(detailId(9))
+    svc.tiket.buat.mockResolvedValueOnce({ tiket: detailId(9), pesan: null })
     await w.get('[data-testid="halo-tiket-baru"]').trigger('click')
     await flushPromises()
     await isiDanKirimTiketBaru()
@@ -559,7 +559,7 @@ describe('perilaku inti (review B2 P6)', () => {
   it('8. sukses Tambah Pertanyaan: rute ke tiket baru, dialog tertutup, daftar dimuat ulang', async () => {
     const { w, router } = await pasang({ role: Role.PEGAWAI })
     const muatSebelum = svc.tiket.list.mock.calls.length
-    svc.tiket.buat.mockResolvedValueOnce(detailId(42))
+    svc.tiket.buat.mockResolvedValueOnce({ tiket: detailId(42), pesan: null })
     await w.get('[data-testid="halo-tiket-baru"]').trigger('click')
     await flushPromises()
     await isiDanKirimTiketBaru()
@@ -713,7 +713,7 @@ describe('Q3: fokus sesudah tiket baru dibuat (alur nyata lewat router)', () => 
       ],
     })
     await router.push('/halo-simpeg')
-    svc.tiket.buat.mockResolvedValueOnce({ ...DETAIL, id: 9, subjek: 'Tiket 9', belum_dibaca: false })
+    svc.tiket.buat.mockResolvedValueOnce({ tiket: { ...DETAIL, id: 9, subjek: 'Tiket 9', belum_dibaca: false }, pesan: null })
     svc.tiket.detail.mockResolvedValue({ ...DETAIL, id: 9, subjek: 'Tiket 9', belum_dibaca: false })
     const w = mount({ render: () => h(RouterView) }, { global: { plugins: [router] }, attachTo: document.body })
     await flushPromises()
@@ -1226,5 +1226,44 @@ describe('CR-142 T-B4: ruang bawah untuk launcher Vanya (AC HP24)', () => {
     expect(halaman.classes()).toContain(RUANG_LAUNCHER_CLASS)
     // pb-24 = 6rem = 96 px > 64 px launcher + 24 px offset `sm:bottom-6` (VanyaWidget).
     expect(RUANG_LAUNCHER_CLASS).toBe('pb-24')
+  })
+})
+
+describe('CR-142 T-B1: notice sukses sesudah tiket baru', () => {
+  async function kirimTiketBaru(w: Awaited<ReturnType<typeof pasang>>['w']) {
+    await w.get('[data-testid="halo-tiket-baru"]').trigger('click')
+    await flushPromises()
+    const form = document.querySelector('[data-testid="halo-tiket-baru-form"]') as HTMLFormElement
+    const subjek = form.querySelector('input[name="subjek"]') as HTMLInputElement
+    subjek.value = 'Baru'
+    subjek.dispatchEvent(new Event('input'))
+    const pesan = form.querySelector('textarea') as HTMLTextAreaElement
+    pesan.value = 'Isi'
+    pesan.dispatchEvent(new Event('input'))
+    ;(form.querySelector('[role="combobox"]') as HTMLElement).click()
+    await flushPromises()
+    ;(document.querySelector('[role="option"]') as HTMLElement).click()
+    await flushPromises()
+    form.dispatchEvent(new Event('submit'))
+    await flushPromises()
+  }
+
+  it.each([
+    ['message BE (CR-143)', 'Berhasil menambahkan data halo simpeg.', 'Berhasil menambahkan data halo simpeg.'],
+    ['tanpa message → cadangan legacy', null, 'Berhasil menambahkan data halo simpeg.'],
+    ['message BE lain dipakai apa adanya', 'Tiket terkirim.', 'Tiket terkirim.'],
+  ])('%s → notice sukses; thread tiket baru dibuka; pindah tiket → notice hilang', async (_n, pesan, teks) => {
+    svc.tiket.buat.mockResolvedValueOnce({ tiket: { ...DETAIL, id: 42, belum_dibaca: false }, pesan })
+    svc.tiket.detail.mockResolvedValue({ ...DETAIL, id: 42, belum_dibaca: false })
+    const { w, router, props } = await pasang()
+    await kirimTiketBaru(w)
+    expect(svc.tiket.buat).toHaveBeenCalledTimes(1)
+    expect(router.currentRoute.value.fullPath).toBe('/halo-simpeg/tiket/42')
+    props.value = { idTiket: 42, idTidakSah: false }
+    await flushPromises()
+    expect(w.get('[data-testid="halo-tiket-baru-sukses"]').text()).toBe(teks)
+    props.value = { idTiket: 7, idTidakSah: false }
+    await flushPromises()
+    expect(w.find('[data-testid="halo-tiket-baru-sukses"]').exists()).toBe(false)
   })
 })

@@ -118,10 +118,22 @@ describe('detail & tulis (fixture kontrak MAKE-071)', () => {
     expect(server.panggilan[0]).toMatchObject({ method: 'get', url: '/halo-simpeg/tiket/1' })
   })
 
+  it('CR-142 T-B1: 201 dengan message amplop (CR-143) → pesan ikut; message kosong/bukan string → null', async () => {
+    jawab({ ...tiketBuat, message: 'Berhasil menambahkan data halo simpeg.' }, 201)
+    await expect(tiketHaloService.buat({ id_kategori: 1, subjek: 'a', pesan: 'b', arsip: null })).resolves.toEqual({
+      tiket: tiketBuat.data,
+      pesan: 'Berhasil menambahkan data halo simpeg.',
+    })
+    jawab({ ...tiketBuat, message: '  ' }, 201)
+    await expect(tiketHaloService.buat({ id_kategori: 1, subjek: 'a', pesan: 'b', arsip: null })).resolves.toMatchObject({ pesan: null })
+    jawab({ ...tiketBuat, message: 5 }, 201)
+    await expect(tiketHaloService.buat({ id_kategori: 1, subjek: 'a', pesan: 'b', arsip: null })).resolves.toMatchObject({ pesan: null })
+  })
+
   it('POST tiket multipart nama legacy {id_question_category, subject, msg, arsip}', async () => {
     jawab(tiketBuat, 201)
     const arsip = new File(['%PDF'], 'surat.pdf', { type: 'application/pdf' })
-    await expect(tiketHaloService.buat({ id_kategori: 1, subjek: ' Sisa cuti ', pesan: ' Berapa? ', arsip })).resolves.toEqual(tiketBuat.data)
+    await expect(tiketHaloService.buat({ id_kategori: 1, subjek: ' Sisa cuti ', pesan: ' Berapa? ', arsip })).resolves.toEqual({ tiket: tiketBuat.data, pesan: null })
     expect(server.panggilan[0]?.body).toEqual([
       ['id_question_category', '1'],
       ['subject', 'Sisa cuti'],
