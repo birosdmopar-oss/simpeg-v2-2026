@@ -48,6 +48,8 @@ README sendiri: `chatbot/README.md` (MAKE-095).
   notifikasi (`total`).
 - Menu (CR-135, `ACTIVE_PHASE` 8): Pusat Bantuan → "Halo Simpeg" (`to: { name: 'halo-simpeg' }`, `roles: HALO_ROLES` 1–7; role 8
   tanpa menu) dan Pengaturan → "Halo Simpeg" (`halo-admin`, role 1). Badge pada NAV asli diuji `HaloShellNavAsli.spec.ts` (HL2).
+  **[V2] deviasi kecil CR-135:** menu E-Kinerja/E-Talenta (grup Karier, Fase 6, perkiraan) belum punya halaman → disembunyikan
+  lewat aturan umum `buildNav` (item tanpa `to` dan tanpa anak tidak ditampilkan; grup kosong ikut hilang).
 - Notifikasi (H8-15 (b)): entri "Tiket Halo Simpeg (n)" menuju Halo Simpeg, tab Antrean bila sisi petugas > 0.
 
 ### Layar pemilik (B2)

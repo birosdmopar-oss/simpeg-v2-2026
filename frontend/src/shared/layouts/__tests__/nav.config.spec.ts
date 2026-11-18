@@ -4,7 +4,7 @@
  * tampil sejak B-20 penutup (WS-2 MAKE-014), menu Layanan Fase 4 sejak penutup M7 (MAKE-026, PRD Fase 4 §6.11.2), dan
  * menu Presensi Fase 5 sejak penutup 5C (MAKE-053, tanpa `rilis`; anak per role `NavChild.roles`), dan menu Fase 6–8
  * (Integrasi, Pusat Notifikasi, Arsip, Laporan, Dokumen, konten admin, Halo Simpeg, Chatbot Manager) sejak rilis menu Fase 8
- * (ACTIVE_PHASE = 8, CR-135). Placeholder tanpa halaman (`belumAda`: E-Kinerja/E-Talenta) tidak pernah tampil.
+ * (ACTIVE_PHASE = 8, CR-135). Item tanpa `to` dan tanpa anak (E-Kinerja/E-Talenta, belum ada halaman) tidak pernah tampil [V2].
  */
 import { describe, expect, it } from 'vitest'
 
@@ -94,7 +94,7 @@ describe('buildNav — fase aktif 8 (rilis menu Fase 8, CR-135)', () => {
     expect(rolesWith('Usulan Karpeg/Karis')).toEqual([1, 2, 4, 5, 7])
   })
 
-  it('placeholder `belumAda` (E-Kinerja, E-Talenta, grup Karier) tidak tampil untuk siapa pun pada fase berapa pun', () => {
+  it('item tanpa `to` dan tanpa anak (E-Kinerja, E-Talenta) tidak tampil; grup Karier ikut hilang, pada fase berapa pun', () => {
     for (const fase of [ACTIVE_PHASE, Number.MAX_SAFE_INTEGER]) {
       const all = Object.values(Role).flatMap((r) => labels(r, fase))
       expect(all).not.toContain('E-Kinerja')
@@ -107,7 +107,7 @@ describe('buildNav — fase aktif 8 (rilis menu Fase 8, CR-135)', () => {
     expect(labels(role)).not.toContain('Web Config')
   })
 
-  it('grup tanpa item dibuang (Pegawai tidak punya grup Pengaturan; Karier kosong karena `belumAda`)', () => {
+  it('grup tanpa item dibuang (Pegawai tidak punya grup Pengaturan; Karier kosong karena itemnya tanpa tujuan)', () => {
     expect(buildNav(Role.PEGAWAI).map((g) => g.key)).toEqual(['main', 'kepegawaian', 'berita', 'bantuan'])
   })
 
@@ -287,7 +287,7 @@ describe('buildNav — `rilis` & `NavChild.roles` (F5-18, PRD Fase 5A §7.8.2)',
     expect(presensi(Role.PEGAWAI, 5)?.children?.map((c) => c.key)).toEqual(['presensi-saya', 'presensi-slip-gaji', 'presensi-tukin-saya'])
   })
 
-  it('item `belumAda` dengan children kosong tidak tampil walau fasenya lewat (E-Kinerja fase 6, CR-135)', () => {
+  it('item tanpa `to` dengan children kosong tidak tampil walau fasenya lewat (E-Kinerja fase 6, CR-135)', () => {
     expect(labels(Role.SUPER_ADMIN, 5)).not.toContain('E-Kinerja')
     expect(labels(Role.SUPER_ADMIN, 6)).not.toContain('E-Kinerja')
     expect(labels(Role.SUPER_ADMIN)).not.toContain('E-Kinerja')

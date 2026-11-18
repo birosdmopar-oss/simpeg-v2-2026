@@ -126,11 +126,6 @@ export interface NavItem {
    * penutup fase menaikkan `ACTIVE_PHASE` melewati `phase` item itu. Tanpa `rilis` = perilaku lama.
    */
   rilis?: true
-  /**
-   * Placeholder mockup tanpa halaman/route (tanpa `to` dan tanpa anak): tidak pernah tampil, berapa pun `ACTIVE_PHASE`
-   * (CR-135: grup Karier E-Kinerja/E-Talenta). Hapus flag ini saat halamannya dibuat dan item diberi `to`/`children`.
-   */
-  belumAda?: true
   /** Tujuan = Detail Pegawai NIP akun; item disembunyikan bila akun tanpa NIP (CR-049). */
   nipAkun?: true
 }
@@ -253,11 +248,11 @@ const NAV: NavGroup[] = [
   {
     key: 'karier',
     title: 'Karier',
-    // Fase 6 (Integrasi) — perkiraan; belum dikonfirmasi di dokumen. Belum ada halaman/route → `belumAda` (CR-135), grup Karier
-    // tidak tampil sampai halamannya dibuat.
+    // Fase 6 (Integrasi) — perkiraan; belum dikonfirmasi di dokumen. Belum ada halaman/route: tersembunyi otomatis (item tanpa
+    // `to` dan tanpa anak tidak ditampilkan `buildNav`, CR-135 [V2]); grup Karier ikut hilang. Tampil begitu `to`/anak diisi.
     items: [
-      { key: 'ekinerja', label: 'E-Kinerja', icon: FileText, phase: 6, children: [], belumAda: true },
-      { key: 'etalenta', label: 'E-Talenta', icon: TrendingUp, phase: 6, children: [], belumAda: true },
+      { key: 'ekinerja', label: 'E-Kinerja', icon: FileText, phase: 6, children: [] },
+      { key: 'etalenta', label: 'E-Talenta', icon: TrendingUp, phase: 6, children: [] },
     ],
   },
   {
@@ -348,9 +343,12 @@ const NAV: NavGroup[] = [
 const bolehRole = (roles: readonly RoleCode[] | undefined, role: RoleCode | null): boolean =>
   !roles || (role !== null && roles.includes(role))
 
-/** Submenu yang boleh dilihat `role`; item ber-anak yang semua anaknya tersaring → null (dibuang). */
+/**
+ * Submenu yang boleh dilihat `role`; item ber-anak yang semua anaknya tersaring → null (dibuang). CR-135: item tanpa `to`
+ * dan tanpa anak yang lolos (placeholder tanpa halaman, mis. E-Kinerja/E-Talenta) juga dibuang — tidak ada menu mati.
+ */
 function saringAnak(item: NavItem, role: RoleCode | null): NavItem | null {
-  if (!item.children || item.children.length === 0) return item
+  if (!item.children || item.children.length === 0) return item.to !== undefined ? item : null
   const children = item.children.filter((c) => bolehRole(c.roles, role))
   return children.length > 0 ? { ...item, children } : null
 }
@@ -363,10 +361,11 @@ export function buildNav(role: RoleCode | null, activePhase: number = ACTIVE_PHA
   return NAV.map((group) => ({
     ...group,
     items: group.items
-      .filter((item) => !item.belumAda && (item.phase <= activePhase || item.rilis === true) && bolehRole(item.roles, role))
+      .filter((item) => (item.phase <= activePhase || item.rilis === true) && bolehRole(item.roles, role))
       .filter((item) => !item.nipAkun || Boolean(nip))
+      // `nipAkun` diberi tujuan sebelum `saringAnak`, karena item tanpa `to` dan tanpa anak dibuang di sana.
+      .map((item) => (item.nipAkun && nip ? { ...item, to: { name: 'pegawai-detail', params: { nip } } } : item))
       .map((item) => saringAnak(item, role))
-      .filter((item): item is NavItem => item !== null)
-      .map((item) => (item.nipAkun && nip ? { ...item, to: { name: 'pegawai-detail', params: { nip } } } : item)),
+      .filter((item): item is NavItem => item !== null),
   })).filter((group) => group.items.length > 0)
 }
