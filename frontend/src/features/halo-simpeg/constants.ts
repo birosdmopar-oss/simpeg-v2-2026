@@ -133,3 +133,13 @@ export const TEKS_EKSPOR = {
 export function hariIniWib(sekarang: Date = new Date()): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit' }).format(sekarang)
 }
+
+/**
+ * CR-142 T-B4 (AC HP24): ruang bawah halaman Halo Simpeg setinggi launcher Vanya (64 px, `fixed` `bottom-4`/`sm:bottom-6`, jadi
+ * menempati ≤ 88 px dari bawah) + jarak, supaya tombol "Kirim" dan field lampiran form balas tidak pernah tertutup launcher saat
+ * halaman digulir ke ujung. Dipasang untuk semua role (rapi juga tanpa widget); posisi launcher global tidak diubah.
+ */
+export const RUANG_LAUNCHER_CLASS = 'pb-24'
+
+/** CR-142 T-B1: cadangan notice sukses tiket baru bila 201 tanpa `message` (teks legacy, PRD §7.3; BE mengirimnya lewat CR-143). */
+export const TEKS_SUKSES_TIKET_BARU = 'Berhasil menambahkan data halo simpeg.'

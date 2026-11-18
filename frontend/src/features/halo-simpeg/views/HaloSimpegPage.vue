@@ -10,7 +10,7 @@
  * - `idTidakSah` (id 0 / di luar batas) → "Data percakapan tidak ditemukan." (review B1 V3).
  */
 import { ArrowLeft } from 'lucide-vue-next'
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/features/auth/stores/auth.store'
@@ -24,7 +24,7 @@ import KontakHelpdeskCard from '../components/KontakHelpdeskCard.vue'
 import PanelPerluTindak from '../components/PanelPerluTindak.vue'
 import ThreadTiket from '../components/ThreadTiket.vue'
 import TiketBaruDialog from '../components/TiketBaruDialog.vue'
-import { BACA_BAWAAN_ANTREAN, HALO_PEMBUAT_TIKET_ROLES, TAB_ANTREAN, TEKS_GALAT_TIKET } from '../constants'
+import { BACA_BAWAAN_ANTREAN, HALO_PEMBUAT_TIKET_ROLES, RUANG_LAUNCHER_CLASS, TAB_ANTREAN, TEKS_GALAT_TIKET } from '../constants'
 import { bisaEkspor, haloState, muatPetugasSaya, petugasAktif } from '../stores/haloSimpeg'
 import { bukaTiket, daftarAntrean, daftarSaya, tutupPanel, type DaftarTiket as Daftar } from '../stores/tiket'
 import type { TiketDetail } from '../types'
@@ -44,6 +44,21 @@ const dialogEkspor = ref(false)
 // Review B3 R4: dimuat paksa sekali per kunjungan (admin bisa baru menambah/menonaktifkan dirinya sebagai petugas).
 onMounted(() => {
   void muatPetugasSaya(true)
+})
+
+/**
+ * CR-142 V1 (WCAG 2.4.11): `pb-24` hanya menolong saat halaman digulir ke ujung. Selama halaman ini terpasang, dokumen (penggulir
+ * halaman, `<main>` tanpa overflow) diberi `scroll-padding-bottom` 6rem, sehingga fokus Tab ke lampiran/checkbox/Kirim digulir
+ * di atas launcher Vanya. Nilai sebelumnya dipulihkan saat halaman dilepas.
+ */
+const RUANG_GULIR_BAWAH = '6rem'
+let scrollPaddingLama = ''
+onMounted(() => {
+  scrollPaddingLama = document.documentElement.style.scrollPaddingBottom
+  document.documentElement.style.scrollPaddingBottom = RUANG_GULIR_BAWAH
+})
+onBeforeUnmount(() => {
+  document.documentElement.style.scrollPaddingBottom = scrollPaddingLama
 })
 
 const TAB_SAYA = 'saya'
@@ -141,9 +156,25 @@ function kembali(): void {
   void router.push({ name: 'halo-simpeg', query: queryTab.value })
 }
 
-function onDibuat(t: TiketDetail): void {
+/**
+ * CR-142 T-B1: sesudah tiket baru → notice sukses (pesan BE / cadangan legacy) lalu thread dibuka seperti biasa (fokus judul, Q3).
+ * Notice hilang saat ditutup (×), pindah ke tiket lain, membuka form tiket baru lagi, atau aksi pengguna berikutnya (kirim balasan,
+ * aksi ⋮ daftar; CR-142 V2).
+ */
+const suksesBaru = ref<{ id: number; pesan: string } | null>(null)
+function onDibuat(t: TiketDetail, pesan: string): void {
+  suksesBaru.value = { id: t.id, pesan }
   void router.push({ name: 'halo-tiket', params: { id: t.id } })
 }
+watch(
+  () => props.idTiket,
+  (id) => {
+    if (suksesBaru.value && id !== suksesBaru.value.id) suksesBaru.value = null
+  },
+)
+watch(dialogBaru, (buka) => {
+  if (buka) suksesBaru.value = null
+})
 
 /**
  * Review B3 R1: "Lihat semua" menampilkan SEMUA tiket perlu ditindak — `baca` = semua dan filter lain dikosongkan, agar tiket
@@ -161,7 +192,10 @@ function hapusFilterPerluTindak(): void {
 
 <template>
   <RedesignShell :breadcrumbs="crumbs">
-    <div class="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]" data-testid="halo-halaman">
+    <UiNotice v-if="suksesBaru" tone="success" dismissible class="mb-4" data-testid="halo-tiket-baru-sukses" @dismiss="suksesBaru = null">
+      {{ suksesBaru.pesan }}
+    </UiNotice>
+    <div class="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]" :class="RUANG_LAUNCHER_CLASS" data-testid="halo-halaman">
       <div v-if="tampilDaftar" ref="panelDaftarEl" class="flex min-w-0 flex-col gap-4" data-testid="halo-panel-daftar">
         <UiCard v-if="memuatAntrean" title="Antrean">
           <p class="py-6 text-center text-sm text-slate-500" data-testid="halo-antrean-memuat">Memuat...</p>
@@ -185,9 +219,9 @@ function hapusFilterPerluTindak(): void {
               <span class="rounded-full bg-warning-soft px-2 py-0.5 text-[#8a4f0f]">Hanya perlu ditindak</span>
               <UiButton size="sm" variant="secondary" appearance="ghost" data-testid="halo-hapus-filter-perlu-tindak" @click="hapusFilterPerluTindak">Hapus filter</UiButton>
             </div>
-            <DaftarTiket :key="TAB_ANTREAN" :daftar="daftarAntrean" :id-aktif="idTiket" :kategori-petugas="kategoriPetugas" />
+            <DaftarTiket :key="TAB_ANTREAN" :daftar="daftarAntrean" @aksi="suksesBaru = null" :id-aktif="idTiket" :kategori-petugas="kategoriPetugas" />
           </template>
-          <DaftarTiket v-else :key="TAB_SAYA" :daftar="daftarSaya" :boleh-buat="bolehBuat" :id-aktif="idTiket" @tiket-baru="dialogBaru = true" />
+          <DaftarTiket v-else :key="TAB_SAYA" :daftar="daftarSaya" @aksi="suksesBaru = null" :boleh-buat="bolehBuat" :id-aktif="idTiket" @tiket-baru="dialogBaru = true" />
         </UiCard>
         <!-- S2 (a): non-petugas dengan ?tab=antrean melihat tab Saya → kartu Kontak tetap tampil (kecuali saat memuat/galat). -->
         <KontakHelpdeskCard v-if="!diAntrean && !memuatAntrean && !galatAntrean" />
@@ -198,7 +232,7 @@ function hapusFilterPerluTindak(): void {
           {{ TEKS_GALAT_TIKET.tidakDitemukan }}
         </p>
         <!-- :key per tiket (review B2 P2): respons balas/unduh tiket A yang terlambat tidak menyentuh form/galat tiket B. -->
-        <ThreadTiket v-else-if="idTiket !== null" :key="idTiket" :id-tiket="idTiket" :tampil-kembali="!isDesktop" @kembali="kembali" />
+        <ThreadTiket v-else-if="idTiket !== null" :key="idTiket" :id-tiket="idTiket" :tampil-kembali="!isDesktop" @kembali="kembali" @aksi="suksesBaru = null" />
         <p v-else class="py-10 text-center text-sm text-slate-500" data-testid="halo-thread-kosong">
           Pilih "Lihat detail" pada daftar untuk membuka percakapan.
         </p>

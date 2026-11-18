@@ -20,9 +20,10 @@ import { tiketBaruFormSchema } from '../schemas'
 import { kategoriHaloService } from '../services/master.service'
 import { buatTiket } from '../stores/tiket'
 import type { KategoriOpsi, TiketDetail } from '../types'
+import { TEKS_SUKSES_TIKET_BARU } from '../constants'
 
 const props = defineProps<{ open: boolean }>()
-const emit = defineEmits<{ 'update:open': [value: boolean]; dibuat: [tiket: TiketDetail] }>()
+const emit = defineEmits<{ 'update:open': [value: boolean]; dibuat: [tiket: TiketDetail, pesan: string] }>()
 
 const form = reactive({ id_kategori: '', subjek: '', pesan: '' })
 const arsip = ref<File | null>(null)
@@ -107,9 +108,10 @@ async function onSubmit(): Promise<void> {
   if (Object.keys(galatKlien.value).length > 0 || submitting.value) return
   submitting.value = true
   try {
-    const tiket = await buatTiket(tiketBaruFormSchema.parse(isian.value))
-    berhasil.value = tiket !== null
-    if (tiket) emit('dibuat', tiket)
+    const hasil = await buatTiket(tiketBaruFormSchema.parse(isian.value))
+    berhasil.value = hasil !== null
+    // CR-142 T-B1: notice sukses = `message` BE (CR-143), cadangan teks legacy bila kosong.
+    if (hasil) emit('dibuat', hasil.tiket, hasil.pesan ?? TEKS_SUKSES_TIKET_BARU)
     emit('update:open', false)
   } catch (e) {
     serverErrors.value = galatPerKolom(e, (k) => PETA[k] ?? k)

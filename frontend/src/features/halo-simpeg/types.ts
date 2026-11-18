@@ -186,6 +186,12 @@ export interface Ringkasan {
   total: number
 }
 
+/** E-03 POST tiket: detail tiket baru + `message` amplop (CR-142 T-B1 / CR-143; `null` bila BE tidak mengirim). */
+export interface HasilBuatTiket {
+  tiket: TiketDetail
+  pesan: string | null
+}
+
 /** T9: POST pesan 201. */
 export interface HasilBalas {
   pesan: Pesan

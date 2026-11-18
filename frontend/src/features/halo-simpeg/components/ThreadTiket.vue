@@ -31,7 +31,8 @@ import { balasTiket, bukaTiket, detailTiket } from '../stores/tiket'
 import type { Lampiran, LampiranRingkas, Pesan } from '../types'
 
 const props = withDefaults(defineProps<{ idTiket: number; tampilKembali?: boolean }>(), { tampilKembali: false })
-const emit = defineEmits<{ kembali: [] }>()
+/** `aksi`: pengguna memulai aksi di thread (kirim balasan), dipakai halaman untuk menutup notice sukses (CR-142 V2). */
+const emit = defineEmits<{ kembali: []; aksi: [] }>()
 
 const detail = computed(() => (detailTiket.detail?.id === props.idTiket ? detailTiket.detail : null))
 const judulEl = ref<HTMLElement | null>(null)
@@ -156,6 +157,7 @@ async function kirim(): Promise<void> {
   galatBalas.value = ''
   galatKolom.value = {}
   if (Object.keys(galatKlien.value).length > 0 || mengirim.value) return
+  emit('aksi')
   mengirim.value = true
   try {
     // Centang hanya dikirim bila tiket punya pengingat (petugas tiket bukan pemilik); selain itu selalu 0 (F8-11).

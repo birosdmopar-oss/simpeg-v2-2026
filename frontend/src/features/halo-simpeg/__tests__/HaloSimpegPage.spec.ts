@@ -42,6 +42,7 @@ import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { Role, type RoleCode, type User } from '@/features/auth/types'
 import { rowMenuActions, selectRowAction } from '@/shared/components/__tests__/rowActionsMenu.helpers'
 
+import { RUANG_LAUNCHER_CLASS } from '../constants'
 import { muatRingkasan, resetHaloSimpeg, setRingkasanHalo } from '../stores/haloSimpeg'
 import { bukaTiket, daftarAntrean, detailTiket } from '../stores/tiket'
 import type { Halaman, TiketBaris, TiketDetail } from '../types'
@@ -58,6 +59,7 @@ import detailPemilik from './fixtures/tiket-detail-pemilik.json'
 import detailPetugas from './fixtures/tiket-detail-petugas.json'
 import detailTanpaJabatan from './fixtures/tiket-detail-tanpa-jabatan.json'
 import detailTanpaKategori from './fixtures/tiket-detail-tanpa-kategori.json'
+import tiketBuat from './fixtures/tiket-buat.json'
 
 const DAFTAR = daftarPemilik.data as Halaman<TiketBaris>
 const DETAIL = detailPemilik.data as TiketDetail
@@ -469,7 +471,7 @@ describe('perilaku inti (review B2 P6)', () => {
     await flushPromises()
     expect(judul()?.textContent?.trim()).toBe('Tiket 2')
     expect(document.activeElement).toBe(judul())
-    svc.tiket.buat.mockResolvedValueOnce(detailId(9))
+    svc.tiket.buat.mockResolvedValueOnce({ tiket: detailId(9), pesan: null })
     await w.get('[data-testid="halo-tiket-baru"]').trigger('click')
     await flushPromises()
     await isiDanKirimTiketBaru()
@@ -558,7 +560,7 @@ describe('perilaku inti (review B2 P6)', () => {
   it('8. sukses Tambah Pertanyaan: rute ke tiket baru, dialog tertutup, daftar dimuat ulang', async () => {
     const { w, router } = await pasang({ role: Role.PEGAWAI })
     const muatSebelum = svc.tiket.list.mock.calls.length
-    svc.tiket.buat.mockResolvedValueOnce(detailId(42))
+    svc.tiket.buat.mockResolvedValueOnce({ tiket: detailId(42), pesan: null })
     await w.get('[data-testid="halo-tiket-baru"]').trigger('click')
     await flushPromises()
     await isiDanKirimTiketBaru()
@@ -712,7 +714,7 @@ describe('Q3: fokus sesudah tiket baru dibuat (alur nyata lewat router)', () => 
       ],
     })
     await router.push('/halo-simpeg')
-    svc.tiket.buat.mockResolvedValueOnce({ ...DETAIL, id: 9, subjek: 'Tiket 9', belum_dibaca: false })
+    svc.tiket.buat.mockResolvedValueOnce({ tiket: { ...DETAIL, id: 9, subjek: 'Tiket 9', belum_dibaca: false }, pesan: null })
     svc.tiket.detail.mockResolvedValue({ ...DETAIL, id: 9, subjek: 'Tiket 9', belum_dibaca: false })
     const w = mount({ render: () => h(RouterView) }, { global: { plugins: [router] }, attachTo: document.body })
     await flushPromises()
@@ -738,6 +740,14 @@ describe('Q3: fokus sesudah tiket baru dibuat (alur nyata lewat router)', () => 
     expect(router.currentRoute.value.fullPath).toBe('/halo-simpeg/tiket/9')
     expect(document.querySelector('[data-testid="halo-thread-judul"]')?.textContent?.trim()).toBe('Tiket 9')
     expect(document.activeElement).toBe(document.querySelector('[data-testid="halo-thread-judul"]'))
+    // CR-142 V3: notice sukses (cadangan legacy, role="status") tampil bersama fokus judul; buka dialog Tambah lagi → notice hilang.
+    const sukses = document.querySelector('[data-testid="halo-tiket-baru-sukses"]')
+    expect(sukses?.textContent?.trim()).toBe('Berhasil menambahkan data halo simpeg.')
+    expect(sukses?.getAttribute('role')).toBe('status')
+    await w.get('[data-testid="halo-tiket-baru"]').trigger('click')
+    await flushPromises()
+    expect(document.querySelector('[data-testid="halo-tiket-baru-dialog"]')).not.toBeNull()
+    expect(document.querySelector('[data-testid="halo-tiket-baru-sukses"]')).toBeNull()
   })
 })
 
@@ -1172,5 +1182,162 @@ describe('B4 K1: "Data pelapor" lewat keyboard', () => {
     await vi.waitFor(() => expect(document.querySelector('[role="tooltip"]')).toBeNull())
     await enter()
     await vi.waitFor(() => expect(document.querySelector('[role="tooltip"]')?.textContent).toContain('NIP:'))
+  })
+})
+
+describe('CR-142 T-B3: kolom Aksi selalu terlihat (sticky kanan)', () => {
+  const ukur = (el: HTMLElement, u: { scrollWidth: number; clientWidth: number; scrollLeft: number }) => {
+    Object.defineProperty(el, 'scrollWidth', { configurable: true, value: u.scrollWidth })
+    Object.defineProperty(el, 'clientWidth', { configurable: true, value: u.clientWidth })
+    Object.defineProperty(el, 'scrollLeft', { configurable: true, writable: true, value: u.scrollLeft })
+  }
+
+  it.each([
+    ['pemilik', ''],
+    ['antrean', '?tab=antrean'],
+  ])('tabel %s: header & sel Aksi sticky right-0 berlatar; bayangan selama tabel tergulir (1536 px + sidebar: 694 > 652)', async (_n, query) => {
+    svc.petugas.saya.mockResolvedValue({ petugas: true, aktif: true, kategori: [{ id: 1, nama: 'Cuti', status: 1 }], bisa_ekspor: false })
+    const id = DAFTAR.items[0]!.id
+    const { w } = await pasang({ query })
+    const daftar = w.get(query ? '[data-testid="halo-daftar-antrean"]' : '[data-testid="halo-daftar-saya"]')
+    const th = () => daftar.get('th[data-kolom="aksi"]')
+    const td = () => daftar.get(`[data-testid="halo-tiket-row-${id}"] td[data-kolom="aksi"]`)
+    expect(th().classes()).toEqual(expect.arrayContaining(['sticky', 'right-0', 'z-10', 'bg-slate-50']))
+    expect(td().classes()).toEqual(expect.arrayContaining(['sticky', 'right-0', 'z-10', 'bg-white']))
+    expect(td().find(`[data-testid="halo-tiket-actions-${id}"]`).exists()).toBe(true)
+    const scroller = daftar.get('[data-testid="halo-daftar-scroll"]')
+    ukur(scroller.element as HTMLElement, { scrollWidth: 694, clientWidth: 652, scrollLeft: 0 })
+    await scroller.trigger('scroll')
+    expect(th().classes()).toContain('shadow-sticky-end')
+    expect(td().classes()).toContain('shadow-sticky-end')
+    ukur(scroller.element as HTMLElement, { scrollWidth: 694, clientWidth: 652, scrollLeft: 42 })
+    await scroller.trigger('scroll')
+    expect(td().classes()).not.toContain('shadow-sticky-end')
+  })
+
+  it('baris aktif: sel Aksi sticky ikut warna baris aktif (tidak menutupi dengan putih)', async () => {
+    const id = DAFTAR.items[0]!.id
+    svc.tiket.detail.mockResolvedValue({ ...DETAIL, id, belum_dibaca: false })
+    const { w } = await pasang({ idTiket: id })
+    const td = w.get(`[data-testid="halo-tiket-row-${id}"] td[data-kolom="aksi"]`)
+    expect(td.classes()).toContain('bg-[#E8F1FF]')
+    expect(td.classes()).not.toContain('bg-white')
+  })
+})
+
+describe('CR-142 T-B4: ruang bawah untuk launcher Vanya (AC HP24)', () => {
+  it.each([
+    ['role 2 (widget Vanya tampil)', Role.PEGAWAI],
+    ['role 1 (tanpa widget)', Role.SUPER_ADMIN],
+  ])('%s: halaman memberi ruang bawah ≥ tinggi launcher 64 px + offset 24 px', async (_n, role) => {
+    const { w } = await pasang({ role })
+    const halaman = w.get('[data-testid="halo-halaman"]')
+    expect(halaman.classes()).toContain(RUANG_LAUNCHER_CLASS)
+    // pb-24 = 6rem = 96 px > 64 px launcher + 24 px offset `sm:bottom-6` (VanyaWidget).
+    expect(RUANG_LAUNCHER_CLASS).toBe('pb-24')
+  })
+})
+
+describe('CR-142 T-B1: notice sukses sesudah tiket baru', () => {
+  async function kirimTiketBaru(w: Awaited<ReturnType<typeof pasang>>['w']) {
+    await w.get('[data-testid="halo-tiket-baru"]').trigger('click')
+    await flushPromises()
+    const form = document.querySelector('[data-testid="halo-tiket-baru-form"]') as HTMLFormElement
+    const subjek = form.querySelector('input[name="subjek"]') as HTMLInputElement
+    subjek.value = 'Baru'
+    subjek.dispatchEvent(new Event('input'))
+    const pesan = form.querySelector('textarea') as HTMLTextAreaElement
+    pesan.value = 'Isi'
+    pesan.dispatchEvent(new Event('input'))
+    ;(form.querySelector('[role="combobox"]') as HTMLElement).click()
+    await flushPromises()
+    ;(document.querySelector('[role="option"]') as HTMLElement).click()
+    await flushPromises()
+    form.dispatchEvent(new Event('submit'))
+    await flushPromises()
+  }
+
+  it.each([
+    ['message BE (fixture tiket-buat CR-143)', tiketBuat.message, tiketBuat.message],
+    ['tanpa message → cadangan legacy', null, 'Berhasil menambahkan data halo simpeg.'],
+    ['message BE lain dipakai apa adanya', 'Tiket terkirim.', 'Tiket terkirim.'],
+  ])('%s → notice sukses; thread tiket baru dibuka; pindah tiket → notice hilang', async (_n, pesan, teks) => {
+    svc.tiket.buat.mockResolvedValueOnce({ tiket: { ...DETAIL, id: 42, belum_dibaca: false }, pesan })
+    svc.tiket.detail.mockResolvedValue({ ...DETAIL, id: 42, belum_dibaca: false })
+    const { w, router, props } = await pasang()
+    await kirimTiketBaru(w)
+    expect(svc.tiket.buat).toHaveBeenCalledTimes(1)
+    expect(router.currentRoute.value.fullPath).toBe('/halo-simpeg/tiket/42')
+    props.value = { idTiket: 42, idTidakSah: false }
+    await flushPromises()
+    expect(w.get('[data-testid="halo-tiket-baru-sukses"]').text()).toBe(teks)
+    props.value = { idTiket: 7, idTidakSah: false }
+    await flushPromises()
+    expect(w.find('[data-testid="halo-tiket-baru-sukses"]').exists()).toBe(false)
+  })
+})
+
+describe('CR-142 V1: scroll-padding bawah dokumen selama halaman terpasang (WCAG 2.4.11)', () => {
+  it('dipasang 6rem saat mount; nilai lama dipulihkan saat unmount; pb-24 tetap', async () => {
+    document.documentElement.style.scrollPaddingBottom = '1rem'
+    const { w } = await pasang()
+    expect(document.documentElement.style.scrollPaddingBottom).toBe('6rem')
+    expect(w.get('[data-testid="halo-halaman"]').classes()).toContain('pb-24')
+    w.unmount()
+    expect(document.documentElement.style.scrollPaddingBottom).toBe('1rem')
+    document.documentElement.style.scrollPaddingBottom = ''
+  })
+})
+
+describe('CR-142 V2: notice sukses tiket baru tidak menumpuk dengan pesan aksi berikutnya', () => {
+  async function siapkan() {
+    svc.tiket.buat.mockResolvedValueOnce({ tiket: { ...DETAIL, id: 42, belum_dibaca: false, bisa_balas: true }, pesan: tiketBuat.message })
+    svc.tiket.detail.mockResolvedValue({ ...DETAIL, id: 42, belum_dibaca: false, bisa_balas: true })
+    const ctx = await pasang()
+    await ctx.w.get('[data-testid="halo-tiket-baru"]').trigger('click')
+    await flushPromises()
+    await isiKirimBaru()
+    ctx.props.value = { idTiket: 42, idTidakSah: false }
+    await flushPromises()
+    expect(ctx.w.find('[data-testid="halo-tiket-baru-sukses"]').exists()).toBe(true)
+    return ctx
+  }
+  async function isiKirimBaru() {
+    const form = document.querySelector('[data-testid="halo-tiket-baru-form"]') as HTMLFormElement
+    const subjek = form.querySelector('input[name="subjek"]') as HTMLInputElement
+    subjek.value = 'Baru'
+    subjek.dispatchEvent(new Event('input'))
+    const pesan = form.querySelector('textarea') as HTMLTextAreaElement
+    pesan.value = 'Isi'
+    pesan.dispatchEvent(new Event('input'))
+    ;(form.querySelector('[role="combobox"]') as HTMLElement).click()
+    await flushPromises()
+    ;(document.querySelector('[role="option"]') as HTMLElement).click()
+    await flushPromises()
+    form.dispatchEvent(new Event('submit'))
+    await flushPromises()
+  }
+
+  it('balas gagal 422 → galat balas tampil, notice sukses hilang', async () => {
+    svc.tiket.balas.mockRejectedValueOnce(apiError(422, galat422Ditutup))
+    const { w } = await siapkan()
+    const balas = w.get('[data-testid="halo-balas-form"]')
+    await balas.get('textarea').setValue('Terima kasih')
+    await balas.trigger('submit')
+    await flushPromises()
+    expect(document.body.textContent).toContain(galat422Ditutup.message)
+    expect(w.find('[data-testid="halo-tiket-baru-sukses"]').exists()).toBe(false)
+  })
+
+  it('tombol tutup (×) → notice hilang; aksi ⋮ daftar → notice hilang', async () => {
+    const a = await siapkan()
+    await a.w.get('[data-testid="halo-tiket-baru-sukses"] button').trigger('click')
+    expect(a.w.find('[data-testid="halo-tiket-baru-sukses"]').exists()).toBe(false)
+    a.w.unmount()
+    const b = await siapkan()
+    const id = DAFTAR.items[0]!.id
+    await selectRowAction(b.w, `halo-tiket-actions-${id}`, 'detail')
+    await flushPromises()
+    expect(b.w.find('[data-testid="halo-tiket-baru-sukses"]').exists()).toBe(false)
   })
 })
