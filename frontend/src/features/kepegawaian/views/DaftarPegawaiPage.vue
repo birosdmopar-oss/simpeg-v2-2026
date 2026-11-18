@@ -47,8 +47,8 @@ const kriteria = ref<KriteriaPencarian[] | null>(null)
 const galatKriteria = ref<Record<string, string>>({})
 const mengekspor = ref(false)
 const EXPORT_FORMATS = [
-  { key: 'xlsx' as const, label: 'Export Excel (.xlsx)' },
-  { key: 'csv' as const, label: 'Export CSV' },
+  { key: 'xlsx' as const, label: 'Ekspor Excel (.xlsx)' },
+  { key: 'csv' as const, label: 'Ekspor CSV' },
 ]
 const filter = ref<PegawaiFilter>({ status: '1', id_unit: '', id_satker: '', id_jenis_pegawai: '', sort: 'nama', order: 'asc' })
 

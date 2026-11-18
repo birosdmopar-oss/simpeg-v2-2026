@@ -77,7 +77,7 @@ describe('DaftarPegawaiPage — ekspor & pencarian lanjutan (MAKE-014)', () => {
     vi.mocked(pegawaiService.pencarian).mockResolvedValue({ items: ITEMS.slice(0, 2), total: 2, page: 1, per_page: 10 })
   })
 
-  it('Export Excel/CSV memakai filter aktif dan kolom tampil; nama berkas dari server', async () => {
+  it('Ekspor Excel/CSV memakai filter aktif dan kolom tampil; nama berkas dari server', async () => {
     const klik = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
     vi.mocked(pegawaiService.ekspor).mockResolvedValue({ blob: new Blob(['x']), nama: 'daftar_pegawai_1.xlsx' })
     await mountList()
