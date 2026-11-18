@@ -1,7 +1,7 @@
 /**
  * Tujuan entri "Tiket Halo Simpeg (n)" di Pusat Notifikasi (✔ H8-15 (b), 8_2 §1a): tab antrean bila sisi petugas punya
  * angka (`belum_dibaca_petugas` atau `perlu_tindak` dari ringkasan helpdesk yang sudah dimuat), selain itu `/halo-simpeg`.
- * Ringkasan helpdesk SEMENTARA kosong sampai README MAKE-071 beku, sehingga tujuan bawaan = `/halo-simpeg`.
+ * Ringkasan helpdesk (README MAKE-071) belum dimuat (mis. gerbang polling tertutup) → tujuan bawaan `/halo-simpeg`.
  */
 import type { RouteLocationRaw } from 'vue-router'
 

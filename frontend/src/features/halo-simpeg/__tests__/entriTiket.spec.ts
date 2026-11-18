@@ -1,4 +1,4 @@
-/** Tujuan entri lonceng H8-15 (b). SEMENTARA: ringkasan sintetis bentuk PRD §6.1b sampai README MAKE-071 beku. */
+/** Tujuan entri lonceng H8-15 (b) dengan bentuk `Ringkasan` final (README MAKE-071). */
 import { describe, expect, it } from 'vitest'
 
 import { tujuanEntriTiket } from '../entriTiket'

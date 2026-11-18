@@ -1,6 +1,5 @@
 /**
- * `sisipBadgeHalo` (AC-E08.12). SEMENTARA: ringkasan sintetis berbentuk `Ringkasan` PRD v1.3 §6.1b; dicocokkan ulang dengan
- * fixture `tiket-ringkasan` saat README MAKE-071 beku.
+ * `sisipBadgeHalo` (AC-E08.12) dengan fixture kontrak `tiket-ringkasan` (README MAKE-071): badge > total.
  */
 import { MessageCircle } from 'lucide-vue-next'
 import { describe, expect, it } from 'vitest'
@@ -9,6 +8,7 @@ import type { NavGroup } from '@/shared/layouts/nav.config'
 
 import { sisipBadgeHalo } from '../navBadge'
 import type { Ringkasan } from '../types'
+import tiketRingkasan from './fixtures/tiket-ringkasan.json'
 
 const groups = (): NavGroup[] => [
   { key: 'utama', items: [{ key: 'home', label: 'Beranda', icon: MessageCircle, to: '/', phase: 1 }] },
@@ -22,8 +22,8 @@ const groups = (): NavGroup[] => [
   },
 ]
 
-/** Tiket sudah dibaca tetapi pengingat 24 jam lewat: badge > total (R5). */
-const RINGKASAN: Ringkasan = { belum_dibaca_saya: 1, belum_dibaca_petugas: 2, perlu_tindak: 2, badge: 4, total: 3 }
+/** Fixture kontrak: tiket sudah dibaca petugas tetapi pengingat 24 jam lewat → badge > total (R5). */
+const RINGKASAN = tiketRingkasan.data as Ringkasan
 
 const halo = (g: NavGroup[]) => g.flatMap((x) => x.items).find((i) => i.key === 'halo')
 
@@ -31,7 +31,8 @@ describe('sisipBadgeHalo', () => {
   it('memakai ringkasan.badge (bukan total) di item halo; masukan tidak dimutasi', () => {
     const asal = groups()
     const hasil = sisipBadgeHalo(asal, RINGKASAN.badge)
-    expect(halo(hasil)?.badge).toBe(4)
+    expect(halo(hasil)?.badge).toBe(RINGKASAN.badge)
+    expect(RINGKASAN.badge).toBeGreaterThan(RINGKASAN.total)
     expect(halo(asal)?.badge).toBeUndefined()
     expect(hasil[0]).toBe(asal[0])
     expect(hasil[1]?.items[1]).toBe(asal[1]?.items[1])
