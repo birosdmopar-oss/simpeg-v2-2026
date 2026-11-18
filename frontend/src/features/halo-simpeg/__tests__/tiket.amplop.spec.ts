@@ -160,6 +160,20 @@ describe('detail & tulis (fixture kontrak MAKE-071)', () => {
   })
 })
 
+describe('lampiran E-04 — galat blob dan nama cadangan (review B1 N1)', () => {
+  it('404 dengan body Blob JSON amplop → ApiError 404 + pesan BE persis', async () => {
+    const body = new Blob([JSON.stringify({ status: 'error', message: 'Lampiran tidak ditemukan.' })], { type: 'application/json' })
+    jawab(body, 404, { 'content-type': 'application/json' })
+    const e = await galatDari(tiketHaloService.lampiran(1, 2))
+    expect(isApiError(e) && [e.status, e.message]).toEqual([404, 'Lampiran tidak ditemukan.'])
+  })
+
+  it('tanpa Content-Disposition → nama cadangan lampiran-{id}-{idPesan} + ekstensi dari tipe', async () => {
+    jawab(new Blob(['%PDF'], { type: 'application/pdf' }), 200, { 'content-type': 'application/pdf' })
+    await expect(tiketHaloService.lampiran(1, 2)).resolves.toMatchObject({ nama: 'lampiran-1-2.pdf' })
+  })
+})
+
 describe('galat tiket (fixture kontrak MAKE-071)', () => {
   it('422 per kolom termasuk errors.arsip', async () => {
     jawab(galat422Tiket, 422)
