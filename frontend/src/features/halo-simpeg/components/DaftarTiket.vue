@@ -43,7 +43,8 @@ const antrean = computed(() => props.daftar.peran === 'petugas')
 const bacaBawaan = computed<FilterBaca>(() => (antrean.value ? 'belum' : 'semua'))
 /** Rute panel mempertahankan tab aktif (`?tab=antrean`). */
 const queryTab = computed(() => (antrean.value ? { tab: TAB_ANTREAN } : {}))
-const emit = defineEmits<{ 'tiket-baru': [] }>()
+/** `aksi`: aksi ⋮ baris dipilih (CR-142 V2: halaman menutup notice sukses tiket baru). */
+const emit = defineEmits<{ 'tiket-baru': []; aksi: [] }>()
 
 const router = useRouter()
 
@@ -132,6 +133,7 @@ const dialogTerbuka = ref(false)
 const memproses = ref(false)
 
 function onAksi(t: TiketBaris, key: string): void {
+  emit('aksi')
   notice.value = ''
   galatAksi.value = ''
   if (key === 'detail') void router.push({ name: 'halo-tiket', params: { id: t.id }, query: queryTab.value })
