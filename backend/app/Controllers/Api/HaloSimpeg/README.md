@@ -505,7 +505,7 @@ ekspor FE (B4, Worker Muse). Service: `App\Libraries\HaloSimpeg\EksporTiketServi
 | Respons | Isi |
 |---|---|
 | 200 xlsx | `Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`, `Content-Disposition: attachment; filename="Rekap_Halo_Simpeg_{ds}_{de}.xlsx"`, `X-Content-Type-Options: nosniff`, `Cache-Control: private, no-store`; diaudit |
-| 200 JSON kosong | `{status: "success", data: {kosong: true, jumlah: 0}, message: "Tidak ada data Halo Simpeg pada periode ini."}`, `Content-Type: application/json`, **tanpa** `Content-Disposition`, `Cache-Control: private, no-store`; **tidak** diaudit |
+| 200 JSON kosong | `{status: "success", data: {kosong: true, jumlah: 0}, message: "Tidak ada data Halo Simpeg pada periode ini."}`, `Content-Type: application/json`, **tanpa** `Content-Disposition`, `X-Content-Type-Options: nosniff`, `Cache-Control: private, no-store`; **tidak** diaudit |
 | 403 `bukan_petugas` | "Fitur ini hanya untuk petugas Halo Simpeg yang aktif." — bukan petugas atau petugas nonaktif (`bisa_ekspor = false`) |
 | 422 per kolom | `errors.ds` / `errors.de` / `errors.format` (tabel di bawah); parameter berbentuk array → 422 `ListQuery` |
 | 422 `ekspor_terlalu_besar` | "Data pada periode ini terlalu besar untuk diekspor. Persempit periode." — satu teks untuk batas baris dan karakter; tanpa berkas |
