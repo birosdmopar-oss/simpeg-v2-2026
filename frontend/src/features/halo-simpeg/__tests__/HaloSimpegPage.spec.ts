@@ -1127,3 +1127,50 @@ describe('S5: label pengingat berganti saat jatuh tempo lewat', () => {
     }
   })
 })
+
+describe('B4 T1: pesan 403 bukan_petugas tetap terbaca walau bisa_ekspor jadi false', () => {
+  it('ekspor 403 → petugas/saya berikutnya bisa_ekspor=false → pesan tetap di dialog; sesudah ditutup tombol hilang', async () => {
+    const PETUGAS = { petugas: true, aktif: true, kategori: [{ id: 1, nama: 'Cuti', status: 1 as const }], bisa_ekspor: true }
+    svc.petugas.saya.mockResolvedValueOnce(PETUGAS).mockResolvedValue({ ...PETUGAS, aktif: false, bisa_ekspor: false })
+    svc.tiket.ekspor.mockRejectedValue(apiError(403, { message: 'Fitur ini hanya untuk petugas Halo Simpeg yang aktif.', code: 'bukan_petugas' }))
+    const { w } = await pasang({ query: '?tab=antrean' })
+    await w.get('[data-testid="halo-ekspor-buka"]').trigger('click')
+    await flushPromises()
+    for (const [nama, teks] of [['ds', '01/11/2026'], ['de', '18/11/2026']] as const) {
+      const el = document.querySelector(`input[name="${nama}"]`) as HTMLInputElement
+      el.value = teks
+      el.dispatchEvent(new Event('input'))
+      await flushPromises()
+      el.dispatchEvent(new Event('blur'))
+      await flushPromises()
+    }
+    ;(document.querySelector('[data-testid="halo-ekspor-form"]') as HTMLFormElement).dispatchEvent(new Event('submit'))
+    await flushPromises()
+    await flushPromises()
+    expect(svc.petugas.saya).toHaveBeenCalledTimes(2)
+    expect(document.querySelector('[data-testid="halo-ekspor-galat"]')?.textContent?.trim()).toBe('Fitur ini hanya untuk petugas Halo Simpeg yang aktif.')
+    ;(document.querySelector('[data-testid="halo-ekspor-dialog"] button[aria-label="Tutup"]') as HTMLButtonElement).click()
+    await flushPromises()
+    expect(document.querySelector('[data-testid="halo-ekspor-dialog"]')).toBeNull()
+    expect(w.find('[data-testid="halo-ekspor-buka"]').exists()).toBe(false)
+  })
+})
+
+describe('B4 K1: "Data pelapor" lewat keyboard', () => {
+  it('fokus membuka tooltip; Enter (keydown + click) menutup; Enter lagi membuka', async () => {
+    svc.tiket.detail.mockResolvedValueOnce({ ...(detailPetugas.data as TiketDetail), belum_dibaca: false })
+    const { w } = await pasang({ idTiket: detailPetugas.data.id })
+    const tombol = w.get('[data-testid="halo-thread-snapshot"]')
+    await tombol.trigger('focus')
+    await vi.waitFor(() => expect(document.querySelector('[role="tooltip"]')).not.toBeNull())
+    const enter = async () => {
+      await tombol.trigger('keydown', { key: 'Enter' })
+      await tombol.trigger('click')
+      await flushPromises()
+    }
+    await enter()
+    await vi.waitFor(() => expect(document.querySelector('[role="tooltip"]')).toBeNull())
+    await enter()
+    await vi.waitFor(() => expect(document.querySelector('[role="tooltip"]')?.textContent).toContain('NIP:'))
+  })
+})

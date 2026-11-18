@@ -18,13 +18,20 @@ vi.mock('@/features/kepegawaian/services/berkasUnduhan', async (asli) => ({
   ...(await asli<typeof import('@/features/kepegawaian/services/berkasUnduhan')>()),
   simpanBerkas: svc.simpan,
 }))
+// Review B4 T3: "hari ini WIB" komponen di-mock ke tanggal tetap yang BERBEDA dari hari ini lokal, supaya test mengikat batas `max`
+// picker ke `hariIniWib()` (bukan ke `today()` kalender lokal). Fungsi aslinya diuji terpisah lewat `importActual`.
+const HARI_MOCK = '2030-06-15'
+vi.mock('../constants', async (asli) => ({
+  ...(await asli<typeof import('../constants')>()),
+  hariIniWib: () => HARI_MOCK,
+}))
 vi.mock('../stores/haloSimpeg', async (asli) => ({
   ...(await asli<typeof import('../stores/haloSimpeg')>()),
   muatPetugasSaya: svc.muatPetugasSaya,
 }))
 
 import EksporRekapDialog from '../components/EksporRekapDialog.vue'
-import { hariIniWib, TEKS_EKSPOR } from '../constants'
+import { TEKS_EKSPOR } from '../constants'
 import eksporKosong from './fixtures/ekspor-kosong.json'
 import galat403 from './fixtures/galat-403-bukan-petugas.json'
 import galat422 from './fixtures/galat-422-ekspor.json'
@@ -35,10 +42,10 @@ function apiError(status: number, body: { message: string; code?: string; errors
   return { status, message: body.message, errors: body.errors ?? null, isNetworkError: false, original: new AxiosError('x', 'ERR', undefined, null, res as never) }
 }
 
-// Jam tidak dipalsukan (Date beku membuat invoker event Vue mengabaikan blur): "hari ini" = hariIniWib() nyata; zona WIB diuji
-// terpisah dengan Date eksplisit.
+// Jam tidak dipalsukan (Date beku membuat invoker event Vue mengabaikan blur): "hari ini" picker = HARI_MOCK; zona WIB fungsi
+// asli diuji terpisah dengan Date eksplisit.
 const SEKARANG = new Date('2026-11-18T20:00:00Z') // = 19-11-2026 03:00 WIB
-const HARI_INI = hariIniWib()
+const HARI_INI = HARI_MOCK
 /** Geser tanggal `YYYY-MM-DD` sebanyak n hari (kalender UTC murni, tanpa jam lokal). */
 function geser(iso: string, n: number): string {
   const [y, m, d] = iso.split('-').map(Number) as [number, number, number]
@@ -88,7 +95,8 @@ afterEach(() => {
 enableAutoUnmount(afterEach)
 
 describe('hariIniWib', () => {
-  it('memakai zona Asia/Jakarta, bukan UTC', () => {
+  it('memakai zona Asia/Jakarta, bukan UTC', async () => {
+    const { hariIniWib } = await vi.importActual<typeof import('../constants')>('../constants')
     expect(hariIniWib(SEKARANG)).toBe('2026-11-19')
     expect(hariIniWib(new Date('2026-11-18T16:59:59Z'))).toBe('2026-11-18')
   })
@@ -111,6 +119,11 @@ describe('EksporRekapDialog — periode', () => {
     expect([bantuan('ds'), bantuan('de')]).toEqual(['', ''])
     await kirim()
     expect(svc.ekspor).toHaveBeenCalledWith(HARI_INI, HARI_INI)
+  })
+
+  it('T3: max picker = hariIniWib() (tanggal mock ≠ hari ini lokal), bukan kalender lokal', async () => {
+    const { w } = await pasang()
+    expect(w.findAllComponents({ name: 'UiDatePicker' }).map((c) => c.props('max'))).toEqual([HARI_MOCK, HARI_MOCK])
   })
 
   it('besok (WIB) ditolak picker: nilai tidak diterima + pesan rentang; kirim → wajib diisi, tanpa request', async () => {
@@ -207,5 +220,58 @@ describe('EksporRekapDialog — hasil', () => {
     await flushPromises()
     expect([input('ds').value, input('de').value]).toEqual(['', ''])
     expect(document.querySelector('[data-testid="halo-ekspor-kosong"]')).toBeNull()
+  })
+})
+
+describe('T2: request berjalan sesudah Batal / buka ulang', () => {
+  it('tutup saat ekspor tertunda → lepas → tanpa unduhan/pesan; buka ulang → tombol aktif, form bersih', async () => {
+    let lepas!: (v: unknown) => void
+    svc.ekspor.mockReturnValueOnce(new Promise((r) => (lepas = r)))
+    const { open } = await pasang()
+    await ketik('ds', '01/11/2026')
+    await ketik('de', '18/11/2026')
+    await kirim()
+    const tombol = () => document.querySelector('[data-testid="halo-ekspor-kirim"]') as HTMLButtonElement
+    expect(tombol().disabled).toBe(true)
+    open.value = false
+    await flushPromises()
+    open.value = true
+    await flushPromises()
+    expect(tombol().disabled).toBe(false)
+    expect(tombol().textContent?.trim()).toBe('Ekspor Excel')
+    lepas({ jenis: 'berkas', nama: 'lama.xlsx', blob: new Blob(['PK']) })
+    await flushPromises()
+    expect(svc.simpan).not.toHaveBeenCalled()
+    expect(open.value).toBe(true)
+    expect(tombol().disabled).toBe(false)
+    expect(document.querySelector('[data-testid="halo-ekspor-kosong"]')).toBeNull()
+  })
+
+  it('galat dari generasi lama juga diabaikan (tanpa notice, tanpa muat ulang petugas/saya)', async () => {
+    let tolak!: (e: unknown) => void
+    svc.ekspor.mockReturnValueOnce(new Promise((_r, j) => (tolak = j)))
+    const { open } = await pasang()
+    await ketik('ds', '01/11/2026')
+    await ketik('de', '18/11/2026')
+    await kirim()
+    open.value = false
+    await flushPromises()
+    tolak(apiError(403, galat403))
+    await flushPromises()
+    open.value = true
+    await flushPromises()
+    expect(document.querySelector('[data-testid="halo-ekspor-galat"]')).toBeNull()
+    expect(svc.muatPetugasSaya).not.toHaveBeenCalled()
+  })
+
+  it('T5: notice galat tanpa role="alert" bersarang', async () => {
+    svc.ekspor.mockRejectedValue(apiError(422, galat422Besar))
+    await pasang()
+    await ketik('ds', '01/11/2026')
+    await ketik('de', '18/11/2026')
+    await kirim()
+    const notice = document.querySelector('[data-testid="halo-ekspor-galat"]')!
+    expect(notice.querySelectorAll('[role="alert"]')).toHaveLength(0)
+    expect(document.querySelectorAll('[role="alert"]')).toHaveLength(1)
   })
 })
