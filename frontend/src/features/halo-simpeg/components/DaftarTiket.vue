@@ -103,7 +103,8 @@ function aksiBaris(t: TiketBaris): RowAction[] {
   return [
     { key: 'detail', label: 'Lihat detail' },
     { key: 'tutup', label: 'Tutup', hidden: t.status === 'closed' || !t.bisa_tutup },
-    { key: 'unduh', label: 'Unduh lampiran', hidden: !t.pesan_terakhir?.lampiran, disabled: mengunduh.value === t.id },
+    // Review B2 Q4: satu unduhan pada satu waktu → item di semua baris disabled selama unduhan berjalan (AGENTS.md §1 butir 4).
+    { key: 'unduh', label: 'Unduh lampiran', hidden: !t.pesan_terakhir?.lampiran, disabled: mengunduh.value !== null },
     { key: 'hapus', label: 'Hapus', danger: true, hidden: !t.bisa_hapus },
   ]
 }

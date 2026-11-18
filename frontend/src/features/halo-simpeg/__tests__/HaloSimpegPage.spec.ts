@@ -728,3 +728,20 @@ describe('Q3: fokus sesudah tiket baru dibuat (alur nyata lewat router)', () => 
     expect(document.activeElement).toBe(document.querySelector('[data-testid="halo-thread-judul"]'))
   })
 })
+
+describe('Q4: Unduh lampiran lewat ⋮ saat unduhan lain berjalan', () => {
+  it('unduhan baris A berjalan → item Unduh lampiran di baris B disabled; galat unduh lewat ⋮ tampil', async () => {
+    const pt = DAFTAR.items[0]!.pesan_terakhir!
+    const lamp = (id: number) => ({ ...pt, id_inbox_msg: id * 10, lampiran: { nama: `lampiran-${id}.pdf`, tipe: 'application/pdf' } })
+    svc.tiket.list.mockResolvedValueOnce({ ...DAFTAR, items: [baris({ id: 1, pesan_terakhir: lamp(1) }), baris({ id: 2, pesan_terakhir: lamp(2) })] })
+    let tolak: (e: unknown) => void = () => {}
+    svc.tiket.lampiran.mockReturnValueOnce(new Promise((_r, j) => (tolak = j)))
+    const { w } = await pasang()
+    await selectRowAction(w, 'halo-tiket-actions-1', 'unduh')
+    expect((await rowMenuActions(w, 'halo-tiket-actions-2')).find((a) => a.label === 'Unduh lampiran')?.disabled).toBe(true)
+    tolak(apiError(404, { message: 'Lampiran tidak ditemukan.' }))
+    await flushPromises()
+    expect(w.get('[data-testid="halo-daftar-galat-unduh"]').text()).toBe('Lampiran tidak ditemukan.')
+    expect((await rowMenuActions(w, 'halo-tiket-actions-2')).find((a) => a.label === 'Unduh lampiran')?.disabled).toBe(false)
+  })
+})
