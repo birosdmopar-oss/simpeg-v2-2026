@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * Kolom unggah berkas bergaya input (§4.1.6, Gambar 22): ikon berkas + "Upload File", lalu petunjuk jenis file
- * yang diperbolehkan dan batas ukuran di bawahnya. Validasi ekstensi & ukuran dilakukan di sini (UX) — validasi
+ * Kolom unggah berkas bergaya input (§4.1.6, Gambar 22): ikon berkas + "Unggah berkas", lalu petunjuk jenis berkas
+ * yang diperbolehkan dan batas ukuran di bawahnya (teks Bahasa Indonesia sejak CR-150). Validasi ekstensi & ukuran dilakukan di sini (UX) — validasi
  * yang mengikat tetap di backend (B-18). Memakai <input type="file"> asli supaya bisa dioperasikan keyboard.
  * Berkas juga bisa diseret-lepas ke kolom; berkas yang lolos ditampilkan pratinjaunya (gambar = gambar kecil, selain
  * itu nama + ukuran) — CR-049 D-F6. Pesan tolak jenis/ukuran tetap sama untuk pilih maupun seret.
@@ -19,7 +19,7 @@ const props = withDefaults(
     /** Ekstensi tanpa titik, huruf kecil. */
     allowed: string[]
     maxMb: number
-    /** Baris pertama petunjuk, mis. "File yang diunggah Arsip status". */
+    /** Baris pertama petunjuk, mis. "Berkas yang diunggah Arsip status". */
     hint?: string
     disabled?: boolean
   }>(),
