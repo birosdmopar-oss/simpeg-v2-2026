@@ -101,17 +101,25 @@ export async function bacaTiket(id: number): Promise<Ringkasan | null> {
 }
 
 let janjiRingkasan: Promise<void> | null = null
+/** Review B2 Q5: permintaan "paksa" datang saat muat berjalan (dimulai sebelum perubahan di server) → satu muat ulang sesudahnya. */
+let kotor = false
 
 /**
  * `GET tiket/ringkasan`. Pemanggil yang datang saat muat berjalan memakai janji yang sama (shell dipasang ulang per route +
- * muat ulang pindah halaman tidak menggandakan request). Galat → angka terakhir dipertahankan (tidak mengganggu halaman).
+ * muat ulang pindah halaman tidak menggandakan request). `paksa` (sesudah tutup/balas/hapus/baca mengubah server): bila muat
+ * sedang berjalan, tandai kotor → tepat satu muat ulang sesudah janji itu selesai, dan janji yang dikembalikan menunggu muat
+ * ulang tersebut. Galat → angka terakhir dipertahankan (tidak mengganggu halaman).
  */
-export function muatRingkasan(): Promise<void> {
-  if (janjiRingkasan) return janjiRingkasan
+export function muatRingkasan(paksa = false): Promise<void> {
+  if (janjiRingkasan) {
+    if (!paksa) return janjiRingkasan
+    kotor = true
+    return janjiRingkasan.then(() => (janjiRingkasan ?? Promise.resolve()))
+  }
   const gen = generasi
   const urutan = ++urutanRingkasan
   // Dibungkus Promise agar galat sinkron pun tidak pernah menggagalkan pemanggil (mis. tutup/balas memuat ulang ringkasan).
-  const janji = Promise.resolve()
+  const janji: Promise<void> = Promise.resolve()
     .then(() => tiketHaloService.ringkasan())
     .then((hasil) => {
       if (gen === generasi && urutan === urutanRingkasan) state.ringkasan = hasil
@@ -120,7 +128,12 @@ export function muatRingkasan(): Promise<void> {
       // Dipertahankan nilai terakhir; percobaan berikutnya pada siklus polling / pindah halaman.
     })
     .finally(() => {
-      if (janjiRingkasan === janji) janjiRingkasan = null
+      if (janjiRingkasan !== janji) return
+      janjiRingkasan = null
+      if (kotor && gen === generasi) {
+        kotor = false
+        void muatRingkasan()
+      }
     })
   janjiRingkasan = janji
   return janji
@@ -140,5 +153,6 @@ export function resetHaloSimpeg(): void {
   urutanRingkasan += 1
   janjiMuat = null
   janjiRingkasan = null
+  kotor = false
   Object.assign(state, awal())
 }

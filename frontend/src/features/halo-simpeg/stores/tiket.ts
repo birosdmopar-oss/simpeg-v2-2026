@@ -200,7 +200,7 @@ export async function tutupTiket(id: number): Promise<void> {
   const baris = await tiketHaloService.tutup(id)
   if (gen !== generasiDetail) return
   terapkanKeSemua(baris)
-  if (tadinyaBelum || petugas) void muatRingkasan()
+  if (tadinyaBelum || petugas) void muatRingkasan(true)
   if (petugas) segarkanPanel()
   if (detailState.idDibuka === id) void bukaTiket(id)
 }
@@ -213,7 +213,7 @@ export async function hapusTiket(id: number): Promise<void> {
   if (gen !== generasiDetail) return
   for (const d of semuaDaftar) d.buangBaris(id)
   if (petugas) {
-    void muatRingkasan()
+    void muatRingkasan(true)
     segarkanPanel()
   }
   if (detailState.idDibuka === id) tutupPanel()
@@ -241,7 +241,7 @@ export async function balasTiket(id: number, form: BalasForm): Promise<Pesan | n
   if (gen !== generasiDetail) return null
   if (detailState.detail?.id === id) detailState.detail = { ...detailState.detail, pesan: [...detailState.detail.pesan, hasil.pesan] }
   terapkanKeSemua(hasil.tiket)
-  if (tadinyaBelum || petugas) void muatRingkasan()
+  if (tadinyaBelum || petugas) void muatRingkasan(true)
   if (petugas) {
     segarkanPanel()
     // Pengingat 24 jam diatur BE dari balasan petugas → detail dimuat ulang agar `pengingat` terbaru tampil.

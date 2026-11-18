@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const svc = vi.hoisted(() => ({ list: vi.fn(), detail: vi.fn(), baca: vi.fn(), tutup: vi.fn(), hapus: vi.fn(), balas: vi.fn(), buat: vi.fn(), ringkasan: vi.fn() }))
 vi.mock('../services/tiket.service', async (asli) => ({ ...(await asli<typeof import('../services/tiket.service')>()), tiketHaloService: svc }))
 
-import { haloState, resetHaloSimpeg } from '../stores/haloSimpeg'
+import { haloState, muatRingkasan, resetHaloSimpeg } from '../stores/haloSimpeg'
 import { balasTiket, bukaTiket, daftarAntrean, daftarPerluTindak, daftarSaya, detailTiket, hapusTiket, tutupTiket } from '../stores/tiket'
 import type { Halaman, HasilBalas, Ringkasan, TiketBaris, TiketDetail } from '../types'
 import baca from './fixtures/baca.json'
@@ -229,5 +229,24 @@ describe('pabrik daftar per peran (B3, keputusan reviewer)', () => {
     resetHaloSimpeg()
     expect([daftarSaya.state.daftar, daftarAntrean.state.daftar, daftarPerluTindak.state.daftar, detailTiket.detail]).toEqual([null, null, null, null])
     expect(daftarAntrean.state.filter.baca).toBe('belum')
+  })
+})
+
+describe('Q5: penyegaran ringkasan sesudah aksi tidak tertelan dedupe', () => {
+  it('GET ringkasan (polling) berjalan → tutup baris belum dibaca → lepas: tepat 2 GET, badge memakai hasil kedua', async () => {
+    const a = { ...DAFTAR.items[0]!, id: 70, status: 'open' as const, belum_dibaca: true, bisa_tutup: true }
+    svc.list.mockResolvedValueOnce({ ...DAFTAR, items: [a] })
+    await daftarSaya.muat()
+    const pertama = tertunda<Ringkasan>()
+    const hasilKedua = { ...(baca.data as Ringkasan), badge: 7 }
+    svc.ringkasan.mockReturnValueOnce(pertama.janji).mockResolvedValueOnce(hasilKedua)
+    const polling = muatRingkasan()
+    svc.tutup.mockResolvedValueOnce({ ...a, status: 'closed', bisa_tutup: false, belum_dibaca: false })
+    await tutupTiket(70)
+    pertama.lepas({ ...(baca.data as Ringkasan), badge: 3 })
+    await polling
+    await vi.waitFor(() => expect(svc.ringkasan).toHaveBeenCalledTimes(2))
+    await vi.waitFor(() => expect(haloState.ringkasan?.badge).toBe(7))
+    expect(svc.ringkasan).toHaveBeenCalledTimes(2)
   })
 })
