@@ -150,6 +150,13 @@ export const ringkasanSchema = z.object({
 
 export const hasilBalasSchema = z.object({ pesan: pesanSchema, tiket: tiketBarisSchema })
 
+/** Ekspor periode kosong (README MAKE-074): 200 JSON amplop UTUH (bukan berkas), dibaca dari blob. */
+export const eksporKosongSchema = z.object({
+  status: z.literal('success'),
+  data: z.object({ kosong: z.literal(true), jumlah: angka }),
+  message: teks,
+})
+
 /** Galat parse respons dianggap galat muat data (pesan galat umum, bukan crash). */
 export class KontrakHaloError extends Error {
   readonly path: string
