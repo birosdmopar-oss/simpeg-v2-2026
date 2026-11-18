@@ -48,7 +48,7 @@ async function mountShell(role: RoleCode, extra: Parameters<typeof loginAs>[1] =
   router.addRoute({ path: '/layanan/cuti/:id', name: 'layanan-cuti-detail', component: { render: () => null } })
   await router.push('/')
   await router.isReady()
-  mount(RedesignShell, { slots: { default: '<p>beranda</p>' }, global: { plugins: [router] }, attachTo: document.body })
+  mount(RedesignShell, { slots: { default: '<p>beranda</p>' }, global: { plugins: [router], stubs: { InteraksiPopupHost: false } }, attachTo: document.body })
   await flushPromises()
 }
 

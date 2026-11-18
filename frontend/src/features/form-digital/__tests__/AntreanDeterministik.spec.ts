@@ -60,7 +60,7 @@ async function pasang(): Promise<void> {
   router.addRoute({ path: '/layanan/cuti/:id', name: 'layanan-cuti-detail', component: { render: () => null } })
   await router.push('/')
   await router.isReady()
-  mount(RedesignShell, { slots: { default: PopupAktifDialog }, global: { plugins: [router] }, attachTo: document.body })
+  mount(RedesignShell, { slots: { default: PopupAktifDialog }, global: { plugins: [router], stubs: { InteraksiPopupHost: false } }, attachTo: document.body })
   await flushPromises()
 }
 

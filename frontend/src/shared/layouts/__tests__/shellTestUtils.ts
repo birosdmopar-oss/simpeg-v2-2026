@@ -60,7 +60,11 @@ export function createShellRouter(): Router {
     // Nama route menu lain (Fase 4–8) ditambah otomatis oleh `ruteMenuTiruan` (CR-135).
   ]
   const sudahAda = new Set(routes.map((r) => String(r.name ?? '')))
-  return createRouter({ history: createMemoryHistory(), routes: [...routes, ...ruteMenuTiruan(sudahAda)] })
+  // Menu ber-path string (mis. `/layanan/cuti`, `/presensi`, `/notifikasi`) ditampung satu rute catch-all supaya RouterLink tidak
+  // membanjiri console dengan "[Vue Router warn]: No match found" (CR-135). Catch-all berperingkat terendah, jadi rute yang
+  // ditambah spec (`router.addRoute`) untuk path yang sama tetap menang.
+  const tampung: RouteRecordRaw = { path: '/:pathMatch(.*)*', name: '__nav-tampung', component: stub }
+  return createRouter({ history: createMemoryHistory(), routes: [...routes, ...ruteMenuTiruan(sudahAda), tampung] })
 }
 
 export function userWithRole(role: RoleCode, extra: Partial<User> = {}): User {

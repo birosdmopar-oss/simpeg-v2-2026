@@ -18,5 +18,7 @@ export default defineConfig({
     environment: 'jsdom',
     include: ['src/**/*.{spec,test}.ts'],
     clearMocks: true,
+    // CR-135: host shell yang memanggil API sendiri di-stub bawaan (lihat src/test/setup.ts).
+    setupFiles: ['./src/test/setup.ts'],
   },
 })
