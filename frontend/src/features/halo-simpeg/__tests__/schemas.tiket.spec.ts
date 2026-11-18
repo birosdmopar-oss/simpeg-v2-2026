@@ -108,13 +108,17 @@ describe('skema form tiket (batas §7.3a, teks BE)', () => {
     expect(pesan(tiketBaruFormSchema.safeParse({ ...sah, pesan: huruf(5001) }))).toContain(TT.pesanMaks)
   })
 
-  it('P5 (a): baris baru dihitung CRLF seperti multipart/mb_strlen BE', () => {
-    // 4.990 huruf + 11 baris baru + 1 huruf: LF 5.002, CRLF 5.013 → ditolak klien (bukan 422 BE).
-    expect(pesan(balasFormSchema.safeParse({ pesan: 'a'.repeat(4990) + '\n'.repeat(11) + 'z', arsip: null, ingatkan_24_jam: false }))).toContain(TT.pesanMaks)
-    // 4.990 huruf + 4 baris baru + 1 huruf: CRLF 4.999 → lolos.
-    expect(balasFormSchema.safeParse({ pesan: 'a'.repeat(4990) + '\n'.repeat(4) + 'z', arsip: null, ingatkan_24_jam: false }).success).toBe(true)
-    // 4.990 huruf + 5 baris baru + 1 huruf: LF 4.996 (akan lolos bila dihitung LF), CRLF 5.001 → ditolak.
-    expect(pesan(tiketBaruFormSchema.safeParse({ ...sah, pesan: 'a'.repeat(4990) + '\n'.repeat(5) + 'z' }))).toContain(TT.pesanMaks)
+  it('P5 (a) / Q6 (3): baris baru dihitung CRLF seperti multipart/mb_strlen BE — kasus pembeda untuk kedua skema', () => {
+    // 4.995 huruf + 3 baris baru di tengah (trim tidak memangkasnya): LF 4.998 (akan lolos bila dihitung LF), CRLF 5.001 → ditolak.
+    const pembeda = 'a'.repeat(4992) + '\na'.repeat(3)
+    expect(pembeda.length).toBe(4998)
+    expect(pesan(tiketBaruFormSchema.safeParse({ ...sah, pesan: pembeda }))).toContain(TT.pesanMaks)
+    expect(pesan(balasFormSchema.safeParse({ pesan: pembeda, arsip: null, ingatkan_24_jam: false }))).toContain(TT.pesanMaks)
+    // 4.996 huruf + 2 baris baru di tengah: LF 4.998, CRLF 5.000 → lolos di kedua skema (batas tepat).
+    const batas = 'a'.repeat(4994) + '\na'.repeat(2)
+    expect(batas.length).toBe(4998)
+    expect(tiketBaruFormSchema.safeParse({ ...sah, pesan: batas }).success).toBe(true)
+    expect(balasFormSchema.safeParse({ pesan: batas, arsip: null, ingatkan_24_jam: false }).success).toBe(true)
   })
 
   it('balas: pesan wajib, batas 5.000 code point sesudah trim', () => {

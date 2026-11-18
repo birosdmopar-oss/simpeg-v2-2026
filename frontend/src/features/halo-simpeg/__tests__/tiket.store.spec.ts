@@ -93,13 +93,17 @@ describe('buka tiket + POST baca', () => {
 
 describe('tutup, hapus, balas', () => {
   it('tutup → baris dari BE diterapkan ke daftar dan detail', async () => {
+    svc.list.mockResolvedValueOnce({ ...DAFTAR, items: [{ ...DAFTAR.items[0]!, id: DETAIL.id, status: 'open' }] })
     await daftarSaya.muat()
     await bukaTiket(DETAIL.id)
     svc.tutup.mockResolvedValueOnce({ ...(tiketTutup.data as TiketBaris), id: DETAIL.id })
     // Detail dimuat ulang sesudah tutup (P1 (c)): BE kini mengembalikan tiket Closed.
     svc.detail.mockResolvedValueOnce({ ...DETAIL, belum_dibaca: false, status: 'closed', bisa_balas: false })
     await tutupTiket(DETAIL.id)
-    expect(daftarSaya.state.daftar?.items.find((t) => t.id === DETAIL.id)?.status ?? 'closed').toBe('closed')
+    // Q6 (1): baris benar-benar ada dan berstatus closed (tanpa cadangan tautologis).
+    const barisTutup = daftarSaya.state.daftar?.items.find((t) => t.id === DETAIL.id)
+    expect(barisTutup).toBeDefined()
+    expect(barisTutup?.status).toBe('closed')
     await vi.waitFor(() => expect(detailTiket.detail?.status).toBe('closed'))
   })
 
@@ -164,10 +168,24 @@ describe('konsistensi daftar ↔ detail ↔ ringkasan (review B2 P1)', () => {
     svc.ringkasan.mockResolvedValue(baca.data as Ringkasan)
     svc.tutup.mockResolvedValueOnce({ ...a, status: 'closed', bisa_tutup: false, belum_dibaca: false })
     await tutupTiket(a.id)
-    expect(svc.ringkasan).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => expect(svc.ringkasan).toHaveBeenCalledTimes(1))
+    // Baris kini sudah dibaca → tutup ulang tidak memuat ringkasan lagi.
     svc.tutup.mockResolvedValueOnce({ ...a, status: 'closed', bisa_tutup: false, belum_dibaca: false })
     await tutupTiket(a.id)
+    await Promise.resolve()
     expect(svc.ringkasan).toHaveBeenCalledTimes(1)
+  })
+
+  it('(b) Q6 (2): balas tiket belum dibaca (sisi pemilik) → satu GET ringkasan lewat balasTiket', async () => {
+    const hasil = tiketBalas.data as HasilBalas
+    const b = { ...hasil.tiket, id: 81, belum_dibaca: true, sebagai_petugas: false }
+    svc.list.mockResolvedValueOnce({ ...DAFTAR, items: [b] })
+    await daftarSaya.muat()
+    svc.ringkasan.mockResolvedValue(baca.data as Ringkasan)
+    svc.balas.mockResolvedValueOnce({ ...hasil, tiket: { ...b, belum_dibaca: false } })
+    await balasTiket(81, { pesan: 'x', arsip: null, ingatkan_24_jam: false })
+    expect(svc.balas).toHaveBeenCalledWith(81, expect.objectContaining({ pesan: 'x' }))
+    await vi.waitFor(() => expect(svc.ringkasan).toHaveBeenCalledTimes(1))
   })
 
   it('(c) tutup tiket yang sedang terbuka → detail dimuat ulang (ditutup_oleh_label dari BE)', async () => {

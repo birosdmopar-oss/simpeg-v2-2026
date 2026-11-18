@@ -745,3 +745,68 @@ describe('Q4: Unduh lampiran lewat ⋮ saat unduhan lain berjalan', () => {
     expect((await rowMenuActions(w, 'halo-tiket-actions-2')).find((a) => a.label === 'Unduh lampiran')?.disabled).toBe(false)
   })
 })
+
+describe('Q6 (4, 5): galat ⋮ Tutup dan galat per kolom yang tepat', () => {
+  /** Elemen pesan galat yang ditautkan `aria-describedby` milik kontrol. */
+  const galatKontrol = (el: Element | null): string => {
+    const ids = (el?.getAttribute('aria-describedby') ?? '').split(' ').filter(Boolean)
+    return ids.map((i) => document.getElementById(i)?.textContent?.trim() ?? '').join(' ')
+  }
+
+  it.each([
+    ['422 tiket_sudah_ditutup', () => apiError(422, { message: 'Percakapan ini telah ditutup sebelumnya.', code: 'tiket_sudah_ditutup' })],
+    ['404', () => apiError(404, { message: 'Data percakapan tidak ditemukan.' })],
+  ])('(4) %s dari ⋮ Tutup → daftar dimuat ulang + detail dimuat ulang bila tiket itu terbuka', async (_n, galat) => {
+    const t = baris({ id: 5, status: 'open', bisa_tutup: true, belum_dibaca: false, pesan_terakhir: null })
+    svc.tiket.list.mockResolvedValue({ ...DAFTAR, items: [t] })
+    svc.tiket.detail.mockResolvedValue({ ...DETAIL, id: 5, belum_dibaca: false })
+    svc.tiket.tutup.mockRejectedValueOnce(galat())
+    const { w } = await pasang({ idTiket: 5 })
+    const list0 = svc.tiket.list.mock.calls.length
+    const detail0 = svc.tiket.detail.mock.calls.length
+    await selectRowAction(w, 'halo-tiket-actions-5', 'tutup')
+    ;([...document.querySelectorAll('[role="alertdialog"] button')].find((b) => b.textContent?.trim() === 'Tutup') as HTMLButtonElement).click()
+    await flushPromises()
+    expect(svc.tiket.list.mock.calls.length).toBe(list0 + 1)
+    expect(svc.tiket.detail.mock.calls.length).toBe(detail0 + 1)
+    expect(svc.tiket.detail).toHaveBeenLastCalledWith(5)
+  })
+
+  it('(5) tiket baru: 422 msg di kolom Pesan dan id_question_category di kolom Kategori (aria-describedby kontrol)', async () => {
+    const { w } = await pasang({ role: Role.PEGAWAI })
+    await w.get('[data-testid="halo-tiket-baru"]').trigger('click')
+    await flushPromises()
+    const form = document.querySelector('[data-testid="halo-tiket-baru-form"]') as HTMLFormElement
+    const subjek = form.querySelector('input[name="subjek"]') as HTMLInputElement
+    subjek.value = 'Baru'
+    subjek.dispatchEvent(new Event('input'))
+    const pesan = form.querySelector('textarea') as HTMLTextAreaElement
+    pesan.value = 'Isi'
+    pesan.dispatchEvent(new Event('input'))
+    ;(form.querySelector('[role="combobox"]') as HTMLElement).click()
+    await flushPromises()
+    ;(document.querySelector('[role="option"]') as HTMLElement).click()
+    await flushPromises()
+    svc.tiket.buat.mockRejectedValueOnce(
+      apiError(422, {
+        message: 'Pesan wajib diisi.',
+        errors: { msg: ['Pesan wajib diisi.'], id_question_category: ['Kategori tidak tersedia.'] },
+      }),
+    )
+    form.dispatchEvent(new Event('submit'))
+    await flushPromises()
+    expect(galatKontrol(form.querySelector('textarea'))).toBe('Pesan wajib diisi.')
+    expect(galatKontrol(form.querySelector('[role="combobox"]'))).toContain('Kategori tidak tersedia.')
+    expect(document.querySelector('[data-testid="halo-tiket-baru-galat"]')).toBeNull()
+  })
+
+  it('(5) balas: 422 msg di kolom Balasan (aria-describedby textarea)', async () => {
+    svc.tiket.detail.mockResolvedValue({ ...DETAIL, id: 1, belum_dibaca: false, bisa_balas: true })
+    const { w } = await pasang({ idTiket: 1 })
+    await w.get('[data-testid="halo-balas-form"] textarea').setValue('x')
+    svc.tiket.balas.mockRejectedValueOnce(apiError(422, { message: 'Pesan maksimal 5.000 karakter.', errors: { msg: ['Pesan maksimal 5.000 karakter.'] } }))
+    await w.get('[data-testid="halo-balas-form"]').trigger('submit')
+    await flushPromises()
+    expect(galatKontrol(w.get('[data-testid="halo-balas-form"] textarea').element)).toBe('Pesan maksimal 5.000 karakter.')
+  })
+})
