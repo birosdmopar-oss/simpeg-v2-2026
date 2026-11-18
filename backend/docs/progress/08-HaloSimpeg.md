@@ -133,8 +133,8 @@ CR-134).
 - CR-134 paket 2 ✔ (`d659acf6`): perbaikan temuan QA T-02 dan T-03.
 
 **Belum (penutup Fase 8):**
-- QA Lapis 1 bagian chatbot (AC-E10.22) oleh reviewer. Putaran 1 bagian A selesai 17-11-2026 (checklist CR-132 `67f3303c`);
-  temuan T-02/T-03 tuntas di CR-134 paket 2.
+- ~~QA Lapis 1 bagian chatbot (AC-E10.22) oleh reviewer~~ ✔ selesai: putaran 1 bagian A 17-11-2026 (checklist CR-132 `67f3303c`),
+  uji ulang T-02/T-03 (CR-134 paket 2 `d659acf6`) dan AW17, sisa 18-11-2026 pada `e4392507`; 0 ❌ (CR-144).
 - Acuan visual widget dev **PN8-8**: diputus 16-11-2026, acuan = tangkapan layar widget dev dari Horii; **diterima 16-11-2026** (✔, PRD v1.3 CR-136), disimpan di luar repo dan tidak di-commit.
   Keputusan tampilan Horii 17-11-2026 ("ikut rekomendasi"): avatar tetap ilustrasi SVG (foto tidak dipakai); aksen biru
   `brand-tertiary`, bukan pink dev; saat memuat, tombol/chip disabled + indikator; launcher 64 px dan gaya nama "Vanya" tetap
@@ -145,7 +145,13 @@ CR-134).
 
 ## Helpdesk E-01..E-09 — status (CR-138, 17-11-2026)
 
-**Terakhir diperbarui:** 18 November 2026 (MAKE-074, Handling Case). Per `main` `64d68377`: DBV-028, MAKE-070, MAKE-071,
+**Status akhir (18 November 2026, CR-144, reviewer CR):** per `main` `8bc6c509` **semua paket helpdesk di `main`** (DBV-028,
+MAKE-070, MAKE-071, MAKE-097, MAKE-072 + CR-137, MAKE-074 BE + FE, MAKE-073) beserta perbaikan temuan QA CR-143 dan CR-142.
+**QA Lapis 1 Fase 8 selesai** 18-11-2026 pada `main` `e4392507` (bagian B) + verifikasi perbaikan `8bc6c509`, 0 ❌ terbuka
+(checklist `docs/fase8/Checklist_QA_Lapis1_Fase8.md`, laporan `docs/fase8/Laporan_Akhir_Fase8.md`). **Menunggu sign-off Horii**;
+rilis menu CR-135 sesudah sign-off.
+
+Riwayat 18 November 2026 (MAKE-074, Handling Case). Per `main` `64d68377`: DBV-028, MAKE-070, MAKE-071,
 MAKE-097, dan MAKE-072 + CR-137 di `main`; MAKE-074 BE berjalan; status MAKE-073 (FE) diisi Worker Muse. Riwayat 17 November
 2026 (CR-138, per `main` `d659acf6`): DBV-028 dan MAKE-070 di `main`; MAKE-071, MAKE-097, dan MAKE-073 B1 berjalan. Bagian ini diisi tiap paket
 helpdesk secara aditif (BE: Handling Case; FE: Worker Muse; T12b: ReadOne). Kontrak final: PRD v1.3 §6.1b (dibekukan di README
@@ -159,11 +165,14 @@ helpdesk secara aditif (BE: Handling Case; FE: Worker Muse; T12b: ReadOne). Kont
 | A2 Master | MAKE-070 | DONE (main `56a700b1`) | README master beku; selisih S1–S12 diterima reviewer 17-11-2026, termasuk S8 (b) Horii (PUT petugas → 200 + `peringatan`); kunci transaksi W1 (locking read sebelum kunci terakhir) |
 | A3 Tiket + ringkasan | MAKE-071 | DONE (main `066315c5`) | T1–T13 diputus 17-11-2026 (T2 (b) Horii: pemilik selalu 403 hapus); README tiket beku; binding `RingkasanTiket` untuk lonceng F-08 (AC-E06.9); H8-10 ✔ tetap [I] |
 | A4 Push | MAKE-072 + CR-137 | DONE (main `64d68377`) | CR-137 = berkas bersama Push, commit terpisah; penerima per akun (`antreAkun`), pelaku dikecualikan, kanal `semua`; selisih U1–U9 diterima; H8-8 belum ada → payload terbatas F8-16, uji push real ke DEPLOY-001.1 |
-| A5 Ekspor + penutup BE | MAKE-074 | IN_PROGRESS (branch `fase8/make-074-ekspor-penutup`) | E-09 `GET tiket/ekspor` (rincian di bawah); penutup: bagian ini, README modul/Push, runbook cutover `README-deploy.md` §1n (B6, B7, Q-H19 + EXPLAIN gladi, DBV-028 Q8 (a)) |
-| B1–B3, B5 Frontend | MAKE-073 | IN_PROGRESS (review putaran 2 S1–S6 selesai, branch `fase8/make-073-fe-halo` `49f91f5a`; belum di `main`) | layar pemilik, petugas, admin master, badge/notifikasi; rincian di "Frontend helpdesk" di bawah; B5 penutup di branch B4 |
-| B4 Frontend ekspor | MAKE-074 | IN_PROGRESS (branch `fase8/make-074-fe-ekspor`, termasuk merge MAKE-073; belum di `main`) | tombol "Ekspor Rekap" tab Antrean + dialog periode WIB; rincian di bawah |
+| A5 Ekspor + penutup BE | MAKE-074 | DONE (main `947b94fd`) | E-09 `GET tiket/ekspor` (rincian di bawah); penutup: bagian ini, README modul/Push, runbook cutover `README-deploy.md` §1n (B6, B7, Q-H19 + EXPLAIN gladi, DBV-028 Q8 (a)) |
+| B1–B3, B5 Frontend | MAKE-073 | DONE (main `d90d8a75`; B5 masuk bersama MAKE-074 FE `e4392507`) | layar pemilik, petugas, admin master, badge/notifikasi; rincian di "Frontend helpdesk" di bawah; B5 penutup di branch B4 |
+| B4 Frontend ekspor | MAKE-074 | DONE (main `e4392507`) | tombol "Ekspor Rekap" tab Antrean + dialog periode WIB; rincian di bawah |
 | T12b Impor master | MAKE-097 | DONE (main `82d698ec`, PR #42) | ReadOne, review DB WS-2; `id_user` apa adanya, yatim dibuang + dicatat (K-M11/K-M12); lampiran tiket lama di `ManifestLampiran` (T-5/T-8); runbook `docs/migrasi/MAKE-069-rencana.md` T12b |
 | Helper satker | CR-139 | DONE (main `ccb90f78`) | `WebConfigService::satkerKepegawaian()` dipakai `PetugasLayananService` dan `HaloSimpeg\PetugasService` |
+| Temuan QA T-B1 (BE) | CR-143 | DONE (main `4d06a8c6`) | `message` sukses legacy "Berhasil menambahkan data halo simpeg." pada 201 buat tiket |
+| Temuan QA T-B4, T-B3, T-B1 (FE) | CR-142 | DONE (main `8bc6c509`) | ruang bawah halaman + `scroll-padding` agar launcher Vanya tidak menutupi "Kirim"; kolom Aksi sticky kanan; notice sukses tiket baru dari `message` |
+| QA Lapis 1 + laporan akhir | CR-132, CR-144 | QA selesai 18-11-2026; menunggu sign-off Horii | checklist terisi; T-B2 (`Cache-Control` gabungan `tanpaCache`) = kandidat CR sesudah sign-off |
 
 **Keputusan Horii 16-11-2026** ("ikut rekomendasi semua", diteruskan reviewer):
 - H8-14 (a): `AntrePushPesan::antreAkun(id_pengguna[])` aditif; berkas Push bersama = **CR-137**, commit terpisah di branch MAKE-072,
@@ -250,13 +259,15 @@ ada butir H8 yang terbuka.
 - **Penutup:** README `Libraries/HaloSimpeg` (peta kelas + aturan bersama), README Push (status H8-8/PN8-1), runbook cutover
   `README-deploy.md` §1n (merujuk runbook T12b MAKE-097 dan berkas audit DBV-028; lembar hasil B6/B7/Q-H15/Q-H19/EXPLAIN dengan
   ambang Q8 (a)/(b) 5.000 tiket / 100 ms; butir cutover H8-7, DEPLOY-001.1, §1m, CR-135).
-- **Masih terbuka:** H8-8/PN8-1 (payload push lengkap); saran trim Unicode validasi `msg` (dari MAKE-072, di luar kontrak beku);
-  tombol ekspor FE (B4, Worker Muse, sesudah README ekspor beku + MAKE-073).
+- **Masih terbuka (bukan syarat sign-off):** H8-8/PN8-1 payload push lengkap + uji push real = blocker deploy (DEPLOY-001.1);
+  saran trim Unicode validasi `msg` (dari MAKE-072, di luar kontrak beku) = kandidat CR sesudah sign-off. Tombol ekspor FE (B4)
+  sudah di `main` `e4392507`.
 
 ### Frontend helpdesk — MAKE-073 (B1–B3, B5) + MAKE-074 FE (B4) (18-11-2026, Worker Muse)
 
 - **Branch:** `fase8/make-073-fe-halo` (B1–B3 + review R1–R12, Q1–Q7, S1–S6; HEAD `49f91f5a`) dan `fase8/make-074-fe-ekspor`
-  (B4 + B5, berisi merge MAKE-073). Keduanya belum di `main`; merge lewat reviewer dengan izin Horii. Rincian layar, berkas
+  (B4 + B5, berisi merge MAKE-073). Keduanya **di `main`** (izin Horii 18-11-2026): MAKE-073 merge `d90d8a75`, MAKE-074 FE merge
+  `e4392507`. Rincian layar, berkas
   bersama, deviasi, dan tabel acuan layar tanpa Figma: README `frontend/src/features/halo-simpeg/README.md` bagian helpdesk.
 - **Isi:** layar pemilik master-detail (B2); tab Antrean + panel "Perlu ditindak" + thread sisi petugas (B3); admin master Kategori /
   Petugas / Kontak `/halo-simpeg-admin/:bagian` (B3); badge menu (polling `tiket/ringkasan` 60 dtk), titik sidebar ciut, entri tiket di
@@ -269,5 +280,8 @@ ada butir H8 yang terbuka.
 - **Deviasi B4:** tanggal ketikan di luar batas picker ditolak `UiDatePicker` bersama (tidak terkirim), bukan "dikirim apa adanya"
   seperti rancangan; komponen bersama tidak diubah.
 - **AC-E08.7 (H8-9):** frame Figma helpdesk belum ada; acuan per layar dicatat di README dan diuji di QA Lapis 1 §HV (tanpa Vitest).
-- **Masih terbuka:** QA Lapis 1 bagian B (HV, HB badge lewat build lokal) bersama reviewer sesudah MAKE-073/074 di `main`; Q3 (fokus
-  sesudah tiket baru) dicek di browser saat QA karena test jsdom tidak membedakan.
+- **QA Lapis 1 bagian B ✔ selesai 18-11-2026** (`main` `e4392507`; HV dan HB lewat build lokal): Q3 (fokus judul thread sesudah
+  tiket baru) terbukti di browser (HP3). Temuan T-B4, T-B3, dan notice T-B1 diperbaiki CR-142 `8bc6c509` (sisi BE T-B1: CR-143
+  `4d06a8c6`). Verifikasi demo pada CR-142 @`f49f075e`: ruang bawah T-B4 (desktop), kolom Aksi T-B3, dan notice T-B1 dengan
+  teks cadangan (BE demo belum CR-143); sisi BE `message` dan `scroll-padding` (`a2f1e894`) diterima lewat test otomatis
+  (CI #900, `564ebaa5` + CI #904) tanpa uji demo.
