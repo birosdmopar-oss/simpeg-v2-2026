@@ -2,8 +2,8 @@
  * Badge menu Halo Simpeg (AC-E08.12, ✔ Horii D8 (a)): angka = `Ringkasan.badge` (distinct belum dibaca ∪ `perlu_tindak`),
  * bukan `total` (angka lonceng). Fungsi murni; `buildNav` tidak diubah.
  * Dipakai computed `groups` `RedesignShell.vue` dengan angka dari `useRingkasanHalo` (`GET tiket/ringkasan`, README MAKE-071,
- * bergerbang AC-E08.11). Item `halo` baru dirender sesudah CR-135 memberi `to`/`roles`; sampai itu badge diuji lewat
- * `buildNav` tiruan (`HaloShell.spec.ts`).
+ * bergerbang AC-E08.11). Item `halo` dirender sejak CR-135 (`to`/`roles`); badge diuji pada NAV asli (`HaloShellNavAsli.spec.ts`)
+ * dan gerbangnya lewat `buildNav` tiruan (`HaloShell.spec.ts`).
  */
 import type { NavGroup } from '@/shared/layouts/nav.config'
 

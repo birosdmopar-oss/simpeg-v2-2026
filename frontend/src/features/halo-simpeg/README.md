@@ -46,6 +46,8 @@ README sendiri: `chatbot/README.md` (MAKE-095).
 - Badge menu (AC-E08.11/12): `useRingkasanHalo` aktif hanya bila `ACTIVE_PHASE >= 8`, role 1–7, dan tidak wajib ganti password;
   `RedesignShell` menyisipkan angka `badge` ke item `halo`; sidebar ciut menampilkan titik penanda. Lonceng tetap memakai ringkasan
   notifikasi (`total`).
+- Menu (CR-135, `ACTIVE_PHASE` 8): Pusat Bantuan → "Halo Simpeg" (`to: { name: 'halo-simpeg' }`, `roles: HALO_ROLES` 1–7; role 8
+  tanpa menu) dan Pengaturan → "Halo Simpeg" (`halo-admin`, role 1). Badge pada NAV asli diuji `HaloShellNavAsli.spec.ts` (HL2).
 - Notifikasi (H8-15 (b)): entri "Tiket Halo Simpeg (n)" menuju Halo Simpeg, tab Antrean bila sisi petugas > 0.
 
 ### Layar pemilik (B2)

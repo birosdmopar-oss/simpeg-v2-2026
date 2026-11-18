@@ -22,8 +22,8 @@ Simpeg: tidak memakai service, store, route, atau komponen helpdesk.
 
 - **Gerbang render widget** (F8-30/F8-43/F8-50): `ACTIVE_PHASE >= FASE_CHATBOT (8)`, role sesi ∈ `UL_PEGAWAI` (2/6/7), dan
   tidak sedang wajib ganti password. Dipasang sekali di `shared/layouts/RedesignShell.vue`.
-- **Menu** Pengaturan → "Chatbot Manager" (role 1, `phase: 8`, tanpa `rilis`): tersembunyi sampai `ACTIVE_PHASE ≥ 8`; QA lewat
-  URL langsung (pola F7-14). Menu dan widget terbuka bersamaan.
+- **Menu** Pengaturan → "Chatbot Manager" (role 1, `phase: 8`, tanpa `rilis`): tampil sejak rilis menu Fase 8 (CR-135,
+  `ACTIVE_PHASE` = 8); sebelumnya QA lewat URL langsung (pola F7-14). Menu dan widget terbuka bersamaan.
 - **HTML hanya lewat `SafeHtml`** (BP8-14): jawaban widget dan pratinjau jawaban di form QnA. Pesan pengguna, teks sistem,
   judul, riwayat, dan statistik selalu teks ter-escape; tidak ada `v-html` lain.
 - **Tabel admin** `page-fill` + `table-fill` + `UiCard fill`; aksi baris lewat ⋮ (`RowActionsMenu`): Edit → Aktifkan/Nonaktifkan

@@ -6,8 +6,8 @@
  *   halaman menampilkan "tidak ditemukan" alih-alih jatuh ke tampilan daftar.
  * - `/halo-simpeg-admin/:bagian` (nama `halo-admin-<bagian>`): master Kategori | Petugas | Kontak, role 1;
  *   `/halo-simpeg-admin` → kategori. Prefiks sendiri (pola `/chatbot-manager`, keputusan reviewer V2): `AppSidebar` mencocokkan
- *   prefiks path, jadi di bawah `/halo-simpeg/` layar admin akan ikut mengaktifkan item `halo` sesudah CR-135.
- * Menu `halo` tetap `phase: 8` tanpa `to`/`roles` sampai CR-135 (H8-11 (a)); selama `ACTIVE_PHASE < 8` QA lewat URL langsung.
+ *   prefiks path, jadi di bawah `/halo-simpeg/` layar admin akan ikut mengaktifkan item `halo`.
+ * Menu `halo` (`phase: 8`) diberi `to: { name: 'halo-simpeg' }` + `roles: HALO_ROLES` di CR-135 (H8-11 (a), `ACTIVE_PHASE` 8).
  * Guard FE hanya UX (ADR-024); backend tetap menegakkan role.
  */
 import type { RouteRecordRaw } from 'vue-router'

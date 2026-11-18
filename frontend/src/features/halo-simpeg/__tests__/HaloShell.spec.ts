@@ -1,7 +1,8 @@
 /**
  * Titik pasang ringkasan helpdesk di RedesignShell (MAKE-073, AC-E08.11/12), gaya `VanyaShell.spec`: klien `api` diganti
  * adapter pencatat yang hanya menjawab `GET /halo-simpeg/tiket/ringkasan` (fixture kontrak) dan menolak request lain;
- * `buildNav` tiruan memberi `to` ke item `halo` (asli tanpa `to` sampai CR-135) agar badge-nya dirender.
+ * `buildNav` tiruan (satu item `halo`) supaya gerbang fase/role diuji terisolasi; badge pada NAV asli sejak CR-135 ada di
+ * `HaloShellNavAsli.spec.ts` (HL2).
  * - role 8, wajib ganti password, `ACTIVE_PHASE` 5 → tanpa request; role 2 → tepat satu request dan badge = `Ringkasan.badge`.
  */
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
