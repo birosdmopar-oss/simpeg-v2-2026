@@ -740,6 +740,14 @@ describe('Q3: fokus sesudah tiket baru dibuat (alur nyata lewat router)', () => 
     expect(router.currentRoute.value.fullPath).toBe('/halo-simpeg/tiket/9')
     expect(document.querySelector('[data-testid="halo-thread-judul"]')?.textContent?.trim()).toBe('Tiket 9')
     expect(document.activeElement).toBe(document.querySelector('[data-testid="halo-thread-judul"]'))
+    // CR-142 V3: notice sukses (cadangan legacy, role="status") tampil bersama fokus judul; buka dialog Tambah lagi → notice hilang.
+    const sukses = document.querySelector('[data-testid="halo-tiket-baru-sukses"]')
+    expect(sukses?.textContent?.trim()).toBe('Berhasil menambahkan data halo simpeg.')
+    expect(sukses?.getAttribute('role')).toBe('status')
+    await w.get('[data-testid="halo-tiket-baru"]').trigger('click')
+    await flushPromises()
+    expect(document.querySelector('[data-testid="halo-tiket-baru-dialog"]')).not.toBeNull()
+    expect(document.querySelector('[data-testid="halo-tiket-baru-sukses"]')).toBeNull()
   })
 })
 
@@ -1266,5 +1274,70 @@ describe('CR-142 T-B1: notice sukses sesudah tiket baru', () => {
     props.value = { idTiket: 7, idTidakSah: false }
     await flushPromises()
     expect(w.find('[data-testid="halo-tiket-baru-sukses"]').exists()).toBe(false)
+  })
+})
+
+describe('CR-142 V1: scroll-padding bawah dokumen selama halaman terpasang (WCAG 2.4.11)', () => {
+  it('dipasang 6rem saat mount; nilai lama dipulihkan saat unmount; pb-24 tetap', async () => {
+    document.documentElement.style.scrollPaddingBottom = '1rem'
+    const { w } = await pasang()
+    expect(document.documentElement.style.scrollPaddingBottom).toBe('6rem')
+    expect(w.get('[data-testid="halo-halaman"]').classes()).toContain('pb-24')
+    w.unmount()
+    expect(document.documentElement.style.scrollPaddingBottom).toBe('1rem')
+    document.documentElement.style.scrollPaddingBottom = ''
+  })
+})
+
+describe('CR-142 V2: notice sukses tiket baru tidak menumpuk dengan pesan aksi berikutnya', () => {
+  async function siapkan() {
+    svc.tiket.buat.mockResolvedValueOnce({ tiket: { ...DETAIL, id: 42, belum_dibaca: false, bisa_balas: true }, pesan: tiketBuat.message })
+    svc.tiket.detail.mockResolvedValue({ ...DETAIL, id: 42, belum_dibaca: false, bisa_balas: true })
+    const ctx = await pasang()
+    await ctx.w.get('[data-testid="halo-tiket-baru"]').trigger('click')
+    await flushPromises()
+    await isiKirimBaru()
+    ctx.props.value = { idTiket: 42, idTidakSah: false }
+    await flushPromises()
+    expect(ctx.w.find('[data-testid="halo-tiket-baru-sukses"]').exists()).toBe(true)
+    return ctx
+  }
+  async function isiKirimBaru() {
+    const form = document.querySelector('[data-testid="halo-tiket-baru-form"]') as HTMLFormElement
+    const subjek = form.querySelector('input[name="subjek"]') as HTMLInputElement
+    subjek.value = 'Baru'
+    subjek.dispatchEvent(new Event('input'))
+    const pesan = form.querySelector('textarea') as HTMLTextAreaElement
+    pesan.value = 'Isi'
+    pesan.dispatchEvent(new Event('input'))
+    ;(form.querySelector('[role="combobox"]') as HTMLElement).click()
+    await flushPromises()
+    ;(document.querySelector('[role="option"]') as HTMLElement).click()
+    await flushPromises()
+    form.dispatchEvent(new Event('submit'))
+    await flushPromises()
+  }
+
+  it('balas gagal 422 → galat balas tampil, notice sukses hilang', async () => {
+    svc.tiket.balas.mockRejectedValueOnce(apiError(422, galat422Ditutup))
+    const { w } = await siapkan()
+    const balas = w.get('[data-testid="halo-balas-form"]')
+    await balas.get('textarea').setValue('Terima kasih')
+    await balas.trigger('submit')
+    await flushPromises()
+    expect(document.body.textContent).toContain(galat422Ditutup.message)
+    expect(w.find('[data-testid="halo-tiket-baru-sukses"]').exists()).toBe(false)
+  })
+
+  it('tombol tutup (×) → notice hilang; aksi ⋮ daftar → notice hilang', async () => {
+    const a = await siapkan()
+    await a.w.get('[data-testid="halo-tiket-baru-sukses"] button').trigger('click')
+    expect(a.w.find('[data-testid="halo-tiket-baru-sukses"]').exists()).toBe(false)
+    a.w.unmount()
+    const b = await siapkan()
+    const id = DAFTAR.items[0]!.id
+    await selectRowAction(b.w, `halo-tiket-actions-${id}`, 'detail')
+    await flushPromises()
+    expect(b.w.find('[data-testid="halo-tiket-baru-sukses"]').exists()).toBe(false)
   })
 })
