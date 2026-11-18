@@ -4,7 +4,8 @@
  *
  * `phase` = fase pengembangan modul tujuan menu (00-INDEX.md). Menu dengan `phase > ACTIVE_PHASE` sengaja tidak
  * ditampilkan: UI redesign dikerjakan bertahap sampai Fase 3 (Kepegawaian Core), dan halaman tujuannya belum ada.
- * Menaikkan ACTIVE_PHASE saat fase berikutnya selesai cukup untuk memunculkan menunya.
+ * Menaikkan ACTIVE_PHASE saat fase berikutnya selesai cukup untuk memunculkan menunya. Item tanpa `to` dan tanpa anak yang lolos
+ * saring (placeholder tanpa halaman, mis. E-Kinerja/E-Talenta) tidak pernah tampil; grup yang jadi kosong ikut hilang (CR-135 [V2]).
  *
  * Hak akses per role mengikuti Matriks Role x Endpoint (Fase 3: Matriks v2, `features/kepegawaian/roles.ts`).
  * Tampilan menu hanya UX — RoleFilter backend tetap yang menegakkan (ADR-024).

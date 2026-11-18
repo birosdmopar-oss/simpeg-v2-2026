@@ -7,6 +7,12 @@
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+// CR-135 R1: hermetik — host shell (lonceng, ringkasan Halo, pengingat cuti) tidak boleh memakai jaringan sungguhan.
+vi.mock('@/lib/axios', async (asli) => {
+  const a = await asli<typeof import('@/lib/axios')>()
+  const { adapterPenolakShell } = await import('./shellJaringan')
+  return { ...a, api: a.createApiClient({ adapter: adapterPenolakShell }) }
+})
 vi.mock('@/features/auth/services/auth.service', () => ({
   authService: { me: vi.fn(), login: vi.fn(), logout: vi.fn().mockResolvedValue(undefined), changePassword: vi.fn() },
 }))
@@ -16,6 +22,8 @@ import { Role, type RoleCode } from '@/features/auth/types'
 
 import RedesignShell from '../RedesignShell.vue'
 
+import { requestShell, STUB_HOST_SHELL } from './shellJaringan'
+import { resetShellGlobal } from './shellReset'
 import { createShellRouter, loginAs } from './shellTestUtils'
 
 async function mountShell(role: RoleCode, path = '/', extra: Parameters<typeof loginAs>[1] = {}, breadcrumbs?: { label: string }[]) {
@@ -26,13 +34,16 @@ async function mountShell(role: RoleCode, path = '/', extra: Parameters<typeof l
   const wrapper = mount(RedesignShell, {
     props: { breadcrumbs },
     slots: { default: '<p data-testid="content">isi halaman</p>' },
-    global: { plugins: [router] },
+    global: { plugins: [router], stubs: STUB_HOST_SHELL },
     attachTo: document.body,
   })
   return { wrapper, router }
 }
 
 afterEach(() => {
+  // Hanya ringkasan host shell yang boleh diminta (dan semuanya ditolak adapter tiruan).
+  expect(requestShell.filter((r) => !/^get \/(notifikasi|halo-simpeg\/tiket)\/ringkasan$/.test(r))).toEqual([])
+  resetShellGlobal()
   document.body.innerHTML = ''
 })
 enableAutoUnmount(afterEach)

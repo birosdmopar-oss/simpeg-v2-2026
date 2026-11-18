@@ -14,7 +14,7 @@ Komponen yang dipakai modul kedua dipindah ke `src/shared/`.
 ## Admin → Integrasi (MAKE-078, ISSUE-058)
 
 - Route `/integrasi` (`routes.integrasi.ts`, role 1 `INTEGRASI_ADMIN_ROLES`), menu Pengaturan → Integrasi (`nav.config.ts`,
-  `phase: 6` + `rilis`). Figma halaman ini belum ada: tata letak mengikuti halaman daftar Hari Libur (`page-fill` +
+  `phase: 6`; sempat `rilis` saat ACTIVE_PHASE 5, dihapus di CR-135 (ACTIVE_PHASE 8)). Figma halaman ini belum ada: tata letak mengikuti halaman daftar Hari Libur (`page-fill` +
   `table-fill`).
 - `services/logIntegrasi.service.ts` — `GET /integrasi/log` (filter kosong tidak dikirim) dan `POST /integrasi/bkn/tarik`.
 - `views/IntegrasiAdminView.vue` — tabel log (filter layanan dari `layanan_tersedia`, status, rentang tanggal WIB,

@@ -53,19 +53,35 @@ describe('buildNav — fase aktif 8 (rilis menu Fase 8, CR-135)', () => {
     expect(labels(role)).toEqual(harapan)
   })
 
+  // R4: dicek dengan NIP uji (item `nipAkun` ikut) pada fase aktif DAN fase maksimum (item yang belum terbuka ikut).
+  const NIP_UJI = '199001012015011001'
+  const SEMUA = Object.values(Role).flatMap((role) => [ACTIVE_PHASE, Number.MAX_SAFE_INTEGER].map((fase) => [role, fase] as const))
+
   it('tidak ada item ber-`rilis` dengan `phase <= ACTIVE_PHASE` (rilis lebih awal sudah dibersihkan, CR-135)', () => {
-    for (const role of Object.values(Role)) {
-      for (const item of buildNav(role, Number.MAX_SAFE_INTEGER).flatMap((g) => g.items)) {
+    for (const [role, fase] of SEMUA) {
+      for (const item of buildNav(role, fase, NIP_UJI).flatMap((g) => g.items)) {
         if (item.rilis) expect(item.phase, `${item.key} masih ber-rilis`).toBeGreaterThan(ACTIVE_PHASE)
       }
     }
   })
 
-  it.each(Object.values(Role))('role %i: tanpa key duplikat dan tanpa item mati (tanpa `to` dan tanpa anak)', (role) => {
-    const items = buildNav(role).flatMap((g) => g.items)
+  it.each(SEMUA)('role %i fase %i: tanpa key duplikat (item + anak, dengan NIP)', (role, fase) => {
+    const items = buildNav(role, fase, NIP_UJI).flatMap((g) => g.items)
     const keys = [...items.map((i) => i.key), ...items.flatMap((i) => (i.children ?? []).map((c) => c.key))]
     expect(new Set(keys).size).toBe(keys.length)
-    for (const i of items) expect(i.to !== undefined || (i.children?.length ?? 0) > 0, `${i.key} tanpa tujuan`).toBe(true)
+  })
+
+  // R3: tujuan menu harus ada di router ASLI (nama terdaftar; path tidak jatuh ke catch-all `/:pathMatch(.*)*`).
+  it.each(Object.values(Role))('role %i: setiap tujuan menu (item & anak) ter-resolve di router asli', async (role) => {
+    const { default: router } = await import('@/router')
+    for (const item of buildNav(role, ACTIVE_PHASE, NIP_UJI).flatMap((g) => g.items)) {
+      for (const [key, to] of [[item.key, item.to], ...(item.children ?? []).map((c) => [c.key, c.to] as const)] as const) {
+        if (to === undefined) continue
+        const r = router.resolve(to)
+        expect(r.matched.length, `${key} → ${JSON.stringify(to)}`).toBeGreaterThan(0)
+        expect(r.matched.at(-1)?.path, `${key} → ${JSON.stringify(to)} jatuh ke catch-all`).not.toBe('/:pathMatch(.*)*')
+      }
+    }
   })
 
   it('Daftar Pegawai hanya role 1, 3, 4, 5, 8', () => {

@@ -1,7 +1,9 @@
 /**
  * Helper test bersama untuk komponen yang dirender di dalam RedesignShell (bukan spec).
  * Router tiruan memuat SEMUA nama route yang dirujuk nav.config.ts — `router.resolve` melempar error bila ada
- * nama route yang tidak terdaftar — plus route halaman Kepegawaian.
+ * nama route yang tidak terdaftar — plus route halaman Kepegawaian. Nama route menu didaftarkan otomatis (`ruteMenuTiruan`) dan
+ * path string menu ditampung rute catch-all berperingkat terendah (CR-135 R2), jadi tidak ada warn "No match found".
+ * Jaringan hermetik host shell: `shellJaringan.ts` + `shellReset.ts`.
  */
 import { createPinia, setActivePinia } from 'pinia'
 import { h } from 'vue'
@@ -57,7 +59,7 @@ export function createShellRouter(): Router {
     { path: '/arsip', name: 'arsip', component: stub },
     { path: '/arsip/:nip', name: 'arsip-pegawai', component: stub },
     { path: '/arsip/:nip/:folder', name: 'arsip-folder', component: stub },
-    // Nama route menu lain (Fase 4–8) ditambah otomatis oleh `ruteMenuTiruan` (CR-135).
+    // Nama route menu lain (Fase 4–8) ditambah otomatis oleh `ruteMenuTiruan`; path string menu ditampung catch-all (CR-135).
   ]
   const sudahAda = new Set(routes.map((r) => String(r.name ?? '')))
   // Menu ber-path string (mis. `/layanan/cuti`, `/presensi`, `/notifikasi`) ditampung satu rute catch-all supaya RouterLink tidak

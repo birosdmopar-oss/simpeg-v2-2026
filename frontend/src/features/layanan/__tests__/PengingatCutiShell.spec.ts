@@ -7,6 +7,12 @@
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+// CR-135 R1: hermetik — lonceng dan ringkasan Halo shell tidak memakai jaringan sungguhan.
+vi.mock('@/lib/axios', async (asli) => {
+  const a = await asli<typeof import('@/lib/axios')>()
+  const { adapterPenolakShell } = await import('@/shared/layouts/__tests__/shellJaringan')
+  return { ...a, api: a.createApiClient({ adapter: adapterPenolakShell }) }
+})
 vi.mock('../services/cuti.service', () => ({
   cutiService: { pengingat: vi.fn(), tunda: vi.fn() },
 }))
@@ -16,6 +22,8 @@ vi.mock('@/features/auth/services/auth.service', () => ({
 
 import { Role, type RoleCode } from '@/features/auth/types'
 import { resetAntreanDialog, useAntreanDialog } from '@/shared/composables/antreanDialog'
+import { requestShell, STUB_HOST_SHELL } from '@/shared/layouts/__tests__/shellJaringan'
+import { resetShellGlobal } from '@/shared/layouts/__tests__/shellReset'
 import { createShellRouter, loginAs } from '@/shared/layouts/__tests__/shellTestUtils'
 import RedesignShell from '@/shared/layouts/RedesignShell.vue'
 
@@ -46,7 +54,7 @@ async function mountShell(role: RoleCode, extra: Parameters<typeof loginAs>[1] =
   router.addRoute({ path: '/layanan/cuti/:id', name: 'layanan-cuti-detail', component: { render: () => null } })
   await router.push('/')
   await router.isReady()
-  const wrapper = mount(RedesignShell, { slots: { default: '<p>beranda</p>' }, global: { plugins: [router] }, attachTo: document.body })
+  const wrapper = mount(RedesignShell, { slots: { default: '<p>beranda</p>' }, global: { plugins: [router], stubs: { ...STUB_HOST_SHELL, PengingatCutiShell: false } }, attachTo: document.body })
   await flushPromises()
   return { wrapper, router, auth }
 }
@@ -56,12 +64,14 @@ async function mountShellDenganStore() {
   router.addRoute({ path: '/layanan/cuti/:id', name: 'layanan-cuti-detail', component: { render: () => null } })
   await router.push('/')
   await router.isReady()
-  const wrapper = mount(RedesignShell, { slots: { default: '<p>beranda</p>' }, global: { plugins: [router] }, attachTo: document.body })
+  const wrapper = mount(RedesignShell, { slots: { default: '<p>beranda</p>' }, global: { plugins: [router], stubs: { ...STUB_HOST_SHELL, PengingatCutiShell: false } }, attachTo: document.body })
   await flushPromises()
   return wrapper
 }
 
 afterEach(() => {
+  expect(requestShell.filter((r) => !/^get \/(notifikasi|halo-simpeg\/tiket)\/ringkasan$/.test(r))).toEqual([])
+  resetShellGlobal()
   resetAntreanDialog()
   document.body.innerHTML = ''
   window.sessionStorage.clear()
