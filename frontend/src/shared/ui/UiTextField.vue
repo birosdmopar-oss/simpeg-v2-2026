@@ -43,6 +43,8 @@ const props = withDefaults(
     list?: string
     /** Saran nilai teks bebas (UiCombobox custom, bukan <datalist> bawaan browser); `[]` = belum ada saran (CR-060). */
     suggestions?: string[]
+    /** Combobox: false = saran tidak disaring teks ketikan (hasil server). Bawaan true. */
+    saringLokal?: boolean
     /** Batas tanggal `YYYY-MM-DD` (inklusif), hanya untuk type="date". */
     min?: string
     max?: string
@@ -63,12 +65,13 @@ const props = withDefaults(
     inputmode: undefined,
     list: undefined,
     suggestions: undefined,
+    saringLokal: true,
     min: undefined,
     max: undefined,
   },
 )
 
-const emit = defineEmits<{ 'update:modelValue': [value: string]; blur: []; focus: [] }>()
+const emit = defineEmits<{ 'update:modelValue': [value: string]; blur: []; focus: []; pilih: [indeks: number] }>()
 
 const id = useId()
 const slots = useSlots()
@@ -82,7 +85,13 @@ const picker = computed(() => (isCombobox.value ? UiCombobox : (PICKERS[props.ty
 /** Props khusus per komponen kontrol (picker tanggal: batas; combobox: saran + atribut input). */
 const pickerProps = computed(() =>
   isCombobox.value
-    ? { suggestions: props.suggestions, inputmode: props.inputmode, autocomplete: props.autocomplete, placeholder: props.placeholder }
+    ? {
+        suggestions: props.suggestions,
+        saringLokal: props.saringLokal,
+        inputmode: props.inputmode,
+        autocomplete: props.autocomplete,
+        placeholder: props.placeholder,
+      }
     : { min: props.min, max: props.max, ...(props.placeholder ? { placeholder: props.placeholder } : {}) },
 )
 /** Pesan format salah dari picker (kosong = sah); hanya dipakai bila pemanggil tidak memberi help text sendiri. */
@@ -144,6 +153,7 @@ const controlClass = computed(() => [
         :control-class="controlClass"
         :describedby="help ? `${id}-help` : undefined"
         @update:model-value="emit('update:modelValue', $event)"
+        @pilih="emit('pilih', $event)"
         @invalid="pickerMessage = $event"
         @blur="emit('blur')"
         @focus="emit('focus')"

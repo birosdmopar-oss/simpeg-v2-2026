@@ -7,6 +7,10 @@
  * kolom ketik (`aria-activedescendant`). Keyboard: ↓/↑ membuka dan memindah saran aktif, Enter memilih saran aktif (tanpa
  * saran aktif, Enter dibiarkan untuk form), Esc menutup daftar saja, Tab menutup. Saran disaring (huruf besar/kecil
  * diabaikan, berisi teks ketikan); daftar tidak tampil bila tidak ada yang cocok.
+ *
+ * Aditif (MAKE-073 review B3 R8): `saringLokal = false` menampilkan saran apa adanya (mis. hasil pencarian server yang cocok
+ * lewat kolom lain); event `pilih` memancarkan indeks saran di `suggestions` yang dipilih, agar pemanggil dapat memetakan
+ * pilihan ke id walau labelnya kembar.
  */
 import { PopoverAnchor, PopoverContent, PopoverPortal, PopoverRoot } from 'radix-vue'
 import { computed, nextTick, ref } from 'vue'
@@ -27,6 +31,8 @@ const props = withDefaults(
     inputmode?: 'text' | 'numeric' | 'decimal' | 'tel' | 'email' | 'search'
     autocomplete?: string
     ariaLabel?: string
+    /** false = saran tidak disaring teks ketikan (hasil server). Bawaan true (perilaku lama). */
+    saringLokal?: boolean
   }>(),
   {
     modelValue: '',
@@ -43,10 +49,11 @@ const props = withDefaults(
     inputmode: undefined,
     autocomplete: 'off',
     ariaLabel: undefined,
+    saringLokal: true,
   },
 )
 
-const emit = defineEmits<{ 'update:modelValue': [value: string]; blur: []; focus: [] }>()
+const emit = defineEmits<{ 'update:modelValue': [value: string]; blur: []; focus: []; pilih: [indeks: number] }>()
 
 const MAX_SHOWN = 50
 
@@ -56,11 +63,14 @@ const active = ref(-1)
 const root = ref<HTMLElement | null>(null)
 
 const text = computed(() => String(props.modelValue ?? ''))
-const matches = computed(() => {
+/** Saran yang tampil beserta indeks asalnya di `suggestions`. */
+const daftar = computed(() => {
   const q = text.value.trim().toLowerCase()
-  const list = q === '' ? props.suggestions : props.suggestions.filter((s) => s.toLowerCase().includes(q) && s.toLowerCase() !== q)
+  const semua = props.suggestions.map((teks, asal) => ({ teks, asal }))
+  const list = q === '' || !props.saringLokal ? semua : semua.filter((s) => s.teks.toLowerCase().includes(q) && s.teks.toLowerCase() !== q)
   return list.slice(0, MAX_SHOWN)
 })
+const matches = computed(() => daftar.value.map((s) => s.teks))
 
 const listId = computed(() => `${props.id ?? 'ui-combobox'}-list`)
 const optionId = (i: number): string => `${props.id ?? 'ui-combobox'}-opt-${i}`
@@ -83,8 +93,9 @@ function onInput(e: Event): void {
   show()
 }
 
-function choose(value: string): void {
+function choose(value: string, asal?: number): void {
   emit('update:modelValue', value)
+  if (asal !== undefined) emit('pilih', asal)
   hide()
   void nextTick(() => input.value?.focus())
 }
@@ -99,7 +110,9 @@ function onKeydown(e: KeyboardEvent): void {
     void nextTick(() => document.getElementById(optionId(active.value))?.scrollIntoView?.({ block: 'nearest' }))
   } else if (e.key === 'Enter' && showList.value && active.value >= 0) {
     e.preventDefault()
-    choose(matches.value[active.value] ?? text.value)
+    const s = daftar.value[active.value]
+    if (s) choose(s.teks, s.asal)
+    else choose(text.value)
   } else if (e.key === 'Escape' && open.value) {
     e.stopPropagation() // Esc menutup daftar, bukan dialog di belakangnya
     hide()
@@ -164,9 +177,9 @@ function onPointerDownOutside(e: CustomEvent<{ originalEvent: PointerEvent }>): 
       >
         <ul :id="listId" role="listbox" class="max-h-64 overflow-y-auto">
           <li
-            v-for="(s, i) in matches"
+            v-for="(s, i) in daftar"
             :id="optionId(i)"
-            :key="s"
+            :key="s.asal"
             role="option"
             :aria-selected="i === active ? 'true' : 'false'"
             :data-active="i === active || undefined"
@@ -174,9 +187,9 @@ function onPointerDownOutside(e: CustomEvent<{ originalEvent: PointerEvent }>): 
             :class="i === active ? 'bg-slate-100' : ''"
             @mousedown.prevent
             @mousemove="active = i"
-            @click="choose(s)"
+            @click="choose(s.teks, s.asal)"
           >
-            {{ s }}
+            {{ s.teks }}
           </li>
         </ul>
       </PopoverContent>
