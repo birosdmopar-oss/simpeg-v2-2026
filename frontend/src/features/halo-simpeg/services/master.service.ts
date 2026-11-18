@@ -40,7 +40,7 @@ import type {
 
 export const BASIS_HALO = '/halo-simpeg'
 
-function parse<S extends z.ZodTypeAny>(schema: S, data: unknown, path: string): z.output<S> {
+export function parse<S extends z.ZodTypeAny>(schema: S, data: unknown, path: string): z.output<S> {
   const hasil = schema.safeParse(data)
   if (!hasil.success) throw new KontrakHaloError(path, hasil.error)
   return hasil.data as z.output<S>
@@ -60,10 +60,11 @@ function params(filter: object): Record<string, string | number> {
 const bulatDalam = (n: number, min: number, maks: number): number => Math.min(maks, Math.max(min, Math.trunc(n)))
 
 /**
- * Filter daftar master → query (README final S3): `page` dibulatkan ke 1..1.000.000 dan `per_page` ke 1..100 agar UI tidak
- * memicu 422 `errors.page`; nilai bukan angka hingga tidak dikirim (bawaan BE). `status` hanya 0/1 (tipe).
+ * Filter daftar → query (README final S3; daftar tiket memakai konvensi paginasi yang sama): `page` dibulatkan ke
+ * 1..1.000.000 dan `per_page` ke 1..100 agar UI tidak memicu 422 `errors.page`; nilai bukan angka hingga tidak dikirim
+ * (bawaan BE). Parameter kosong tidak dikirim.
  */
-export function queryDaftar(filter: FilterMaster): Record<string, string | number> {
+export function queryDaftar<F extends { page?: number; per_page?: number }>(filter: F): Record<string, string | number> {
   const { page, per_page, ...lain } = filter
   return params({
     ...lain,
