@@ -269,3 +269,25 @@ describe('Q5: penyegaran ringkasan sesudah aksi tidak tertelan dedupe', () => {
     expect(svc.ringkasan).toHaveBeenCalledTimes(2)
   })
 })
+
+describe('R7 (b): muat ulang detail sesudah balas', () => {
+  it('sisi petugas → detail dimuat 2× dan pengingat memakai respons kedua; sisi pemilik → tanpa muat ulang', async () => {
+    const hasil = tiketBalas.data as HasilBalas
+    svc.ringkasan.mockResolvedValue(baca.data as Ringkasan)
+    svc.detail
+      .mockResolvedValueOnce({ ...DETAIL, id: 90, sebagai_petugas: true, belum_dibaca: false, pengingat: { aktif: false, jatuh_tempo: null } })
+      .mockResolvedValueOnce({ ...DETAIL, id: 90, sebagai_petugas: true, belum_dibaca: false, pengingat: { aktif: true, jatuh_tempo: '2026-11-20T01:00:00Z' } })
+    await bukaTiket(90)
+    svc.balas.mockResolvedValueOnce({ ...hasil, tiket: { ...hasil.tiket, id: 90 } })
+    await balasTiket(90, { pesan: 'x', arsip: null, ingatkan_24_jam: true })
+    await vi.waitFor(() => expect(svc.detail).toHaveBeenCalledTimes(2))
+    await vi.waitFor(() => expect(detailTiket.detail?.pengingat).toEqual({ aktif: true, jatuh_tempo: '2026-11-20T01:00:00Z' }))
+
+    svc.detail.mockReset().mockResolvedValueOnce({ ...DETAIL, id: 91, sebagai_petugas: false, belum_dibaca: false, pengingat: null })
+    await bukaTiket(91)
+    svc.balas.mockResolvedValueOnce({ ...hasil, tiket: { ...hasil.tiket, id: 91, sebagai_petugas: false } })
+    await balasTiket(91, { pesan: 'y', arsip: null, ingatkan_24_jam: false })
+    await Promise.resolve()
+    expect(svc.detail).toHaveBeenCalledTimes(1)
+  })
+})

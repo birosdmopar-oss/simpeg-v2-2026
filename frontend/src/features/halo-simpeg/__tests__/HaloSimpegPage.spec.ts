@@ -911,3 +911,31 @@ describe('R4/R5: petugas/saya disegarkan dan deep-link antrean', () => {
     expect(w.find('[data-testid="halo-daftar-antrean"]').exists()).toBe(true)
   })
 })
+
+describe('R7 (a, c): pengingat di form balas petugas', () => {
+  it('jatuh tempo + hint baru tampil sesudah kirim (detail dimuat ulang); aktif=false → tanpa elemen jatuh tempo', async () => {
+    const dasar = { ...(detailPetugas.data as TiketDetail), belum_dibaca: false }
+    svc.tiket.detail
+      .mockResolvedValueOnce({ ...dasar, pengingat: { aktif: false, jatuh_tempo: null } })
+      .mockResolvedValueOnce({ ...dasar, pengingat: { aktif: true, jatuh_tempo: '2099-01-01T00:00:00Z' } })
+    svc.tiket.ringkasan.mockResolvedValue({ belum_dibaca_saya: 0, belum_dibaca_petugas: 0, perlu_tindak: 0, badge: 0, total: 0 })
+    svc.tiket.balas.mockResolvedValueOnce({ pesan: dasar.pesan[1], tiket: { ...DAFTAR.items[0]!, id: dasar.id, sebagai_petugas: true } })
+    const { w } = await pasang({ idTiket: dasar.id })
+    expect(w.find('[data-testid="halo-pengingat-jatuh-tempo"]').exists()).toBe(false)
+    expect(w.find('[data-testid="halo-pengingat-hint"]').exists()).toBe(false)
+    expect((w.get('[data-testid="halo-balas-ingatkan"] input[type="checkbox"]').element as HTMLInputElement).checked).toBe(false)
+    await w.get('[data-testid="halo-balas-form"] textarea').setValue('Kami cek.')
+    await w.get('[data-testid="halo-balas-ingatkan"] input[type="checkbox"]').setValue(true)
+    await w.get('[data-testid="halo-balas-form"]').trigger('submit')
+    await flushPromises()
+    await flushPromises()
+    expect(w.get('[data-testid="halo-pengingat-jatuh-tempo"]').text()).toContain('Pengingat aktif')
+    expect(w.get('[data-testid="halo-pengingat-hint"]').text()).toBe('Kirim tanpa centang akan membatalkan pengingat.')
+  })
+
+  it('jatuh tempo sudah lewat → label "Pengingat jatuh tempo"', async () => {
+    svc.tiket.detail.mockResolvedValueOnce({ ...(detailPetugas.data as TiketDetail), belum_dibaca: false, pengingat: { aktif: true, jatuh_tempo: '2020-01-01T00:00:00Z' } })
+    const { w } = await pasang({ idTiket: detailPetugas.data.id })
+    expect(w.get('[data-testid="halo-pengingat-jatuh-tempo"]').text()).toContain('Pengingat jatuh tempo')
+  })
+})

@@ -107,6 +107,11 @@ const galatKlien = computed<Record<string, string>>(() => {
 })
 /** Centang pengingat hanya untuk petugas tiket bukan pemilik (`pengingat !== null`). */
 const bolehIngatkan = computed(() => detail.value?.pengingat != null)
+/** Jatuh tempo pengingat sudah lewat (perbandingan instan UTC, aman lintas zona). */
+const pengingatLewat = computed(() => {
+  const jt = detail.value?.pengingat?.jatuh_tempo
+  return jt ? new Date(jt).getTime() <= Date.now() : false
+})
 const isDesktop = useIsDesktop()
 const idSnapshot = `${useId()}-snapshot`
 const teksSnapshot = computed(() => {
@@ -269,9 +274,13 @@ async function kirim(): Promise<void> {
           <p v-if="errBalas('arsip')" class="text-caption text-danger" role="alert">{{ errBalas('arsip') }}</p>
           <div v-if="bolehIngatkan" data-testid="halo-balas-ingatkan">
             <UiCheckbox v-model="balas.ingatkan" label="Ingatkan Saya Kembali?" :disabled="mengirim" />
-            <p v-if="detail.pengingat?.aktif" class="mt-1 text-caption text-slate-500" data-testid="halo-pengingat-jatuh-tempo">
-              Pengingat aktif: {{ waktu(detail.pengingat.jatuh_tempo) }}
-            </p>
+            <template v-if="detail.pengingat?.aktif">
+              <p class="mt-1 text-caption text-slate-500" data-testid="halo-pengingat-jatuh-tempo">
+                {{ pengingatLewat ? 'Pengingat jatuh tempo' : 'Pengingat aktif' }}: {{ waktu(detail.pengingat.jatuh_tempo) }}
+              </p>
+              <!-- Review B3 R7: bawaan centang kosong [K]; mengirim tanpa centang membatalkan pengingat (notify_pic = 2). -->
+              <p class="mt-0.5 text-caption text-slate-500" data-testid="halo-pengingat-hint">Kirim tanpa centang akan membatalkan pengingat.</p>
+            </template>
             <p v-if="errBalas('ingatkan_24_jam')" class="mt-1 text-caption text-danger" role="alert">{{ errBalas('ingatkan_24_jam') }}</p>
           </div>
           <div class="flex justify-end">
