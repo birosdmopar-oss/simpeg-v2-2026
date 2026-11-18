@@ -1,9 +1,9 @@
 <script setup lang="ts">
 /**
  * Popup "Filter Kolom" Daftar Pegawai (§4.1.5, Gambar 20 & 21): tombol terbelah "Filter Kolom ▾" membuka panel
- * berisi pencarian kolom, "Toggle All Column/Result", daftar kolom dikelompokkan per huruf dalam dua lajur,
- * tombol "Apply Column" dan tutup (×). Saat mencari, judul berubah jadi "Hasil pencarian ditemukan" dan
- * keadaan kosong menampilkan "Tidak ada hasil ditemukan…". Pilihan baru berlaku setelah "Apply Column".
+ * berisi pencarian kolom, "Pilih semua kolom/hasil", daftar kolom dikelompokkan per huruf dalam dua lajur,
+ * tombol "Terapkan Kolom" dan tutup (×). Saat mencari, judul berubah jadi "Hasil pencarian ditemukan" dan
+ * keadaan kosong menampilkan "Tidak ada hasil ditemukan…". Pilihan baru berlaku setelah "Terapkan Kolom" (teks Bahasa Indonesia sejak CR-150).
  */
 import { ChevronDown, Search, X } from 'lucide-vue-next'
 import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from 'radix-vue'
