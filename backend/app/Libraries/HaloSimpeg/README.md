@@ -24,5 +24,5 @@ Aturan bersama:
   10.4 tanpa `FOR SHARE`). Ekspor hanya baca, tanpa transaksi.
 - Status terbuka (bukan bagian kontrak beku):
   - H8-8 (payload push lengkap, PN8-1) belum ada, jadi payload tetap terbatas F8-16; uji push real = DEPLOY-001.1.
-  - Saran terpisah dari MAKE-072: validasi `msg` tiket memakai trim Unicode. Saat ini pesan yang hanya berisi spasi Unicode lolos
-    validasi, dan isi push-nya memakai teks cadangan.
+  - Saran MAKE-072 (trim Unicode validasi `msg`) selesai di CR-148: pesan yang hanya berisi spasi Unicode ditolak 422; teks cadangan
+    isi push tetap ada sebagai pengaman.

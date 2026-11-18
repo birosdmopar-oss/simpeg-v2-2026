@@ -307,7 +307,7 @@ Nama pengirim pesan baru = nama bergelar bila akun punya data pegawai (B-28), se
 **Buat tiket (E-03):**
 - Pelapor wajib akun ber-NIP yang terdaftar di `pegawai` [K `SC:612-617`]; selain itu 422 "Data pegawai tidak ditemukan didalam sistem.".
 - Throttle **5 per 10 menit** per akun, dicek sebelum validasi dan unggah: lewat batas → 429 tanpa baris dan tanpa berkas.
-- `id_question_category` kategori **aktif**; `subject` wajib ≤ 250; `msg` wajib ≤ 5.000 (karakter sesudah trim); `arsip` opsional.
+- `id_question_category` kategori **aktif**; `subject` wajib ≤ 250; `msg` wajib ≤ 5.000 (karakter sesudah trim **Unicode**, CR-148); `arsip` opsional.
 - Kategori aktif dicek ulang di dalam transaksi di bawah kunci bersama (`LOCK IN SHARE MODE`) sebelum INSERT; kategori yang
   dinonaktifkan/dihapus di sela itu (termasuk FK 1452) → 422 `errors.id_question_category` "Kategori tidak tersedia.".
 - Tersimpan: `status = 0`, `allow_reply = 1`, `is_read = 1`, `is_read_off = 2`, `notify_pic = 2`, `receiver = 0`, `sender_name` =
@@ -397,7 +397,7 @@ terlihat petugas mana pun (404) dan tidak dihitung di sisi petugas.
 |---|---|
 | `id_question_category` | "Kategori wajib dipilih." / "Kategori tidak tersedia." |
 | `subject` | "Subjek wajib diisi." / "Subjek maksimal 250 karakter." |
-| `msg` | "Pesan wajib diisi." / "Pesan maksimal 5.000 karakter." |
+| `msg` | "Pesan wajib diisi." / "Pesan maksimal 5.000 karakter." — buat tiket dan balasan. Wajib dan batas panjang dihitung sesudah trim Unicode (CR-148): spasi `\p{Z}` (NBSP, U+2000–U+200A, U+202F, U+205F, U+3000, …), spasi ASCII, dan lebar-nol U+180E, U+200B–U+200D, U+2060, U+FEFF di tepi tidak dihitung; isi spasi Unicode saja → "Pesan wajib diisi.". Isi yang disimpan tidak diubah |
 | `arsip` | teks `ValidasiBerkas` (mis. "Jenis berkas tidak diizinkan (hanya jpg, jpeg, png, gif, pdf, doc, docx, xls, xlsx).", "Ukuran berkas melebihi 5 MB.", "Jenis isi berkas tidak sesuai dengan ekstensinya.") |
 | `ingatkan_24_jam` | "Nilai pengingat tidak valid." / "Pengingat 24 jam hanya dapat diatur petugas." |
 | `peran` / `status` / `kategori` / `baca` (query) | "Peran tidak valid." / "Status tidak valid." / "Kategori tidak valid." / "Filter baca tidak valid." |
@@ -470,8 +470,8 @@ Acuan: PRD Fase 8 v1.4 §6.4, §7.6, F8-13..F8-16, H8-14 (a). Tidak ada endpoint
 - **Payload terbatas F8-16** (H8-8 belum ada; uji push real ke perangkat dicatat ke DEPLOY-001.1):
   - judul `"Halo Simpeg"`;
   - isi = teks pesan, spasi dirapatkan, maksimal 100 karakter + `…`; untuk tutup: `"Percakapan Halo Simpeg telah ditutup."`;
-    bila potongan kosong (pesan hanya berisi spasi Unicode, mis. NBSP/U+3000, yang lolos validasi `msg`): `"Ada pesan baru di Halo
-    Simpeg."`. Saran terpisah (di luar MAKE-072): validasi `msg` tiket memakai trim Unicode, karena kontrak README tiket sudah beku;
+    bila potongan kosong: `"Ada pesan baru di Halo Simpeg."` (pengaman; sejak CR-148 pesan yang hanya berisi spasi Unicode ditolak
+    422 di validasi `msg`, sehingga jalur ini tidak tercapai lewat endpoint);
   - `data = {modul: "halo-simpeg", id_inbox: "<id>", url: "/halo-simpeg/tiket/<id>", link: "/halo-simpeg/tiket/<id>"}`
     (`link` dibuka service worker web, `url` untuk klien lain);
   - tanpa NIP, jabatan, satker, token, atau isi pesan lengkap (AC-E06.5). Kunci kompatibilitas Android menunggu PN8-1.
