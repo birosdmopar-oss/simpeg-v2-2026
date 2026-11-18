@@ -74,7 +74,7 @@ final class PusatNotifikasiTest extends DatabaseTestCase
         foreach ([Role::SUPER_ADMIN, Role::PEGAWAI, Role::ADMIN_SATKER, Role::ADMIN_VIEW_ESELON1, Role::MENTERI, Role::PTT, Role::PPPK, Role::PIMPINAN] as $role) {
             $res = $this->asRole($role)->get(self::BASE . '/ringkasan');
             $res->assertStatus(200);
-            $this->assertStringContainsString('no-store', (string) $res->response()->getHeaderLine('Cache-Control'));
+            $this->assertSame('private, no-store', $res->response()->getHeaderLine('Cache-Control'), 'CR-147: tepat satu nilai');
 
             $data = $this->json($res)['data'];
             $this->assertSame(['notifikasi_belum_dibaca', 'butuh_approval', 'berita_belum_dibaca', 'tiket_belum_dibaca', 'diperbarui_at'], array_keys($data), "role {$role}");
