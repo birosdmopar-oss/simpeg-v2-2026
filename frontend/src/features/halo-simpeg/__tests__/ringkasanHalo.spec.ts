@@ -126,19 +126,32 @@ describe('gerbang polling ringkasan (AC-E08.11)', () => {
     expect(svc.ringkasan).toHaveBeenCalledTimes(2)
   })
 
-  it('shell dipasang ulang (dua pemakai bergantian) tetap satu watch; muat ulang saat request berjalan tidak menggandakan', async () => {
+  it('shell dipasang ulang dengan urutan nyata (unmount lama → mount baru): satu request, satu timer (review B1 N4)', async () => {
+    vi.useFakeTimers()
     const t = tertunda<Ringkasan>()
     svc.ringkasan.mockReturnValueOnce(t.janji)
     login(Role.PEGAWAI)
     const a = pasang()
-    const b = pasang()
     a.w.unmount()
-    b.api().muatUlang()
-    b.api().muatUlang()
+    const b = pasang()
     t.lepas(RINGKASAN)
     await flushPromises()
     expect(svc.ringkasan).toHaveBeenCalledTimes(1)
     expect(b.w.get('[data-testid="badge"]').text()).toBe(String(RINGKASAN.badge))
+    await vi.advanceTimersByTimeAsync(INTERVAL_RINGKASAN_MS)
+    expect(svc.ringkasan).toHaveBeenCalledTimes(2)
+  })
+
+  it('muat ulang saat request berjalan tidak menggandakan', async () => {
+    const t = tertunda<Ringkasan>()
+    svc.ringkasan.mockReturnValueOnce(t.janji)
+    login(Role.PEGAWAI)
+    const { api } = pasang()
+    api().muatUlang()
+    api().muatUlang()
+    t.lepas(RINGKASAN)
+    await flushPromises()
+    expect(svc.ringkasan).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -203,5 +216,47 @@ describe('bacaTiket — penjaga generasi (review B1 N2)', () => {
     b.lepas(ringkasanB)
     await muatB
     expect(haloState.ringkasan).toEqual(ringkasanB)
+  })
+})
+
+describe('tab tersembunyi dan pelepasan listener (review B1 N3)', () => {
+  const terlihatSebagai = (v: DocumentVisibilityState) => vi.spyOn(document, 'visibilityState', 'get').mockReturnValue(v)
+  const ubahTerlihat = () => document.dispatchEvent(new Event('visibilitychange'))
+
+  afterEach(() => vi.restoreAllMocks())
+
+  it('tab tersembunyi → interval tidak memanggil; terlihat lagi + visibilitychange → tepat satu panggilan', async () => {
+    vi.useFakeTimers()
+    login(Role.PEGAWAI)
+    pasang()
+    await flushPromises()
+    expect(svc.ringkasan).toHaveBeenCalledTimes(1)
+    terlihatSebagai('hidden')
+    await vi.advanceTimersByTimeAsync(INTERVAL_RINGKASAN_MS)
+    ubahTerlihat()
+    await flushPromises()
+    expect(svc.ringkasan).toHaveBeenCalledTimes(1)
+    terlihatSebagai('visible')
+    ubahTerlihat()
+    await flushPromises()
+    expect(svc.ringkasan).toHaveBeenCalledTimes(2)
+  })
+
+  it.each([
+    ['unmount pemakai terakhir', (w: { unmount: () => void }) => w.unmount()],
+    ['logout (clearSession)', () => useAuthStore().clearSession()],
+    ['wajib ganti password', () => login(Role.PEGAWAI, true)],
+  ])('sesudah %s → visibilitychange + interval tidak memanggil lagi', async (_n, akhiri) => {
+    vi.useFakeTimers()
+    login(Role.PEGAWAI)
+    const { w } = pasang()
+    await flushPromises()
+    expect(svc.ringkasan).toHaveBeenCalledTimes(1)
+    akhiri(w)
+    await flushPromises()
+    terlihatSebagai('visible')
+    ubahTerlihat()
+    await vi.advanceTimersByTimeAsync(INTERVAL_RINGKASAN_MS * 2)
+    expect(svc.ringkasan).toHaveBeenCalledTimes(1)
   })
 })
