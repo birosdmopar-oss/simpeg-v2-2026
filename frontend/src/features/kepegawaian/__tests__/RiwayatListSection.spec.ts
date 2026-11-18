@@ -155,6 +155,13 @@ describe('RiwayatListSection — data & tampilan', () => {
     expect(wrapper.get('[data-testid="riwayat-row-1"]').findAll('td').at(-1)?.classes()).toEqual(expect.arrayContaining(['sticky', 'right-0']))
   })
 
+  it('CR-153: kotak cari memakai placeholder Bahasa Indonesia "Cari <judul>..." (bukan "Search")', async () => {
+    const wrapper = await mountTab()
+    const cari = wrapper.get('input[type="search"]')
+    expect(cari.attributes('placeholder')).toBe(`Cari ${uji.title.toLowerCase()}...`)
+    expect(cari.attributes('placeholder')).not.toBe('Search')
+  })
+
   it('CR-049 D-F7: klik header mengurutkan (aria-sort naik → turun); tanggal dari nilai mentah', async () => {
     svc.list.mockResolvedValue([
       pendidikanRow(1, { tgl_lulus: '2012-08-30', institusi_pendidikan: 'Beta' }),

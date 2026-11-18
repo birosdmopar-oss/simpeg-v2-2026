@@ -358,7 +358,7 @@ const colspan = computed(() => props.config.columns.length + 1 + (hasActions.val
 
       <template v-else>
         <div class="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-5 py-4">
-          <div class="w-64 max-w-full"><UiSearchInput v-model="search" placeholder="Search" :label="`Cari ${config.title.toLowerCase()}`" /></div>
+          <div class="w-64 max-w-full"><UiSearchInput v-model="search" :placeholder="`Cari ${config.title.toLowerCase()}...`" :label="`Cari ${config.title.toLowerCase()}`" /></div>
           <p class="text-body2 text-slate-500" aria-live="polite">{{ filtered.length }} data</p>
         </div>
 
