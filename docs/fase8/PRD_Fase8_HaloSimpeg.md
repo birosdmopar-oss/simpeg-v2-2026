@@ -87,7 +87,7 @@
   `d90d8a75`, MAKE-074 FE `e4392507`; E-10 seperti di atas). **QA Lapis 1 Fase 8 selesai** 18-11-2026 pada `main` `e4392507`
   (bagian B) + verifikasi perbaikan `8bc6c509`, 0 ❌ terbuka; temuan bagian B diperbaiki CR-143 `4d06a8c6` dan CR-142 `8bc6c509`
   (checklist CR-132, laporan `docs/fase8/Laporan_Akhir_Fase8.md`, di `main` `d8020fc3`). **SIGN-OFF Horii 18-11-2026** pada
-  `main` `d8020fc3` (CR-145); sesudahnya rilis menu CR-135 (⛔ izin Horii).
+  `main` `d8020fc3` (CR-145); rilis menu CR-135 di `main` `f5e730bb` (izin Horii 18-11-2026).
 
 ### 0.2 Prasyarat non-teknis
 
@@ -289,7 +289,7 @@ langkah 1 pindah dari MAKE-073 ke CR-134 paket 1; CR-133 dan CR-134 dst. masuk i
 | — | Checklist QA Lapis 1 Fase 8 | CR-132 | `docs/fase8/Checklist_QA_Lapis1_Fase8.md` (bagian A chatbot sekarang, bagian B helpdesk sesudah MAKE-073) | Reviewer CR (+ Worker Muse untuk chatbot, usulan) | — (tanpa kode workload); merge ⛔ izin Horii | bagian A: PN8-8 (✔ diterima 16-11-2026, v1.3) | ✔ di `main` `67f3303c` (v1.4); QA Lapis 1 selesai 18-11-2026 pada `e4392507` + verifikasi perbaikan `8bc6c509`, 0 ❌ terbuka (CR-144); SIGN-OFF Horii 18-11-2026, `main` `d8020fc3` (CR-145) |
 | — | Test AC-E10.19 sisi log aplikasi | CR-133 | logger uji: teks pesan chatbot tidak masuk log aplikasi (v1.4: juga `audit_logs`) | ReadOne | #10 (v1.4) | — | ✔ di `main` `19a11ed5` (v1.4) |
 | — | Perbaikan temuan QA chatbot | CR-134 dst. | v1.3: termasuk R10 langkah 2 (migrasi `chatbot/galat.ts` + `TagPilihan.vue` ke `shared/`, ✔ izin Horii 16-11-2026, syarat test chatbot 83/83). v1.4: paket 1 (di `main` per `67f3303c`): avatar mini rata atas [K], catatan README [V2] PN8-8, R10 langkah 1 + 2 (`shared/` dibuat, versi `chatbot/` dihapus); paket 2 (`d659acf6`): T-02, T-03 | ReadOne (BE) / Worker Muse (FE) | #10 (v1.4) | QA bagian A | ✔ paket 1 dan 2 di `main` (v1.4); sisa QA bagian A 18-11-2026 tanpa temuan baru (CR-144) |
-| 9 | Rilis menu (H8-11 (a)) | CR-135 | `ACTIVE_PHASE` 5 → 8, pembersihan `rilis`, item `halo` diberi `to`/`roles` | Worker Muse (atau Worker Fix Bug) | ⛔ izin Horii | sign-off Fase 8 | ◻ sesudah sign-off (SIGN-OFF Horii 18-11-2026, CR-145); menunggu izin Horii |
+| 9 | Rilis menu (H8-11 (a)) | CR-135 | `ACTIVE_PHASE` 5 → 8, pembersihan `rilis`, item `halo` diberi `to`/`roles` | Worker Muse (atau Worker Fix Bug) | ⛔ izin Horii | sign-off Fase 8 | ✔ di `main` `f5e730bb` (izin Horii 18-11-2026; §HL ✅, CR-146) |
 | — | Helper satker | CR-139 | `WebConfigService::satkerKepegawaian()` dipakai `PetugasLayananService` dan `HaloSimpeg\PetugasService` (method privat di keduanya dihapus, perilaku tetap) | — | — | — | ✔ di `main` `ccb90f78` (v1.4) |
 | — | Stabilkan test flaky | CR-140 | `frontend/src/router/__tests__/alurInti.e2e.spec.ts` flaky di bawah beban | — | — | — | ✔ di `main` `6c2b3305` (CR-144) |
 | — | Teks paginasi bersama | CR-141 | `frontend/src/shared/ui/UiPagination.vue:42` "Showing … entries" → "Menampilkan a sampai b dari n data" (Horii 17-11-2026, §12) | — | — | — | ✔ di `main` (merge `dd7cafe3`; CR-144) |

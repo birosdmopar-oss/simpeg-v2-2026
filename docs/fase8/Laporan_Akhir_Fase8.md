@@ -119,7 +119,7 @@ checklist (U1–U4, P1–P6, akun demo role N).
 | HZ regresi Fase 4 dan FAQ | [test-otomatis] 5, [test-otomatis] sebagian 1 |
 | HBB "bukan bug" helpdesk | ✅ 17, ✅ sebagian 4, [test-otomatis] 2, — 1 (HBB23 gugur sesudah R10 langkah 2) |
 | CA / CB butir otomatis | CA: ✅ 1, [test-otomatis] 24, [test-otomatis] sebagian 3, — 1 (AC-E10.30); CB: ✅ 1, [test-otomatis] 15, — 1 (CB11, CR-135) |
-| HL rilis menu CR-135 | — 4 (sesudah sign-off, tidak dihitung) |
+| HL rilis menu CR-135 | ✅ 4 (18-11-2026 sesudah sign-off, CR-135 `f5e730bb`; tidak dihitung dalam 300 butir) |
 | **Total sign-off (tanpa HL dan E)** | **300 butir: ✅ 169, ✅ sebagian 50, [test-otomatis] 66, [test-otomatis] sebagian 7, [mock-terbatas] 4, — 4; ❌ 0** |
 
 "✅ sebagian" berarti bagian yang dijalankan lolos dan bagian yang tidak dijalankan disebut di kolom Hasil (mis. 768 px dan mode
@@ -245,12 +245,13 @@ Tidak ada temuan QA ❌ yang terbuka. T-B2 dan kandidat CR lain (§9) tidak mena
    H8-5 (a).
 7. **Isi awal chatbot (PN8-6/K-5, C4, DEPLOY-002):** isi QnA dev dibawa lewat impor sekali jalan atau v2 mulai kosong; diputus Horii
    saat deploy.
-8. **Rilis menu CR-135 (sesudah sign-off, ⛔ izin Horii):** `ACTIVE_PHASE` 5 → 8, pembersihan `rilis`, item `halo` diberi `to`/`roles`;
+8. **Rilis menu CR-135 (✔ di `main` `f5e730bb` 18-11-2026, izin Horii; §HL ✅):** `ACTIVE_PHASE` 5 → 8, pembersihan `rilis`, item `halo` diberi `to`/`roles`;
    kenaikan fase juga membuka menu Fase 6–7 yang masih tersembunyi (checklist §HL).
 
 ## 9. Setelah sign-off
 
-- **CR-135** rilis menu + verifikasi §HL checklist (⛔ izin Horii, dicatat terpisah, tidak mengubah sign-off).
+- **CR-135** rilis menu + verifikasi §HL checklist (⛔ izin Horii, dicatat terpisah, tidak mengubah sign-off). ✔ di `main`
+  `f5e730bb` 18-11-2026; §HL HL1–HL4 ✅ di demo (dicatat CR-146); deviasi [V2]: menu tanpa halaman (E-Kinerja/E-Talenta) disembunyikan.
 - **Kandidat CR sesudah sign-off** (tidak menahan sign-off):
   - T-B2: helper `tanpaCache` membuang `Cache-Control` bawaan sebelum memasang `private, no-store`;
   - teks Inggris tersisa di `shared/ui` dan pemilih kolom pegawai (Horii: ditunda sampai sesudah sign-off);

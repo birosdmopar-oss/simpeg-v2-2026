@@ -149,7 +149,7 @@ CR-134).
 MAKE-070, MAKE-071, MAKE-097, MAKE-072 + CR-137, MAKE-074 BE + FE, MAKE-073) beserta perbaikan temuan QA CR-143 dan CR-142.
 **QA Lapis 1 Fase 8 selesai** 18-11-2026 pada `main` `e4392507` (bagian B) + verifikasi perbaikan `8bc6c509`, 0 ❌ terbuka
 (checklist `docs/fase8/Checklist_QA_Lapis1_Fase8.md`, laporan `docs/fase8/Laporan_Akhir_Fase8.md`). **SIGN-OFF Horii 18-11-2026**
-pada `main` `d8020fc3` (CR-145); rilis menu CR-135 sesudah sign-off (⛔ izin Horii).
+pada `main` `d8020fc3` (CR-145); rilis menu CR-135 di `main` `f5e730bb` (izin Horii 18-11-2026; §HL ✅, CR-146).
 
 Riwayat 18 November 2026 (MAKE-074, Handling Case). Per `main` `64d68377`: DBV-028, MAKE-070, MAKE-071,
 MAKE-097, dan MAKE-072 + CR-137 di `main`; MAKE-074 BE berjalan; status MAKE-073 (FE) diisi Worker Muse. Riwayat 17 November

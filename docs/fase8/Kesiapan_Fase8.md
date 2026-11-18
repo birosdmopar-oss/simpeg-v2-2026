@@ -16,7 +16,7 @@ repo) diberi catatan "fakta reviewer 13-11-2026" atau "fakta reviewer 16-11-2026
 
 ```
 Status: Fase 8 SIGN-OFF Horii 18-11-2026 (main d8020fc3, CR-145): E-01..E-10 di main; QA Lapis 1 Fase 8
-        selesai 18-11-2026 (300 butir sign-off, 0 ❌); rilis menu CR-135 sesudah sign-off, ⛔ izin Horii.
+        selesai 18-11-2026 (300 butir sign-off, 0 ❌); rilis menu CR-135 di main f5e730bb (18-11-2026).
         Fase 7 SIGN-OFF Horii 11-11-2026 (main 0af9be4f); F-10 SIGN-OFF Horii 16-11-2026 (main fd9e8371,
         addendum ditutup CR-129 603af133). Gerbang koding helpdesk (PRD §0.1) TERPENUHI, termasuk G8-10
         (E-10 di main: DBV-033 3fb8c5f7, MAKE-094 4af0c188, MAKE-095 2a8f405d) dan G8-12 (F-10 sign-off).
@@ -114,7 +114,7 @@ kode, subfolder helpdesk masih kosong. Kerangka FE helpdesk berdata contoh hanya
 | E-10 C3 | MAKE-095 FE chatbot | Worker Muse | ✔ merge `2a8f405d` (14-11-2026), sesudah MAKE-094 di `main` (→ §6.2 T-7). Menu Chatbot Manager `phase: 8` tanpa `rilis` (`frontend/src/shared/layouts/nav.config.ts:297-312`), widget di `frontend/src/shared/layouts/RedesignShell.vue:198-199` |
 | E-10 C4 | Impor isi QnA dev | ReadOne (key saat PN8-6, F8-51) | — keluar dari DoD/sign-off (H8-13 (b), Horii 16-11-2026), dilacak di Trello DEPLOY-002 |
 | E-10 QA | QA Lapis 1 chatbot (checklist CR-132), test AC-E10.19 (CR-133), perbaikan temuan (CR-134+) | Reviewer + Worker Muse (QA); izin [#10-WorkloadQAChatbot] (CR-138, Horii 17-11-2026): ReadOne (CR-133, BE CR-134+), Worker Muse (FE CR-134+) | ▶ (CR-138): CR-132 ✔ `67f3303c`, CR-133 ✔ `19a11ed5`, CR-134 paket 1 ✔ (avatar mini rata atas, catatan README [V2] PN8-8, R10 langkah 1 + 2 selesai) dan paket 2 ✔ (T-02, T-03, `d659acf6`); QA Lapis 1 bagian A putaran 1 selesai 17-11-2026, temuan T-02/T-03 tuntas. Sebelumnya (CR-136): PN8-8 ✔, R10 langkah 2 disetujui Horii 16-11-2026 |
-| E-10 rilis | Kenaikan `ACTIVE_PHASE` 5 → 8 (`nav.config.ts:97`) | — | ◻ bersama helpdesk di penutup Fase 8 (H8-11 (a)), paket CR-135 sesudah sign-off atas izin Horii |
+| E-10 rilis | Kenaikan `ACTIVE_PHASE` 5 → 8 (`nav.config.ts:97`) | — | ✔ CR-135 di `main` `f5e730bb` (18-11-2026, izin Horii; H8-11 (a)) |
 | Helpdesk E-01..E-09 | A0–A5, B0–B5, DBV-028, MAKE-070..074, MAKE-097 | §4.2 | ▶ berjalan (CR-136): A0 ✔ disetujui reviewer 16-11-2026, B0 ✔ disetujui final 16-11-2026, A1/DBV-028 dibuka 16-11-2026 (Handling Case, review DB WS-2); belum ada kode helpdesk di `main`. **CR-138:** DBV-028 ✔ di `main` (PR #41, `a5cb7300`), MAKE-070 ✔ di `main` (`56a700b1`); MAKE-071 berjalan (README tiket beku di branch); MAKE-097 PR #42 (DBV SETUJU, revisi berjalan); MAKE-073 B1 bagian master selesai review, di branch; MAKE-072 dan MAKE-074 belum |
 | CR-139 / CR-140 / CR-141 | Helper satker `WebConfigService::satkerKepegawaian()` / stabilkan test `alurInti.e2e` yang flaky di bawah beban / teks info paginasi bersama | — | CR-138: CR-139 ✔ di `main` `ccb90f78`; CR-140 ◻; CR-141 ▶ berjalan |
 | G10-4 | Verifikasi Nginx `/berkas/` (rancangan awal: server dev) | Reviewer + Horii | ✔ 16-11-2026 lewat K-12 (Nginx lokal; checklist QA F-10); sisa server di daftar periksa deploy README-deploy §1l (B10-3) |
