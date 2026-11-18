@@ -23,6 +23,12 @@ import { cutiService } from '../services/cuti.service'
 import type { CutiItem } from '../types'
 
 const svc = vi.mocked(cutiService)
+/**
+ * CR-135 (ACTIVE_PHASE 8): host interaksi form digital/SKL (FASE_INTERAKSI 7) kini aktif di shell dan memanggil API sendiri serta
+ * mengambil giliran antrean dialog. Spec ini menguji pengingat cuti saja, jadi host itu di-stub; giliran form digital tetap diuji
+ * lewat `useAntreanDialog` di test MAKE-083 di bawah.
+ */
+const STUB_HOST_LAIN = { InteraksiPopupHost: true }
 const q = <T extends Element = HTMLElement>(sel: string) => document.body.querySelector<T>(sel)
 
 const baris = (id: number, tunda = true): CutiItem =>
@@ -45,7 +51,7 @@ async function mountShell(role: RoleCode, extra: Parameters<typeof loginAs>[1] =
   router.addRoute({ path: '/layanan/cuti/:id', name: 'layanan-cuti-detail', component: { render: () => null } })
   await router.push('/')
   await router.isReady()
-  const wrapper = mount(RedesignShell, { slots: { default: '<p>beranda</p>' }, global: { plugins: [router] }, attachTo: document.body })
+  const wrapper = mount(RedesignShell, { slots: { default: '<p>beranda</p>' }, global: { plugins: [router], stubs: STUB_HOST_LAIN }, attachTo: document.body })
   await flushPromises()
   return { wrapper, router, auth }
 }
@@ -55,7 +61,7 @@ async function mountShellDenganStore() {
   router.addRoute({ path: '/layanan/cuti/:id', name: 'layanan-cuti-detail', component: { render: () => null } })
   await router.push('/')
   await router.isReady()
-  const wrapper = mount(RedesignShell, { slots: { default: '<p>beranda</p>' }, global: { plugins: [router] }, attachTo: document.body })
+  const wrapper = mount(RedesignShell, { slots: { default: '<p>beranda</p>' }, global: { plugins: [router], stubs: STUB_HOST_LAIN }, attachTo: document.body })
   await flushPromises()
   return wrapper
 }
