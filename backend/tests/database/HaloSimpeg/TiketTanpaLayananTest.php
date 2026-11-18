@@ -60,7 +60,8 @@ final class TiketTanpaLayananTest extends DatabaseTestCase
 
         $this->sebagai($petugas)->post(self::URL . "tiket/{$id}/pesan", ['msg' => 'Silakan ajukan lewat menu layanan.'])->assertStatus(201);
         $this->sebagai($pemilik)->post(self::URL . "tiket/{$id}/pesan", ['msg' => 'Terima kasih.'])->assertStatus(201);
-        $this->assertContains($this->sebagai($petugas)->post(self::URL . "tiket/{$id}/tutup")->response()->getStatusCode(), [200, 204]);
+        $this->sebagai($petugas)->post(self::URL . "tiket/{$id}/tutup")->assertStatus(200);
+        $this->assertSame(1, (int) $this->db->table('disiplin_ticket')->where('id_inbox', $id)->get()->getRow('status'), 'tiket tertutup');
 
         $this->assertSame(3, $this->db->table('disiplin_ticket_msg')->where('id_inbox', $id)->countAllResults(), 'alur benar-benar dijalankan');
         $this->assertSame($awal, $this->jejakLayanan(), 'tiket helpdesk tidak menyentuh tabel layanan');

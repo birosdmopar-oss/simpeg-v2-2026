@@ -8,6 +8,7 @@ use App\Constants\Role;
 use App\Libraries\Auth\AuthContext;
 use App\Libraries\Layanan\Ib\IbApprovalService;
 use App\Libraries\Layanan\Ib\IbService;
+use App\Libraries\Layanan\NotifikasiService;
 use App\Libraries\Layanan\PetugasLayananService;
 use App\Libraries\Layanan\Pmk\PmkApprovalService;
 use App\Libraries\Layanan\Pmk\PmkPengajuanService;
@@ -18,12 +19,11 @@ use Config\Services;
 use Tests\Support\Database\Seeds\MasterDataSeeder;
 use Tests\Support\DatabaseTestCase;
 use Tests\Support\Layanan\LayananStudiUjiTrait;
-use Tests\Support\Layanan\NotifikasiRekam;
 
 /**
  * CR-149: alur layanan TB / IB / PMK (Fase 4) tidak menulis tabel tiket helpdesk Halo Simpeg (`disiplin_ticket`,
  * `disiplin_ticket_msg`; PRD Fase 8 "tidak ter-mix"). Ajukan → setujui dan ajukan → tolak per layanan; jumlah baris kedua
- * tabel dan jejak audit tiket tidak berubah. Arah sebaliknya: `Tests\Database\HaloSimpeg\TiketTanpaLayananTest`. Data sintetis.
+ * tabel dan jejak audit tiket tidak berubah, sementara notifikasi layanan asli benar-benar menulis `inbox_msg`. Arah sebaliknya: `Tests\Database\HaloSimpeg\TiketTanpaLayananTest`. Data sintetis.
  *
  * @internal
  */
@@ -43,7 +43,9 @@ final class LayananTanpaTiketTest extends DatabaseTestCase
     {
         parent::setUp();
         $this->siapkanLayananStudi();
-        Services::injectMock('notifikasiLayanan', new NotifikasiRekam());
+        // Layanan notifikasi asli (menulis `inbox`/`inbox_msg`), hanya pengantre push yang tiruan: jalur yang paling rawan
+        // tercampur dengan tiket karena keduanya berasal dari inbox legacy (review CR-149 R1).
+        Services::injectMock('notifikasiLayanan', new NotifikasiService($this->db, static fn (int $id): bool => true));
 
         foreach ([PetugasLayananService::JENIS_TB => 'picTb', PetugasLayananService::JENIS_IB => 'picIb', PetugasLayananService::JENIS_PMK => 'picPmk'] as $jenis => $prop) {
             [$nip, $this->{$prop}] = $this->aktorStudi(Role::ADMIN_SATKER, [], $this->buatSatker());
@@ -59,7 +61,8 @@ final class LayananTanpaTiketTest extends DatabaseTestCase
 
     public function testTbAjukanSetujuiTolakTanpaTiket(): void
     {
-        $awal = $this->jejakTiket();
+        $awal      = $this->jejakTiket();
+        $inboxAwal = $this->db->table('inbox_msg')->countAllResults();
 
         $setuju = $this->ajukanTb();
         (new TbApprovalService())->proses($this->picTb, $setuju, ['aksi' => 'setujui', 'perihal_ds_tb' => 'Izin studi'] + $this->dataSkTb(), $this->berkasPdf('sk.pdf'));
@@ -67,12 +70,14 @@ final class LayananTanpaTiketTest extends DatabaseTestCase
         (new TbApprovalService())->proses($this->picTb, $tolak, ['aksi' => 'tolak', 'reason_note' => 'Berkas belum lengkap']);
 
         $this->assertSame([1, 2], $this->statusLayanan('riwayat_tb', 'id_riwayat_tb', [$setuju, $tolak]), 'alur benar-benar dijalankan');
+        $this->assertGreaterThan($inboxAwal, $this->db->table('inbox_msg')->countAllResults(), 'notifikasi TB lewat inbox benar-benar berjalan');
         $this->assertSame($awal, $this->jejakTiket(), 'TB tidak menulis disiplin_ticket(_msg)');
     }
 
     public function testIbAjukanSetujuiTolakTanpaTiket(): void
     {
-        $awal = $this->jejakTiket();
+        $awal      = $this->jejakTiket();
+        $inboxAwal = $this->db->table('inbox_msg')->countAllResults();
 
         $setuju = $this->ajukanIb();
         (new IbApprovalService())->proses($this->picIb, $setuju, ['aksi' => 'setujui', 'no_sk' => 'SK/IB/149', 'tgl_sk' => '2026-10-21', 'ds_ib' => 'Surat Kampus', 'no_ds_ib' => 'K/149', 'tgl_ds_ib' => '2026-10-01']);
@@ -80,12 +85,14 @@ final class LayananTanpaTiketTest extends DatabaseTestCase
         (new IbApprovalService())->proses($this->picIb, $tolak, ['aksi' => 'tolak', 'reason_note' => 'Jadwal bentrok jam kerja']);
 
         $this->assertSame([1, 2], $this->statusLayanan('riwayat_ib', 'id_riwayat_ib', [$setuju, $tolak]), 'alur benar-benar dijalankan');
+        $this->assertGreaterThan($inboxAwal, $this->db->table('inbox_msg')->countAllResults(), 'notifikasi IB lewat inbox benar-benar berjalan');
         $this->assertSame($awal, $this->jejakTiket(), 'IB tidak menulis disiplin_ticket(_msg)');
     }
 
     public function testPmkAjukanSetujuiTolakTanpaTiket(): void
     {
-        $awal = $this->jejakTiket();
+        $awal      = $this->jejakTiket();
+        $inboxAwal = $this->db->table('inbox_msg')->countAllResults();
 
         $setuju = $this->ajukanPmk();
         (new PmkApprovalService())->proses($this->picPmk, $setuju, ['aksi' => 'setujui']);
@@ -93,6 +100,7 @@ final class LayananTanpaTiketTest extends DatabaseTestCase
         (new PmkApprovalService())->proses($this->picPmk, $tolak, ['aksi' => 'tolak', 'reason_note' => 'Masa kerja tidak sesuai']);
 
         $this->assertSame([1, 2], $this->statusLayanan('riwayat_pmk_req', 'id_riwayat_pmk_req', [$setuju, $tolak]), 'alur benar-benar dijalankan');
+        $this->assertGreaterThan($inboxAwal, $this->db->table('inbox_msg')->countAllResults(), 'notifikasi PMK lewat inbox benar-benar berjalan');
         $this->assertSame($awal, $this->jejakTiket(), 'PMK tidak menulis disiplin_ticket(_msg)');
     }
 
