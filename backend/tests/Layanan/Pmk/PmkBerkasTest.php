@@ -71,7 +71,7 @@ final class PmkBerkasTest extends DatabaseTestCase
         $this->assertStringStartsWith('application/pdf', $res->response()->getHeaderLine('Content-Type'));
         $this->assertSame("attachment; filename=\"pmk_{$this->id}_file_kontrak.pdf\"", $res->response()->getHeaderLine('Content-Disposition'), 'nama dibangkitkan server, tanpa path internal');
         $this->assertSame('nosniff', $res->response()->getHeaderLine('X-Content-Type-Options'));
-        $this->assertStringContainsString('no-store', $res->response()->getHeaderLine('Cache-Control'));
+        $this->assertSame('private, no-store', $res->response()->getHeaderLine('Cache-Control'), 'Cache-Control persis (CR-151)');
 
         [$picNip] = $this->aktorStudi(Role::ADMIN_SATKER, [], $this->buatSatker());
         $this->jadikanPic($picNip, PetugasLayananService::JENIS_PMK);

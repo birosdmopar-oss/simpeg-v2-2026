@@ -107,7 +107,7 @@ final class SuratCutiPublikTest extends DatabaseTestCase
             $res = $this->panggil($url);
             $res->assertStatus(404);
             $this->assertSame('noindex, nofollow', $res->response()->getHeaderLine('X-Robots-Tag'));
-            $this->assertStringContainsString('no-store', $res->response()->getHeaderLine('Cache-Control'));
+            $this->assertSame('no-store', $res->response()->getHeaderLine('Cache-Control'), 'Cache-Control persis (CR-151)');
             $this->assertStringContainsString(VerifikasiSuratCutiService::PESAN_TIDAK_DITEMUKAN, (string) $res->response()->getBody());
         }
 

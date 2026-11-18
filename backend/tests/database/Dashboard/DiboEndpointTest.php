@@ -93,7 +93,7 @@ final class DiboEndpointTest extends DatabaseTestCase
         $ok->assertStatus(200);
         $ok->assertHeader('Content-Type', 'application/pdf');
         $this->assertStringContainsString('attachment', $ok->response()->getHeaderLine('Content-Disposition'));
-        $this->assertStringContainsString('no-store', $ok->response()->getHeaderLine('Cache-Control'));
+        $this->assertSame('private, no-store', $ok->response()->getHeaderLine('Cache-Control'), 'Cache-Control persis (CR-151)');
         $this->assertStringStartsWith('%PDF', $ok->response()->getBody());
 
         $this->asRole(Role::PEGAWAI)->get("api/v1/konten/dibo/{$this->idAktif}/berkas/2")->assertStatus(404);

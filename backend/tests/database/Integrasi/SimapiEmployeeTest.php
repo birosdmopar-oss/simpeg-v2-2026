@@ -270,7 +270,7 @@ final class SimapiEmployeeTest extends DatabaseTestCase
         $this->assertSame($png, (string) $res->response()->getBody());
         $this->assertStringStartsWith('image/png', $res->response()->getHeaderLine('Content-Type'));
         $this->assertSame('nosniff', $res->response()->getHeaderLine('X-Content-Type-Options'));
-        $this->assertStringContainsString('no-store', $res->response()->getHeaderLine('Cache-Control'));
+        $this->assertSame('no-store', $res->response()->getHeaderLine('Cache-Control'), 'Cache-Control persis (CR-151)');
         $this->assertSame('inline; filename="foto_' . $ada . '.png"', $res->response()->getHeaderLine('Content-Disposition'));
         $this->assertStringNotContainsString('rahasia-dir', $res->response()->getHeaderLine('Content-Disposition') . $url, 'path tidak bocor');
 

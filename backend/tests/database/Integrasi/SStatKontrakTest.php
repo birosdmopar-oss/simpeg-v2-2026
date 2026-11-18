@@ -144,7 +144,7 @@ final class SStatKontrakTest extends DatabaseTestCase
         $unduh->assertStatus(200);
         $unduh->assertHeader('Content-Disposition', "attachment; filename=\"s_stat_tb_{$id}.pdf\"");
         $unduh->assertHeader('X-Content-Type-Options', 'nosniff');
-        $this->assertStringContainsString('no-store', $unduh->response()->getHeaderLine('Cache-Control'));
+        $this->assertSame('no-store', $unduh->response()->getHeaderLine('Cache-Control'), 'Cache-Control persis (CR-151)');
         $this->assertStringStartsWith('application/pdf', (string) $unduh->response()->getHeaderLine('Content-Type'), 'mime dari isi');
         $this->assertSame('%PDF-1.4 uji', $unduh->response()->getBody());
     }

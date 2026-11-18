@@ -143,7 +143,7 @@ final class SEsignMudigTest extends DatabaseTestCase
         $res = $this->tandaTangani($this->param(['id_rw' => '12', 'reason' => 'Persetujuan MuDig']));
 
         $res->assertStatus(200);
-        $this->assertStringContainsString('no-store', $res->response()->getHeaderLine('Cache-Control'));
+        $this->assertSame('no-store', $res->response()->getHeaderLine('Cache-Control'), 'Cache-Control persis (CR-151)');
         $badan = $this->badan($res);
         $this->assertSame(['1', 'Berhasil menandatangani dokumen secara digital.'], [$badan['status'], $badan['msg']]);
         $this->assertSame(self::PDF_TTE, base64_decode($badan['data']['signed_file'], true));

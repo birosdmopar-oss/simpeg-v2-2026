@@ -25,7 +25,7 @@ final class ResponsLayananTest extends CIUnitTestCase
         $b   = self::badan($res);
 
         $this->assertSame(200, $res->getStatusCode());
-        $this->assertStringContainsString('no-store', $res->getHeaderLine('Cache-Control'));
+        $this->assertSame('no-store', $res->getHeaderLine('Cache-Control'), 'Cache-Control persis (CR-151)');
         $this->assertSame(1, $b->status);
         $this->assertSame('', $b->msg);
         $this->assertSame([], $b->data, 'daftar kosong tetap array JSON []');

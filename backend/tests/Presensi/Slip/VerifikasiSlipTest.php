@@ -144,7 +144,7 @@ final class VerifikasiSlipTest extends DatabaseTestCase
     private function assertHeaderAman(\CodeIgniter\Test\TestResponse $res): void
     {
         $this->assertSame('noindex, nofollow', $res->response()->getHeaderLine('X-Robots-Tag'));
-        $this->assertStringContainsString('no-store', $res->response()->getHeaderLine('Cache-Control'));
+        $this->assertSame('no-store', $res->response()->getHeaderLine('Cache-Control'), 'Cache-Control persis (CR-151)');
     }
 
     private function satker(string $nip): string

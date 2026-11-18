@@ -51,7 +51,7 @@ final class ThrottlePublikFilterTest extends CIUnitTestCase
         $this->assertSame(['status' => 'error', 'message' => ThrottlePublikFilter::PESAN], json_decode((string) $respons->getBody(), true));
         $this->assertGreaterThanOrEqual(1, (int) $respons->getHeaderLine('Retry-After'));
         $this->assertSame('noindex, nofollow', $respons->getHeaderLine('X-Robots-Tag'));
-        $this->assertStringContainsString('no-store', $respons->getHeaderLine('Cache-Control'));
+        $this->assertSame('no-store', $respons->getHeaderLine('Cache-Control'), 'Cache-Control persis (CR-151)');
 
         $this->assertNull($this->panggil('203.0.113.6'), 'IP lain punya bucket sendiri');
     }

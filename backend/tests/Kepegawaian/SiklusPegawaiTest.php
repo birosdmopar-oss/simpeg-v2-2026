@@ -246,7 +246,7 @@ final class SiklusPegawaiTest extends DatabaseTestCase
         $this->assertSame(self::NIP_BARU, $this->json($result)['data']['pegawai']['nip']);
 
         $this->asUser($admin3)->delete('api/v1/pegawai/' . self::NIP_BARU)->assertStatus(403);
-        $this->assertStringContainsString('no-store', $result->response()->getHeaderLine('Cache-Control'));
+        $this->assertSame('no-store', $result->response()->getHeaderLine('Cache-Control'), 'Cache-Control persis (CR-151)');
 
         // Pegawai baru (akun + foto, tanpa data turunan) bisa dihapus: akunnya dilepas.
         $hapus = $this->asUser($super)->delete('api/v1/pegawai/' . self::NIP_BARU);

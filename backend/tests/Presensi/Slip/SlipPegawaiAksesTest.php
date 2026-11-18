@@ -63,7 +63,7 @@ final class SlipPegawaiAksesTest extends DatabaseTestCase
         $this->assertStringStartsWith('%PDF-', (string) $pdf->response()->getBody());
         $this->assertSame('attachment; filename="Slip_Gaji_CITRA_SAYA_September_2026.pdf"', $pdf->response()->getHeaderLine('Content-Disposition'));
         $this->assertSame('nosniff', $pdf->response()->getHeaderLine('X-Content-Type-Options'));
-        $this->assertStringContainsString('no-store', $pdf->response()->getHeaderLine('Cache-Control'));
+        $this->assertSame('private, no-store', $pdf->response()->getHeaderLine('Cache-Control'), 'Cache-Control persis (CR-151)');
 
         $daftar = $this->json($this->asUser($akun)->get('api/v1/slip-gaji/saya'))['data'];
         $per    = array_column($daftar['items'], null, 'periode');

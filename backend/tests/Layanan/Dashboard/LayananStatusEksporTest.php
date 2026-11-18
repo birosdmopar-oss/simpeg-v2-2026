@@ -71,7 +71,7 @@ final class LayananStatusEksporTest extends DatabaseTestCase
         $res->assertStatus(200);
         $res->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
         $res->assertHeader('X-Content-Type-Options', 'nosniff');
-        $this->assertStringContainsString('no-store', $res->response()->getHeaderLine('Cache-Control'));
+        $this->assertSame('no-store', $res->response()->getHeaderLine('Cache-Control'), 'Cache-Control persis (CR-151)');
         $this->assertMatchesRegularExpression('/^attachment; filename="status_layanan_\d{8}_\d{6}\.csv"$/', $res->response()->getHeaderLine('Content-Disposition'));
 
         $csv = $res->response()->getBody();
