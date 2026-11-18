@@ -35,6 +35,8 @@ const STATUS = [
 const isEdit = computed(() => props.row !== null)
 const form = reactive({ akun: '', id_user: null as number | null, kategori: [] as number[], email: '', no_hp: '', status: '1' })
 const kandidat = ref<PetugasKandidat[]>([])
+/** S6: saran kandidat milik teks lama (disembunyikan sampai hasil kueri teks terbaru tiba). */
+const saranBasi = ref(false)
 const peringatanKandidat = ref('')
 const galatKandidat = ref('')
 const opsiKategori = ref<KategoriOpsi[]>([])
@@ -58,6 +60,7 @@ watch(
     serverErrors.value = {}
     peringatanKandidat.value = ''
     galatKandidat.value = ''
+    saranBasi.value = false
     kandidat.value = row ? [{ id_user: row.id_user, label: row.label }] : []
     form.akun = row?.label ?? ''
     form.id_user = row?.id_user ?? null
@@ -83,7 +86,7 @@ const opsiPilih = computed<OpsiPilihBanyak[]>(() => {
   return opsi
 })
 
-const saran = computed(() => kandidat.value.map((k) => k.label))
+const saran = computed(() => (saranBasi.value ? [] : kandidat.value.map((k) => k.label)))
 
 async function cari(teks: string): Promise<void> {
   const n = ++urutanCari
@@ -93,6 +96,7 @@ async function cari(teks: string): Promise<void> {
     const hasil = await petugasHaloService.kandidat(teks)
     if (n !== urutanCari) return
     kandidat.value = hasil.items
+    saranBasi.value = false
     peringatanKandidat.value = hasil.peringatan ?? ''
   } catch (e) {
     if (n !== urutanCari) return
@@ -107,6 +111,12 @@ function ubahAkun(v: string): void {
   form.id_user = null
   delete serverErrors.value.id_user
   if (jeda) clearTimeout(jeda)
+  // Review S6: tanpa saring lokal, saran teks lama jangan tampil apa adanya — disembunyikan (basi) saat teks di luar 2..50
+  // karakter dan selama jeda kueri baru; urutan dinaikkan agar respons kueri lama yang tiba belakangan diabaikan. Daftar
+  // `kandidat` tidak dikosongkan karena UiCombobox memancarkan `update:modelValue` tepat sebelum `pilih` (indeks).
+  saranBasi.value = true
+  peringatanKandidat.value = ''
+  urutanCari += 1
   jeda = setTimeout(() => void cari(v), 300)
 }
 
@@ -118,6 +128,7 @@ function pilihAkun(indeks: number): void {
   urutanCari += 1
   form.akun = k.label
   form.id_user = k.id_user
+  saranBasi.value = false
   delete serverErrors.value.id_user
 }
 

@@ -25,7 +25,7 @@ import PanelPerluTindak from '../components/PanelPerluTindak.vue'
 import ThreadTiket from '../components/ThreadTiket.vue'
 import TiketBaruDialog from '../components/TiketBaruDialog.vue'
 import { BACA_BAWAAN_ANTREAN, HALO_PEMBUAT_TIKET_ROLES, TAB_ANTREAN, TEKS_GALAT_TIKET } from '../constants'
-import { haloState, muatPetugasSaya, petugasAktif } from '../stores/haloSimpeg'
+import { bisaEkspor, haloState, muatPetugasSaya, petugasAktif } from '../stores/haloSimpeg'
 import { bukaTiket, daftarAntrean, daftarSaya, tutupPanel, type DaftarTiket as Daftar } from '../stores/tiket'
 import type { TiketDetail } from '../types'
 
@@ -38,8 +38,7 @@ const isDesktop = useIsDesktop()
 
 const bolehBuat = computed(() => auth.role !== null && HALO_PEMBUAT_TIKET_ROLES.includes(auth.role))
 const dialogBaru = ref(false)
-/** B4 (MAKE-074): tombol "Ekspor Rekap" hanya di tab Antrean dan hanya bila `petugas/saya.bisa_ekspor` (bukan role). */
-const bisaEkspor = computed(() => haloState.petugasSaya?.bisa_ekspor === true)
+// B4 (MAKE-074): tombol "Ekspor Rekap" hanya di tab Antrean dan hanya bila `petugas/saya.bisa_ekspor` (`bisaEkspor` store, bukan role).
 const dialogEkspor = ref(false)
 
 // Review B3 R4: dimuat paksa sekali per kunjungan (admin bisa baru menambah/menonaktifkan dirinya sebagai petugas).
@@ -52,6 +51,10 @@ const tabs = computed<TabItem[]>(() => [
   { value: TAB_SAYA, label: 'Tiket Saya' },
   ...(petugasAktif.value ? [{ value: TAB_ANTREAN, label: 'Antrean' }] : []),
 ])
+const TAB_GALAT: TabItem[] = [
+  { value: TAB_SAYA, label: 'Tiket Saya' },
+  { value: TAB_ANTREAN, label: 'Antrean' },
+]
 /** `?tab=antrean` hanya berlaku untuk petugas aktif; selain itu tab "Tiket saya". */
 const tab = computed<string>({
   get: () => (route.query.tab === TAB_ANTREAN && petugasAktif.value ? TAB_ANTREAN : TAB_SAYA),
@@ -61,7 +64,8 @@ const diAntrean = computed(() => tab.value === TAB_ANTREAN)
 /** Review B3 R5: deep-link `?tab=antrean` sebelum `petugas/saya` selesai → "Memuat..." (jangan memasang tab Saya dulu). */
 const mintaAntrean = computed(() => route.query.tab === TAB_ANTREAN)
 const memuatAntrean = computed(() => mintaAntrean.value && ['awal', 'memuat'].includes(haloState.statusPetugasSaya) && !petugasAktif.value)
-const galatAntrean = computed(() => mintaAntrean.value && haloState.statusPetugasSaya === 'galat')
+/** Review S2 (b): galat muat paksa dengan cache petugas aktif → antrean dari cache tetap tampil; galat hanya tanpa data petugas. */
+const galatAntrean = computed(() => mintaAntrean.value && haloState.statusPetugasSaya === 'galat' && !petugasAktif.value)
 const daftarAktif = computed<Daftar>(() => (diAntrean.value ? daftarAntrean : daftarSaya))
 const queryTab = computed(() => (diAntrean.value ? { tab: TAB_ANTREAN } : {}))
 const kategoriPetugas = computed(() => (haloState.petugasSaya?.kategori ?? []).map((k) => ({ id: k.id, nama: k.nama })))
@@ -163,9 +167,9 @@ function hapusFilterPerluTindak(): void {
           <p class="py-6 text-center text-sm text-slate-500" data-testid="halo-antrean-memuat">Memuat...</p>
         </UiCard>
         <UiCard v-else-if="galatAntrean" title="Antrean">
-          <UiNotice tone="danger" data-testid="halo-antrean-galat">
-            <span role="alert">{{ haloState.galatPetugasSaya }}</span>
-          </UiNotice>
+          <!-- S2 (b): tab tetap ada agar "Tiket Saya" selalu bisa dipilih; S2 (c): UiNotice danger sudah role="alert". -->
+          <UiTabs :model-value="TAB_ANTREAN" :items="TAB_GALAT" aria-label="Halo Simpeg" class="mb-4" data-testid="halo-tabs" @update:model-value="tab = $event" />
+          <UiNotice tone="danger" data-testid="halo-antrean-galat">{{ haloState.galatPetugasSaya }}</UiNotice>
           <UiButton size="sm" variant="secondary" appearance="outline" class="mt-3" data-testid="halo-antrean-coba-lagi" @click="muatPetugasSaya(true)">
             Coba lagi
           </UiButton>
@@ -185,7 +189,8 @@ function hapusFilterPerluTindak(): void {
           </template>
           <DaftarTiket v-else :key="TAB_SAYA" :daftar="daftarSaya" :boleh-buat="bolehBuat" :id-aktif="idTiket" @tiket-baru="dialogBaru = true" />
         </UiCard>
-        <KontakHelpdeskCard v-if="!diAntrean && !mintaAntrean" />
+        <!-- S2 (a): non-petugas dengan ?tab=antrean melihat tab Saya → kartu Kontak tetap tampil (kecuali saat memuat/galat). -->
+        <KontakHelpdeskCard v-if="!diAntrean && !memuatAntrean && !galatAntrean" />
       </div>
 
       <UiCard v-if="tampilThread" class="min-w-0" data-testid="halo-panel-thread">

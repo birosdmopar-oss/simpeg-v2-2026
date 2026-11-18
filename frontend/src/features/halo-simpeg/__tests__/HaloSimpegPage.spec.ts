@@ -43,7 +43,7 @@ import { Role, type RoleCode, type User } from '@/features/auth/types'
 import { rowMenuActions, selectRowAction } from '@/shared/components/__tests__/rowActionsMenu.helpers'
 
 import { muatRingkasan, resetHaloSimpeg, setRingkasanHalo } from '../stores/haloSimpeg'
-import { daftarAntrean, detailTiket } from '../stores/tiket'
+import { bukaTiket, daftarAntrean, detailTiket } from '../stores/tiket'
 import type { Halaman, TiketBaris, TiketDetail } from '../types'
 import HaloSimpegPage from '../views/HaloSimpegPage.vue'
 import galat422Ditutup from './fixtures/galat-422-ditutup.json'
@@ -829,8 +829,18 @@ describe('R1 (BLOK): Lihat semua Perlu ditindak', () => {
     const banyak = Array.from({ length: 5 }, (_, i) => baris({ id: 100 + i, pesan_terakhir: null }))
     svc.tiket.list.mockImplementation(async (f: { perlu_tindak?: boolean }) => (f.perlu_tindak ? { ...DAFTAR, items: banyak, total: 8 } : DAFTAR))
     const { w } = await pasang({ query: '?tab=antrean' })
-    await daftarAntrean.ubahFilter({ status: 'open', q: 'cuti', kategori: 2 })
+    await daftarAntrean.ubahFilter({ status: 'open', kategori: 2 })
     await flushPromises()
+    // Celah R1: "cuti" diketik di kotak cari dan jeda 300 ms dijalankan dulu, BARU "Lihat semua" diklik.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      await w.get('[data-testid="halo-daftar-antrean"] input[type="search"]').setValue('cuti')
+      await vi.advanceTimersByTimeAsync(300)
+    } finally {
+      vi.useRealTimers()
+    }
+    await flushPromises()
+    expect(svc.tiket.list.mock.calls.at(-1)![0]).toMatchObject({ peran: 'petugas', q: 'cuti' })
     await w.get('[data-testid="halo-perlu-tindak-semua"]').trigger('click')
     await flushPromises()
     const akhir = svc.tiket.list.mock.calls.at(-1)![0] as Record<string, unknown>
@@ -1009,5 +1019,111 @@ describe('B4 (MAKE-074): tombol Ekspor Rekap di tab Antrean', () => {
     expect(svc.tiket.ekspor).toHaveBeenCalledWith('2026-11-01', '2026-11-18')
     expect(document.querySelector('[data-testid="halo-ekspor-kosong"]')?.textContent?.trim()).toBe('Tidak ada data pada periode ini.')
     expect(unduhan.simpan).not.toHaveBeenCalled()
+  })
+})
+
+describe('celah R1: teks kosong tabel saat Lihat semua', () => {
+  it('perlu_tindak tanpa baris → "Tidak ada tiket yang perlu ditindak." di halo-daftar-kosong', async () => {
+    svc.petugas.saya.mockResolvedValue({ petugas: true, aktif: true, kategori: [{ id: 1, nama: 'Cuti', status: 1 }], bisa_ekspor: true })
+    const lima = Array.from({ length: 5 }, (_, i) => baris({ id: 100 + i, pesan_terakhir: null }))
+    // Panel (per_page 5) berisi 8 → "Lihat semua" tampil; tabel antrean perlu_tindak (halaman penuh) kosong.
+    svc.tiket.list.mockImplementation(async (f: { perlu_tindak?: boolean; per_page?: number }) =>
+      f.perlu_tindak ? (f.per_page === 5 ? { ...DAFTAR, items: lima, total: 8 } : { ...DAFTAR, items: [], total: 0 }) : DAFTAR,
+    )
+    const { w } = await pasang({ query: '?tab=antrean' })
+    await w.get('[data-testid="halo-perlu-tindak-semua"]').trigger('click')
+    await flushPromises()
+    expect(w.get('[data-testid="halo-daftar-antrean"] [data-testid="halo-daftar-kosong"]').text()).toBe('Tidak ada tiket yang perlu ditindak.')
+  })
+})
+
+describe('S2: deep-link ?tab=antrean', () => {
+  const AKTIF = { petugas: true, aktif: true, kategori: [{ id: 1, nama: 'Cuti', status: 1 as const }], bisa_ekspor: true }
+
+  it('(a) non-petugas + ?tab=antrean sesudah petugas/saya siap → tab Saya + kartu Kontak Helpdesk tampil', async () => {
+    const { w } = await pasang({ query: '?tab=antrean' })
+    expect(w.find('[data-testid="halo-daftar-saya"]').exists()).toBe(true)
+    expect(w.find('[data-testid="halo-kontak"]').exists()).toBe(true)
+  })
+
+  it('(b) galat muat paksa dengan cache petugas aktif → antrean dari cache + UiTabs tetap, tanpa notice galat', async () => {
+    svc.petugas.saya.mockResolvedValue(AKTIF)
+    const a = await pasang({ query: '?tab=antrean' })
+    a.w.unmount()
+    svc.petugas.saya.mockRejectedValue(apiError(500, { message: 'Terjadi kesalahan server.' }))
+    const { w } = await pasang({ query: '?tab=antrean' })
+    expect(w.find('[data-testid="halo-antrean-galat"]').exists()).toBe(false)
+    expect(w.find('[data-testid="halo-daftar-antrean"]').exists()).toBe(true)
+    expect(w.findAll('[data-testid="halo-tabs"] [role="tab"]').map((t) => t.text())).toEqual(['Tiket Saya', 'Antrean'])
+  })
+
+  it('(b, c) galat tanpa data petugas → notice tanpa role="alert" bersarang; tab "Tiket Saya" tetap bisa dipilih', async () => {
+    svc.petugas.saya.mockRejectedValue(apiError(500, { message: 'Terjadi kesalahan server.' }))
+    const { w, router } = await pasang({ query: '?tab=antrean' })
+    const notice = w.get('[data-testid="halo-antrean-galat"]')
+    expect(notice.text()).toContain('Terjadi kesalahan server.')
+    expect(notice.findAll('[role="alert"]')).toHaveLength(0)
+    expect(w.find('[data-testid="halo-kontak"]').exists()).toBe(false)
+    const tabSaya = w.findAll('[data-testid="halo-tabs"] [role="tab"]').find((t) => t.text() === 'Tiket Saya')!
+    await tabSaya.trigger('mousedown', { button: 0 })
+    await tabSaya.trigger('click')
+    await tabSaya.trigger('focus')
+    await flushPromises()
+    expect(router.currentRoute.value.query.tab).toBeUndefined()
+    expect(w.find('[data-testid="halo-daftar-saya"]').exists()).toBe(true)
+  })
+})
+
+describe('S3: panel disegarkan sesudah baca bila ringkasan belum ada', () => {
+  it('ringkasan null → buka tiket petugas belum dibaca → POST baca → panel dimuat ulang tepat 1×', async () => {
+    svc.petugas.saya.mockResolvedValue({ petugas: true, aktif: true, kategori: [{ id: 1, nama: 'Cuti', status: 1 }], bisa_ekspor: true })
+    svc.tiket.detail.mockResolvedValue({ ...(detailPetugas.data as TiketDetail), belum_dibaca: true })
+    svc.tiket.baca.mockResolvedValue({ belum_dibaca_saya: 0, belum_dibaca_petugas: 0, perlu_tindak: 2, badge: 2, total: 0 })
+    const panel = () => svc.tiket.list.mock.calls.filter((c) => (c[0] as { perlu_tindak?: boolean }).perlu_tindak === true).length
+    await pasang({ query: '?tab=antrean' })
+    const awal = panel()
+    await bukaTiket(detailPetugas.data.id)
+    await flushPromises()
+    expect(svc.tiket.baca).toHaveBeenCalledTimes(1)
+    expect(panel()).toBe(awal + 1)
+  })
+})
+
+describe('S4: tombol "Data pelapor"', () => {
+  it('klik membuka lalu menutup tooltip; isi hanya lewat aria-describedby ke elemen hidden', async () => {
+    svc.tiket.detail.mockResolvedValueOnce({ ...(detailPetugas.data as TiketDetail), belum_dibaca: false })
+    const { w } = await pasang({ idTiket: detailPetugas.data.id })
+    const tombol = w.get('[data-testid="halo-thread-snapshot"]')
+    const rujukan = document.getElementById(tombol.attributes('aria-describedby')!)!
+    expect(rujukan.hasAttribute('hidden')).toBe(true)
+    expect([...document.querySelectorAll('[data-testid="halo-thread"] .sr-only')].some((e) => e.textContent?.includes('NIP:'))).toBe(false)
+    const klik = async () => {
+      tombol.element.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+      await tombol.trigger('click')
+      await flushPromises()
+    }
+    await klik()
+    await vi.waitFor(() => expect(document.querySelector('[role="tooltip"]')?.textContent).toContain('NIP:'))
+    await klik()
+    await vi.waitFor(() => expect(document.querySelector('[role="tooltip"]')).toBeNull())
+  })
+})
+
+describe('S5: label pengingat berganti saat jatuh tempo lewat', () => {
+  it('"Pengingat aktif" → (60 dtk, jatuh tempo lewat) → "Pengingat jatuh tempo" tanpa muat ulang', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] })
+    try {
+      vi.setSystemTime(new Date('2026-11-19T02:59:30Z'))
+      svc.tiket.detail.mockResolvedValue({ ...(detailPetugas.data as TiketDetail), belum_dibaca: false, pengingat: { aktif: true, jatuh_tempo: '2026-11-19T03:00:00Z' } })
+      const { w } = await pasang({ idTiket: detailPetugas.data.id })
+      expect(w.get('[data-testid="halo-pengingat-jatuh-tempo"]').text()).toContain('Pengingat aktif')
+      const muat = svc.tiket.detail.mock.calls.length
+      vi.advanceTimersByTime(60_000)
+      await flushPromises()
+      expect(w.get('[data-testid="halo-pengingat-jatuh-tempo"]').text()).toContain('Pengingat jatuh tempo')
+      expect(svc.tiket.detail.mock.calls.length).toBe(muat)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

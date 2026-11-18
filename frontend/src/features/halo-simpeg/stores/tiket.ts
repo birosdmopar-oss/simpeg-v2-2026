@@ -186,7 +186,8 @@ export async function bukaTiket(id: number): Promise<void> {
         for (const d of semuaDaftar) d.tandaiDibaca(id)
         if (detailState.detail?.id === id) detailState.detail = { ...detailState.detail, belum_dibaca: false }
         // Ringkasan sudah dipasang dari respons baca; panel hanya bila angkanya tidak berubah (watcher menangani sisanya).
-        if (detail.sebagai_petugas && haloState.ringkasan?.perlu_tindak === sebelumBaca) segarkanPanel()
+        // Review S3: ringkasan belum ada sebelum baca (watcher tidak punya pembanding) → panel tetap disegarkan.
+        if (detail.sebagai_petugas && (sebelumBaca === undefined || haloState.ringkasan?.perlu_tindak === sebelumBaca)) segarkanPanel()
       } catch {
         // Penanda baca gagal: thread tetap tampil; badge disegarkan polling berikutnya.
       }

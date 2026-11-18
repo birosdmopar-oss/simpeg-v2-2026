@@ -39,4 +39,9 @@ Komponen yang dipakai modul kedua dipindah ke `src/shared/`.
   notice pesan BE tanpa unduhan; selain itu berkas (nama dari `Content-Disposition`) → `simpanBerkas`. 403 `bukan_petugas` →
   pesan BE + `petugas/saya` dimuat ulang paksa; 422 per kolom → galat kolom; 422 `ekspor_terlalu_besar` → pesan BE. Fixture
   ekspor disalin dari `main` @947b94fd.
+- Review MAKE-073 putaran 2 (S1–S6): item ⋮ nonaktif yang berketerangan tetap bisa difokus (`aria-disabled`, alasan terbaca);
+  deep-link `?tab=antrean` non-petugas tetap menampilkan Kontak Helpdesk, galat dengan cache petugas tetap menampilkan antrean;
+  panel Perlu ditindak disegarkan sesudah baca bila ringkasan belum ada; "Data pelapor" bisa diklik (UiTooltip `v-model:open`)
+  dan isinya hanya lewat `aria-describedby`; label pengingat berganti saat jatuh tempo lewat (detak per menit); saran kandidat
+  teks lama disembunyikan selama jeda kueri baru.
 - **Tanpa frame Figma** (H8-9): layar pemilik/petugas/admin/dialog ekspor mengikuti pola redesign (Gambar 33/34, Master Data); dicatat di B5.
