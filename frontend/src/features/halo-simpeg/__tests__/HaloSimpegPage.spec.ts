@@ -829,8 +829,18 @@ describe('R1 (BLOK): Lihat semua Perlu ditindak', () => {
     const banyak = Array.from({ length: 5 }, (_, i) => baris({ id: 100 + i, pesan_terakhir: null }))
     svc.tiket.list.mockImplementation(async (f: { perlu_tindak?: boolean }) => (f.perlu_tindak ? { ...DAFTAR, items: banyak, total: 8 } : DAFTAR))
     const { w } = await pasang({ query: '?tab=antrean' })
-    await daftarAntrean.ubahFilter({ status: 'open', q: 'cuti', kategori: 2 })
+    await daftarAntrean.ubahFilter({ status: 'open', kategori: 2 })
     await flushPromises()
+    // Celah R1: "cuti" diketik di kotak cari dan jeda 300 ms dijalankan dulu, BARU "Lihat semua" diklik.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      await w.get('[data-testid="halo-daftar-antrean"] input[type="search"]').setValue('cuti')
+      await vi.advanceTimersByTimeAsync(300)
+    } finally {
+      vi.useRealTimers()
+    }
+    await flushPromises()
+    expect(svc.tiket.list.mock.calls.at(-1)![0]).toMatchObject({ peran: 'petugas', q: 'cuti' })
     await w.get('[data-testid="halo-perlu-tindak-semua"]').trigger('click')
     await flushPromises()
     const akhir = svc.tiket.list.mock.calls.at(-1)![0] as Record<string, unknown>
@@ -967,6 +977,21 @@ describe('R11: ⋮ Hapus di antrean petugas (fixture tiket-daftar-petugas)', () 
     const { w } = await pasang()
     const id = DAFTAR.items[0]!.id
     expect((await rowMenuActions(w, `halo-tiket-actions-${id}`)).some((a) => a.label === 'Hapus')).toBe(false)
+  })
+})
+
+describe('celah R1: teks kosong tabel saat Lihat semua', () => {
+  it('perlu_tindak tanpa baris → "Tidak ada tiket yang perlu ditindak." di halo-daftar-kosong', async () => {
+    svc.petugas.saya.mockResolvedValue({ petugas: true, aktif: true, kategori: [{ id: 1, nama: 'Cuti', status: 1 }], bisa_ekspor: true })
+    const lima = Array.from({ length: 5 }, (_, i) => baris({ id: 100 + i, pesan_terakhir: null }))
+    // Panel (per_page 5) berisi 8 → "Lihat semua" tampil; tabel antrean perlu_tindak (halaman penuh) kosong.
+    svc.tiket.list.mockImplementation(async (f: { perlu_tindak?: boolean; per_page?: number }) =>
+      f.perlu_tindak ? (f.per_page === 5 ? { ...DAFTAR, items: lima, total: 8 } : { ...DAFTAR, items: [], total: 0 }) : DAFTAR,
+    )
+    const { w } = await pasang({ query: '?tab=antrean' })
+    await w.get('[data-testid="halo-perlu-tindak-semua"]').trigger('click')
+    await flushPromises()
+    expect(w.get('[data-testid="halo-daftar-antrean"] [data-testid="halo-daftar-kosong"]').text()).toBe('Tidak ada tiket yang perlu ditindak.')
   })
 })
 
