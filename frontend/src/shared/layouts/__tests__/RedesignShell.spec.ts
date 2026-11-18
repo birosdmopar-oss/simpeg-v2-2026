@@ -47,9 +47,11 @@ describe('RedesignShell — menu', () => {
     const { wrapper } = await mountShell(Role.SUPER_ADMIN)
     const links = wrapper.get('[data-testid="nav-main"]').findAll('a').map((a) => a.text())
 
+    // CR-135 (ACTIVE_PHASE 8): tautan langsung (item ber-anak = tombol grup, bukan <a>) termasuk menu Fase 6–8.
     expect(links).toEqual([
-      'Beranda', 'Daftar Pegawai', 'Pengajuan Data Umum', 'Struktur Organisasi', 'Plt/Plh', 'Usulan Konket', 'Usulan Karpeg/Karis', 'Verifikasi LKH',
-      'Master Data', 'Angka Kredit JF', 'Web Config', 'Hari Libur', 'Manajemen Akun', 'Integrasi', 'FAQ',
+      'Beranda', 'Notifikasi', 'Daftar Pegawai', 'Pengajuan Data Umum', 'Struktur Organisasi', 'Plt/Plh', 'Usulan Konket', 'Usulan Karpeg/Karis', 'Verifikasi LKH', 'Arsip',
+      'Portal Berita', 'DIBO', 'Kelola Berita', 'Form Digital', 'Survei Layanan',
+      'Master Data', 'Angka Kredit JF', 'Web Config', 'Hari Libur', 'Manajemen Akun', 'Integrasi', 'Halo Simpeg', 'FAQ',
     ])
     expect(wrapper.get('[data-testid="nav-web-config"]').attributes('href')).toBe('/web-config')
     expect(wrapper.get('main#main-content [data-testid="content"]').text()).toBe('isi halaman')
@@ -58,7 +60,7 @@ describe('RedesignShell — menu', () => {
   it('Pegawai melihat menu Fase 3 miliknya tanpa Daftar Pegawai', async () => {
     const { wrapper } = await mountShell(Role.PEGAWAI)
     expect(wrapper.get('[data-testid="nav-main"]').findAll('a').map((a) => a.text())).toEqual([
-      'Beranda', 'Struktur Organisasi', 'Usulan Konket', 'Usulan Karpeg/Karis', 'Verifikasi LKH', 'FAQ',
+      'Beranda', 'Notifikasi', 'Struktur Organisasi', 'Usulan Konket', 'Usulan Karpeg/Karis', 'Verifikasi LKH', 'Arsip', 'Portal Berita', 'DIBO', 'Halo Simpeg', 'FAQ',
     ])
     expect(wrapper.find('[data-testid="nav-pegawai"]').exists()).toBe(false)
     expect(wrapper.get('[data-testid="nav-struktur"]').attributes('href')).toBe('/struktur-organisasi')

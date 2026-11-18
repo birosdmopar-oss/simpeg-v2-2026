@@ -47,7 +47,7 @@ import type { RouteLocationRaw } from 'vue-router'
 import { USER_MANAGEMENT_ROLES, type RoleCode } from '@/features/auth/types'
 import { DOKUMEN_ROLES } from '@/features/dokumen/types'
 import { CHATBOT_ADMIN_ROLES } from '@/features/halo-simpeg/chatbot/constants'
-import { HALO_ADMIN_ROLES } from '@/features/halo-simpeg/constants'
+import { HALO_ADMIN_ROLES, HALO_ROLES } from '@/features/halo-simpeg/constants'
 import { INTEGRASI_ADMIN_ROLES } from '@/features/integrasi/integrasi.types'
 import {
   AK_JF_ROLES,
@@ -91,11 +91,11 @@ import { MASTER_DATA_ROLES } from '@/features/master-data/types'
 import { WEB_CONFIG_ROLES } from '@/features/master-data/webConfig.types'
 
 /**
- * Fase tertinggi yang menunya ditampilkan. 5 sejak paket penutup 5C (MAKE-053): semua halaman Modul D (Presensi &
- * Remunerasi) tersambung API (4 sejak penutup M7 MAKE-026, 3 sejak B-20 penutup WS-2 MAKE-014). Menu fase 6+ sudah
- * terdaftar di bawah tetapi tersembunyi (kecuali yang ber-`rilis`).
+ * Fase tertinggi yang menunya ditampilkan. 8 sejak rilis menu Fase 8 (CR-135, H8-11 (a), F8-50; sign-off Horii 18-11-2026):
+ * Fase 6 (Integrasi), 7 (Pusat Notifikasi, Arsip, Laporan, Dokumen, konten admin), dan 8 (Halo Simpeg, Chatbot Manager)
+ * tampil sesuai role. Riwayat: 5 sejak penutup 5C (MAKE-053), 4 sejak penutup M7 (MAKE-026), 3 sejak B-20 WS-2 (MAKE-014).
  */
-export const ACTIVE_PHASE = 5
+export const ACTIVE_PHASE = 8
 
 export interface NavChild {
   key: string
@@ -126,6 +126,11 @@ export interface NavItem {
    * penutup fase menaikkan `ACTIVE_PHASE` melewati `phase` item itu. Tanpa `rilis` = perilaku lama.
    */
   rilis?: true
+  /**
+   * Placeholder mockup tanpa halaman/route (tanpa `to` dan tanpa anak): tidak pernah tampil, berapa pun `ACTIVE_PHASE`
+   * (CR-135: grup Karier E-Kinerja/E-Talenta). Hapus flag ini saat halamannya dibuat dan item diberi `to`/`children`.
+   */
+  belumAda?: true
   /** Tujuan = Detail Pegawai NIP akun; item disembunyikan bila akun tanpa NIP (CR-049). */
   nipAkun?: true
 }
@@ -143,7 +148,7 @@ const NAV: NavGroup[] = [
     items: [
       { key: 'home', label: 'Beranda', icon: House, to: { name: 'home' }, phase: 0 },
       // Fase 7 F-08 MAKE-085: Pusat Notifikasi (legacy menu Notifikasi / Butuh Approval / Histori Approval, Q7-29). Tetap
-      // `phase: 7` (tersembunyi sampai ACTIVE_PHASE ≥ 7); lonceng topbar membuka halaman yang sama.
+      // `phase: 7` (tampil sejak CR-135, ACTIVE_PHASE 8); lonceng topbar membuka halaman yang sama.
       { key: 'notifikasi', label: 'Notifikasi', icon: Bell, to: '/notifikasi', roles: NOTIFIKASI_ROLES, phase: FASE_LONCENG },
     ],
   },
@@ -211,7 +216,7 @@ const NAV: NavGroup[] = [
         ],
       },
       // Fase 7 (Dashboard/laporan) F-03 MAKE-036: 7 statistik (hr/chart/* = role 1, 3, 4, 5, 8); 3 pertama mengikuti
-      // mockup Gambar 15. Tetap `phase: 7` (tersembunyi sampai ACTIVE_PHASE ≥ 7); QA lewat URL langsung (PRD F7-14).
+      // mockup Gambar 15. `phase: 7` (sebelum CR-135 tersembunyi, QA lewat URL langsung, PRD F7-14).
       {
         key: 'laporan',
         label: 'Laporan',
@@ -228,8 +233,8 @@ const NAV: NavGroup[] = [
           { key: 'laporan-golongan', label: 'Golongan', to: '/laporan/golongan' },
         ],
       },
-      // Fase 7 F-09 MAKE-037: generator dokumen (hr/document/* = role 1, 3, 4, 5, 8). Tetap `phase: 7` (tersembunyi
-      // sampai ACTIVE_PHASE ≥ 7, tanpa `rilis`); QA lewat URL langsung (PRD F7-14).
+      // Fase 7 F-09 MAKE-037: generator dokumen (hr/document/* = role 1, 3, 4, 5, 8). `phase: 7` tanpa `rilis` (sebelum
+      // CR-135 tersembunyi, QA lewat URL langsung, PRD F7-14).
       {
         key: 'dokumen',
         label: 'Dokumen',
@@ -248,16 +253,17 @@ const NAV: NavGroup[] = [
   {
     key: 'karier',
     title: 'Karier',
-    // Fase 6 (Integrasi) — perkiraan; belum dikonfirmasi di dokumen.
+    // Fase 6 (Integrasi) — perkiraan; belum dikonfirmasi di dokumen. Belum ada halaman/route → `belumAda` (CR-135), grup Karier
+    // tidak tampil sampai halamannya dibuat.
     items: [
-      { key: 'ekinerja', label: 'E-Kinerja', icon: FileText, phase: 6, children: [] },
-      { key: 'etalenta', label: 'E-Talenta', icon: TrendingUp, phase: 6, children: [] },
+      { key: 'ekinerja', label: 'E-Kinerja', icon: FileText, phase: 6, children: [], belumAda: true },
+      { key: 'etalenta', label: 'E-Talenta', icon: TrendingUp, phase: 6, children: [], belumAda: true },
     ],
   },
   {
     key: 'berita',
     title: 'Berita',
-    // Fase 7 konten admin (MAKE-079..082): phase 7 (tersembunyi sampai ACTIVE_PHASE >= 7, pola F7-14); QA lewat URL langsung.
+    // Fase 7 konten admin (MAKE-079..082): phase 7 (sebelum CR-135 tersembunyi, pola F7-14; QA lewat URL langsung).
     items: [
       { key: 'berita', label: 'Portal Berita', icon: Newspaper, to: { name: 'konten-berita' }, phase: 7 },
       { key: 'konten-dibo-baca', label: 'DIBO', icon: Files, to: { name: 'konten-dibo' }, phase: 7 },
@@ -292,11 +298,11 @@ const NAV: NavGroup[] = [
       { key: 'web-config', label: 'Web Config', icon: Settings, to: { name: 'web-config' }, roles: WEB_CONFIG_ROLES, phase: 2 },
       { key: 'hari-libur', label: 'Hari Libur', icon: CalendarDays, to: { name: 'hari-libur' }, roles: HARI_LIBUR_READ_ROLES, phase: 2 },
       { key: 'users', label: 'Manajemen Akun', icon: UserCog, to: { name: 'users' }, roles: USER_MANAGEMENT_ROLES, phase: 1 },
-      // MAKE-078 (ISSUE-058, PRD Fase 6 §6.2): Admin → Integrasi, role 1. Fase 6 sudah DONE tetapi ACTIVE_PHASE masih 5 →
-      // `rilis` (hapus saat ACTIVE_PHASE ≥ 6).
-      { key: 'integrasi', label: 'Integrasi', icon: Plug, to: { name: 'integrasi-admin' }, roles: INTEGRASI_ADMIN_ROLES, phase: 6, rilis: true },
+      // MAKE-078 (ISSUE-058, PRD Fase 6 §6.2): Admin → Integrasi, role 1. Sempat dirilis lebih awal (`rilis`, ACTIVE_PHASE 5);
+      // `rilis` dihapus di CR-135 (ACTIVE_PHASE 8).
+      { key: 'integrasi', label: 'Integrasi', icon: Plug, to: { name: 'integrasi-admin' }, roles: INTEGRASI_ADMIN_ROLES, phase: 6 },
       // MAKE-095 (PRD Fase 8 v1.1 F8-43/F8-50): Chatbot Manager "Vanya", role 1. `phase: 8` tanpa `rilis` (pola lonceng F-08):
-      // menu dan widget terbuka bersamaan saat ACTIVE_PHASE ≥ 8; sebelum itu QA lewat URL langsung (pola F7-14).
+      // menu dan widget terbuka bersamaan sejak CR-135 (ACTIVE_PHASE 8); sebelumnya QA lewat URL langsung (pola F7-14).
       {
         key: 'chatbot-manager',
         label: 'Chatbot Manager',
@@ -311,8 +317,8 @@ const NAV: NavGroup[] = [
           { key: 'chatbot-riwayat', label: 'Riwayat', to: { name: 'chatbot-riwayat' } },
         ],
       },
-      // MAKE-073 (PRD Fase 8 v1.3 §7.2, 8_2 §1a): master helpdesk Halo Simpeg, role 1. `phase: 8` tanpa `rilis`; sebelum
-      // ACTIVE_PHASE ≥ 8 QA lewat URL langsung. Item `halo` di Pusat Bantuan tetap tanpa `to`/`roles` (CR-135).
+      // MAKE-073 (PRD Fase 8 v1.3 §7.2, 8_2 §1a): master helpdesk Halo Simpeg, role 1. `phase: 8` tanpa `rilis`; tampil sejak
+      // CR-135 (ACTIVE_PHASE 8), sebelumnya QA lewat URL langsung.
       {
         key: 'halo-admin',
         label: 'Halo Simpeg',
@@ -331,8 +337,9 @@ const NAV: NavGroup[] = [
     key: 'bantuan',
     title: 'Pusat Bantuan',
     items: [
-      // Fase 8 (Halo Simpeg).
-      { key: 'halo', label: 'Halo Simpeg', icon: MessageCircle, phase: 8 },
+      // Fase 8 (Halo Simpeg): halaman pemilik/petugas, role 1–7 (F8-04, Q8-12 B; role 8 tanpa akses). `to`/`roles` diisi di
+      // CR-135 (H8-11 (a)); badge menu disisipkan `sisipBadgeHalo` (RedesignShell).
+      { key: 'halo', label: 'Halo Simpeg', icon: MessageCircle, to: { name: 'halo-simpeg' }, roles: HALO_ROLES, phase: 8 },
       { key: 'faq', label: 'FAQ', icon: CircleHelp, to: { name: 'faq' }, phase: 2 },
     ],
   },
@@ -356,7 +363,7 @@ export function buildNav(role: RoleCode | null, activePhase: number = ACTIVE_PHA
   return NAV.map((group) => ({
     ...group,
     items: group.items
-      .filter((item) => (item.phase <= activePhase || item.rilis === true) && bolehRole(item.roles, role))
+      .filter((item) => !item.belumAda && (item.phase <= activePhase || item.rilis === true) && bolehRole(item.roles, role))
       .filter((item) => !item.nipAkun || Boolean(nip))
       .map((item) => saringAnak(item, role))
       .filter((item): item is NavItem => item !== null)

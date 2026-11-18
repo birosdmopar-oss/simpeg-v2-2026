@@ -2,8 +2,9 @@
  * nav.config — menu sidebar redesign per role & fase aktif. Hak akses mengikuti Matriks Role x Endpoint
  * (Fase 3: Matriks v2 + keputusan user). Semua menu yang ada di `main` (termasuk Web Config) wajib ada; menu Fase 3
  * tampil sejak B-20 penutup (WS-2 MAKE-014), menu Layanan Fase 4 sejak penutup M7 (MAKE-026, PRD Fase 4 §6.11.2), dan
- * menu Presensi Fase 5 sejak penutup 5C (ACTIVE_PHASE = 5, MAKE-053, tanpa `rilis`; anak per role `NavChild.roles`);
- * menu fase 6+ tetap tersembunyi.
+ * menu Presensi Fase 5 sejak penutup 5C (MAKE-053, tanpa `rilis`; anak per role `NavChild.roles`), dan menu Fase 6–8
+ * (Integrasi, Pusat Notifikasi, Arsip, Laporan, Dokumen, konten admin, Halo Simpeg, Chatbot Manager) sejak rilis menu Fase 8
+ * (ACTIVE_PHASE = 8, CR-135). Placeholder tanpa halaman (`belumAda`: E-Kinerja/E-Talenta) tidak pernah tampil.
  */
 import { describe, expect, it } from 'vitest'
 
@@ -18,23 +19,53 @@ const rolesWith = (menu: string, phase?: number): RoleCode[] => Object.values(Ro
 
 const FASE3_MENUS = ['Daftar Pegawai', 'Pengajuan Data Umum', 'Struktur Organisasi', 'Plt/Plh', 'Usulan Konket', 'Usulan Karpeg/Karis', 'Verifikasi LKH']
 
-describe('buildNav — fase aktif 5 (penutup 5C Fase 5)', () => {
-  it('ACTIVE_PHASE = 5 sejak halaman Modul D (Presensi) tersambung API', () => {
-    expect(ACTIVE_PHASE).toBe(5)
+describe('buildNav — fase aktif 8 (rilis menu Fase 8, CR-135)', () => {
+  it('ACTIVE_PHASE = 8 sejak sign-off Fase 8 (Horii 18-11-2026, H8-11 (a))', () => {
+    expect(ACTIVE_PHASE).toBe(8)
   })
 
-  // Menu lengkap per role (urut sidebar): Kepegawaian Fase 3 lalu menu main.
+  // Menu lengkap per role (urut sidebar). Role 1: "Halo Simpeg" dua kali = master admin (Pengaturan) + halaman tiket (Pusat Bantuan).
+  const BERITA = ['Portal Berita', 'DIBO']
   it.each([
-    [Role.SUPER_ADMIN, ['Beranda', ...FASE3_MENUS, 'Layanan', 'Presensi', 'Master Data', 'Angka Kredit JF', 'Web Config', 'Hari Libur', 'Manajemen Akun', 'Integrasi', 'FAQ']],
-    [Role.PEGAWAI, ['Beranda', 'Struktur Organisasi', 'Usulan Konket', 'Usulan Karpeg/Karis', 'Verifikasi LKH', 'Layanan', 'Presensi', 'FAQ']],
-    [Role.ADMIN_SATKER, ['Beranda', 'Daftar Pegawai', 'Pengajuan Data Umum', 'Struktur Organisasi', 'Plt/Plh', 'Usulan Konket', 'Verifikasi LKH', 'Layanan', 'Presensi', 'Manajemen Akun', 'FAQ']],
-    [Role.ADMIN_VIEW_ESELON1, ['Beranda', 'Daftar Pegawai', 'Struktur Organisasi', 'Plt/Plh', 'Usulan Konket', 'Usulan Karpeg/Karis', 'Layanan', 'Presensi', 'Hari Libur', 'FAQ']],
-    [Role.MENTERI, ['Beranda', 'Daftar Pegawai', 'Struktur Organisasi', 'Plt/Plh', 'Usulan Konket', 'Usulan Karpeg/Karis', 'Layanan', 'Presensi', 'Hari Libur', 'FAQ']],
-    [Role.PTT, ['Beranda', 'Struktur Organisasi', 'Usulan Konket', 'Verifikasi LKH', 'Layanan', 'Presensi', 'FAQ']],
-    [Role.PPPK, ['Beranda', 'Struktur Organisasi', 'Usulan Konket', 'Usulan Karpeg/Karis', 'Verifikasi LKH', 'Layanan', 'Presensi', 'FAQ']],
-    [Role.PIMPINAN, ['Beranda', 'Daftar Pegawai', 'Struktur Organisasi', 'Hari Libur', 'FAQ']],
-  ])('role %i melihat menu sesuai Matriks v2', (role, harapan) => {
+    [
+      Role.SUPER_ADMIN,
+      ['Beranda', 'Notifikasi', ...FASE3_MENUS, 'Arsip', 'Layanan', 'Presensi', 'Laporan', 'Dokumen', ...BERITA, 'Kelola Berita', 'Kelola Konten', 'Form Digital', 'Survei Layanan',
+        'Master Data', 'Angka Kredit JF', 'Web Config', 'Hari Libur', 'Manajemen Akun', 'Integrasi', 'Chatbot Manager', 'Halo Simpeg', 'Halo Simpeg', 'FAQ'],
+    ],
+    [Role.PEGAWAI, ['Beranda', 'Notifikasi', 'Struktur Organisasi', 'Usulan Konket', 'Usulan Karpeg/Karis', 'Verifikasi LKH', 'Arsip', 'Layanan', 'Presensi', ...BERITA, 'Halo Simpeg', 'FAQ']],
+    [
+      Role.ADMIN_SATKER,
+      ['Beranda', 'Notifikasi', 'Daftar Pegawai', 'Pengajuan Data Umum', 'Struktur Organisasi', 'Plt/Plh', 'Usulan Konket', 'Verifikasi LKH', 'Arsip', 'Layanan', 'Presensi', 'Laporan', 'Dokumen',
+        ...BERITA, 'Kelola Berita', 'Manajemen Akun', 'Halo Simpeg', 'FAQ'],
+    ],
+    [
+      Role.ADMIN_VIEW_ESELON1,
+      ['Beranda', 'Daftar Pegawai', 'Struktur Organisasi', 'Plt/Plh', 'Usulan Konket', 'Usulan Karpeg/Karis', 'Arsip', 'Layanan', 'Presensi', 'Laporan', 'Dokumen', ...BERITA, 'Hari Libur', 'Halo Simpeg', 'FAQ'],
+    ],
+    [
+      Role.MENTERI,
+      ['Beranda', 'Daftar Pegawai', 'Struktur Organisasi', 'Plt/Plh', 'Usulan Konket', 'Usulan Karpeg/Karis', 'Arsip', 'Layanan', 'Presensi', 'Laporan', 'Dokumen', ...BERITA, 'Hari Libur', 'Halo Simpeg', 'FAQ'],
+    ],
+    [Role.PTT, ['Beranda', 'Notifikasi', 'Struktur Organisasi', 'Usulan Konket', 'Verifikasi LKH', 'Arsip', 'Layanan', 'Presensi', ...BERITA, 'Halo Simpeg', 'FAQ']],
+    [Role.PPPK, ['Beranda', 'Notifikasi', 'Struktur Organisasi', 'Usulan Konket', 'Usulan Karpeg/Karis', 'Verifikasi LKH', 'Arsip', 'Layanan', 'Presensi', ...BERITA, 'Halo Simpeg', 'FAQ']],
+    [Role.PIMPINAN, ['Beranda', 'Daftar Pegawai', 'Struktur Organisasi', 'Laporan', 'Dokumen', ...BERITA, 'Hari Libur', 'FAQ']],
+  ])('role %i melihat menu sesuai Matriks v2 + menu Fase 6–8', (role, harapan) => {
     expect(labels(role)).toEqual(harapan)
+  })
+
+  it('tidak ada item ber-`rilis` dengan `phase <= ACTIVE_PHASE` (rilis lebih awal sudah dibersihkan, CR-135)', () => {
+    for (const role of Object.values(Role)) {
+      for (const item of buildNav(role, Number.MAX_SAFE_INTEGER).flatMap((g) => g.items)) {
+        if (item.rilis) expect(item.phase, `${item.key} masih ber-rilis`).toBeGreaterThan(ACTIVE_PHASE)
+      }
+    }
+  })
+
+  it.each(Object.values(Role))('role %i: tanpa key duplikat dan tanpa item mati (tanpa `to` dan tanpa anak)', (role) => {
+    const items = buildNav(role).flatMap((g) => g.items)
+    const keys = [...items.map((i) => i.key), ...items.flatMap((i) => (i.children ?? []).map((c) => c.key))]
+    expect(new Set(keys).size).toBe(keys.length)
+    for (const i of items) expect(i.to !== undefined || (i.children?.length ?? 0) > 0, `${i.key} tanpa tujuan`).toBe(true)
   })
 
   it('Daftar Pegawai hanya role 1, 3, 4, 5, 8', () => {
@@ -43,7 +74,7 @@ describe('buildNav — fase aktif 5 (penutup 5C Fase 5)', () => {
 
   it('Struktur Organisasi untuk semua role login (dan tanpa role)', () => {
     expect(rolesWith('Struktur Organisasi')).toEqual(Object.values(Role))
-    expect(labels(null)).toEqual(['Beranda', 'Struktur Organisasi', 'FAQ'])
+    expect(labels(null)).toEqual(['Beranda', 'Struktur Organisasi', 'Portal Berita', 'DIBO', 'FAQ'])
   })
 
   it('Pengajuan Data Umum (antrean B-04) = role 1, 3', () => {
@@ -63,10 +94,12 @@ describe('buildNav — fase aktif 5 (penutup 5C Fase 5)', () => {
     expect(rolesWith('Usulan Karpeg/Karis')).toEqual([1, 2, 4, 5, 7])
   })
 
-  it('menu fase 5+ tanpa `rilis` belum tampil untuk siapa pun', () => {
-    const all = Object.values(Role).flatMap((r) => labels(r))
-    for (const later of ['Laporan', 'Arsip', 'E-Kinerja', 'E-Talenta', 'Portal Berita', 'Kelola Berita', 'Kelola Konten', 'DIBO', 'Halo Simpeg']) {
-      expect(all).not.toContain(later)
+  it('placeholder `belumAda` (E-Kinerja, E-Talenta, grup Karier) tidak tampil untuk siapa pun pada fase berapa pun', () => {
+    for (const fase of [ACTIVE_PHASE, Number.MAX_SAFE_INTEGER]) {
+      const all = Object.values(Role).flatMap((r) => labels(r, fase))
+      expect(all).not.toContain('E-Kinerja')
+      expect(all).not.toContain('E-Talenta')
+      for (const r of Object.values(Role)) expect(buildNav(r, fase).map((g) => g.key)).not.toContain('karier')
     }
   })
 
@@ -74,8 +107,8 @@ describe('buildNav — fase aktif 5 (penutup 5C Fase 5)', () => {
     expect(labels(role)).not.toContain('Web Config')
   })
 
-  it('grup tanpa item dibuang (Pegawai tidak punya grup Pengaturan)', () => {
-    expect(buildNav(Role.PEGAWAI).map((g) => g.key)).toEqual(['main', 'kepegawaian', 'bantuan'])
+  it('grup tanpa item dibuang (Pegawai tidak punya grup Pengaturan; Karier kosong karena `belumAda`)', () => {
+    expect(buildNav(Role.PEGAWAI).map((g) => g.key)).toEqual(['main', 'kepegawaian', 'berita', 'bantuan'])
   })
 
   it('tujuan menu memakai nama route yang sama dengan router', () => {
@@ -95,6 +128,21 @@ describe('buildNav — fase aktif 5 (penutup 5C Fase 5)', () => {
       'hari-libur': { name: 'hari-libur' },
       users: { name: 'users' },
       integrasi: { name: 'integrasi-admin' },
+      notifikasi: '/notifikasi',
+      arsip: { name: 'arsip' },
+      layanan: undefined,
+      presensi: undefined,
+      laporan: undefined,
+      dokumen: undefined,
+      berita: { name: 'konten-berita' },
+      'konten-dibo-baca': { name: 'konten-dibo' },
+      'konten-berita-kelola': { name: 'konten-berita-kelola' },
+      'konten-admin': undefined,
+      'form-digital': { name: 'form-digital-kelola' },
+      'survei-layanan': { name: 'survei-layanan-rekap' },
+      'chatbot-manager': undefined,
+      'halo-admin': undefined,
+      halo: { name: 'halo-simpeg' },
       faq: { name: 'faq' },
     })
   })
@@ -125,8 +173,8 @@ describe('buildNav — fase 2 (sebelum B-20 penutup)', () => {
     for (const menu of FASE3_MENUS) expect(all).not.toContain(menu)
   })
 
-  it('Super Admin melihat menu main saja', () => {
-    expect(labels(Role.SUPER_ADMIN, 2)).toEqual(['Beranda', 'Master Data', 'Web Config', 'Hari Libur', 'Manajemen Akun', 'Integrasi', 'FAQ'])
+  it('Super Admin melihat menu main saja (Integrasi fase 6 tanpa `rilis` sejak CR-135 → tidak ada di fase 2)', () => {
+    expect(labels(Role.SUPER_ADMIN, 2)).toEqual(['Beranda', 'Master Data', 'Web Config', 'Hari Libur', 'Manajemen Akun', 'FAQ'])
   })
 })
 
@@ -140,13 +188,13 @@ describe('buildNav — fase berikutnya', () => {
     expect(laporan?.children?.map((c) => c.to)).toEqual(['/laporan/unit-kerja', '/laporan/jenis-kelamin', '/laporan/eselon', '/laporan/jabatan', '/laporan/pendidikan', '/laporan/usia', '/laporan/golongan'])
   })
 
-  it('Laporan (fase 7) = role 1, 3, 4, 5, 8 (hr/chart/*), tetap tersembunyi pada fase aktif', () => {
-    const punya = Object.values(Role).filter((r) => buildNav(r, 7).flatMap((g) => g.items).some((i) => i.key === 'laporan'))
+  it('Laporan (fase 7) = role 1, 3, 4, 5, 8 (hr/chart/*), tampil pada fase aktif 8 (CR-135), tersembunyi di fase 6', () => {
+    const punya = Object.values(Role).filter((r) => buildNav(r).flatMap((g) => g.items).some((i) => i.key === 'laporan'))
     expect(punya).toEqual([1, 3, 4, 5, 8])
-    expect(Object.values(Role).flatMap((r) => labels(r))).not.toContain('Laporan')
+    expect(Object.values(Role).flatMap((r) => labels(r, 6))).not.toContain('Laporan')
   })
 
-  it('Dokumen (fase 7, MAKE-037) = role 1, 3, 4, 5, 8 (hr/document/*), 4 anak, tetap tersembunyi pada fase aktif', () => {
+  it('Dokumen (fase 7, MAKE-037) = role 1, 3, 4, 5, 8 (hr/document/*), 4 anak, tersembunyi di fase 6', () => {
     const punya = Object.values(Role).filter((r) => buildNav(r, 7).flatMap((g) => g.items).some((i) => i.key === 'dokumen'))
     expect(punya).toEqual([1, 3, 4, 5, 8])
     const dokumen = buildNav(Role.SUPER_ADMIN, 7)
@@ -154,7 +202,7 @@ describe('buildNav — fase berikutnya', () => {
       .find((i) => i.key === 'dokumen')
     expect(dokumen?.children?.map((c) => c.label)).toEqual(['DUK', 'Nominatif', 'Proyeksi Pensiun', 'Baperjakat'])
     expect(dokumen?.children?.map((c) => c.to)).toEqual(['/dokumen/duk', '/dokumen/nominatif', '/dokumen/pensiun', '/dokumen/baperjakat'])
-    expect(Object.values(Role).flatMap((r) => labels(r))).not.toContain('Dokumen')
+    expect(Object.values(Role).flatMap((r) => labels(r, 6))).not.toContain('Dokumen')
   })
 })
 
@@ -173,9 +221,10 @@ describe('buildNav — Arsip (F-10, MAKE-091)', () => {
     expect(grup?.key).toBe('kepegawaian')
   })
 
-  it('tetap tersembunyi pada fase aktif (QF10-3: ikut gerbang fase 7, tanpa `rilis`)', () => {
-    expect(ACTIVE_PHASE).toBeLessThan(7)
-    for (const role of Object.values(Role)) expect(arsip(role), `role ${role}`).toBeUndefined()
+  it('ikut gerbang fase 7 tanpa `rilis` (QF10-3): tampil pada fase aktif 8 (CR-135), tersembunyi di fase 6', () => {
+    expect(ACTIVE_PHASE).toBeGreaterThanOrEqual(7)
+    expect(Object.values(Role).filter((r) => arsip(r) !== undefined)).toEqual([1, 2, 3, 4, 5, 6, 7])
+    for (const role of Object.values(Role)) expect(arsip(role, 6), `role ${role}`).toBeUndefined()
     expect(arsip(Role.SUPER_ADMIN, 7)).not.toHaveProperty('rilis')
   })
 })
@@ -186,8 +235,8 @@ describe('buildNav — `rilis` & `NavChild.roles` (F5-18, PRD Fase 5A §7.8.2)',
       .flatMap((g) => g.items)
       .find((i) => i.key === 'presensi')
 
-  it('grup Presensi (phase 5, tanpa `rilis`) tampil pada ACTIVE_PHASE 5 dan tersembunyi pada fase 4', () => {
-    expect(ACTIVE_PHASE).toBe(5)
+  it('grup Presensi (phase 5, tanpa `rilis`) tampil pada fase aktif (≥ 5) dan tersembunyi pada fase 4', () => {
+    expect(ACTIVE_PHASE).toBeGreaterThanOrEqual(5)
     expect(presensi(Role.PEGAWAI)).toMatchObject({ phase: 5 })
     expect(presensi(Role.PEGAWAI)).not.toHaveProperty('rilis')
     for (const role of Object.values(Role)) expect(presensi(role, 4), `role ${role}`).toBeUndefined()
@@ -238,9 +287,10 @@ describe('buildNav — `rilis` & `NavChild.roles` (F5-18, PRD Fase 5A §7.8.2)',
     expect(presensi(Role.PEGAWAI, 5)?.children?.map((c) => c.key)).toEqual(['presensi-saya', 'presensi-slip-gaji', 'presensi-tukin-saya'])
   })
 
-  it('item tanpa `rilis` dengan children kosong tetap mengikuti fase (E-Kinerja fase 6)', () => {
+  it('item `belumAda` dengan children kosong tidak tampil walau fasenya lewat (E-Kinerja fase 6, CR-135)', () => {
+    expect(labels(Role.SUPER_ADMIN, 5)).not.toContain('E-Kinerja')
+    expect(labels(Role.SUPER_ADMIN, 6)).not.toContain('E-Kinerja')
     expect(labels(Role.SUPER_ADMIN)).not.toContain('E-Kinerja')
-    expect(labels(Role.SUPER_ADMIN, 6)).toContain('E-Kinerja')
   })
 })
 
@@ -303,8 +353,9 @@ describe('buildNav — admin master Halo Simpeg (MAKE-073)', () => {
       .flatMap((g) => g.items)
       .find((i) => i.key === 'halo-admin')
 
-  it('role 1 saja, terbuka saat fase 8 (tersembunyi di ACTIVE_PHASE sekarang); anak Kategori/Petugas/Kontak', () => {
-    expect(adminHalo(Role.SUPER_ADMIN, ACTIVE_PHASE)).toBeUndefined()
+  it('role 1 saja, terbuka saat fase 8 (= ACTIVE_PHASE sejak CR-135, tersembunyi di fase 7); anak Kategori/Petugas/Kontak', () => {
+    expect(adminHalo(Role.SUPER_ADMIN, 7)).toBeUndefined()
+    expect(adminHalo(Role.SUPER_ADMIN, ACTIVE_PHASE)).toBeDefined()
     const item = adminHalo(Role.SUPER_ADMIN, 8)
     expect(item?.children?.map((c) => [c.label, c.to])).toEqual([
       ['Kategori', { name: 'halo-admin-kategori' }],
@@ -316,11 +367,22 @@ describe('buildNav — admin master Halo Simpeg (MAKE-073)', () => {
     }
   })
 
-  it('item `halo` Pusat Bantuan tetap tanpa to/roles (CR-135)', () => {
-    const halo = buildNav(Role.PEGAWAI, 8)
-      .flatMap((g) => g.items)
-      .find((i) => i.key === 'halo')
-    expect(halo?.to).toBeUndefined()
-    expect(halo?.roles).toBeUndefined()
+  it('item `halo` Pusat Bantuan (CR-135): to = route `halo-simpeg`, roles = HALO_ROLES 1–7; role 8 dan tanpa role tidak melihat', () => {
+    const halo = (role: RoleCode | null) =>
+      buildNav(role)
+        .flatMap((g) => g.items)
+        .find((i) => i.key === 'halo')
+    expect(halo(Role.PEGAWAI)).toMatchObject({ label: 'Halo Simpeg', to: { name: 'halo-simpeg' }, roles: [1, 2, 3, 4, 5, 6, 7], phase: 8 })
+    expect(Object.values(Role).filter((r) => halo(r) !== undefined)).toEqual([1, 2, 3, 4, 5, 6, 7])
+    expect(halo(Role.PIMPINAN)).toBeUndefined()
+    expect(halo(null)).toBeUndefined()
+    expect(buildNav(Role.PEGAWAI, 7).flatMap((g) => g.items).some((i) => i.key === 'halo')).toBe(false)
+  })
+
+  it('nama route item `halo` terdaftar di router Halo Simpeg', async () => {
+    const { haloRoutes } = await import('@/features/halo-simpeg/routes.halo')
+    const nama = (rs: readonly { name?: unknown; children?: readonly unknown[] }[]): unknown[] =>
+      rs.flatMap((r) => [r.name, ...nama((r.children ?? []) as { name?: unknown }[])])
+    expect(nama(haloRoutes as never)).toContain('halo-simpeg')
   })
 })

@@ -30,8 +30,8 @@ const anakPresensi = (role: (typeof Role)[keyof typeof Role]) =>
     ?.children?.map((c) => c.label) ?? []
 
 describe('navPresensi', () => {
-  it('ACTIVE_PHASE = 5 sejak penutup 5C (MAKE-053); grup Presensi tanpa `rilis`', () => {
-    expect(ACTIVE_PHASE).toBe(5)
+  it('grup Presensi tanpa `rilis` (dihapus penutup 5C, MAKE-053); ACTIVE_PHASE ≥ 5 (8 sejak CR-135)', () => {
+    expect(ACTIVE_PHASE).toBeGreaterThanOrEqual(5)
     const grup = buildNav(Role.SUPER_ADMIN)
       .flatMap((g) => g.items)
       .find((i) => i.key === 'presensi')
