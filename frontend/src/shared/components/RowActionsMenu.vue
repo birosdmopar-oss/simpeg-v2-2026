@@ -8,7 +8,7 @@
  * otomatis diberi pemisah di atasnya. Item `hidden` tidak dirender; item `disabled` tetap tampil tetapi tidak bisa
  * dipilih. Konfirmasi (ConfirmDialog) tetap tanggung jawab halaman pemanggil lewat event `select`.
  */
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, useId } from 'vue'
 import { MoreVertical } from 'lucide-vue-next'
 import {
   DropdownMenuContent,
@@ -34,6 +34,10 @@ const emit = defineEmits<{ select: [key: string] }>()
 
 const visible = computed(() => props.actions.filter((a) => !a.hidden))
 const pemicu = ref<HTMLButtonElement | null>(null)
+
+const uid = useId()
+/** id elemen keterangan item (untuk `aria-describedby`). */
+const idKeterangan = (key: string): string => `${uid}-ket-${key}`
 
 /**
  * CR-078 (T-06): fokus pindah ke ⋮ SEBELUM aksi dipancarkan. Dialog konfirmasi yang dibuka aksi ini menyimpan elemen
@@ -89,12 +93,19 @@ onBeforeUnmount(() => {
           <DropdownMenuItem
             :disabled="action.disabled"
             :data-action="action.key"
+            :aria-describedby="action.keterangan ? idKeterangan(action.key) : undefined"
             class="flex cursor-pointer select-none items-center gap-2 rounded-md px-2.5 py-1.5 outline-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40"
             :class="action.danger ? 'text-red-600 data-[highlighted]:bg-red-50' : 'text-slate-700 data-[highlighted]:bg-slate-100'"
             @select="pilih(action.key)"
           >
             <component :is="action.icon" v-if="action.icon" class="h-4 w-4 shrink-0" aria-hidden="true" />
-            {{ action.label }}
+            <template v-if="action.keterangan">
+              <span class="flex min-w-0 flex-col">
+                <span>{{ action.label }}</span>
+                <span :id="idKeterangan(action.key)" class="max-w-64 whitespace-normal text-xs text-slate-500" data-keterangan>{{ action.keterangan }}</span>
+              </span>
+            </template>
+            <template v-else>{{ action.label }}</template>
           </DropdownMenuItem>
         </template>
       </DropdownMenuContent>

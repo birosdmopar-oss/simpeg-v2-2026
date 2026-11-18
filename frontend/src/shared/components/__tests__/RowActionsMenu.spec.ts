@@ -180,3 +180,27 @@ describe('RowActionsMenu', () => {
     expect(wrapper.emitted('select')).toBeUndefined()
   })
 })
+
+describe('RowActionsMenu — keterangan opsional (MAKE-073 review B3 R2)', () => {
+  it('keterangan dirender di bawah label item dan ditautkan lewat aria-describedby', async () => {
+    const wrapper = mountMenu([
+      { key: 'edit', label: 'Edit', icon: Pencil },
+      { key: 'delete', label: 'Hapus', icon: Trash2, danger: true, disabled: true, keterangan: 'Masih dipakai tiket.' },
+    ])
+    const menu = await openRowMenu(wrapper, TESTID)
+    const item = menu.querySelector<HTMLElement>('[data-action="delete"]')!
+    const id = item.getAttribute('aria-describedby')
+    expect(id).toBeTruthy()
+    expect(document.getElementById(id!)?.textContent).toBe('Masih dipakai tiket.')
+    expect(renderedActions(menu).find((a) => a.key === 'delete')).toMatchObject({ label: 'Hapus', keterangan: 'Masih dipakai tiket.', disabled: true })
+  })
+
+  it('tanpa keterangan: tanpa aria-describedby dan tanpa elemen keterangan (DOM tidak berubah)', async () => {
+    const wrapper = mountMenu([{ key: 'edit', label: 'Edit', icon: Pencil }])
+    const menu = await openRowMenu(wrapper, TESTID)
+    const item = menu.querySelector<HTMLElement>('[data-action="edit"]')!
+    expect(item.hasAttribute('aria-describedby')).toBe(false)
+    expect(item.querySelector('[data-keterangan]')).toBeNull()
+    expect(item.textContent?.trim()).toBe('Edit')
+  })
+})
