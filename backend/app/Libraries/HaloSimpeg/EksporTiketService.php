@@ -90,7 +90,7 @@ final class EksporTiketService extends MasterHaloSimpeg
         [$dari, $ke] = self::rentangUtc($ds, $de);
         $kategori    = AksesTiket::kategoriAktif($this->db, $idPengguna);
 
-        $agregat = $kategori === [] ? ['jumlah' => 0, 'karakter' => 0] : $this->cakupan($kategori, $dari, $ke)
+        $agregat = $kategori === [] ? ['jumlah' => 0, 'karakter' => 0] : $this->cakupan($kategori, $dari, $ke, $idPengguna)
             ->select('COUNT(*) AS jumlah, COALESCE(SUM(CHAR_LENGTH(m.msg)), 0) AS karakter', false)->get()->getRowArray();
         $jumlah = (int) ($agregat['jumlah'] ?? 0);
 
@@ -102,7 +102,7 @@ final class EksporTiketService extends MasterHaloSimpeg
             throw self::terlaluBesar();
         }
 
-        $rows = $this->cakupan($kategori, $dari, $ke)
+        $rows = $this->cakupan($kategori, $dari, $ke, $idPengguna)
             ->select('t.id_inbox, t.sender, qc.question_category AS kategori, m.msg_sender, m.msg_sender_name, u.nip AS nip_pengirim, m.msg, m.created_at')
             ->orderBy('t.id_inbox', 'ASC')->orderBy('m.id_inbox_msg', 'ASC')
             ->limit($this->config->eksporMaksBaris + 1)->get()->getResultArray();
@@ -111,7 +111,7 @@ final class EksporTiketService extends MasterHaloSimpeg
         $utc      = new DateTimeZone('UTC');
         $baris    = [];
         $karakter = 0;
-        $terpilih = $this->barisTerpilih($rows, $idPengguna, $auth->role());
+        $terpilih = $this->barisTerpilih($rows);
         unset($rows); // generator memegang satu-satunya salinan dan melepasnya per baris
 
         foreach ($terpilih as [$r, $pengirim]) {
@@ -203,16 +203,15 @@ final class EksporTiketService extends MasterHaloSimpeg
     }
 
     /**
-     * SATU titik keputusan cakupan + label baris ekspor (V1/V2, menunggu Horii): pesan yang ikut berkas di-yield bersama [nama, NIP]
-     * untuk kolom NAMA PENANYA / NIP PENANYA; pesan yang tidak ikut cukup dilewati. Baris sumber dilepas satu per satu (memori).
-     * Saat ini (usulan, belum beku): semua pesan tiket ikut; nama/NIP = pengirim pesan baris itu [K `LS:1797-1799`]. Kolom yang
-     * tersedia untuk opsi (a)/(b): `sender` (pemilik tiket), `msg_sender`, `$pengekspor`, `$role` pengekspor.
+     * Label baris ekspor (V2, keputusan Horii 18-11 opsi (a) ikut legacy): kolom NAMA PENANYA / NIP PENANYA = nama/NIP pengirim
+     * pesan baris itu [K `LS:1797-1799`]; NIP kosong bila pengirim tanpa NIP. Tanpa penyamaran: cakupan (V1, lihat `cakupan()`)
+     * hanya memuat pesan pemilik tiket dan pesan pengekspor sendiri. Baris sumber dilepas satu per satu (memori).
      *
      * @param list<array<string, mixed>> $rows baris kueri data
      *
      * @return Generator<int, array{0: array<string, mixed>, 1: array{0: string, 1: string}}>
      */
-    private function barisTerpilih(array $rows, int $pengekspor, ?int $role): Generator
+    private function barisTerpilih(array $rows): Generator
     {
         foreach ($rows as $i => $r) {
             unset($rows[$i]);
@@ -241,18 +240,22 @@ final class EksporTiketService extends MasterHaloSimpeg
     }
 
     /**
-     * Pesan pada tiket berkategori milik petugas yang tanggal tiketnya di dalam rentang UTC `[dari, ke)`.
+     * Pesan pada tiket berkategori milik petugas yang tanggal tiketnya di dalam rentang UTC `[dari, ke)`. V1 (keputusan Horii 18-11
+     * opsi (a) ikut legacy [K `LS:1626`]): hanya pesan pemilik tiket dan pesan petugas yang mengekspor; balasan petugas lain tidak
+     * ikut, termasuk bila pengekspor role 1. Tiket tetap ikut walau pengekspor belum menulis (F8-20). Agregat batas (COUNT/SUM) dan
+     * kueri data memakai cakupan yang sama.
      *
      * @param list<int> $kategori
      */
-    private function cakupan(array $kategori, string $dari, string $ke): BaseBuilder
+    private function cakupan(array $kategori, string $dari, string $ke, int $pengekspor): BaseBuilder
     {
         return $this->db->table('disiplin_ticket t')
             ->join('disiplin_ticket_msg m', 'm.id_inbox = t.id_inbox', 'inner')
             ->join('question_category qc', 'qc.id_question_category = t.id_question_category', 'left')
             ->join('pengguna u', 'u.id_pengguna = m.msg_sender', 'left')
             ->whereIn('t.id_question_category', $kategori)
-            ->where('t.created_at >=', $dari)->where('t.created_at <', $ke);
+            ->where('t.created_at >=', $dari)->where('t.created_at <', $ke)
+            ->groupStart()->where('m.msg_sender = t.sender', null, false)->orWhere('m.msg_sender', $pengekspor)->groupEnd();
     }
 
     /**
