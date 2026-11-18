@@ -8,8 +8,8 @@ use CodeIgniter\Router\RouteCollection;
 /**
  * Route helpdesk Halo Simpeg (Fase 8 E-02/E-07 master, MAKE-070; PRD Fase 8 v1.3 §6.1). Dimuat lewat Config\Routing::$routeFiles.
  * Chatbot punya berkas sendiri (`RoutesChatbot.php`). Filter `jwt` di level grup; `role:*` per route: baca bersama = role 1–7
- * (F8-04: role 8 tanpa akses), kelola master = role 1 (F8-05). Route literal (`kategori/opsi`, `petugas/kandidat`, `petugas/saya`,
- * `kontak/aktif`) didaftarkan sebelum `(:num)`. Kontrak: Controllers/Api/HaloSimpeg/README.md.
+ * (F8-04: role 8 tanpa akses), kelola master = role 1 (F8-05), buat tiket = role 2/6/7. Route literal (`kategori/opsi`,
+ * `petugas/kandidat`, `petugas/saya`, `kontak/aktif`, `tiket/ringkasan`) didaftarkan sebelum `(:num)`. Kontrak: Controllers/Api/HaloSimpeg/README.md.
  *
  * @var RouteCollection $routes
  */
@@ -21,6 +21,17 @@ $routes->group('api/v1/halo-simpeg', ['namespace' => 'App\Controllers\Api\HaloSi
     $routes->get('petugas/saya', 'PetugasController::saya', $semua);
     $routes->get('petugas/kandidat', 'PetugasController::kandidat', $admin);
     $routes->get('kontak/aktif', 'KontakController::aktif', $semua);
+
+    // Tiket (MAKE-071, PRD §6.1): role 1–7, pembuatan role pegawai 2/6/7 (F8-04); kewenangan objek di AksesTiket.
+    $routes->get('tiket/ringkasan', 'TiketController::ringkasan', $semua);
+    $routes->get('tiket', 'TiketController::index', $semua);
+    $routes->post('tiket', 'TiketController::create', ['filter' => Role::filter(...Role::UL_PEGAWAI)]);
+    $routes->get('tiket/(:num)/pesan/(:num)/lampiran', 'TiketController::lampiran/$1/$2', $semua);
+    $routes->post('tiket/(:num)/pesan', 'TiketController::pesan/$1', $semua);
+    $routes->post('tiket/(:num)/baca', 'TiketController::baca/$1', $semua);
+    $routes->post('tiket/(:num)/tutup', 'TiketController::tutup/$1', $semua);
+    $routes->get('tiket/(:num)', 'TiketController::show/$1', $semua);
+    $routes->delete('tiket/(:num)', 'TiketController::delete/$1', $semua);
 
     foreach (['kategori' => 'KategoriController', 'petugas' => 'PetugasController', 'kontak' => 'KontakController'] as $jalur => $c) {
         $routes->get($jalur, "{$c}::index", $admin);

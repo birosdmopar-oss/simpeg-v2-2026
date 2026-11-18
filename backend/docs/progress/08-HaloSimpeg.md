@@ -1,6 +1,6 @@
 # Progress Fase 8 — Modul E: Halo Simpeg
 
-Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). Kontrak: `docs/fase8/PRD_Fase8_HaloSimpeg.md` (v1.1; v1.3 CR-136 untuk helpdesk), rincian jalur
+Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). Kontrak: `docs/fase8/PRD_Fase8_HaloSimpeg.md` (v1.1; v1.3 CR-136 dan v1.4 CR-138 untuk helpdesk), rincian jalur
 `docs/fase8/8_1.md` (BE) dan `8_2.md` (FE). Berkas ini dipakai bersama jalur helpdesk dan jalur chatbot: tiap jalur menambah
 bagiannya sendiri secara aditif.
 
@@ -65,12 +65,15 @@ Gate penuh sebelum merge: PHPUnit 4.253 test, Vitest 1.826 test, PHPStan dan CS 
 - N4: `judul_unik` tidak ditulis dan tidak dikirim.
 - N5: tanpa purge log (bukan blok; `idx_log_waktu` siap bila kelak perlu retensi).
 
+**Sesudah MAKE-094 (izin [#10-WorkloadQAChatbot], Horii 17-11-2026):**
+- CR-133 ✔ di `main` `19a11ed5` (ReadOne): test isi pesan chatbot tidak masuk log aplikasi maupun `audit_logs` (AC-E10.19).
+
 **Sisa di luar MAKE-094:**
 - C4 impor isi QnA dev: menunggu keputusan PN8-6 saat deploy (F8-27, F8-46, F8-51). CSV dan isi QnA dev tidak pernah masuk repo.
 
 ## E-10 Chatbot "Vanya" — bagian FE (MAKE-095)
 
-**Terakhir diperbarui:** 16 November 2026. MAKE-095 **DONE**: masuk `main` lewat merge commit `2a8f405d` (14-11-2026), di atas
+**Terakhir diperbarui:** 17 November 2026 (CR-138, lewat reviewer). MAKE-095 **DONE**: masuk `main` lewat merge commit `2a8f405d` (14-11-2026), di atas
 MAKE-092 `f3827106`. Branch `fase8/make-095-chatbot-fe` (HEAD `50d75d79`). Kontrak yang diikuti: README MAKE-094
 `backend/app/Controllers/Api/HaloSimpeg/Chatbot/README.md`. Rincian jalur ada di `docs/fase8/8_2.md` §5.
 
@@ -94,7 +97,8 @@ MAKE-092 `f3827106`. Branch `fase8/make-095-chatbot-fe` (HEAD `50d75d79`). Kontr
   - Titik pasangnya `shared/layouts/RedesignShell.vue`, dengan syarat `v-if="!auth.mustChangePassword"`.
 - **Chatbot Manager** (role 1, `views/ChatbotManagerPage.vue` + `views/admin/*`), lima halaman:
   - **Kategori, Tag:** `MasterChatbotView`; tag punya ekspor xlsx.
-  - **QnA:** `QnaChatbotView`, dengan form `QnaFormDialog` + `TagPilihan`, impor `ImporQnaDialog`, dan unduh template.
+  - **QnA:** `QnaChatbotView`, dengan form `QnaFormDialog` + `UiPilihBanyak` (`shared/ui/`), impor `ImporQnaDialog`, dan unduh
+    template. Sampai CR-134 paket 1 pemilih tag memakai komponen lokal `TagPilihan`; komponen itu sudah dihapus (R10).
   - **Statistik:** `StatistikChatbotView`.
   - **Riwayat:** `RiwayatChatbotView`, dengan filter tanggal, cocok, dan feedback termasuk "Belum dinilai".
 - **Pola Chatbot Manager:**
@@ -104,7 +108,8 @@ MAKE-092 `f3827106`. Branch `fase8/make-095-chatbot-fe` (HEAD `50d75d79`). Kontr
   - halaman tanpa frame Figma, ikut pola tabel v2 (K-11).
 - **Layanan:**
   - `services/chatbot.service.ts`, respons dibaca Zod (`schemas.ts`);
-  - galat 422 per kolom berbentuk array v2 (`galat.ts`);
+  - galat 422 per kolom berbentuk array v2 (`shared/utils/galatKolom.ts`; sampai CR-134 paket 1 lewat `chatbot/galat.ts`
+    lokal, yang sudah dihapus, R10);
   - unduhan lewat `berkasUnduhan`, dengan nama dari Content-Disposition.
 - **Route dan menu:**
   - `routes.chatbot.ts`: `/chatbot-manager/{kategori,tag,qna,statistik,riwayat}`, nama `chatbot-<bagian>`, `/chatbot-manager` →
@@ -112,7 +117,8 @@ MAKE-092 `f3827106`. Branch `fase8/make-095-chatbot-fe` (HEAD `50d75d79`). Kontr
   - Item menu **Pengaturan → Chatbot Manager** di `shared/layouts/nav.config.ts`: fase 8, role 1, 5 anak.
 - Berkas bersama diubah secara aditif dan di-commit terpisah dari fitur.
 
-**Test:** 83 test Vitest di `__tests__/`.
+**Test:** 83 test Vitest di `__tests__/` saat MAKE-095 masuk `main`; CR-134 paket 1 dan 2 menambah test (rincian di commit
+CR-134).
 - `VanyaWidget.spec.ts` 36, `ChatbotManager.spec.ts` 23, `chatbot.amplop.spec.ts` 21, dan `VanyaShell.spec.ts` 3.
 - `chatbot.amplop.spec.ts` memakai klien API asli.
 - `VanyaShell.spec.ts` hermetik: tanpa request jaringan.
@@ -120,31 +126,42 @@ MAKE-092 `f3827106`. Branch `fase8/make-095-chatbot-fe` (HEAD `50d75d79`). Kontr
 - Perbaikan review CR (M-1..M-12, N-1..N-8, 14-11-2026) memakai key MAKE-095, karena masih dalam paket.
 - Gate frontend `./check.sh frontend` @`50d75d79` lolos: 174 berkas / 1.909 test, ESLint, vue-tsc, build.
 
+**Perbaikan QA chatbot (izin [#10-WorkloadQAChatbot], Horii 17-11-2026; FE Worker Muse):**
+- CR-134 paket 1 ✔ (di `main` per `67f3303c`): avatar mini rata atas [K]; catatan README [V2] PN8-8; R10 langkah 1 + 2
+  (`shared/utils/galatKolom.ts` dan `shared/ui/UiPilihBanyak.vue` dibuat, `chatbot/galat.ts` dan
+  `chatbot/components/admin/TagPilihan.vue` dihapus). Duplikasi R10 (PRD B-30, Kesiapan RK-13) **selesai**.
+- CR-134 paket 2 ✔ (`d659acf6`): perbaikan temuan QA T-02 dan T-03.
+
 **Belum (penutup Fase 8):**
-- QA Lapis 1 bagian chatbot (AC-E10.22) oleh reviewer.
+- QA Lapis 1 bagian chatbot (AC-E10.22) oleh reviewer. Putaran 1 bagian A selesai 17-11-2026 (checklist CR-132 `67f3303c`);
+  temuan T-02/T-03 tuntas di CR-134 paket 2.
 - Acuan visual widget dev **PN8-8**: diputus 16-11-2026, acuan = tangkapan layar widget dev dari Horii; **diterima 16-11-2026** (✔, PRD v1.3 CR-136), disimpan di luar repo dan tidak di-commit.
+  Keputusan tampilan Horii 17-11-2026 ("ikut rekomendasi"): avatar tetap ilustrasi SVG (foto tidak dipakai); aksen biru
+  `brand-tertiary`, bukan pink dev; saat memuat, tombol/chip disabled + indikator; launcher 64 px dan gaya nama "Vanya" tetap
+  v2 = [V2]; perbaikan [K] avatar mini rata atas tuntas di CR-134 (README `features/halo-simpeg/chatbot`).
 - Rilis menu dan widget: `ACTIVE_PHASE` masih 5, sehingga widget dan menu Chatbot Manager belum tampil. Fase aktif dinaikkan ke 8 saat
   penutup Fase 8 (keputusan Horii).
-- R10 langkah 2 (migrasi `chatbot/galat.ts` + `chatbot/components/admin/TagPilihan.vue` ke `shared/`, PRD v1.3 §3): disetujui Horii
-  16-11-2026, dikerjakan di paket perbaikan QA chatbot (CR-134 dst.) dengan syarat 83 test chatbot di atas tetap hijau.
+- ~~R10 langkah 2~~ (gugur CR-138: selesai di CR-134 paket 1, lihat di atas).
 
-## Helpdesk E-01..E-09 — status (CR-136, 16-11-2026)
+## Helpdesk E-01..E-09 — status (CR-138, 17-11-2026)
 
-**Terakhir diperbarui:** 16 November 2026 (CR-136, lewat reviewer). Belum ada kode helpdesk di `main`. Bagian ini diisi tiap paket
+**Terakhir diperbarui:** 17 November 2026 (CR-138, lewat reviewer). Per `main` `d659acf6`: DBV-028 dan MAKE-070 di `main`;
+MAKE-071, MAKE-097, dan MAKE-073 B1 berjalan (sampai CR-136 belum ada kode helpdesk di `main`). Bagian ini diisi tiap paket
 helpdesk secara aditif (BE: Handling Case; FE: Worker Muse; T12b: ReadOne). Kontrak final: PRD v1.3 §6.1b (dibekukan di README
-`backend/app/Controllers/Api/HaloSimpeg/README.md` saat MAKE-070/071).
+`backend/app/Controllers/Api/HaloSimpeg/README.md` saat MAKE-070/071); selisih README master terhadap PRD v1.3 (S1–S12) diringkas di PRD v1.4 §6.1b.
 
 | Task | Key | Status | Ringkas |
 |---|---|---|---|
 | A0 Laporan pemahaman BE | — | DONE (disetujui reviewer 16-11-2026) | dua putaran revisi; tanpa commit kode; daftar kontrak final, galat, batas per field, dan fixture masuk PRD v1.3 §6.1b, §7.3a; `8_1.md` A3 |
 | B0 Laporan pemahaman FE | — | DONE (disetujui final 16-11-2026) | tanpa commit kode; keputusan FE final di PRD v1.3 §6.3; rencana berkas bersama di PRD v1.3 §3 |
-| A1 Skema helpdesk | DBV-028 | IN_PROGRESS (dibuka 16-11-2026) | Handling Case menulis, review DB WS-2, PR `[CR][DBV]`; indeks dan kueri pra-cek mengikuti PRD v1.3 §7.1 |
-| A2 Master | MAKE-070 | TODO | menunggu DBV-028 di `main` |
-| A3 Tiket + ringkasan | MAKE-071 | TODO | menunggu MAKE-070; H8-10 ◻ |
-| A4 Push | MAKE-072 + CR-137 | TODO | CR-137 = berkas bersama Push, commit terpisah di branch MAKE-072; H8-8 ◻ |
-| A5 Ekspor + penutup BE | MAKE-074 | TODO | menunggu MAKE-071 |
-| B1–B3, B5 Frontend | MAKE-073 | TODO | B1 dibuka sesudah kontrak MAKE-070 beku di README `Controllers/Api/HaloSimpeg`; bagian B1 yang memakai kontrak tiket (service/store tiket, ringkasan, badge) serta B2–B3 menunggu README MAKE-071 beku |
-| T12b Impor master | MAKE-097 | TODO | ReadOne, review DB WS-2; menunggu DBV-028 di `main` |
+| A1 Skema helpdesk | DBV-028 | DONE (main, PR #41, `a5cb7300`) | Handling Case menulis; DB Validator WS-2 SETUJU Q1–Q10 (Q8 `last_msg_at` tidak masuk dengan syarat (a)–(c), Q9 Q-H4 INFO, Q10 PK `officer_category.id` [I]); dokumen `backend/docs/db-review/DBV-028-skema-helpdesk.md` |
+| A2 Master | MAKE-070 | DONE (main `56a700b1`) | README master beku; selisih S1–S12 diterima reviewer 17-11-2026, termasuk S8 (b) Horii (PUT petugas → 200 + `peringatan`); kunci transaksi W1 (locking read sebelum kunci terakhir) |
+| A3 Tiket + ringkasan | MAKE-071 | IN_PROGRESS | T1–T13 diputus 17-11-2026 (T2 (b) Horii: pemilik selalu 403 hapus); README tiket beku di branch, belum di `main`; H8-10 ✔ tetap [I] |
+| A4 Push | MAKE-072 + CR-137 | TODO | CR-137 = berkas bersama Push, commit terpisah di branch MAKE-072; H8-8 belum ada → payload terbatas, uji push real ke DEPLOY-001.1 |
+| A5 Ekspor + penutup BE | MAKE-074 | TODO | menunggu MAKE-071; runbook memuat Q-H19 + EXPLAIN daftar petugas pada gladi impor (DBV-028 Q8 (a)) |
+| B1–B3, B5 Frontend | MAKE-073 | IN_PROGRESS (B1 bagian master) | B1 bagian master selesai review, masih di branch; R10 langkah 1 pindah ke CR-134 paket 1 (selesai), jadi B1 memakai `shared/utils/galatKolom.ts` dan `shared/ui/UiPilihBanyak.vue` yang sudah ada; route admin `/halo-simpeg-admin/:bagian`; bagian tiket B1 serta B2–B3 mengikuti README MAKE-071 beku |
+| T12b Impor master | MAKE-097 | IN_PROGRESS (PR #42) | ReadOne, review DB WS-2; DBV SETUJU, revisi berjalan |
+| Helper satker | CR-139 | DONE (main `ccb90f78`) | `WebConfigService::satkerKepegawaian()` dipakai `PetugasLayananService` dan `HaloSimpeg\PetugasService` |
 
 **Keputusan Horii 16-11-2026** ("ikut rekomendasi semua", diteruskan reviewer):
 - H8-14 (a): `AntrePushPesan::antreAkun(id_pengguna[])` aditif; berkas Push bersama = **CR-137**, commit terpisah di branch MAKE-072,
@@ -170,5 +187,24 @@ helpdesk secara aditif (BE: Handling Case; FE: Worker Muse; T12b: ReadOne). Kont
 pra-cek, dan runbook masuk MAKE-097 (ReadOne); Q-A0-7 kontak dua path (`kontak/aktif`, `kontak`); rincian kontrak lain di PRD
 v1.3 §6.1b.
 
-**Masih terbuka:** H8-7 (sebelum QA), H8-8 (sebelum MAKE-072), H8-10 (sebelum MAKE-071; tanpa ekstraksi tetap [I], tetapi penanda baca
-sisi pembalas petugas dan buka-detail sudah [K]).
+**Keputusan Horii 17-11-2026** (CR-138, diteruskan reviewer):
+- H8-10 = tetap [I]: sisi lawan ke 2 dan sisi pembalas pemilik tetap [I], diuji per skenario AC-E04.4; gerbang MAKE-071
+  terpenuhi.
+- H8-8 belum ada: MAKE-072 memakai payload terbatas F8-16; uji push real (G8-7) dicatat ke DEPLOY-001.1.
+- H8-7 belum ada: QA bagian B memakai satker kepegawaian demo (Web Config) untuk kandidat petugas; butir yang bergantung H8-7
+  ditandai bersyarat; konfirmasi Biro SDM menjadi butir cutover.
+- S8 (b) MAKE-070: PUT petugas → 200 + `peringatan` (bukan 422) bila kategori ber-tiket Open kehilangan petugas aktif terakhir.
+- T2 (b) MAKE-071, F8-09 harfiah: pemilik tiket selalu 403 `bukan_pihak_berwenang` untuk hapus walau petugas aktif kategori
+  itu; petugas lain di kategori yang sama boleh menghapus.
+- Izin [#10-WorkloadQAChatbot]: CR-133 oleh ReadOne; CR-134 dst. oleh Worker Muse (FE) dan ReadOne (BE).
+- PN8-8 "ikut rekomendasi" (bagian FE chatbot di atas); teks info paginasi bersama "Menampilkan a sampai b dari n data"
+  (CR-141, berjalan).
+
+**Keputusan reviewer CR dan DB Validator 17-11-2026:** selisih README master S1–S12 diterima; keputusan MAKE-071 T1–T13 sebelum
+README tiket beku; kunci transaksi W1; path admin FE `/halo-simpeg-admin/:bagian`; R10 langkah 1 dipindah dari B1 ke CR-134
+paket 1 (PRD B-30 dan Kesiapan RK-13 selesai); DBV-028 Q8–Q10 (PRD v1.4 §7.1). Key baru: CR-138 (PRD v1.4), CR-139 (helper
+satker), CR-140 (stabilkan test `alurInti.e2e` yang flaky di bawah beban), CR-141 (teks paginasi).
+
+**Masih terbuka (sampai CR-136):** H8-7 (sebelum QA), H8-8 (sebelum MAKE-072), H8-10 (sebelum MAKE-071; tanpa ekstraksi tetap
+[I], tetapi penanda baca sisi pembalas petugas dan buka-detail sudah [K]). **CR-138:** ketiganya dijawab Horii 17-11-2026; tidak
+ada butir H8 yang terbuka.

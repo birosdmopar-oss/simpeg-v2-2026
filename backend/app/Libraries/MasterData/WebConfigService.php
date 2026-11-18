@@ -114,6 +114,17 @@ class WebConfigService
         return $values;
     }
 
+    /**
+     * Id satker kepegawaian (`id_satker_kepegawaian`) untuk penyaring kandidat/petugas (Layanan, Halo Simpeg). Belum
+     * diatur atau bukan bilangan bulat non-negatif → null (konsumen menganggap satker belum diatur).
+     */
+    public function satkerKepegawaian(): ?int
+    {
+        $satker = $this->value('id_satker_kepegawaian');
+
+        return is_scalar($satker) && ctype_digit((string) $satker) ? (int) $satker : null;
+    }
+
     // ------------------------------------------------------------------
     // Admin (role 1)
     // ------------------------------------------------------------------

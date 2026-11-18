@@ -65,6 +65,33 @@ final class ManifestLampiranTest extends DatabaseTestCase
         }
     }
 
+    public function testLampiranTiketLamaIkutManifest(): void
+    {
+        // MAKE-097 T-8 (Q-A0-5): lampiran pesan tiket lama (`inbox_msg.attachments` → `disiplin_ticket_msg`) ikut disalin.
+        $this->db->table('disiplin_ticket')->insert([
+            'id_inbox'    => 1, 'subject' => 'Uji', 'sender' => 11, 'sender_name' => 'Uji', 'nip' => self::NIP, 'receiver' => 0,
+            'allow_reply' => 1, 'status' => 0, 'is_read' => 1, 'is_read_off' => 2, 'notify_pic' => 2,
+        ]);
+        $pesan = static fn (int $id, ?string $lampiran): array => [
+            'id_inbox_msg' => $id, 'id_inbox' => 1, 'msg_sender' => 11, 'msg_sender_name' => 'Uji', 'msg_receiver' => 0, 'msg' => 'Isi',
+            'show_notif'   => 1, 'is_read' => 0, 'attachments' => $lampiran,
+        ];
+        $this->db->table('disiplin_ticket_msg')->insertBatch([
+            $pesan(10, 'arsip/support/lampiran 1.pdf'),
+            $pesan(11, '/arsip/support/lampiran 1.pdf'),
+            $pesan(12, null),
+            $pesan(13, ''),
+            $pesan(14, '../luar.pdf'),
+        ]);
+
+        $m = ManifestLampiran::bangun($this->db);
+
+        $this->assertSame(['disiplin_ticket_msg.attachments' => 2], $m['berkas']['arsip/support/lampiran 1.pdf']['rujukan'] ?? null);
+        $this->assertSame('arsip', $m['berkas']['arsip/support/lampiran 1.pdf']['sumber']);
+        $this->assertSame(1, $m['tidak_sah']['disiplin_ticket_msg.attachments'] ?? null, 'path traversal hanya dihitung');
+        $this->assertSame(['attachments'], ManifestLampiran::KOLOM['disiplin_ticket_msg']);
+    }
+
     public function testPathBedaHurufBesarKecilAdalahBerkasBerbeda(): void
     {
         $this->db->table('document_attachment')->insertBatch([

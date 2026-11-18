@@ -1,0 +1,52 @@
+{
+    "status": "success",
+    "data": {
+        "items": [
+            {
+                "id": 1,
+                "subjek": "Sisa cuti",
+                "kategori": {
+                    "id": 1,
+                    "nama": "Kepegawaian"
+                },
+                "status": "open",
+                "dibuat_pada": "2026-11-17T12:26:50Z",
+                "pemilik_nama": "Pelapor Contoh",
+                "sebagai_petugas": false,
+                "belum_dibaca": true,
+                "perlu_tindak": false,
+                "pesan_terakhir": {
+                    "id_inbox_msg": 3,
+                    "waktu": "2026-11-17T12:26:50Z",
+                    "potongan": "Tambahan dari petugas lain.",
+                    "pengirim_label": "Admin",
+                    "lampiran": null
+                },
+                "bisa_balas": true,
+                "bisa_tutup": true,
+                "bisa_hapus": false
+            },
+            {
+                "id": 2,
+                "subjek": "Pertanyaan uji",
+                "kategori": {
+                    "id": 1,
+                    "nama": "Kepegawaian"
+                },
+                "status": "open",
+                "dibuat_pada": "2026-11-17T12:26:50Z",
+                "pemilik_nama": "Pengirim Uji",
+                "sebagai_petugas": false,
+                "belum_dibaca": false,
+                "perlu_tindak": false,
+                "pesan_terakhir": null,
+                "bisa_balas": true,
+                "bisa_tutup": true,
+                "bisa_hapus": false
+            }
+        ],
+        "total": 2,
+        "page": 1,
+        "per_page": 20
+    }
+}

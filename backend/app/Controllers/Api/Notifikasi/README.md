@@ -17,8 +17,8 @@ antarmuka `Interfaces/Notifikasi/`.
   - S4 histori approval.
   - Sumber modul lain lewat `SumberNotifikasiInterface`: berita F-07, binding `Services::sumberNotifikasiBerita()`
     (`SumberBerita`, aktif sejak DBV-032 + F-07; `berita_belum_dibaca` = angka, bukan null).
-- **BP8-1:** tiket Halo Simpeg hanya angka lewat `RingkasanTiketInterface` (`Services::ringkasanTiket()`, NoOp/null sampai
-  Fase 8). Kode modul ini dilarang memuat nama tabel tiket atau tabel berita (`PusatNotifikasiArsitekturTest`).
+- **BP8-1:** tiket Halo Simpeg hanya angka lewat `RingkasanTiketInterface` (`Services::ringkasanTiket()` =
+  `HaloSimpeg\RingkasanTiket`, MAKE-071). Kode modul ini dilarang memuat nama tabel tiket atau tabel berita (`PusatNotifikasiArsitekturTest`).
 - **Waktu** dikirim UTC ISO `YYYY-MM-DDTHH:MM:SSZ`.
 
 ## Endpoint
@@ -44,6 +44,10 @@ Rincian `GET notifikasi/butuh-approval`:
 ### Kontrak lonceng (Jalur D dan FE)
 `{ notifikasi_belum_dibaca: int, butuh_approval: int, berita_belum_dibaca: int|null, tiket_belum_dibaca: int|null, diperbarui_at }`.
 - `null` = sumber belum tersedia, bukan 0.
+- `tiket_belum_dibaca` (MAKE-071, PRD Fase 8 v1.3 §6.2, AC-E06.9) = `total` `GET halo-simpeg/tiket/ringkasan`: tiket milik sendiri
+  `is_read = 2` + (bila petugas aktif) tiket kategori yang dipegang `is_read_off = 2` yang bukan milik sendiri. Role 1–7 berupa
+  angka; role 8 selalu 0. Sumber: `App\Libraries\HaloSimpeg\RingkasanTiket` lewat `RingkasanTiketInterface` (BP8-1: modul
+  notifikasi tetap tidak membaca tabel tiket).
 - `notifikasi_belum_dibaca` hanya untuk role 2/3/6/7 dan `butuh_approval` hanya untuk role 1/2/3; role lain bernilai 0
   [K `MY_Controller:127-171`].
 - Field baru hanya aditif.

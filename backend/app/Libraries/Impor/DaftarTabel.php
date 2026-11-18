@@ -23,6 +23,15 @@ final class DaftarTabel
      */
     public const TIER_PER_TABEL = [10, 11, 14];
 
+    /** T12b: `support_officer.id_user` 0/kosong (tanpa akun) → dibuang. */
+    public const KODE_HALO_AKUN_KOSONG = 'id_user kosong dibuang (K-M12)';
+
+    /** T12b N1: `support_officer.email` NULL → `''`. */
+    public const KODE_HALO_EMAIL_NULL = "N1 email NULL→''";
+
+    /** T12b: `officer_category` dengan petugas/kategori 0/kosong → dibuang. */
+    public const KODE_HALO_RUJUKAN_KOSONG = 'rujukan kosong dibuang (Q9)';
+
     /**
      * `siasn_referensi.jenis` → tabel legacy `siasn_simpeg` + kolom pemetaan lokal (null = dicari lewat `NAMA`), DBV-027 §3.6.
      *
@@ -479,6 +488,7 @@ final class DaftarTabel
             new DefinisiTabel('jenis_layanan', 'id_jenis_layanan', $r . ' (seed migration)', kolomNama: ['jenis_layanan'], bolehSeed: true),
             new DefinisiTabel('jenis_pa', 'id_jenis_pa', $r . ' (seed migration)', kolomNama: ['jenis_pa'], bolehSeed: true),
             new DefinisiTabel('question_category', 'id_question_category', $r, statusDomain: [0, 1]),
+            ...self::tierMasterHalo(),
             new DefinisiTabel('petugas_layanan', 'id_petugas_layanan', $r . ' (DQ-12/DQ-27)', statusDomain: [0, 1, 10], kolomKode: ['nip']),
             new DefinisiTabel('pa_layanan', 'id_pa_layanan', $r),
             new DefinisiTabel('riwayat_cuti_notif_kt', 'id_riwayat_cuti', $r, statusDomain: [0, 1, 2], kolomKode: ['nip_kt'], kunciUrut: ['id_riwayat_cuti', 'nip_kt']),
@@ -493,6 +503,66 @@ final class DaftarTabel
             new DefinisiTabel('riwayat_pmk_req', 'id_riwayat_pmk_req', $r, statusDomain: [0, 1, 2, 3], kolomKode: ['nip']),
             new DefinisiTabel('riwayat_pmk', 'id_riwayat_pmk', $r, statusDomain: [1, 2], domain: ['siasn_flag' => [0, 1]], kolomKode: ['nip']),
             new DefinisiTabel('esign_hist', 'id_esign_hist', $r . ' (append-only)', statusDomain: ['1', '2'], kolomKode: ['nip']),
+        ];
+    }
+
+    /**
+     * T12b — master Halo Simpeg (MAKE-097; DBV-028 §2/§8, PRD Fase 8 v1.3 §7.1, H8-6/K-M11/K-M12/F8-21), disisipkan di T12
+     * sesudah `question_category` (induk `officer_category`) dan sebelum tiket lama T13, supaya nomor tier lain tetap.
+     * - `support_officer.id_user` disalin apa adanya (tanpa tabel pemetaan UP-1); id tanpa `pengguna` v2 → baris dibuang +
+     *   dicatat; `0`/kosong (→ NULL oleh aturan FK) juga dibuang dengan kode sendiri.
+     * - N1: `email` NULL (NOT NULL di v2) → `''` + dicatat hanya untuk baris yang ditulis (petugas tetap ada, email dilengkapi
+     *   admin; pra-cek Q-H10); email di-trim, spasi-saja → `''` tanpa kode.
+     * - N2: `created_at`/`updated_at` ikut aturan umum R1a (`--zona-sumber`).
+     * - N4: `help_desk_contact.contact` di-trim (`kolomKode`).
+     * - Q9: `officer_category` yatim ke petugas (Q-H4, termasuk petugas yang dibuang di atas) / ke kategori (Q-H5) → dibuang +
+     *   dicatat per kolom.
+     * - Q10: PK `officer_category.id` [I] → `pkSintetis` dengan kunci (petugas, kategori): kolom `id` legacy disalin bila
+     *   namanya sama, selain itu AUTO_INCREMENT membangkitkan ulang; skema v2 tidak diubah. Pasangan ganda (Q-H3 WAJIB_0)
+     *   dibuang + dicatat.
+     * - Q2: panjang di atas kolom v2 [I] → gagal (aturan umum); Q-H9 dijalankan di salinan legacy sebelum T12b (runbook).
+     *
+     * @return list<DefinisiTabel>
+     */
+    private static function tierMasterHalo(): array
+    {
+        $r = 'T12b MAKE-097, DBV-028';
+
+        return [
+            new DefinisiTabel('help_desk_contact', 'id_help_desk_contact', $r, statusDomain: [0, 1], kolomKode: ['contact']),
+            new DefinisiTabel(
+                'support_officer',
+                'id_support_officer',
+                $r,
+                statusDomain: [0, 1],
+                khusus: static function (array $b): array|string {
+                    if ($b['id_user'] === null) {
+                        return self::KODE_HALO_AKUN_KOSONG;
+                    }
+
+                    if (array_key_exists('email', $b)) {
+                        if ($b['email'] === null) {
+                            $b['email']            = '';
+                            $b['__koreksiTulis'][] = self::KODE_HALO_EMAIL_NULL;
+                        } else {
+                            $b['email'] = trim((string) $b['email']); // spasi-saja → '' tanpa kode (R2)
+                        }
+                    }
+
+                    return $b;
+                },
+                yatimBuang: ['id_user'],
+            ),
+            new DefinisiTabel(
+                'officer_category',
+                'id',
+                $r,
+                statusDomain: null,
+                khusus: static fn (array $b): array|string => $b['id_support_officer'] === null || $b['id_question_category'] === null ? self::KODE_HALO_RUJUKAN_KOSONG : $b,
+                kunciUrut: ['id_support_officer', 'id_question_category'],
+                pkSintetis: true,
+                yatimBuang: ['id_support_officer', 'id_question_category'],
+            ),
         ];
     }
 

@@ -13,6 +13,10 @@ legacy** (PRD Fase 6 F6-11..F6-13, Q6-11/Q6-12, CR-099). Konfigurasi & operasion
   `PushAndroidCuti` (cuti, teks & data legacy `andr_notif_queue`) dan `PushAndroidLkhKonket` → `push-pesan` Android;
   `AntrePushRiwayat` (event `riwayatNotifikasi`, LKH, Konket; teks `TemplatPushRiwayat`) → `push-riwayat`; `AntrePushPesan`
   (titik sambung Halo Simpeg Fase 8) → `push-pesan`; `AntreTopikFcm` (presensi, LKH; `TopikFcm`) → `fcm-topik`.
+- CR-137 (Fase 8, H8-14 (a)): `AntrePushPesan::antreAkun(list<int> $idPengguna, …)` — penerima per akun, aditif. Job
+  `push-pesan` dengan data `akun` mencari token web per akun aktif (`PenerimaTokenFcm::webAkun`, tanpa syarat role/NIP, jadi
+  akun role 1 tanpa NIP ikut) dan token Android lewat NIP akun itu (`nipAkun`); akun nonaktif/terhapus dilewati; token yang sama
+  dikirim sekali per platform. Data `nip` lama dan job yang sudah antre diproses seperti sebelumnya.
 - Token web: `TokenFcmService` (`POST|DELETE api/v1/integrasi/fcm-token`, semua akun login; unik per pemilik + hash token,
   DBV-Q8). Token Android (`platform` 2) tidak punya endpoint di v2 — penulisnya pertanyaan cutover DEPLOY-001.1.
 - Uji koneksi (CR-101): `php spark integrasi:uji-koneksi fcm` → `FcmV1Adapter::ujiKoneksi()` — token akses OAuth baru +

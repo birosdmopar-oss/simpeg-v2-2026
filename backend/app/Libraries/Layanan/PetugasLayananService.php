@@ -24,7 +24,7 @@ use CodeIgniter\Database\BaseConnection;
  *
  * CRUD (M6, legacy `Layanan.php:77-222`, `L_layanan.php`): lihat role 1–7 (role 1 semua status, role lain hanya PIC
  * aktif); tulis role 1 saja. Kandidat = pegawai `status = 1`, PNS (`id_jenis_pegawai = 1`), `pmj.id_satker` = satker
- * kepegawaian (`WebConfigService::value('id_satker_kepegawaian')`, Q-06(a)) [K `L_layanan.php:38-46`]; jenis layanan
+ * kepegawaian (`WebConfigService::satkerKepegawaian()`, Q-06(a)) [K `L_layanan.php:38-46`]; jenis layanan
  * wajib aktif (perbaikan opsi nonaktif legacy). Duplikat `(id_jenis_layanan, nip)` → 422 `errors.nip`. Hapus fisik +
  * audit [K `L_layanan.php:166`].
  */
@@ -231,7 +231,7 @@ class PetugasLayananService
             throw new ValidationException(ListQuery::INVALID_MESSAGE, ['search' => ['Kata kunci maksimal ' . self::KANDIDAT_SEARCH_MAKS . ' karakter.']]);
         }
 
-        $satker = $this->satkerKepegawaian();
+        $satker = service('webConfigService')->satkerKepegawaian();
 
         if ($satker === null) {
             return ['items' => [], 'peringatan' => self::PERINGATAN_SATKER_KOSONG];
@@ -312,7 +312,7 @@ class PetugasLayananService
 
     private function galatKandidat(string $nip): ?string
     {
-        $satker = $this->satkerKepegawaian();
+        $satker = service('webConfigService')->satkerKepegawaian();
 
         if ($satker === null) {
             return self::PERINGATAN_SATKER_KOSONG;
@@ -330,13 +330,6 @@ class PetugasLayananService
             ->join('pegawai_mutasi_jabatan pmj', 'pmj.nip = p.nip', 'inner')
             ->where('p.status', 1)->where('p.id_jenis_pegawai', self::JENIS_PEGAWAI_PNS)
             ->where('pmj.id_satker', $satker);
-    }
-
-    private function satkerKepegawaian(): ?int
-    {
-        $satker = service('webConfigService')->value('id_satker_kepegawaian');
-
-        return is_scalar($satker) && ctype_digit((string) $satker) ? (int) $satker : null;
     }
 
     /**

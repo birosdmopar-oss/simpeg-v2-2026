@@ -38,10 +38,15 @@ watch(
   },
 )
 
-/** Berkas baru sesudah impor sukses membuka impor berikutnya (ringkasan lama disembunyikan). */
+/**
+ * Setiap kali berkas berganti atau dilepas (termasuk ditolak sisi klien, mis. > 2 MB → `null`), galat server dan ringkasan
+ * hasil lama dibersihkan (CR-134 T-03): keduanya milik unggahan sebelumnya, bukan berkas yang sekarang dipilih.
+ */
 function pilih(f: File | null): void {
   berkas.value = f
-  if (f) hasil.value = null
+  hasil.value = null
+  galat.value = ''
+  galatKolom.value = []
 }
 
 const tutupEl = ref<{ $el: unknown } | null>(null)

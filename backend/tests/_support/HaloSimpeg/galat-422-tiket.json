@@ -1,0 +1,15 @@
+{
+    "status": "error",
+    "message": "Subjek wajib diisi.",
+    "errors": {
+        "subject": [
+            "Subjek wajib diisi."
+        ],
+        "msg": [
+            "Pesan wajib diisi."
+        ],
+        "arsip": [
+            "Jenis berkas tidak diizinkan (hanya jpg, jpeg, png, gif, pdf, doc, docx, xls, xlsx)."
+        ]
+    }
+}

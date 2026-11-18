@@ -220,6 +220,25 @@ describe('Chatbot Manager — QnA', () => {
     void w
   })
 
+  it('CR-134 T-02: pesan kategori Dihapus tidak tampil ganda — notice awal, lalu galat field saja sesudah submit', async () => {
+    svc.qna.detail.mockResolvedValue({ ...qna[1]!, jawaban: '<p>x</p>' })
+    svc.qna.simpan.mockRejectedValueOnce(apiError(422, galat422Qna.message, galat422Qna.errors))
+    const w = await pasang(QnaChatbotView)
+    await selectRowAction(w, 'chatbot-qna-actions-11', 'edit')
+    await flushPromises()
+    const form = () => document.querySelector('[data-testid="chatbot-qna-form"]') as HTMLFormElement
+    // Elemen daun yang teksnya persis pesan itu (notice atas form, galat field, notice peringatan).
+    const jumlah = () =>
+      [...form().querySelectorAll('*')].filter((el) => el.children.length === 0 && el.textContent?.trim() === galat422Qna.message).length
+    expect(jumlah()).toBe(1)
+    expect(document.querySelector('[data-testid="chatbot-qna-kategori-induk"]')).not.toBeNull()
+    form().dispatchEvent(new Event('submit'))
+    await flushPromises()
+    expect(jumlah()).toBe(1)
+    expect(document.querySelector('[data-testid="chatbot-qna-kategori-induk"]')).toBeNull()
+    void w
+  })
+
   it('Unduh template dan Impor Excel (ringkasan hasil; galat → tidak ada yang tersimpan)', async () => {
     svc.qna.template.mockResolvedValue({ blob: new Blob(['x']), nama: 'Template_Import_QnA.xlsx' })
     svc.qna.impor.mockResolvedValueOnce({ ditambah: 0, kategori_baru: 0, tag_baru: 0, dilewati: [], galat: [{ baris: 3, alasan: 'Kategori wajib diisi.' }] })
@@ -244,6 +263,38 @@ describe('Chatbot Manager — QnA', () => {
     expect(document.querySelector('[data-testid="impor-ditambah"]')?.textContent).toBe('5')
     expect(document.querySelector('[data-testid="impor-daftar-dilewati"]')?.textContent).toContain('Baris 7')
     expect(w.text()).toContain('Data QnA beserta Kategori dan Tag berhasil diimpor!')
+  })
+
+  it('CR-134 T-03: galat dan ringkasan unggahan lama hilang saat berkas berganti atau ditolak sisi klien', async () => {
+    svc.qna.impor.mockRejectedValueOnce(apiError(422, 'Berkas harus berformat .xlsx.', { berkas: ['Berkas harus berformat .xlsx.'] }))
+    svc.qna.impor.mockResolvedValueOnce({ ditambah: 0, kategori_baru: 0, tag_baru: 0, dilewati: [], galat: [{ baris: 2, alasan: 'Format template tidak sesuai.' }] })
+    const w = await pasang(QnaChatbotView)
+    await w.get('[data-testid="chatbot-qna-impor"]').trigger('click')
+    await flushPromises()
+    const field = w.findComponent({ name: 'UiFileField' })
+    const kirim = async () => {
+      ;(document.querySelector('[data-testid="chatbot-impor-kirim"]') as HTMLButtonElement).click()
+      await flushPromises()
+    }
+    const galatTampil = () => document.querySelector('[data-testid="chatbot-impor-galat"]')
+    const hasilTampil = () => document.querySelector('[data-testid="chatbot-impor-hasil"]')
+
+    // Berkas A → 422 → pilih berkas B (valid, belum Impor) → galat lama hilang.
+    field.vm.$emit('change', new File(['x'], 'a.xlsx'))
+    await flushPromises()
+    await kirim()
+    expect(galatTampil()?.textContent).toContain('Berkas harus berformat .xlsx.')
+    field.vm.$emit('change', new File(['y'], 'b.xlsx'))
+    await flushPromises()
+    expect(galatTampil()).toBeNull()
+
+    // Ringkasan baris galat → berkas ditolak sisi klien (> 2 MB → null) → ringkasan lama hilang.
+    await kirim()
+    expect(hasilTampil()?.textContent).toContain('Format template tidak sesuai.')
+    field.vm.$emit('change', null)
+    await flushPromises()
+    expect(hasilTampil()).toBeNull()
+    expect(galatTampil()).toBeNull()
   })
 })
 

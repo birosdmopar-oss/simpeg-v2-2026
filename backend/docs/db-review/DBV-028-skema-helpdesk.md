@@ -271,7 +271,7 @@ menegaskan blok A sama persis, bagian C hanya di berkas legacy, dan menjalankan 
 | Q-H6 | INFO | `support_officer.status` di luar 0/1 |
 | Q-H7 | INFO | `help_desk_contact.status` di luar 0/1 |
 | Q-H8 | INFO | nama kategori kembar (Q3) |
-| Q-H9 | INFO | panjang melebihi kolom v2 [I]; hasil > 0 di salinan legacy diputus sebelum impor (Q2) |
+| Q-H9 | BERHENTI sebelum T12b | panjang melebihi kolom v2 [I]; hasil > 0 di salinan legacy diputus sebelum impor (Q2) |
 | Q-H10 | INFO | email petugas kosong (N1) |
 | Q-H18a / Q-H18b / Q-H18c | INFO | `created_at` NULL / `'0000-00-00 …'` di `help_desk_contact` / `support_officer` / `officer_category` (satu angka per tabel; CR-9, N2) |
 
