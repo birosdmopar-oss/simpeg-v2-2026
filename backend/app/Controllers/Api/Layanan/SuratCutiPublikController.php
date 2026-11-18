@@ -14,7 +14,8 @@ use CodeIgniter\HTTP\ResponseInterface;
  * - `GET api/v1/publik/surat-cuti/{token}` — verifikasi QR kaki surat (Q6-23, AC-02.8), data minimal tanpa NIP;
  * - `GET api/v1/publik/surat-cuti/{token}/pdf` — PDF surat ber-TTE `inline` (Q6-22, AC-02.7), isi QR tanda tangan.
  * Header `X-Robots-Tag: noindex, nofollow` dan `Cache-Control: no-store` dipasang sebelum service berjalan sehingga ikut di
- * respons 200 maupun 404 seragam (pola `VerifikasiSlipController`).
+ * respons 200 maupun 404 seragam (pola `VerifikasiSlipController`); PDF 200 ditimpa `Pdf::respon` menjadi `private, no-store`
+ * (persis, CR-151).
  */
 final class SuratCutiPublikController extends ApiController
 {

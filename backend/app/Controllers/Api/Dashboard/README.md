@@ -42,7 +42,7 @@ Populasi: `pegawai.status = 1` AND `id_jenis_pegawai IN (1 PNS, 6 PPPK)`; sumber
 
 Cache (F0-14): key `dashboard_stat_{jenis}_{lingkup}_{id}_{scope}` (scope `all` / `s<id_satker>` / `u<id_unit>` akun role 3), TTL 900 detik; dihapus oleh listener event riwayat (`Config\Events`) dan hook `PegawaiModel`; jalur tulis lain basi paling lama TTL (lihat `Libraries/Dashboard/Statistik/StatistikCache.php`). `cache.hit` di respons untuk QA.
 
-XLSX: satu sheet — baris 1 judul (tebal), nama lingkup, `Periode: <d M Y>`, header kolom, data, baris `SUBTOTAL`; nama berkas `statistik_{jenis}_{lingkup}{id}_{YmdHis}.xlsx`, `Content-Disposition: attachment`, `Cache-Control: no-store`.
+XLSX: satu sheet — baris 1 judul (tebal), nama lingkup, `Periode: <d M Y>`, header kolom, data, baris `SUBTOTAL`; nama berkas `statistik_{jenis}_{lingkup}{id}_{YmdHis}.xlsx`, `Content-Disposition: attachment`, `Cache-Control: private, no-store` (persis, CR-151).
 
 ## F-09 Generator Dokumen (MAKE-037) — `DokumenController`
 
