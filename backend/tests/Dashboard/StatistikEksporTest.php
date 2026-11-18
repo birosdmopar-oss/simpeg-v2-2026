@@ -55,12 +55,12 @@ final class StatistikEksporTest extends DatabaseTestCase
 
     public function testUnduhXlsxUnitKerjaDanAudit(): void
     {
+        Services::resetSingle('response'); // CR-151: Response dipakai bersama antar-request di feature test
         $result = $this->asRole(Role::SUPER_ADMIN)->get(self::BASE . '/unit-kerja/xlsx');
         $result->assertStatus(200);
         $result->assertHeader('Content-Type', EksporTabel::MIME[EksporTabel::XLSX]);
         $result->assertHeader('X-Content-Type-Options', 'nosniff');
-        $this->assertStringContainsString('no-store', $result->response()->getHeaderLine('Cache-Control'));
-        $this->assertStringContainsString('private', $result->response()->getHeaderLine('Cache-Control'));
+        $this->assertSame('private, no-store', $result->response()->getHeaderLine('Cache-Control'), 'Cache-Control persis (CR-151)');
         $this->assertMatchesRegularExpression('/^attachment; filename="statistik_unit-kerja_kementerian_\d{14}\.xlsx"$/', $result->response()->getHeaderLine('Content-Disposition'));
 
         $isi = $result->response()->getBody();

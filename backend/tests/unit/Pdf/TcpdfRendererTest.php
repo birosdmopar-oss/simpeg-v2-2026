@@ -68,7 +68,7 @@ final class TcpdfRendererTest extends CIUnitTestCase
 
         $this->assertSame('application/pdf; charset=UTF-8', $respon->getHeaderLine('Content-Type'));
         $this->assertSame('attachment; filename="lkh_2026_10.pdf"', $respon->getHeaderLine('Content-Disposition'));
-        $this->assertStringContainsString('no-store', $respon->getHeaderLine('Cache-Control'));
+        $this->assertSame('private, no-store', $respon->getHeaderLine('Cache-Control'), 'Cache-Control persis (CR-151)');
         $this->assertStringStartsWith('inline;', Pdf::respon(new Response(new App()), 'x', 'a.pdf', true)->getHeaderLine('Content-Disposition'));
 
         $palsu = new class () implements PdfRendererInterface {

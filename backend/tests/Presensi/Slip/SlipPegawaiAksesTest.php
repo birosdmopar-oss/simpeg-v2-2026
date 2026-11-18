@@ -7,6 +7,7 @@ namespace Tests\Presensi\Slip;
 use App\Constants\Role;
 use App\Exceptions\ForbiddenException;
 use CodeIgniter\Test\FeatureTestTrait;
+use Config\Services;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\DatabaseTestCase;
 use Tests\Support\Kepegawaian\PegawaiFixtureTrait;
@@ -58,12 +59,13 @@ final class SlipPegawaiAksesTest extends DatabaseTestCase
         $this->assertSame('3000000.00', $this->json($res)['data']['rincian']['gjpokok'], 'slip milik sendiri');
         $this->seeInDatabase('gaji_pegawai', ['nip' => $lain, 'viewed_at' => null]);
 
+        Services::resetSingle('response'); // CR-151: Response dipakai bersama antar-request di feature test
         $pdf = $this->asUser($akun)->get('api/v1/slip-gaji/saya/2026-09/pdf');
         $pdf->assertStatus(200);
         $this->assertStringStartsWith('%PDF-', (string) $pdf->response()->getBody());
         $this->assertSame('attachment; filename="Slip_Gaji_CITRA_SAYA_September_2026.pdf"', $pdf->response()->getHeaderLine('Content-Disposition'));
         $this->assertSame('nosniff', $pdf->response()->getHeaderLine('X-Content-Type-Options'));
-        $this->assertStringContainsString('no-store', $pdf->response()->getHeaderLine('Cache-Control'));
+        $this->assertSame('private, no-store', $pdf->response()->getHeaderLine('Cache-Control'), 'Cache-Control persis (CR-151)');
 
         $daftar = $this->json($this->asUser($akun)->get('api/v1/slip-gaji/saya'))['data'];
         $per    = array_column($daftar['items'], null, 'periode');

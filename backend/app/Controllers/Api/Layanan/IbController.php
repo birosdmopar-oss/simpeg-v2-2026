@@ -75,6 +75,7 @@ class IbController extends ApiController
             ->setContentType((string) ($hasil['lampiran']['file_type'] ?? '') !== '' ? (string) $hasil['lampiran']['file_type'] : 'application/octet-stream')
             ->setHeader('Content-Disposition', 'attachment; filename="' . preg_replace('/[^A-Za-z0-9._-]+/', '_', $nama) . '"; filename*=UTF-8\'\'' . rawurlencode($nama))
             ->setHeader('X-Content-Type-Options', 'nosniff')
+            ->removeHeader('Cache-Control')
             ->setHeader('Cache-Control', 'private, no-store')
             ->setBody($hasil['isi']);
     }

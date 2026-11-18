@@ -19,7 +19,7 @@ final class VerifikasiSlipController extends ApiController
 
     public function verifikasi(string $token): ResponseInterface
     {
-        $this->response->setHeader('X-Robots-Tag', 'noindex, nofollow')->setHeader('Cache-Control', 'no-store');
+        $this->response->setHeader('X-Robots-Tag', 'noindex, nofollow')->removeHeader('Cache-Control')->setHeader('Cache-Control', 'no-store');
 
         return $this->respondSuccess((new VerifikasiSlipService())->verifikasi($token));
     }

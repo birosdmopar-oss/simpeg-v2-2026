@@ -9,6 +9,7 @@ use App\Exceptions\ForbiddenException;
 use App\Exceptions\ValidationException;
 use App\Libraries\Layanan\LayananDashboardService;
 use CodeIgniter\Test\FeatureTestTrait;
+use Config\Services;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\MasterDataSeeder;
 use Tests\Support\DatabaseTestCase;
@@ -67,11 +68,12 @@ final class LayananStatusEksporTest extends DatabaseTestCase
     {
         [$admin] = $this->aktorStudi(Role::SUPER_ADMIN);
 
+        Services::resetSingle('response'); // CR-151: Response dipakai bersama antar-request di feature test
         $res = $this->sebagai($admin)->get('api/v1/layanan/status/ekspor?format=csv&jenis=tb&search=' . substr($this->dalam, -8));
         $res->assertStatus(200);
         $res->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
         $res->assertHeader('X-Content-Type-Options', 'nosniff');
-        $this->assertStringContainsString('no-store', $res->response()->getHeaderLine('Cache-Control'));
+        $this->assertSame('no-store', $res->response()->getHeaderLine('Cache-Control'), 'Cache-Control persis (CR-151)');
         $this->assertMatchesRegularExpression('/^attachment; filename="status_layanan_\d{8}_\d{6}\.csv"$/', $res->response()->getHeaderLine('Content-Disposition'));
 
         $csv = $res->response()->getBody();

@@ -25,6 +25,7 @@ final class ResponsAuthKlien
     public static function gagal(bool $simapi, string $pesan = self::PESAN_GAGAL): ResponseInterface
     {
         $respons = service('response')
+            ->removeHeader('Cache-Control')
             ->setHeader('Cache-Control', 'no-store')
             ->setJSON(['status' => $simapi ? '02' : 2, 'msg' => $pesan, 'data' => self::dataKosong($simapi)]);
 
@@ -40,6 +41,7 @@ final class ResponsAuthKlien
         return service('response')
             ->setStatusCode(429)
             ->setHeader('Retry-After', (string) max(1, $tungguDetik))
+            ->removeHeader('Cache-Control')
             ->setHeader('Cache-Control', 'no-store')
             ->setJSON(['status' => $simapi ? '02' : 2, 'msg' => self::PESAN_THROTTLE, 'data' => self::dataKosong($simapi)]);
     }

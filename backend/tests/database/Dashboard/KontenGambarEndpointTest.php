@@ -128,10 +128,11 @@ final class KontenGambarEndpointTest extends DatabaseTestCase
     {
         $url = "api/v1/konten/popup/{$this->idPopup}/gambar";
 
+        Services::resetSingle('response'); // CR-151: Response dipakai bersama antar-request di feature test
         $ok = $this->asRole(Role::PEGAWAI)->get($url);
         $ok->assertStatus(200);
         $ok->assertHeader('Content-Type', 'image/png');
-        $this->assertStringContainsString('no-store', $ok->response()->getHeaderLine('Cache-Control'));
+        $this->assertSame('private, no-store', $ok->response()->getHeaderLine('Cache-Control'), 'Cache-Control persis (CR-151)');
         $this->assertStringStartsWith("\x89PNG", $ok->response()->getBody());
 
         $this->asRole(Role::SUPER_ADMIN)->get($url)->assertStatus(200);

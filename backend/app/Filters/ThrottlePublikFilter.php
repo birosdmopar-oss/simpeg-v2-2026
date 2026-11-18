@@ -43,6 +43,7 @@ class ThrottlePublikFilter implements FilterInterface
             ->setStatusCode(429)
             ->setHeader('Retry-After', (string) max(1, $throttler->getTokenTime()))
             ->setHeader('X-Robots-Tag', 'noindex, nofollow')
+            ->removeHeader('Cache-Control')
             ->setHeader('Cache-Control', 'no-store')
             ->setJSON(['status' => 'error', 'message' => self::PESAN]);
     }

@@ -65,7 +65,7 @@ abstract class KontenGambarController extends ApiController
     {
         $auth = service('authContext');
 
-        return $this->respondSuccess($this->service()->aktif($auth->nip()))->setHeader('Cache-Control', 'private, no-store');
+        return $this->tanpaCache($this->respondSuccess($this->service()->aktif($auth->nip())));
     }
 
     public function gambar(int|string $id): ResponseInterface
@@ -78,6 +78,7 @@ abstract class KontenGambarController extends ApiController
             ->setContentType($hasil['mime'], '')
             ->setHeader('Content-Disposition', 'inline; filename="' . $hasil['nama'] . '"')
             ->setHeader('X-Content-Type-Options', 'nosniff')
+            ->removeHeader('Cache-Control')
             ->setHeader('Cache-Control', 'private, no-store')
             ->setBody($hasil['isi']);
     }

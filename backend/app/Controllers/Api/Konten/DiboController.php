@@ -21,7 +21,7 @@ final class DiboController extends ApiController
         $q    = $this->query();
         $data = ($q['kelola'] ?? '') === '1' ? $this->service()->kelola(service('authContext'), $q) : $this->service()->baca($q);
 
-        return $this->respondSuccess($data)->setHeader('Cache-Control', 'private, no-store');
+        return $this->tanpaCache($this->respondSuccess($data));
     }
 
     public function create(): ResponseInterface
@@ -59,6 +59,7 @@ final class DiboController extends ApiController
             ->setContentType($hasil['mime'], '')
             ->setHeader('Content-Disposition', 'attachment; filename="' . $hasil['nama'] . '"')
             ->setHeader('X-Content-Type-Options', 'nosniff')
+            ->removeHeader('Cache-Control')
             ->setHeader('Cache-Control', 'private, no-store')
             ->setBody($hasil['isi']);
     }

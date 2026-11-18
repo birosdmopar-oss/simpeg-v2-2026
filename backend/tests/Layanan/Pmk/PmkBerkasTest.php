@@ -11,6 +11,7 @@ use App\Libraries\Layanan\PetugasLayananService;
 use App\Libraries\Layanan\Pmk\PmkPengajuanService;
 use CodeIgniter\Exceptions\PageNotFoundException;
 use CodeIgniter\Test\FeatureTestTrait;
+use Config\Services;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\MasterDataSeeder;
 use Tests\Support\DatabaseTestCase;
@@ -64,6 +65,7 @@ final class PmkBerkasTest extends DatabaseTestCase
 
     public function testPemilikDanPicMengunduhIsiBerkas(): void
     {
+        Services::resetSingle('response'); // CR-151: Response dipakai bersama antar-request di feature test
         $res = $this->sebagai($this->nip)->get("api/v1/pmk/pengajuan/{$this->id}/berkas/file_kontrak");
 
         $res->assertStatus(200);
@@ -71,7 +73,7 @@ final class PmkBerkasTest extends DatabaseTestCase
         $this->assertStringStartsWith('application/pdf', $res->response()->getHeaderLine('Content-Type'));
         $this->assertSame("attachment; filename=\"pmk_{$this->id}_file_kontrak.pdf\"", $res->response()->getHeaderLine('Content-Disposition'), 'nama dibangkitkan server, tanpa path internal');
         $this->assertSame('nosniff', $res->response()->getHeaderLine('X-Content-Type-Options'));
-        $this->assertStringContainsString('no-store', $res->response()->getHeaderLine('Cache-Control'));
+        $this->assertSame('private, no-store', $res->response()->getHeaderLine('Cache-Control'), 'Cache-Control persis (CR-151)');
 
         [$picNip] = $this->aktorStudi(Role::ADMIN_SATKER, [], $this->buatSatker());
         $this->jadikanPic($picNip, PetugasLayananService::JENIS_PMK);

@@ -200,6 +200,7 @@ final class TokenSuratCutiTest extends DatabaseTestCase
         $this->assertSame('ditandatangani', $this->json($sudah)['data']['status_tte']);
         $this->assertStringNotContainsString($a['pemohon']['nip'], (string) $sudah->response()->getBody());
 
+        Services::resetSingle('response'); // CR-151: Response dipakai bersama antar-request di feature test
         $pdf = $this->panggil("api/v1/publik/surat-cuti/{$mentah}/pdf");
         $pdf->assertStatus(200);
         $this->assertSame('application/pdf', explode(';', $pdf->response()->getHeaderLine('Content-Type'))[0]);
@@ -207,7 +208,7 @@ final class TokenSuratCutiTest extends DatabaseTestCase
         $this->assertStringContainsString(VerifikasiSuratCutiService::NAMA_BERKAS, $pdf->response()->getHeaderLine('Content-Disposition'));
         $this->assertStringNotContainsString((string) $id, $pdf->response()->getHeaderLine('Content-Disposition'));
         $this->assertSame('noindex, nofollow', $pdf->response()->getHeaderLine('X-Robots-Tag'));
-        $this->assertStringContainsString('no-store', $pdf->response()->getHeaderLine('Cache-Control'));
+        $this->assertSame('private, no-store', $pdf->response()->getHeaderLine('Cache-Control'), 'Cache-Control persis (CR-151)');
 
         $this->token()->nonaktifkan($this->authUntukAkun($this->buatAkunUntuk($this->buatPegawai(), 1)), $id);
         $this->panggil("api/v1/publik/surat-cuti/{$mentah}/pdf")->assertStatus(404);

@@ -140,11 +140,12 @@ final class SStatKontrakTest extends DatabaseTestCase
         $this->assertSame(['id_unit', 'id_satker'], array_slice(array_keys($r), -2));
 
         // Unduh lewat URL yang dikeluarkan (Q6-38).
+        Services::resetSingle('response'); // CR-151: Response dipakai bersama antar-request di feature test
         $unduh = $this->basic('mudig', $this->rahasia)->call('get', "services/s_stat/berkas/tb/{$nip}/{$id}/file_sp");
         $unduh->assertStatus(200);
         $unduh->assertHeader('Content-Disposition', "attachment; filename=\"s_stat_tb_{$id}.pdf\"");
         $unduh->assertHeader('X-Content-Type-Options', 'nosniff');
-        $this->assertStringContainsString('no-store', $unduh->response()->getHeaderLine('Cache-Control'));
+        $this->assertSame('no-store', $unduh->response()->getHeaderLine('Cache-Control'), 'Cache-Control persis (CR-151)');
         $this->assertStringStartsWith('application/pdf', (string) $unduh->response()->getHeaderLine('Content-Type'), 'mime dari isi');
         $this->assertSame('%PDF-1.4 uji', $unduh->response()->getBody());
     }

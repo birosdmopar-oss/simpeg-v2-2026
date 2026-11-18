@@ -265,19 +265,22 @@ final class SimapiEmployeeTest extends DatabaseTestCase
 
         $this->assertSame(['status' => '02', 'msg' => 'Token is not valid', 'data' => []], $this->jsonUji($this->tanpaAuthUji('simapi/v1/a_employee/foto/' . $ada)));
 
+        Services::resetSingle('response'); // CR-151: Response dipakai bersama antar-request di feature test
         $res = $this->simapiUji('simapi/v1/a_employee/foto/' . $ada, $this->token);
         $res->assertStatus(200);
         $this->assertSame($png, (string) $res->response()->getBody());
         $this->assertStringStartsWith('image/png', $res->response()->getHeaderLine('Content-Type'));
         $this->assertSame('nosniff', $res->response()->getHeaderLine('X-Content-Type-Options'));
-        $this->assertStringContainsString('no-store', $res->response()->getHeaderLine('Cache-Control'));
+        $this->assertSame('no-store', $res->response()->getHeaderLine('Cache-Control'), 'Cache-Control persis (CR-151)');
         $this->assertSame('inline; filename="foto_' . $ada . '.png"', $res->response()->getHeaderLine('Content-Disposition'));
         $this->assertStringNotContainsString('rahasia-dir', $res->response()->getHeaderLine('Content-Disposition') . $url, 'path tidak bocor');
 
         foreach ([$tanpaBerkas, $tanpaFoto, $bukanGambar, '999999999999999999'] as $nip) {
+            Services::resetSingle('response');
             $r = $this->simapiUji('simapi/v1/a_employee/foto/' . $nip, $this->token);
             $r->assertStatus(404);
             $this->assertSame('', (string) $r->response()->getBody(), '404 seragam tanpa alasan');
+            $this->assertSame('no-store', $r->response()->getHeaderLine('Cache-Control'), '404 Cache-Control persis (CR-151)');
         }
 
         Services::resetSingle('storageAdapter');

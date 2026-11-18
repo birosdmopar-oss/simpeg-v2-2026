@@ -70,6 +70,7 @@ final class RekapController extends ApiController
             ->setHeader('Content-Type', $berkas['mime'])
             ->setHeader('Content-Disposition', 'attachment; filename="' . $berkas['nama'] . '"')
             ->setHeader('X-Content-Type-Options', 'nosniff')
+            ->removeHeader('Cache-Control')
             ->setHeader('Cache-Control', 'private, no-store')
             ->setBody($berkas['isi']);
     }

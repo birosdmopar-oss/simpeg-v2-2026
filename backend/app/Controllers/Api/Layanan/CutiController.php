@@ -88,6 +88,7 @@ final class CutiController extends ApiController
             ->setContentType($berkas['mime'])
             ->setHeader('Content-Disposition', 'attachment; filename="' . $ascii . '"; filename*=UTF-8\'\'' . rawurlencode($berkas['nama']))
             ->setHeader('X-Content-Type-Options', 'nosniff')
+            ->removeHeader('Cache-Control')
             ->setHeader('Cache-Control', 'private, no-store')
             ->setBody($berkas['isi']);
     }
