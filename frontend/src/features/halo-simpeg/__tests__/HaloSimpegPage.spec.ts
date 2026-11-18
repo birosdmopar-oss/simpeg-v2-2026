@@ -49,6 +49,7 @@ import galat429 from './fixtures/galat-429.json'
 import kategoriOpsi from './fixtures/kategori-opsi.json'
 import kontakAktif from './fixtures/kontak-aktif.json'
 import daftarPemilik from './fixtures/tiket-daftar-pemilik.json'
+import detailDitutup from './fixtures/tiket-detail-ditutup.json'
 import detailPemilik from './fixtures/tiket-detail-pemilik.json'
 import detailTanpaKategori from './fixtures/tiket-detail-tanpa-kategori.json'
 
@@ -386,5 +387,164 @@ describe('responsif < 1024 px', () => {
     const { w } = await pasang({ idTiket: DETAIL.id })
     expect(w.find('[data-testid="halo-panel-daftar"]').exists()).toBe(true)
     expect(w.find('[data-testid="halo-panel-thread"]').exists()).toBe(true)
+  })
+})
+
+describe('perilaku inti (review B2 P6)', () => {
+  const judul = () => document.querySelector('[data-testid="halo-thread-judul"]')
+  const detailId = (id: number, over: Partial<TiketDetail> = {}): TiketDetail => ({
+    ...DETAIL,
+    id,
+    subjek: `Tiket ${id}`,
+    belum_dibaca: false,
+    bisa_balas: true,
+    ...over,
+  })
+
+  async function isiDanKirimTiketBaru(): Promise<void> {
+    const form = document.querySelector('[data-testid="halo-tiket-baru-form"]') as HTMLFormElement
+    const subjek = form.querySelector('input[name="subjek"]') as HTMLInputElement
+    subjek.value = 'Baru'
+    subjek.dispatchEvent(new Event('input'))
+    const pesan = form.querySelector('textarea') as HTMLTextAreaElement
+    pesan.value = 'Isi'
+    pesan.dispatchEvent(new Event('input'))
+    ;(form.querySelector('[role="combobox"]') as HTMLElement).click()
+    await flushPromises()
+    ;(document.querySelector('[role="option"]') as HTMLElement).click()
+    await flushPromises()
+    form.dispatchEvent(new Event('submit'))
+    await flushPromises()
+  }
+
+  it('1. fokus ke judul thread: buka langsung, pindah A→B, dan sesudah tiket baru dibuat', async () => {
+    svc.tiket.detail.mockImplementation(async (id: number) => detailId(id))
+    const { w, props } = await pasang({ idTiket: 1 })
+    expect(document.activeElement).toBe(judul())
+    props.value = { idTiket: 2, idTidakSah: false }
+    await flushPromises()
+    expect(judul()?.textContent?.trim()).toBe('Tiket 2')
+    expect(document.activeElement).toBe(judul())
+    svc.tiket.buat.mockResolvedValueOnce(detailId(9))
+    await w.get('[data-testid="halo-tiket-baru"]').trigger('click')
+    await flushPromises()
+    await isiDanKirimTiketBaru()
+    props.value = { idTiket: 9, idTidakSah: false }
+    await flushPromises()
+    expect(judul()?.textContent?.trim()).toBe('Tiket 9')
+    expect(document.activeElement).toBe(judul())
+  })
+
+  it('2. POST baca di tingkat halaman: belum_dibaca → baca 1× dengan id benar; pindah ke tiket sudah dibaca → tetap 1×', async () => {
+    svc.tiket.detail.mockImplementation(async (id: number) => detailId(id, { belum_dibaca: id === 3 }))
+    svc.tiket.baca.mockResolvedValue({ belum_dibaca_saya: 0, belum_dibaca_petugas: 0, perlu_tindak: 0, badge: 0, total: 0 })
+    const { props } = await pasang({ idTiket: 3 })
+    expect(svc.tiket.baca).toHaveBeenCalledTimes(1)
+    expect(svc.tiket.baca).toHaveBeenCalledWith(3)
+    props.value = { idTiket: 4, idTidakSah: false }
+    await flushPromises()
+    expect(svc.tiket.baca).toHaveBeenCalledTimes(1)
+  })
+
+  it('4. tutup: baris jadi Closed, bisa_tutup false, ⋮ hanya item yang masih berlaku', async () => {
+    const t = baris({ id: 5, status: 'open', bisa_tutup: true, bisa_hapus: false, belum_dibaca: false, pesan_terakhir: null })
+    svc.tiket.list.mockResolvedValueOnce({ ...DAFTAR, items: [t] })
+    svc.tiket.tutup.mockResolvedValueOnce({ ...t, status: 'closed', bisa_tutup: false })
+    const { w } = await pasang()
+    await selectRowAction(w, 'halo-tiket-actions-5', 'tutup')
+    const ya = [...document.querySelectorAll('[role="alertdialog"] button')].find((b) => b.textContent?.trim() === 'Tutup') as HTMLButtonElement
+    ya.click()
+    await flushPromises()
+    expect(w.get('[data-testid="halo-tiket-row-5"] [data-status]').attributes('data-status')).toBe('closed')
+    expect((await rowMenuActions(w, 'halo-tiket-actions-5')).map((a) => a.label)).toEqual(['Lihat detail'])
+  })
+
+  it('5. 422 tiket_ditutup → detail dimuat ulang (fixture ditutup): form balas hilang, catatan + pesan BE tampil', async () => {
+    const ditutup = detailDitutup.data as TiketDetail
+    svc.tiket.detail.mockResolvedValueOnce({ ...ditutup, status: 'open', bisa_balas: true, belum_dibaca: false }).mockResolvedValueOnce(ditutup)
+    const { w } = await pasang({ idTiket: ditutup.id })
+    await w.get('[data-testid="halo-balas-form"] textarea').setValue('Masih?')
+    svc.tiket.balas.mockRejectedValueOnce(apiError(422, galat422Ditutup))
+    await w.get('[data-testid="halo-balas-form"]').trigger('submit')
+    await flushPromises()
+    expect(w.find('[data-testid="halo-balas-form"]').exists()).toBe(false)
+    const catatan = w.get('[data-testid="halo-balas-tertutup"]').text()
+    expect(catatan).toContain('telah ditutup')
+    expect(catatan).toContain(galat422Ditutup.message)
+  })
+
+  it('6. pindah A→B (halaman tetap terpasang): draf kosong, judul B, detail(2); idTiket null → panel petunjuk', async () => {
+    svc.tiket.detail.mockImplementation(async (id: number) => detailId(id))
+    const { w, props } = await pasang({ idTiket: 1 })
+    await w.get('[data-testid="halo-balas-form"] textarea').setValue('Draf A')
+    props.value = { idTiket: 2, idTidakSah: false }
+    await flushPromises()
+    expect(svc.tiket.detail).toHaveBeenLastCalledWith(2)
+    expect(judul()?.textContent?.trim()).toBe('Tiket 2')
+    expect((w.get('[data-testid="halo-balas-form"] textarea').element as HTMLTextAreaElement).value).toBe('')
+    props.value = { idTiket: null, idTidakSah: false }
+    await flushPromises()
+    expect(w.find('[data-testid="halo-thread-kosong"]').exists()).toBe(true)
+  })
+
+  it('7. 422 msg → kolom Pesan pada form balas (tanpa notice ganda)', async () => {
+    svc.tiket.detail.mockResolvedValue(detailId(1))
+    const { w } = await pasang({ idTiket: 1 })
+    await w.get('[data-testid="halo-balas-form"] textarea').setValue('x')
+    const galat = { message: 'Pesan maksimal 5.000 karakter.', errors: { msg: ['Pesan maksimal 5.000 karakter.'] } }
+    svc.tiket.balas.mockRejectedValueOnce(apiError(422, galat))
+    await w.get('[data-testid="halo-balas-form"]').trigger('submit')
+    await flushPromises()
+    expect(w.get('[data-testid="halo-balas-form"]').text()).toContain('Pesan maksimal 5.000 karakter.')
+    expect(w.find('[data-testid="halo-balas-galat"]').exists()).toBe(false)
+  })
+
+  it('7b. 422 msg → kolom Pesan pada form tiket baru', async () => {
+    const { w } = await pasang({ role: Role.PEGAWAI })
+    await w.get('[data-testid="halo-tiket-baru"]').trigger('click')
+    await flushPromises()
+    svc.tiket.buat.mockRejectedValueOnce(apiError(422, { message: 'Pesan wajib diisi.', errors: { msg: ['Pesan wajib diisi.'] } }))
+    await isiDanKirimTiketBaru()
+    const form = document.querySelector('[data-testid="halo-tiket-baru-form"]') as HTMLFormElement
+    const kolomPesan = (form.querySelector('textarea') as HTMLElement).closest('label, div')!.parentElement!
+    expect(kolomPesan.textContent).toContain('Pesan wajib diisi.')
+    expect(document.querySelector('[data-testid="halo-tiket-baru-galat"]')).toBeNull()
+  })
+
+  it('8. sukses Tambah Pertanyaan: rute ke tiket baru, dialog tertutup, daftar dimuat ulang', async () => {
+    const { w, router } = await pasang({ role: Role.PEGAWAI })
+    const muatSebelum = svc.tiket.list.mock.calls.length
+    svc.tiket.buat.mockResolvedValueOnce(detailId(42))
+    await w.get('[data-testid="halo-tiket-baru"]').trigger('click')
+    await flushPromises()
+    await isiDanKirimTiketBaru()
+    expect(router.currentRoute.value.fullPath).toBe('/halo-simpeg/tiket/42')
+    expect(document.querySelector('[data-testid="halo-tiket-baru-dialog"]')).toBeNull()
+    expect(svc.tiket.list.mock.calls.length).toBe(muatSebelum + 1)
+  })
+
+  it('9. ditutup_oleh_label terisi → nama penutup tampil', async () => {
+    const ditutup = detailDitutup.data as TiketDetail
+    svc.tiket.detail.mockResolvedValueOnce(ditutup)
+    const { w } = await pasang({ idTiket: ditutup.id })
+    expect(w.get('[data-testid="halo-thread-ditutup"]').text()).toContain(ditutup.ditutup_oleh_label as string)
+  })
+
+  it('10. galat unduh lampiran thread tampil; unduh lampiran terakhir lewat ⋮ memanggil service (t.id, id_inbox_msg)', async () => {
+    const p = { ...DETAIL.pesan[0]!, lampiran: { nama: 'lampiran-1-1.pdf', tipe: 'application/pdf', ukuran: null } }
+    svc.tiket.detail.mockResolvedValueOnce(detailId(1, { pesan: [p] }))
+    svc.tiket.lampiran.mockRejectedValueOnce(apiError(404, { message: 'Lampiran tidak ditemukan.' }))
+    const pt = { ...DAFTAR.items[0]!.pesan_terakhir!, id_inbox_msg: 31, lampiran: { nama: 'lampiran-8-31.pdf', tipe: 'application/pdf' } }
+    svc.tiket.list.mockResolvedValueOnce({ ...DAFTAR, items: [baris({ id: 8, pesan_terakhir: pt })] })
+    const { w } = await pasang({ idTiket: 1 })
+    await w.get(`[data-testid="halo-pesan-lampiran-${p.id_inbox_msg}"]`).trigger('click')
+    await flushPromises()
+    expect(w.get('[data-testid="halo-thread-galat-unduh"]').text()).toBe('Lampiran tidak ditemukan.')
+    const blob = new Blob(['%PDF'])
+    svc.tiket.lampiran.mockResolvedValueOnce({ blob, nama: 'lampiran-8-31.pdf' })
+    await selectRowAction(w, 'halo-tiket-actions-8', 'unduh')
+    await flushPromises()
+    expect(svc.tiket.lampiran).toHaveBeenLastCalledWith(8, 31)
+    expect(unduhan.simpan).toHaveBeenCalledWith({ blob, nama: 'lampiran-8-31.pdf' })
   })
 })

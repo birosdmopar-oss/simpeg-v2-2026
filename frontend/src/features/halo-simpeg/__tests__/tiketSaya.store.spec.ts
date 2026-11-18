@@ -57,12 +57,15 @@ describe('daftar tiket saya', () => {
 
 describe('buka tiket + POST baca', () => {
   it('belum_dibaca → POST baca sekali, ringkasan terpasang, baris & detail ditandai dibaca', async () => {
+    svc.list.mockResolvedValueOnce({ ...DAFTAR, items: [{ ...DAFTAR.items[0]!, id: DETAIL.id, belum_dibaca: true }] })
     await muatDaftarSaya()
     svc.detail.mockResolvedValueOnce({ ...DETAIL, belum_dibaca: true })
     await bukaTiket(DETAIL.id)
     expect(svc.baca).toHaveBeenCalledTimes(1)
     expect(haloState.ringkasan).toEqual(baca.data)
     expect(tiketSayaState.detail?.belum_dibaca).toBe(false)
+    // P6 (3): baris daftar juga ditandai dibaca.
+    expect(tiketSayaState.daftar?.items.find((t) => t.id === DETAIL.id)?.belum_dibaca).toBe(false)
   })
 
   it('sudah dibaca → tanpa POST baca', async () => {
