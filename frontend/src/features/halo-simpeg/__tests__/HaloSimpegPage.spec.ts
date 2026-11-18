@@ -1,5 +1,5 @@
 /**
- * Layar pemilik Halo Simpeg (B2, MAKE-073): master-detail (AC-E08.10), ⋮ Lihat detail → Tutup → Hapus (AGENTS.md §1),
+ * Layar pemilik Halo Simpeg (B2, MAKE-073): master-detail (AC-E08.10), ⋮ Lihat detail → Tutup → Unduh lampiran → Hapus (AGENTS.md §1),
  * ConfirmDialog teks legacy, filter baca bawaan `semua` (AC-E08.13), "Tambah Pertanyaan" hanya role 2/6/7, thread (label
  * apa adanya, teks tanpa v-html, lampiran lewat E-04), tiket kategori NULL (H8-16 (a1)), galat 422/429 per kolom
  * (AC-E08.3/15), dan tampilan < 1024 px satu panel. Layanan di-mock; bentuk data = fixture kontrak MAKE-071.

@@ -16,7 +16,7 @@ Komponen yang dipakai modul kedua dipindah ke `src/shared/`.
 - Kontrak: README `backend/app/Controllers/Api/HaloSimpeg` (master MAKE-070, tiket MAKE-071). Fixture `__tests__/fixtures/` =
   salinan `backend/tests/_support/HaloSimpeg/*.json` dari `main`; salin ulang bila kontrak berubah lewat CR.
 - State tingkat modul (`stores/haloSimpeg.ts`, `stores/tiket.ts`), dikosongkan `resetHaloSimpeg()` dari `clearSession()`.
-- Layar pemilik (`/halo-simpeg`, `/halo-simpeg/tiket/:id`): master-detail; ⋮ Lihat detail → Tutup → Hapus; "Tambah Pertanyaan"
+- Layar pemilik (`/halo-simpeg`, `/halo-simpeg/tiket/:id`): master-detail; ⋮ Lihat detail → Tutup → Unduh lampiran → Hapus (lampiran pesan terakhir lewat E-04, kolom hanya teks); "Tambah Pertanyaan"
   hanya role 2/6/7. **[V2]** kolom + filter kategori di tab "Tiket saya" (PRD §7.4; legacy hanya untuk petugas multi-kategori).
 - Layar petugas (B3): tab "Antrean" hanya bila `petugas/saya` aktif (`?tab=antrean`), bawaan baca `belum` [K], kolom Pemilik [K],
   filter kategori hanya bila ≥ 2 kategori [K `VI:31-36`]; panel "Perlu ditindak" = daftar server `perlu_tindak=1` (kosong tetap tampil,
