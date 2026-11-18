@@ -2,8 +2,9 @@
 /**
  * Form Tambah/Edit petugas Halo Simpeg (B3, E-02; role 1). Edit memakai baris daftar (S9).
  * - Akun: kolom ketik + saran kandidat (`UiTextField suggestions` = UiCombobox) dari `GET petugas/kandidat?search=` ber-jeda
- *   300 ms, hanya bila 2..50 karakter (README); `peringatan` kandidat (satker kepegawaian kosong, S1) → `UiNotice`. Akun dipilih
- *   bila teks sama persis dengan label kandidat; selain itu "Akun petugas wajib dipilih.".
+ *   300 ms, hanya bila 2..50 karakter (README); `peringatan` kandidat (satker kepegawaian kosong, S1) → `UiNotice`. Review B3 R8:
+ *   hasil server tidak disaring ulang (`saring-lokal=false`, kandidat yang cocok lewat username/NIP tetap tampil); pilihan
+ *   dipetakan lewat indeks → `id_user` (label kembar aman); mengetik ulang mengosongkan pilihan ("Akun petugas wajib dipilih.").
  * - Kategori: `UiPilihBanyak` (opsi `kategori/opsi` aktif + kategori lama yang Tidak Aktif berbadge, tetap terpilih).
  * - Email (wajib), No HP (opsional), Status (hanya saat Edit). Validasi klien = `petugasFormSchema` (teks BE).
  * - 422 per kolom (`id_user`, `category`, `email`, `no_hp`) dan `petugas_duplikat` tampil di kolom; PUT yang mengembalikan
@@ -47,6 +48,10 @@ let urutanCari = 0
 watch(
   () => [props.open, props.row] as const,
   async ([open, row]) => {
+    // R8 (c): timer & urutan pencarian kandidat diatur ulang setiap dialog dibuka/ditutup.
+    if (jeda) clearTimeout(jeda)
+    jeda = null
+    urutanCari += 1
     if (!open) return
     submitted.value = false
     formError.value = ''
@@ -97,10 +102,23 @@ async function cari(teks: string): Promise<void> {
 
 function ubahAkun(v: string): void {
   form.akun = v
-  form.id_user = kandidat.value.find((k) => k.label === v)?.id_user ?? null
+  // Teks diubah → pilihan lama gugur; akun baru dipilih lewat `pilihAkun` (indeks saran), bukan pencocokan label.
+  if (form.id_user !== null && v === (kandidat.value.find((k) => k.id_user === form.id_user)?.label ?? null)) return
+  form.id_user = null
   delete serverErrors.value.id_user
   if (jeda) clearTimeout(jeda)
-  if (form.id_user === null) jeda = setTimeout(() => void cari(v), 300)
+  jeda = setTimeout(() => void cari(v), 300)
+}
+
+function pilihAkun(indeks: number): void {
+  const k = kandidat.value[indeks]
+  if (!k) return
+  if (jeda) clearTimeout(jeda)
+  jeda = null
+  urutanCari += 1
+  form.akun = k.label
+  form.id_user = k.id_user
+  delete serverErrors.value.id_user
 }
 
 onBeforeUnmount(() => {
@@ -177,9 +195,11 @@ async function onSubmit(): Promise<void> {
               required
               placeholder="Ketik minimal 2 huruf nama, NIP, atau username"
               :suggestions="saran"
+              :saring-lokal="false"
               :state="err('id_user') ? 'error' : 'default'"
               :help-text="err('id_user') ?? galatKandidat"
               @update:model-value="ubahAkun"
+              @pilih="pilihAkun"
             />
             <UiNotice v-if="peringatanKandidat" tone="warning" class="mt-2" data-testid="halo-kandidat-peringatan">{{ peringatanKandidat }}</UiNotice>
           </div>

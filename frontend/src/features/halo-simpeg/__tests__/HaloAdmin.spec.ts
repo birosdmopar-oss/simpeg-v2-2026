@@ -175,8 +175,9 @@ describe('admin Petugas (AC-E08.16)', () => {
     expect(svc.petugas.kandidat).toHaveBeenCalledWith('adm')
     expect(document.querySelector('[data-testid="halo-kandidat-peringatan"]')?.textContent).toBe(kandidatPeringatan.data.peringatan)
     const k = kandidatPeringatan.data.items[0]!
-    akun.value = k.label
-    akun.dispatchEvent(new Event('input'))
+    // R8: pilih lewat opsi (indeks → id_user), bukan mengetik label.
+    ;([...document.querySelectorAll('[role="option"]')].find((o) => o.textContent?.trim() === k.label) as HTMLElement).click()
+    await flushPromises()
     const centang = document.querySelector(`[data-testid="halo-petugas-kategori-${kategoriOpsi.data[0]!.id}"] input`) as HTMLInputElement
     centang.checked = true
     centang.dispatchEvent(new Event('change'))
@@ -239,5 +240,67 @@ describe('admin Kontak', () => {
     const w = await pasang('kontak')
     expect(w.get('[data-testid="halo-kontak-kosong"]').text()).toContain('Belum ada kontak')
     expect(svc.kontak.list).toHaveBeenCalledWith(expect.objectContaining({ status: null, page: 1 }))
+  })
+})
+
+describe('R8: kandidat petugas', () => {
+  async function bukaForm() {
+    vi.useFakeTimers()
+    const w = await pasang('petugas')
+    await w.get('[data-testid="halo-petugas-tambah"]').trigger('click')
+    await flushPromises()
+    const form = document.querySelector('[data-testid="halo-petugas-form"]') as HTMLFormElement
+    const akun = form.querySelector('input[name="akun"]') as HTMLInputElement
+    const ketik = async (v: string) => {
+      akun.value = v
+      akun.dispatchEvent(new Event('input'))
+      await vi.advanceTimersByTimeAsync(300)
+      await flushPromises()
+    }
+    const isiSisa = async () => {
+      const centang = document.querySelector(`[data-testid="halo-petugas-kategori-${kategoriOpsi.data[0]!.id}"] input`) as HTMLInputElement
+      centang.checked = true
+      centang.dispatchEvent(new Event('change'))
+      const email = form.querySelector('input[name="email"]') as HTMLInputElement
+      email.value = 'a@contoh.test'
+      email.dispatchEvent(new Event('input'))
+      await flushPromises()
+      form.dispatchEvent(new Event('submit'))
+      await flushPromises()
+    }
+    return { w, form, ketik, isiSisa }
+  }
+  const opsi = () => [...document.querySelectorAll<HTMLElement>('[role="option"]')]
+
+  it('hasil server tidak disaring ulang: kandidat yang labelnya tidak memuat teks ketikan tetap tampil dan bisa dipilih', async () => {
+    svc.petugas.kandidat.mockResolvedValue({ items: [{ id_user: 31, label: 'Budi Santoso' }], peringatan: null })
+    svc.petugas.tambah.mockResolvedValueOnce(petugasDaftar.data.items[0])
+    const { ketik, isiSisa } = await bukaForm()
+    await ketik('bsantoso')
+    expect(opsi().map((o) => o.textContent?.trim())).toEqual(['Budi Santoso'])
+    opsi()[0]!.click()
+    await flushPromises()
+    await isiSisa()
+    expect(svc.petugas.tambah).toHaveBeenCalledWith(expect.objectContaining({ id_user: 31 }))
+  })
+
+  it('dua label kembar → id_user sesuai opsi yang dipilih (bukan yang pertama)', async () => {
+    svc.petugas.kandidat.mockResolvedValue({ items: [{ id_user: 41, label: 'Sama' }, { id_user: 42, label: 'Sama' }], peringatan: null })
+    svc.petugas.tambah.mockResolvedValueOnce(petugasDaftar.data.items[0])
+    const { ketik, isiSisa } = await bukaForm()
+    await ketik('sama')
+    opsi()[1]!.click()
+    await flushPromises()
+    await isiSisa()
+    expect(svc.petugas.tambah).toHaveBeenCalledWith(expect.objectContaining({ id_user: 42 }))
+  })
+
+  it('51 karakter → tanpa panggilan kandidat; mengetik tanpa memilih → "Akun petugas wajib dipilih."', async () => {
+    const { ketik, isiSisa } = await bukaForm()
+    await ketik('a'.repeat(51))
+    expect(svc.petugas.kandidat).not.toHaveBeenCalled()
+    await isiSisa()
+    expect(svc.petugas.tambah).not.toHaveBeenCalled()
+    expect(document.body.textContent).toContain('Akun petugas wajib dipilih.')
   })
 })
