@@ -2,11 +2,12 @@
 /**
  * Daftar "Tiket saya" (B2, E-04; master kiri Gambar 33/34, tanpa frame Figma H8-9). `<table>` biasa (bukan listbox); baris
  * tidak bisa diklik; aksi per baris lewat ⋮ (AGENTS.md §1): **Lihat detail** (→ rute `/halo-simpeg/tiket/:id`, panel kanan) →
- * **Tutup** (`hidden` bila Closed atau `!bisa_tutup`) → **Hapus** (`danger`, `hidden` bila `!bisa_hapus`; T2 pemilik selalu
- * tidak bisa — flag dari BE, tidak dihitung ulang). Konfirmasi lewat `ConfirmDialog` dengan teks legacy (`VI:136`, `VI:140`).
+ * **Tutup** (`hidden` bila Closed atau `!bisa_tutup`) → **Unduh lampiran** (lampiran pesan terakhir lewat E-04; `hidden` bila
+ * tanpa lampiran, `disabled` saat memproses; review B2 P3) → **Hapus** (`danger`, `hidden` bila `!bisa_hapus`; T2 pemilik selalu
+ * tidak bisa — flag dari BE, tidak dihitung ulang). Kolom "Lampiran Terakhir" hanya teks nama berkas. Konfirmasi lewat `ConfirmDialog` dengan teks legacy (`VI:136`, `VI:140`).
  * Filter: cari (subjek/isi), status, baca (bawaan `semua` [V2]), kategori [V2] PRD §7.4.
  */
-import { Paperclip, Plus } from 'lucide-vue-next'
+import { Plus } from 'lucide-vue-next'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
@@ -83,6 +84,7 @@ function aksiBaris(t: TiketBaris): RowAction[] {
   return [
     { key: 'detail', label: 'Lihat detail' },
     { key: 'tutup', label: 'Tutup', hidden: t.status === 'closed' || !t.bisa_tutup },
+    { key: 'unduh', label: 'Unduh lampiran', hidden: !t.pesan_terakhir?.lampiran, disabled: mengunduh.value === t.id },
     { key: 'hapus', label: 'Hapus', danger: true, hidden: !t.bisa_hapus },
   ]
 }
@@ -98,6 +100,7 @@ function onAksi(t: TiketBaris, key: string): void {
   notice.value = ''
   galatAksi.value = ''
   if (key === 'detail') void router.push({ name: 'halo-tiket', params: { id: t.id } })
+  else if (key === 'unduh') void unduhTerakhir(t)
   else if (key === 'tutup' || key === 'hapus') {
     konfirmasi.value = { jenis: key, tiket: t }
     dialogTerbuka.value = true
@@ -131,15 +134,19 @@ async function jalankan(): Promise<void> {
 }
 
 const galatUnduh = ref('')
+const mengunduh = ref<number | null>(null)
 async function unduhTerakhir(t: TiketBaris): Promise<void> {
   const pt = t.pesan_terakhir
-  if (!pt?.lampiran) return
+  if (!pt?.lampiran || mengunduh.value !== null) return
   galatUnduh.value = ''
+  mengunduh.value = t.id
   try {
     const berkas = await tiketHaloService.lampiran(t.id, pt.id_inbox_msg)
     simpanBerkas({ blob: berkas.blob, nama: berkas.nama || pt.lampiran.nama })
   } catch (e) {
     galatUnduh.value = isApiError(e) ? e.message : TEKS_GALAT_TIKET.lampiranTidakDitemukan
+  } finally {
+    mengunduh.value = null
   }
 }
 
@@ -174,7 +181,7 @@ const teksKosong = computed(() =>
 
     <UiNotice v-if="notice" tone="success">{{ notice }}</UiNotice>
     <UiNotice v-if="galatAksi" tone="danger"><span role="alert">{{ galatAksi }}</span></UiNotice>
-    <p v-if="galatUnduh" class="text-sm text-danger" role="alert">{{ galatUnduh }}</p>
+    <p v-if="galatUnduh" class="text-sm text-danger" role="alert" data-testid="halo-daftar-galat-unduh">{{ galatUnduh }}</p>
 
     <div class="table-fill scrollbar-slim overflow-x-auto rounded-xl border border-slate-100">
       <table class="min-w-full text-sm">
@@ -238,17 +245,9 @@ const teksKosong = computed(() =>
               <span v-else class="text-slate-400">—</span>
             </td>
             <td class="px-4 py-3" data-kolom="lampiran">
-              <UiButton
-                v-if="t.pesan_terakhir?.lampiran"
-                size="sm"
-                variant="secondary"
-                appearance="ghost"
-                :data-testid="`halo-tiket-lampiran-${t.id}`"
-                @click="unduhTerakhir(t)"
-              >
-                <template #icon-left><Paperclip class="h-4 w-4" aria-hidden="true" /></template>
+              <span v-if="t.pesan_terakhir?.lampiran" class="text-slate-700" :data-testid="`halo-tiket-lampiran-${t.id}`">
                 {{ t.pesan_terakhir.lampiran.nama }}
-              </UiButton>
+              </span>
               <span v-else class="text-slate-400">—</span>
             </td>
             <td class="px-4 py-3 text-right">

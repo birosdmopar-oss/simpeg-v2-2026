@@ -110,21 +110,31 @@ describe('daftar Tiket saya', () => {
     expect(w.get('[data-testid="halo-tiket-row-7"] [data-kolom="kategori"]').text()).toBe('—')
   })
 
-  it('⋮ Lihat detail → Tutup → Hapus; Tutup/Hapus hidden menurut status & flag BE; label + testid', async () => {
+  it('⋮ Lihat detail → Tutup → Unduh lampiran → Hapus; hidden menurut status, lampiran, & flag BE; label + testid (P3)', async () => {
+    const pt = DAFTAR.items[0]!.pesan_terakhir!
+    const denganLampiran = { ...pt, lampiran: { nama: 'lampiran-3-9.pdf', tipe: 'application/pdf' } }
     svc.tiket.list.mockResolvedValueOnce({
       ...DAFTAR,
       items: [
-        baris({ id: 1, subjek: 'Open', status: 'open', bisa_tutup: true, bisa_hapus: false }),
-        baris({ id: 2, subjek: 'Tutup', status: 'closed', bisa_tutup: false, bisa_hapus: false }),
-        baris({ id: 3, subjek: 'Boleh hapus', status: 'open', bisa_tutup: true, bisa_hapus: true }),
+        baris({ id: 1, subjek: 'Open', status: 'open', bisa_tutup: true, bisa_hapus: false, pesan_terakhir: { ...pt, lampiran: null } }),
+        baris({ id: 2, subjek: 'Tutup', status: 'closed', bisa_tutup: false, bisa_hapus: false, pesan_terakhir: null }),
+        baris({ id: 3, subjek: 'Boleh hapus', status: 'open', bisa_tutup: true, bisa_hapus: true, pesan_terakhir: denganLampiran }),
       ],
     })
     const { w } = await pasang()
     expect((await rowMenuActions(w, 'halo-tiket-actions-1')).map((a) => a.label)).toEqual(['Lihat detail', 'Tutup'])
     expect((await rowMenuActions(w, 'halo-tiket-actions-2')).map((a) => a.label)).toEqual(['Lihat detail'])
     const tiga = await rowMenuActions(w, 'halo-tiket-actions-3')
-    expect(tiga.map((a) => [a.label, a.danger])).toEqual([['Lihat detail', false], ['Tutup', false], ['Hapus', true]])
+    expect(tiga.map((a) => [a.label, a.danger])).toEqual([
+      ['Lihat detail', false],
+      ['Tutup', false],
+      ['Unduh lampiran', false],
+      ['Hapus', true],
+    ])
     expect(w.get('[data-testid="halo-tiket-actions-1"]').attributes('aria-label')).toBe('Aksi untuk Open')
+    // Kolom Lampiran Terakhir hanya teks (tanpa tombol, AGENTS.md §1).
+    expect(w.get('[data-testid="halo-tiket-lampiran-3"]').element.tagName).toBe('SPAN')
+    expect(w.find('[data-testid="halo-tiket-row-3"] [data-kolom="lampiran"] button').exists()).toBe(false)
   })
 
   it('Lihat detail mengubah rute; klik baris tidak berbuat apa-apa; tanpa role="option" (AC-E08.10)', async () => {
