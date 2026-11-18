@@ -160,7 +160,8 @@ helpdesk secara aditif (BE: Handling Case; FE: Worker Muse; T12b: ReadOne). Kont
 | A3 Tiket + ringkasan | MAKE-071 | DONE (main `066315c5`) | T1–T13 diputus 17-11-2026 (T2 (b) Horii: pemilik selalu 403 hapus); README tiket beku; binding `RingkasanTiket` untuk lonceng F-08 (AC-E06.9); H8-10 ✔ tetap [I] |
 | A4 Push | MAKE-072 + CR-137 | DONE (main `64d68377`) | CR-137 = berkas bersama Push, commit terpisah; penerima per akun (`antreAkun`), pelaku dikecualikan, kanal `semua`; selisih U1–U9 diterima; H8-8 belum ada → payload terbatas F8-16, uji push real ke DEPLOY-001.1 |
 | A5 Ekspor + penutup BE | MAKE-074 | IN_PROGRESS (branch `fase8/make-074-ekspor-penutup`) | E-09 `GET tiket/ekspor` (rincian di bawah); penutup: bagian ini, README modul/Push, runbook cutover `README-deploy.md` §1n (B6, B7, Q-H19 + EXPLAIN gladi, DBV-028 Q8 (a)) |
-| B1–B3, B5 Frontend | MAKE-073 | IN_PROGRESS (B1 bagian master) | B1 bagian master selesai review, masih di branch; R10 langkah 1 pindah ke CR-134 paket 1 (selesai), jadi B1 memakai `shared/utils/galatKolom.ts` dan `shared/ui/UiPilihBanyak.vue` yang sudah ada; route admin `/halo-simpeg-admin/:bagian`; bagian tiket B1 serta B2–B3 mengikuti README MAKE-071 beku |
+| B1–B3, B5 Frontend | MAKE-073 | IN_PROGRESS (review putaran 2 S1–S6 selesai, branch `fase8/make-073-fe-halo` `49f91f5a`; belum di `main`) | layar pemilik, petugas, admin master, badge/notifikasi; rincian di "Frontend helpdesk" di bawah; B5 penutup di branch B4 |
+| B4 Frontend ekspor | MAKE-074 | IN_PROGRESS (branch `fase8/make-074-fe-ekspor`, termasuk merge MAKE-073; belum di `main`) | tombol "Ekspor Rekap" tab Antrean + dialog periode WIB; rincian di bawah |
 | T12b Impor master | MAKE-097 | DONE (main `82d698ec`, PR #42) | ReadOne, review DB WS-2; `id_user` apa adanya, yatim dibuang + dicatat (K-M11/K-M12); lampiran tiket lama di `ManifestLampiran` (T-5/T-8); runbook `docs/migrasi/MAKE-069-rencana.md` T12b |
 | Helper satker | CR-139 | DONE (main `ccb90f78`) | `WebConfigService::satkerKepegawaian()` dipakai `PetugasLayananService` dan `HaloSimpeg\PetugasService` |
 
@@ -251,3 +252,22 @@ ada butir H8 yang terbuka.
   ambang Q8 (a)/(b) 5.000 tiket / 100 ms; butir cutover H8-7, DEPLOY-001.1, §1m, CR-135).
 - **Masih terbuka:** H8-8/PN8-1 (payload push lengkap); saran trim Unicode validasi `msg` (dari MAKE-072, di luar kontrak beku);
   tombol ekspor FE (B4, Worker Muse, sesudah README ekspor beku + MAKE-073).
+
+### Frontend helpdesk — MAKE-073 (B1–B3, B5) + MAKE-074 FE (B4) (18-11-2026, Worker Muse)
+
+- **Branch:** `fase8/make-073-fe-halo` (B1–B3 + review R1–R12, Q1–Q7, S1–S6; HEAD `49f91f5a`) dan `fase8/make-074-fe-ekspor`
+  (B4 + B5, berisi merge MAKE-073). Keduanya belum di `main`; merge lewat reviewer dengan izin Horii. Rincian layar, berkas
+  bersama, deviasi, dan tabel acuan layar tanpa Figma: README `frontend/src/features/halo-simpeg/README.md` bagian helpdesk.
+- **Isi:** layar pemilik master-detail (B2); tab Antrean + panel "Perlu ditindak" + thread sisi petugas (B3); admin master Kategori /
+  Petugas / Kontak `/halo-simpeg-admin/:bagian` (B3); badge menu (polling `tiket/ringkasan` 60 dtk), titik sidebar ciut, entri tiket di
+  Notifikasi (H8-15 (b)); ekspor rekap petugas (B4) dengan batas hari ini WIB, periode kosong tanpa unduhan, 403/422 pesan BE.
+- **Berkas bersama (aditif, commit tersendiri):** `RowAction.keterangan` + item nonaktif berketerangan tetap bisa difokus
+  (`RowActionsMenu`), `UiCombobox`/`UiTextField` `saringLokal` + `pilih`, `UiTooltip` `open` opsional, menu `halo-admin`, badge
+  `RedesignShell`/`AppSidebar`, `resetHaloSimpeg()` dari `clearSession()`.
+- **Label [V2] FE:** bawaan baca tab "Tiket saya" `semua` (D8 (a)); kolom + filter kategori di tab "Tiket saya"; teks alasan
+  tidak bisa hapus Kategori; teks validasi periode ekspor = teks BE.
+- **Deviasi B4:** tanggal ketikan di luar batas picker ditolak `UiDatePicker` bersama (tidak terkirim), bukan "dikirim apa adanya"
+  seperti rancangan; komponen bersama tidak diubah.
+- **AC-E08.7 (H8-9):** frame Figma helpdesk belum ada; acuan per layar dicatat di README dan diuji di QA Lapis 1 §HV (tanpa Vitest).
+- **Masih terbuka:** QA Lapis 1 bagian B (HV, HB badge lewat build lokal) bersama reviewer sesudah MAKE-073/074 di `main`; Q3 (fokus
+  sesudah tiket baru) dicek di browser saat QA karena test jsdom tidak membedakan.
