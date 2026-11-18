@@ -6,6 +6,9 @@
  * - Gelembung: `milik_saya` di kanan; `pengirim_label` ditampilkan apa adanya (dihitung BE, D7 (a)); warna per
  *   `urutan_pengirim` [K `VD:44`]; isi sebagai teks (`white-space: pre-wrap`, tanpa `v-html`, BP8-4).
  * - Lampiran lama/baru lewat E-04 sebagai blob (AC-E08.9), object URL dicabut sesudah klik unduh (`simpanBerkas`).
+ * - Petugas tiket (bukan pemilik): `snapshot` NIP/jabatan/satker pelapor di header lewat `UiTooltip` [K `VD:21-26`], bukan
+ *   `title`; centang "Ingatkan Saya Kembali?" (`ingatkan_24_jam`, F8-11) hanya bila `pengingat !== null`, jatuh tempo tampil
+ *   bila `pengingat.aktif`.
  * - Form balas hanya bila `bisa_balas`; tiket berkategori NULL → catatan pengganti (H8-16 (a1)); 422 tiket ditutup / tanpa
  *   balasan / tanpa kategori → pesan BE + detail dimuat ulang.
  */
@@ -16,7 +19,7 @@ import { simpanBerkas } from '@/features/kepegawaian/services/berkasUnduhan'
 import { isApiError } from '@/lib/axios'
 import FormField from '@/shared/components/FormField.vue'
 import { formatApiDateTime } from '@/shared/utils/dateTime'
-import { UiBadge, UiButton, UiFileField, UiNotice } from '@/shared/ui'
+import { UiBadge, UiButton, UiCheckbox, UiFileField, UiNotice, UiTooltip } from '@/shared/ui'
 import { galatPerKolom } from '@/shared/utils/galatKolom'
 
 import { BATAS_TIKET, EKSTENSI_LAMPIRAN, KODE_GALAT_TIKET, TEKS_GALAT_TIKET } from '../constants'
@@ -63,7 +66,7 @@ async function unduh(p: Pesan, lampiran: Lampiran | LampiranRingkas): Promise<vo
 }
 
 // --- form balas ---------------------------------------------------------------------------------------------------------
-const balas = reactive({ pesan: '' })
+const balas = reactive({ pesan: '', ingatkan: false })
 const arsip = ref<File | null>(null)
 const kunciBerkas = ref(0)
 const mengirim = ref(false)
@@ -75,6 +78,7 @@ watch(
   () => props.idTiket,
   () => {
     balas.pesan = ''
+    balas.ingatkan = false
     arsip.value = null
     kunciBerkas.value += 1
     submitted.value = false
@@ -91,6 +95,13 @@ const galatKlien = computed<Record<string, string>>(() => {
   for (const i of r.error.issues) e[String(i.path[0] ?? '')] ??= i.message
   return e
 })
+/** Centang pengingat hanya untuk petugas tiket bukan pemilik (`pengingat !== null`). */
+const bolehIngatkan = computed(() => detail.value?.pengingat != null)
+const teksSnapshot = computed(() => {
+  const sn = detail.value?.snapshot
+  return sn ? `NIP: ${sn.nip} · Jabatan: ${sn.jabatan ?? '—'} · Satker: ${sn.satker ?? '—'}` : ''
+})
+
 const errBalas = (f: string): string | undefined => galatKolom.value[f] ?? (submitted.value ? galatKlien.value[f] : undefined)
 
 /** Kode yang berarti keadaan tiket berubah di server → detail dimuat ulang agar flag `bisa_*` terbaru. */
@@ -103,8 +114,10 @@ async function kirim(): Promise<void> {
   if (Object.keys(galatKlien.value).length > 0 || mengirim.value) return
   mengirim.value = true
   try {
-    await balasTiket(props.idTiket, { pesan: balas.pesan, arsip: arsip.value, ingatkan_24_jam: false })
+    // Centang hanya dikirim bila tiket punya pengingat (petugas tiket bukan pemilik); selain itu selalu 0 (F8-11).
+    await balasTiket(props.idTiket, { pesan: balas.pesan, arsip: arsip.value, ingatkan_24_jam: bolehIngatkan.value && balas.ingatkan })
     balas.pesan = ''
+    balas.ingatkan = false
     arsip.value = null
     kunciBerkas.value += 1
     submitted.value = false
@@ -150,7 +163,22 @@ async function kirim(): Promise<void> {
         </h2>
         <dl class="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-caption text-slate-500">
           <div><dt class="sr-only">Kategori</dt><dd data-testid="halo-thread-kategori">{{ detail.kategori?.nama ?? '—' }}</dd></div>
-          <div><dt class="sr-only">Pemilik</dt><dd>{{ detail.pemilik_nama }}</dd></div>
+          <div>
+            <dt class="sr-only">Pemilik</dt>
+            <dd>
+              <UiTooltip v-if="detail.snapshot" :content="teksSnapshot" side="bottom">
+                <button
+                  type="button"
+                  class="rounded text-brand-primary underline decoration-dotted underline-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-tertiary"
+                  :aria-label="`${detail.pemilik_nama}, ${teksSnapshot}`"
+                  data-testid="halo-thread-snapshot"
+                >
+                  {{ detail.pemilik_nama }}
+                </button>
+              </UiTooltip>
+              <template v-else>{{ detail.pemilik_nama }}</template>
+            </dd>
+          </div>
           <div><dt class="sr-only">Dibuat</dt><dd>{{ waktu(detail.dibuat_pada) }}</dd></div>
           <div>
             <dt class="sr-only">Status</dt>
@@ -219,6 +247,13 @@ async function kirim(): Promise<void> {
             @change="arsip = $event"
           />
           <p v-if="errBalas('arsip')" class="text-caption text-danger" role="alert">{{ errBalas('arsip') }}</p>
+          <div v-if="bolehIngatkan" data-testid="halo-balas-ingatkan">
+            <UiCheckbox v-model="balas.ingatkan" label="Ingatkan Saya Kembali?" :disabled="mengirim" />
+            <p v-if="detail.pengingat?.aktif" class="mt-1 text-caption text-slate-500" data-testid="halo-pengingat-jatuh-tempo">
+              Pengingat aktif: {{ waktu(detail.pengingat.jatuh_tempo) }}
+            </p>
+            <p v-if="errBalas('ingatkan_24_jam')" class="mt-1 text-caption text-danger" role="alert">{{ errBalas('ingatkan_24_jam') }}</p>
+          </div>
           <div class="flex justify-end">
             <UiButton type="submit" :disabled="mengirim" data-testid="halo-balas-kirim">{{ mengirim ? 'Mengirim...' : 'Kirim' }}</UiButton>
           </div>

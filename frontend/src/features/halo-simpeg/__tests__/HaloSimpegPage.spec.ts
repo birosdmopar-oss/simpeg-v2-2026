@@ -53,6 +53,8 @@ import kontakAktif from './fixtures/kontak-aktif.json'
 import daftarPemilik from './fixtures/tiket-daftar-pemilik.json'
 import detailDitutup from './fixtures/tiket-detail-ditutup.json'
 import detailPemilik from './fixtures/tiket-detail-pemilik.json'
+import detailPetugas from './fixtures/tiket-detail-petugas.json'
+import detailTanpaJabatan from './fixtures/tiket-detail-tanpa-jabatan.json'
 import detailTanpaKategori from './fixtures/tiket-detail-tanpa-kategori.json'
 
 const DAFTAR = daftarPemilik.data as Halaman<TiketBaris>
@@ -594,5 +596,51 @@ describe('tab Antrean petugas (B3)', () => {
     await selectRowAction(w, `halo-tiket-actions-${t.id}`, 'detail')
     await flushPromises()
     expect(router.currentRoute.value.fullPath).toBe(`/halo-simpeg/tiket/${t.id}?tab=antrean`)
+  })
+})
+
+describe('thread sisi petugas (B3)', () => {
+  it('snapshot NIP/jabatan/satker lewat UiTooltip (tanpa atribut title); pemilik tanpa snapshot → teks biasa', async () => {
+    svc.tiket.detail.mockResolvedValueOnce({ ...(detailPetugas.data as TiketDetail), belum_dibaca: false })
+    const a = await pasang({ idTiket: detailPetugas.data.id })
+    const tombol = a.w.get('[data-testid="halo-thread-snapshot"]')
+    expect(tombol.attributes('title')).toBeUndefined()
+    expect(tombol.attributes('aria-label')).toContain(`NIP: ${detailPetugas.data.snapshot.nip}`)
+    expect(tombol.attributes('aria-label')).toContain('Jabatan: Analis Kepegawaian')
+    expect(document.querySelector('[data-testid="halo-thread"] [title]')).toBeNull()
+    a.w.unmount()
+    svc.tiket.detail.mockResolvedValueOnce({ ...DETAIL, belum_dibaca: false, snapshot: null, pengingat: null })
+    const b = await pasang({ idTiket: DETAIL.id })
+    expect(b.w.find('[data-testid="halo-thread-snapshot"]').exists()).toBe(false)
+  })
+
+  it('snapshot tanpa jabatan/satker → "—"', async () => {
+    svc.tiket.detail.mockResolvedValueOnce({ ...(detailTanpaJabatan.data as TiketDetail), belum_dibaca: false })
+    const { w } = await pasang({ idTiket: detailTanpaJabatan.data.id })
+    expect(w.get('[data-testid="halo-thread-snapshot"]').attributes('aria-label')).toContain('Jabatan: — · Satker: —')
+  })
+
+  it('centang "Ingatkan Saya Kembali?" hanya bila pengingat !== null; dicentang → ingatkan_24_jam true', async () => {
+    svc.tiket.detail.mockResolvedValue({ ...(detailPetugas.data as TiketDetail), belum_dibaca: false, pengingat: { aktif: true, jatuh_tempo: '2026-11-19T03:00:00Z' } })
+    svc.tiket.balas.mockResolvedValueOnce({ pesan: detailPetugas.data.pesan[1], tiket: { ...DAFTAR.items[0]!, id: detailPetugas.data.id } })
+    const { w } = await pasang({ idTiket: detailPetugas.data.id })
+    expect(w.get('[data-testid="halo-balas-ingatkan"]').text()).toContain('Ingatkan Saya Kembali?')
+    expect(w.find('[data-testid="halo-pengingat-jatuh-tempo"]').exists()).toBe(true)
+    await w.get('[data-testid="halo-balas-form"] textarea').setValue('Kami cek.')
+    await w.get('[data-testid="halo-balas-ingatkan"] input[type="checkbox"]').setValue(true)
+    await w.get('[data-testid="halo-balas-form"]').trigger('submit')
+    await flushPromises()
+    expect(svc.tiket.balas).toHaveBeenCalledWith(detailPetugas.data.id, expect.objectContaining({ pesan: 'Kami cek.', ingatkan_24_jam: true }))
+  })
+
+  it('pemilik (pengingat null) → tanpa centang ingatkan; balasan selalu ingatkan_24_jam false', async () => {
+    svc.tiket.detail.mockResolvedValue({ ...DETAIL, belum_dibaca: false, bisa_balas: true, pengingat: null })
+    svc.tiket.balas.mockResolvedValueOnce({ pesan: DETAIL.pesan[0], tiket: { ...DAFTAR.items[0]!, id: DETAIL.id } })
+    const { w } = await pasang({ idTiket: DETAIL.id })
+    expect(w.find('[data-testid="halo-balas-ingatkan"]').exists()).toBe(false)
+    await w.get('[data-testid="halo-balas-form"] textarea').setValue('Terima kasih')
+    await w.get('[data-testid="halo-balas-form"]').trigger('submit')
+    await flushPromises()
+    expect(svc.tiket.balas).toHaveBeenCalledWith(DETAIL.id, expect.objectContaining({ ingatkan_24_jam: false }))
   })
 })
