@@ -30,4 +30,9 @@ Komponen yang dipakai modul kedua dipindah ke `src/shared/`.
   (`alasan_tidak_bisa_hapus` BE untuk Petugas, teks FE **[V2]** untuk Kategori); kolom Status hanya badge (AGENTS.md §1 butir 5).
   `peringatan` Nonaktifkan/PUT petugas (S8) → notice peringatan. Kandidat petugas: hasil server tanpa saring lokal, dipilih lewat
   id (`UiCombobox` `saringLokal=false` + `pilih`).
+- Review MAKE-073 putaran 2 (S1–S6): item ⋮ nonaktif yang berketerangan tetap bisa difokus (`aria-disabled`, alasan terbaca);
+  deep-link `?tab=antrean` non-petugas tetap menampilkan Kontak Helpdesk, galat dengan cache petugas tetap menampilkan antrean;
+  panel Perlu ditindak disegarkan sesudah baca bila ringkasan belum ada; "Data pelapor" bisa diklik (UiTooltip `v-model:open`)
+  dan isinya hanya lewat `aria-describedby`; label pengingat berganti saat jatuh tempo lewat (detak per menit); saran kandidat
+  teks lama disembunyikan selama jeda kueri baru.
 - **Tanpa frame Figma** (H8-9): layar pemilik/petugas/admin mengikuti pola redesign (Gambar 33/34, Master Data); dicatat di B5.

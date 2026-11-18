@@ -108,12 +108,31 @@ const galatKlien = computed<Record<string, string>>(() => {
 /** Centang pengingat hanya untuk petugas tiket bukan pemilik (`pengingat !== null`). */
 const bolehIngatkan = computed(() => detail.value?.pengingat != null)
 /** Jatuh tempo pengingat sudah lewat (perbandingan instan UTC, aman lintas zona). */
+// Review S5: `sekarang` reaktif per menit agar label berganti saat jatuh tempo lewat selagi thread terbuka.
+const sekarang = ref(Date.now())
+const detak = setInterval(() => {
+  sekarang.value = Date.now()
+}, 60_000)
+onBeforeUnmount(() => clearInterval(detak))
 const pengingatLewat = computed(() => {
   const jt = detail.value?.pengingat?.jatuh_tempo
-  return jt ? new Date(jt).getTime() <= Date.now() : false
+  return jt ? new Date(jt).getTime() <= sekarang.value : false
 })
 const isDesktop = useIsDesktop()
 const idSnapshot = `${useId()}-snapshot`
+/**
+ * Review S4 (a): klik "Data pelapor" membuka/menutup tooltip di semua lebar (termasuk layar sentuh ≥ 1024 px). Radix menutup
+ * tooltip saat klik pemicu, jadi keadaan dibaca saat pointerdown lalu dibalik saat click.
+ */
+const snapshotBuka = ref(false)
+let bukaSaatTekan: boolean | null = null
+function tekanSnapshot(): void {
+  bukaSaatTekan = snapshotBuka.value
+}
+function klikSnapshot(): void {
+  snapshotBuka.value = !(bukaSaatTekan ?? snapshotBuka.value)
+  bukaSaatTekan = null
+}
 const teksSnapshot = computed(() => {
   const sn = detail.value?.snapshot
   return sn ? `NIP: ${sn.nip} · Jabatan: ${sn.jabatan ?? '—'} · Satker: ${sn.satker ?? '—'}` : ''
@@ -185,21 +204,24 @@ async function kirim(): Promise<void> {
             <dt class="sr-only">Pemilik</dt>
             <dd class="inline-flex items-center gap-1">
               {{ detail.pemilik_nama }}
-              <!-- Review B3 R6: desktop = tombol ikon + tooltip; pembaca layar: nama tombol "Data pelapor", isi lewat
-                   aria-describedby (tidak dibaca dua kali). Layar sentuh/sempit: snapshot tampil sebagai teks kecil. -->
+              <!-- Review B3 R6 / S4: desktop = tombol ikon + tooltip (hover, fokus, atau klik). Pembaca layar: nama tombol
+                   "Data pelapor", isi HANYA lewat aria-describedby ke elemen `hidden` (tidak ikut terbaca di alur baca).
+                   Layar sempit: snapshot tampil sebagai teks kecil. -->
               <template v-if="detail.snapshot && isDesktop">
-                <UiTooltip :content="teksSnapshot" side="bottom">
+                <UiTooltip v-model:open="snapshotBuka" :content="teksSnapshot" side="bottom">
                   <button
                     type="button"
                     class="rounded p-0.5 text-brand-primary hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-tertiary"
                     aria-label="Data pelapor"
                     :aria-describedby="idSnapshot"
                     data-testid="halo-thread-snapshot"
+                    @pointerdown="tekanSnapshot"
+                    @click="klikSnapshot"
                   >
                     <Info class="h-3.5 w-3.5" aria-hidden="true" />
                   </button>
                 </UiTooltip>
-                <span :id="idSnapshot" class="sr-only">{{ teksSnapshot }}</span>
+                <span :id="idSnapshot" hidden>{{ teksSnapshot }}</span>
               </template>
             </dd>
           </div>

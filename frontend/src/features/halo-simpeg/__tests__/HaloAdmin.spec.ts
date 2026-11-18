@@ -295,6 +295,32 @@ describe('R8: kandidat petugas', () => {
     expect(svc.petugas.tambah).toHaveBeenCalledWith(expect.objectContaining({ id_user: 42 }))
   })
 
+  it('S6: saran teks lama dikosongkan saat teks < 2 karakter dan selama jeda kueri baru; respons lama yang terlambat diabaikan', async () => {
+    svc.petugas.kandidat.mockResolvedValueOnce({ items: [{ id_user: 31, label: 'Budi Santoso' }], peringatan: 'Satker kosong.' })
+    const { form, ketik } = await bukaForm()
+    await ketik('bud')
+    expect(opsi().map((o) => o.textContent?.trim())).toEqual(['Budi Santoso'])
+    await ketik('b')
+    expect(opsi()).toEqual([])
+    expect(document.querySelector('[data-testid="halo-kandidat-peringatan"]')).toBeNull()
+    // Kueri baru: selama jeda saran lama tidak tampil; respons kueri lama yang tiba belakangan tidak dipasang.
+    let lepasLama!: (v: unknown) => void
+    svc.petugas.kandidat.mockReturnValueOnce(new Promise((r) => (lepasLama = r)))
+    await ketik('bu')
+    const akun = form.querySelector('input[name="akun"]') as HTMLInputElement
+    akun.value = 'sit'
+    akun.dispatchEvent(new Event('input'))
+    await flushPromises()
+    expect(opsi()).toEqual([])
+    lepasLama({ items: [{ id_user: 99, label: 'Basi' }], peringatan: null })
+    await flushPromises()
+    expect(opsi()).toEqual([])
+    svc.petugas.kandidat.mockResolvedValueOnce({ items: [{ id_user: 32, label: 'Siti' }], peringatan: null })
+    await vi.advanceTimersByTimeAsync(300)
+    await flushPromises()
+    expect(opsi().map((o) => o.textContent?.trim())).toEqual(['Siti'])
+  })
+
   it('51 karakter → tanpa panggilan kandidat; mengetik tanpa memilih → "Akun petugas wajib dipilih."', async () => {
     const { ketik, isiSisa } = await bukaForm()
     await ketik('a'.repeat(51))
