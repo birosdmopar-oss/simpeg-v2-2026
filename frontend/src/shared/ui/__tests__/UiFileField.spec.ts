@@ -43,7 +43,7 @@ describe('UiFileField', () => {
   it('pesan tolak jenis/ukuran tetap sama saat diseret', async () => {
     const w = pasang()
     await lepas(w, new File(['x'], 'virus.exe'))
-    expect(w.get('[role="alert"]').text()).toBe('Jenis file .exe tidak diperbolehkan.')
+    expect(w.get('[role="alert"]').text()).toBe('Jenis berkas .exe tidak diperbolehkan.')
     await lepas(w, new File([new Uint8Array(1024 * 1024 + 1)], 'besar.pdf'))
     expect(w.get('[role="alert"]').text()).toBe('Ukuran berkas melebihi 1 MB.')
     expect(w.emitted('change')?.at(-1)).toEqual([null])

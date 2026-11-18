@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * Popup "Filter Kolom" Daftar Pegawai (§4.1.5, Gambar 20 & 21): tombol terbelah "Filter Kolom ▾" membuka panel
- * berisi pencarian kolom, "Pilih semua kolom/hasil", daftar kolom dikelompokkan per huruf dalam dua lajur,
+ * berisi pencarian kolom, "Pilih/batalkan semua kolom/hasil", daftar kolom dikelompokkan per huruf dalam dua lajur,
  * tombol "Terapkan Kolom" dan tutup (×). Saat mencari, judul berubah jadi "Hasil pencarian ditemukan" dan
  * keadaan kosong menampilkan "Tidak ada hasil ditemukan…". Pilihan baru berlaku setelah "Terapkan Kolom" (teks Bahasa Indonesia sejak CR-150).
  */
@@ -99,7 +99,7 @@ function apply(): void {
         <div class="scrollbar-slim max-h-80 overflow-y-auto pt-3">
           <UiCheckbox
             :model-value="allChecked"
-            :label="searching ? 'Pilih semua hasil' : 'Pilih semua kolom'"
+            :label="searching ? 'Pilih/batalkan semua hasil' : 'Pilih/batalkan semua kolom'"
             :disabled="listed.length === 0"
             @update:model-value="toggleAll"
           />

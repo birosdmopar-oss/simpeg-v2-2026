@@ -271,7 +271,7 @@ onBeforeUnmount(cancelSearchTimer)
           </div>
           <article v-else-if="article" class="space-y-5" data-testid="faq-detail">
             <header>
-              <nav aria-label="Breadcrumb">
+              <nav aria-label="Jejak halaman">
                 <ol class="flex flex-wrap items-center gap-1 text-xs text-slate-500">
                   <li>FAQ</li>
                   <li aria-hidden="true">›</li>

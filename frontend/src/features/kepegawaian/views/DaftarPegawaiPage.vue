@@ -214,7 +214,7 @@ const crumbs = [{ label: 'Home', to: { name: 'home' } }, { label: 'Daftar Pegawa
             <UiSelect v-model="perPage" :options="PER_PAGE_OPTIONS" placeholder="10" aria-label="Jumlah baris" />
           </div>
           <div class="flex flex-wrap items-center gap-3">
-            <div class="w-64 max-w-full"><UiSearchInput v-model="search" placeholder="Search" label="Cari pegawai" /></div>
+            <div class="w-64 max-w-full"><UiSearchInput v-model="search" placeholder="Cari pegawai..." label="Cari pegawai" /></div>
             <PegawaiColumnPicker v-model="columnKeys" />
           </div>
         </div>

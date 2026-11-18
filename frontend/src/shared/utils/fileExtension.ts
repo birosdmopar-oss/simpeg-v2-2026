@@ -16,6 +16,6 @@ export function fileExtensionError(name: string, allowed: readonly string[]): st
   const ext = fileExtension(name)
   const daftar = allowed.map((e) => `.${e}`).join(', ')
   if (ext === '') return `Nama berkas tidak memiliki ekstensi. Gunakan berkas berekstensi ${daftar}.`
-  if (!allowed.includes(ext)) return `Jenis file .${ext} tidak diperbolehkan.`
+  if (!allowed.includes(ext)) return `Jenis berkas .${ext} tidak diperbolehkan.`
   return null
 }
