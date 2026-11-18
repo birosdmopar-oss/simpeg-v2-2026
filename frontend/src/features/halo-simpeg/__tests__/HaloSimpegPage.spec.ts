@@ -239,6 +239,26 @@ describe('thread tiket', () => {
   })
 })
 
+describe('thread per tiket (review B2 P2)', () => {
+  it('balasan A ditahan → pindah ke B → ketik draf → A tiba: draf B utuh, galat A tidak tampil', async () => {
+    let tolakA: (e: unknown) => void = () => {}
+    svc.tiket.balas.mockReturnValueOnce(new Promise((_r, j) => (tolakA = j)))
+    svc.tiket.detail.mockImplementation(async (id: number) => ({ ...DETAIL, id, subjek: `Tiket ${id}`, belum_dibaca: false, bisa_balas: true }))
+    const { w, props } = await pasang({ idTiket: 1 })
+    await w.get('[data-testid="halo-balas-form"] textarea').setValue('Balasan A')
+    await w.get('[data-testid="halo-balas-form"]').trigger('submit')
+    props.value = { idTiket: 2, idTidakSah: false }
+    await flushPromises()
+    expect(w.get('[data-testid="halo-thread-judul"]').text()).toBe('Tiket 2')
+    await w.get('[data-testid="halo-balas-form"] textarea').setValue('Draf B')
+    tolakA(apiError(422, { message: 'Pesan wajib diisi.', errors: { msg: ['Pesan wajib diisi.'] } }))
+    await flushPromises()
+    expect((w.get('[data-testid="halo-balas-form"] textarea').element as HTMLTextAreaElement).value).toBe('Draf B')
+    expect(w.find('[data-testid="halo-balas-galat"]').exists()).toBe(false)
+    expect(w.get('[data-testid="halo-thread"]').text()).not.toContain('Pesan wajib diisi.')
+  })
+})
+
 describe('form tiket baru', () => {
   async function bukaDialog() {
     const ctx = await pasang({ role: Role.PEGAWAI })

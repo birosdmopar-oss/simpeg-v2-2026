@@ -74,7 +74,8 @@ function onDibuat(t: TiketDetail): void {
         <p v-if="idTidakSah" class="py-6 text-sm text-danger" role="alert" data-testid="halo-tiket-tidak-ditemukan">
           {{ TEKS_GALAT_TIKET.tidakDitemukan }}
         </p>
-        <ThreadTiket v-else-if="idTiket !== null" :id-tiket="idTiket" :tampil-kembali="!isDesktop" @kembali="kembali" />
+        <!-- :key per tiket (review B2 P2): respons balas/unduh tiket A yang terlambat tidak menyentuh form/galat tiket B. -->
+        <ThreadTiket v-else-if="idTiket !== null" :key="idTiket" :id-tiket="idTiket" :tampil-kembali="!isDesktop" @kembali="kembali" />
         <p v-else class="py-10 text-center text-sm text-slate-500" data-testid="halo-thread-kosong">
           Pilih "Lihat detail" pada daftar untuk membuka percakapan.
         </p>
