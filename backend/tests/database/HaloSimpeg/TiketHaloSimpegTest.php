@@ -428,6 +428,39 @@ final class TiketHaloSimpegTest extends DatabaseTestCase
         $this->assertSame($sebelum, $this->db->table('disiplin_ticket_msg')->countAllResults(), 'lewat batas tidak menulis');
     }
 
+    /**
+     * CR-152 (pola CR-148): wajib-isi `subject` buat tiket dicek sesudah trim Unicode → subjek spasi Unicode saja 422 "Subjek wajib
+     * diisi."; batas 250 (`maksSubjek`, VARCHAR(250)) pada nilai yang disimpan, spasi Unicode di tepi ikut dihitung; lewat batas → 422
+     * `errors.subject`, bukan 500; isi yang sah tersimpan utuh.
+     */
+    public function testSubjekTrimUnicode(): void
+    {
+        foreach (["\u{00A0}", "\u{3000}", "\u{200B}", "\u{FEFF}", "\u{2003}\u{00A0} \u{200B}\u{3000}", " \t\u{202F}\u{2060} "] as $i => $subjek) {
+            $this->pasangThrottlerHs();
+            $res = $this->sebagai($this->pemilik)->post(self::URL . 'tiket', ['id_question_category' => $this->k1, 'subject' => $subjek, 'msg' => 'M']);
+            $res->assertStatus(422);
+            $this->assertSame(['Subjek wajib diisi.'], $this->json($res)['errors']['subject'], "#{$i}");
+        }
+
+        $this->assertSame(0, $this->db->table('disiplin_ticket')->countAllResults(), 'tidak ada tiket baru');
+
+        // 246 é + 4 spasi Unicode di tepi = tepat 250 code point tersimpan → sah, isi utuh.
+        $tepi = "\u{3000}\u{00A0}" . str_repeat('é', 246) . "\u{200B}\u{3000}";
+        $this->pasangThrottlerHs();
+        $this->sebagai($this->pemilik)->post(self::URL . 'tiket', ['id_question_category' => $this->k1, 'subject' => $tepi, 'msg' => 'M'])->assertStatus(201);
+        $this->assertSame($tepi, (string) $this->db->table('disiplin_ticket')->orderBy('id_inbox', 'DESC')->get(1)->getRow('subject'));
+
+        // Lewat batas karena spasi tepi ikut dihitung, dan spasi Unicode panjang → 422, tanpa baris tertulis.
+        foreach (["\u{3000}\u{00A0}" . str_repeat('é', 250) . "\u{200B}\u{3000}", 'a' . str_repeat("\u{3000}", 300)] as $i => $subjek) {
+            $this->pasangThrottlerHs();
+            $res = $this->sebagai($this->pemilik)->post(self::URL . 'tiket', ['id_question_category' => $this->k1, 'subject' => $subjek, 'msg' => 'M']);
+            $res->assertStatus(422);
+            $this->assertSame(['Subjek maksimal 250 karakter.'], $this->json($res)['errors']['subject'], "lewat #{$i}");
+        }
+
+        $this->assertSame(1, $this->db->table('disiplin_ticket')->countAllResults(), 'lewat batas tidak menulis');
+    }
+
     public function testBalasDitolakTutupTanpaBalasanDanPengingat24Jam(): void
     {
         $tutup = $this->tiket($this->pemilik, $this->k1, null, ['status' => 1, 'allow_reply' => 0]);
