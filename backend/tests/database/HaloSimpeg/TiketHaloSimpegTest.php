@@ -374,6 +374,60 @@ final class TiketHaloSimpegTest extends DatabaseTestCase
         $this->assertSame(0, (new RingkasanTiket($this->db))->hitung($role8)['belum_dibaca_petugas']);
     }
 
+    /**
+     * CR-148: wajib-isi `msg` buat tiket dan balasan dicek sesudah trim Unicode. Isi spasi Unicode saja (NBSP, U+3000, lebar-nol,
+     * BOM, campuran) → 422 "Pesan wajib diisi.". Batas `maksPesan` diukur pada nilai yang disimpan (spasi Unicode di tepi ikut
+     * dihitung, review R1 (a)): lewat batas → 422 `errors.msg`, bukan 500 dari kolom TEXT. Isi yang sah tersimpan utuh.
+     */
+    public function testMsgTrimUnicode(): void
+    {
+        $kosong = ["\u{00A0}", "\u{3000}", "\u{200B}", "\u{FEFF}", "\u{2003}\u{00A0} \u{200B}\u{3000}", " \t\u{202F}\u{2060} "];
+        $t      = $this->tiket($this->pemilik, $this->k1);
+
+        foreach ($kosong as $i => $msg) {
+            $this->pasangThrottlerHs();
+            $buat = $this->sebagai($this->pemilik)->post(self::URL . 'tiket', ['id_question_category' => $this->k1, 'subject' => 'S', 'msg' => $msg]);
+            $buat->assertStatus(422);
+            $this->assertSame(['Pesan wajib diisi.'], $this->json($buat)['errors']['msg'], "buat #{$i}");
+
+            $this->pasangThrottlerHs();
+            $balas = $this->sebagai($this->admin)->post(self::URL . "tiket/{$t}/pesan", ['msg' => $msg]);
+            $balas->assertStatus(422);
+            $this->assertSame(['Pesan wajib diisi.'], $this->json($balas)['errors']['msg'], "balas #{$i}");
+        }
+
+        $this->assertSame(1, $this->db->table('disiplin_ticket')->countAllResults(), 'tidak ada tiket baru');
+        $this->assertSame(0, $this->db->table('disiplin_ticket_msg')->where('id_inbox', $t)->where('msg_sender', $this->admin)->countAllResults(), 'tidak ada balasan baru');
+
+        // 4.996 é + 4 spasi Unicode di tepi = tepat 5.000 code point tersimpan → sah, isi utuh.
+        $tepi = "\u{3000}\u{00A0}" . str_repeat('é', 4996) . "\u{200B}\u{3000}";
+        $this->pasangThrottlerHs();
+        $this->sebagai($this->pemilik)->post(self::URL . 'tiket', ['id_question_category' => $this->k1, 'subject' => 'S', 'msg' => $tepi])->assertStatus(201);
+        $this->assertSame($tepi, (string) $this->db->table('disiplin_ticket_msg')->orderBy('id_inbox_msg', 'DESC')->get(1)->getRow('msg'));
+
+        $this->pasangThrottlerHs();
+        $this->sebagai($this->admin)->post(self::URL . "tiket/{$t}/pesan", ['msg' => "\u{00A0}Jawaban\u{3000}"])->assertStatus(201);
+        $this->assertSame("\u{00A0}Jawaban\u{3000}", (string) $this->db->table('disiplin_ticket_msg')->where('id_inbox', $t)->orderBy('id_inbox_msg', 'DESC')->get(1)->getRow('msg'));
+
+        // R1: spasi Unicode di tepi ikut dihitung — 5.000 é + spasi tepi, dan "a" + 22.000 × U+3000 (66.001 byte > TEXT) → 422
+        // `errors.msg` untuk buat dan balas, tanpa baris tertulis (bukan 500 dari INSERT).
+        $sebelum = $this->db->table('disiplin_ticket_msg')->countAllResults();
+
+        foreach (["\u{3000}\u{00A0}" . str_repeat('é', 5000) . "\u{200B}\u{3000}", 'a' . str_repeat("\u{3000}", 22000)] as $i => $msg) {
+            $this->pasangThrottlerHs();
+            $lewat = $this->sebagai($this->pemilik)->post(self::URL . 'tiket', ['id_question_category' => $this->k1, 'subject' => 'S', 'msg' => $msg]);
+            $lewat->assertStatus(422);
+            $this->assertSame(['Pesan maksimal 5.000 karakter.'], $this->json($lewat)['errors']['msg'], "buat #{$i}");
+
+            $this->pasangThrottlerHs();
+            $balas = $this->sebagai($this->admin)->post(self::URL . "tiket/{$t}/pesan", ['msg' => $msg]);
+            $balas->assertStatus(422);
+            $this->assertSame(['Pesan maksimal 5.000 karakter.'], $this->json($balas)['errors']['msg'], "balas #{$i}");
+        }
+
+        $this->assertSame($sebelum, $this->db->table('disiplin_ticket_msg')->countAllResults(), 'lewat batas tidak menulis');
+    }
+
     public function testBalasDitolakTutupTanpaBalasanDanPengingat24Jam(): void
     {
         $tutup = $this->tiket($this->pemilik, $this->k1, null, ['status' => 1, 'allow_reply' => 0]);

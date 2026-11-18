@@ -253,11 +253,19 @@ final class TiketNotifTest extends DatabaseTestCase
     }
 
     /**
-     * R1: pesan yang hanya berisi spasi Unicode (lolos validasi `msg`) → isi push memakai teks cadangan, bukan kosong.
+     * R1: potongan isi push kosong (pesan hanya spasi Unicode) → teks cadangan, bukan kosong. Sejak CR-148 pesan seperti itu ditolak
+     * 422 di endpoint (tanpa antrean), jadi jalur cadangan diuji langsung lewat service sebagai pengaman.
      */
     public function testIsiPushCadanganUntukPesanSpasiUnicode(): void
     {
-        $this->sebagai($this->pemilik)->post(self::URL . 'tiket', ['id_question_category' => $this->k1, 'subject' => 'Spasi', 'msg' => "\u{00A0}\u{3000}"])->assertStatus(201);
+        $this->sebagai($this->pemilik)->post(self::URL . 'tiket', ['id_question_category' => $this->k1, 'subject' => 'Spasi', 'msg' => "\u{00A0}\u{3000}"])->assertStatus(422);
+        $this->assertSame([], $this->antreanBaru(), 'CR-148: ditolak tanpa push');
+
+        $res = $this->sebagai($this->pemilik)->post(self::URL . 'tiket', ['id_question_category' => $this->k1, 'subject' => 'Spasi', 'msg' => 'Isi']);
+        $res->assertStatus(201);
+        $this->antreanBaru();
+        $t = (array) $this->db->table('disiplin_ticket')->where('id_inbox', $this->json($res)['data']['id'])->get()->getRowArray();
+        (new TicketNotifService($this->db))->tiketBaru($t, $this->pemilik, "\u{00A0}\u{3000}");
         $this->assertSame([['akun' => [$this->adminTanpaNip, $this->ptt], 'isi' => TicketNotifService::ISI_CADANGAN]], $this->antreanBaru());
     }
 
