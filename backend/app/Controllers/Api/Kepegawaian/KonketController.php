@@ -76,6 +76,7 @@ class KonketController extends ApiController
             ->setContentType(is_string($mime) && $mime !== '' ? $mime : 'application/octet-stream')
             ->setHeader('Content-Disposition', 'attachment; filename="' . preg_replace('/[^A-Za-z0-9._-]+/', '_', $berkas['nama']) . '"')
             ->setHeader('X-Content-Type-Options', 'nosniff')
+            ->removeHeader('Cache-Control')
             ->setHeader('Cache-Control', 'private, no-store')
             ->setBody($berkas['isi']);
     }

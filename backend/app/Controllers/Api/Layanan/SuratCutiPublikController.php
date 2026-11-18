@@ -37,7 +37,7 @@ final class SuratCutiPublikController extends ApiController
 
     private function headerPublik(): void
     {
-        $this->response->setHeader('X-Robots-Tag', 'noindex, nofollow')->setHeader('Cache-Control', 'no-store');
+        $this->response->setHeader('X-Robots-Tag', 'noindex, nofollow')->removeHeader('Cache-Control')->setHeader('Cache-Control', 'no-store');
     }
 
     private function service(): VerifikasiSuratCutiService

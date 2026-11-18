@@ -23,12 +23,12 @@ final class BeritaController extends ApiController
         $auth = service('authContext');
         $data = ($q['kelola'] ?? '') === '1' ? $this->service()->kelola($auth, $q) : $this->service()->portal($auth, $q);
 
-        return $this->respondSuccess($data)->setHeader('Cache-Control', 'private, no-store');
+        return $this->tanpaCache($this->respondSuccess($data));
     }
 
     public function show(int|string $id): ResponseInterface
     {
-        return $this->respondSuccess($this->service()->detail(service('authContext'), $this->idValid($id)))->setHeader('Cache-Control', 'private, no-store');
+        return $this->tanpaCache($this->respondSuccess($this->service()->detail(service('authContext'), $this->idValid($id))));
     }
 
     public function create(): ResponseInterface
@@ -51,6 +51,7 @@ final class BeritaController extends ApiController
             ->setContentType($hasil['mime'], '')
             ->setHeader('Content-Disposition', 'inline; filename="' . $hasil['nama'] . '"')
             ->setHeader('X-Content-Type-Options', 'nosniff')
+            ->removeHeader('Cache-Control')
             ->setHeader('Cache-Control', 'private, no-store')
             ->setBody($hasil['isi']);
     }

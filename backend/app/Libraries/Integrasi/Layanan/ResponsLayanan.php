@@ -62,6 +62,7 @@ final class ResponsLayanan
     {
         return service('response')
             ->setStatusCode($http)
+            ->removeHeader('Cache-Control')
             ->setHeader('Cache-Control', 'no-store')
             ->setJSON(['status' => $statusString ? (string) $status : $status, 'msg' => $msg, 'data' => $data]);
     }

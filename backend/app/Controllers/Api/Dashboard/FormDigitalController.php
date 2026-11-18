@@ -131,6 +131,7 @@ final class FormDigitalController extends ApiController
             ->setHeader('Content-Type', $mime)
             ->setHeader('Content-Disposition', 'attachment; filename="' . $aman . '"')
             ->setHeader('X-Content-Type-Options', 'nosniff')
+            ->removeHeader('Cache-Control')
             ->setHeader('Cache-Control', 'private, no-store')
             ->setBody($isi);
     }

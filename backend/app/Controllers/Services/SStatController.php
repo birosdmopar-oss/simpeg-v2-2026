@@ -139,6 +139,7 @@ final class SStatController extends BaseController
             ->setContentType(is_string($mime) && $mime !== '' ? $mime : 'application/octet-stream')
             ->setHeader('Content-Disposition', 'attachment; filename="' . $berkas['nama'] . '"')
             ->setHeader('X-Content-Type-Options', 'nosniff')
+            ->removeHeader('Cache-Control')
             ->setHeader('Cache-Control', 'no-store')
             ->setBody($berkas['isi']);
     }

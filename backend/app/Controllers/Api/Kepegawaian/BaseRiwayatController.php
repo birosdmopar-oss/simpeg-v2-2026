@@ -113,6 +113,7 @@ abstract class BaseRiwayatController extends ApiController
             ->setContentType($mime)
             ->setHeader('Content-Disposition', 'attachment; filename="' . $hasil['nama'] . '"')
             ->setHeader('X-Content-Type-Options', 'nosniff')
+            ->removeHeader('Cache-Control')
             ->setHeader('Cache-Control', 'private, no-store')
             ->setBody($hasil['isi']);
     }

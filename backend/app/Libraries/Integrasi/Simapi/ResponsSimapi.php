@@ -51,6 +51,7 @@ final class ResponsSimapi
     {
         return service('response')
             ->setStatusCode(200)
+            ->removeHeader('Cache-Control')
             ->setHeader('Cache-Control', 'no-store')
             ->setJSON(['status' => $status, 'msg' => $pesan, 'data' => $data]);
     }

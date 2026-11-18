@@ -70,6 +70,7 @@ final class Pdf
             ->setContentType('application/pdf')
             ->setHeader('Content-Disposition', ($inline ? 'inline' : 'attachment') . '; filename="' . $aman . '"')
             ->setHeader('X-Content-Type-Options', 'nosniff')
+            ->removeHeader('Cache-Control')
             ->setHeader('Cache-Control', 'private, no-store')
             ->setBody($isi);
     }

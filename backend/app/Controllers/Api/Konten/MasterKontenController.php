@@ -24,7 +24,7 @@ abstract class MasterKontenController extends ApiController
         $kelola = ($this->request->getGet('kelola') ?? '') === '1';
         $data   = $kelola ? $this->service()->daftar(service('authContext')) : $this->service()->aktif();
 
-        return $this->respondSuccess($data)->setHeader('Cache-Control', 'private, no-store');
+        return $this->tanpaCache($this->respondSuccess($data));
     }
 
     public function create(): ResponseInterface
