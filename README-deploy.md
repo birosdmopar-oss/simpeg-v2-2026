@@ -731,11 +731,26 @@ repo publik):
 | Tiket berkategori NULL | Q-H11 | dicatat; tetap terlihat dan dapat ditutup pemiliknya saja, tidak ikut ekspor (H8-16 (a1)) | … |
 | **B6:** irisan NULL + Open + pengirim yatim | Q-H12 | dicatat; tiket ini tidak terlihat siapa pun (sama dengan legacy). > 0 → Horii dapat memilih tutup otomatis khusus irisan itu saat cutover (keputusan data, di luar Fase 8) | … |
 | **B7:** lampiran ber-path anomali | Q-H13 (pembanding Q-H14) | dicatat; berkasnya tidak dihapus fisik saat tiket dihapus (Q-A0-6 (a')); bandingkan dengan `tidak_sah` `lampiran:manifest` | … |
-| Tiket Open di kategori tanpa petugas aktif | Q-H15 | > 0 → admin menugaskan petugas sebelum go-live | … |
+| Tiket Open di kategori tanpa petugas aktif | Q-H15 + Q-H15b (S12, di bawah tabel) | Q-H15b > 0 → admin menugaskan petugas sebelum go-live | … |
 | Tiket tanpa pesan (anomali impor; dicatat bersama B6) | Q-H16 | dicatat; tampil di akhir daftar, tidak menghasilkan baris ekspor (MAKE-074 V6) | … |
 | **Q-H19:** tiket terbanyak yang terlihat satu petugas aktif | Q-H19 | **> 5.000** → kartu DBV `last_msg_at` wajib di `main` sebelum go-live (DBV-028 Q8 (b)) | … |
 | EXPLAIN daftar petugas, tanpa filter status | langkah 5 runbook T12b | catat `key`, `key_len`, baris, waktu (ms); **> 100 ms** → idem Q8 (b) | … |
 | EXPLAIN daftar petugas, Open | idem | idem | … |
+
+**Q-H15 dengan syarat S12.** Q-H15 di `DBV-028-audit-v2.sql` mendefinisikan petugas aktif tanpa syarat role, sedangkan kode memakai
+petugas aktif = `support_officer.status = 1`, akun aktif, **dan** `user_level` 1–7 (S12). Jalankan juga varian baca-saja ini di DB
+gladi dan isi angkanya di baris Q-H15 (bila lebih besar dari Q-H15, selisihnya = kategori yang hanya dipegang petugas ber-role 8):
+
+```sql
+SELECT 'Q-H15b INFO tiket Open di kategori tanpa petugas aktif (S12)' AS butir, COUNT(*) AS jumlah
+FROM disiplin_ticket t
+WHERE t.status = 0 AND t.id_question_category IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM officer_category oc
+                  JOIN support_officer so ON so.id_support_officer = oc.id_support_officer AND so.status = 1
+                  JOIN pengguna p ON p.id_pengguna = so.id_user AND p.status = '1' AND p.deleted_at IS NULL
+                                 AND p.user_level BETWEEN 1 AND 7
+                  WHERE oc.id_question_category = t.id_question_category);
+```
 
 **Butir cutover lain (dicatat, bukan syarat sign-off Fase 8):**
 - Konfirmasi Biro SDM atas satker kepegawaian (Web Config) yang menentukan kandidat petugas (H8-7).
@@ -743,11 +758,13 @@ repo publik):
   cutover yang sama (§1d butir 5).
 - Kunci token penilaian chatbot (§1m).
 - Rilis menu Halo Simpeg (CR-135: `ACTIVE_PHASE` 5 → 8, item `halo` diberi `to`/`roles`), sesudah sign-off Fase 8.
-- Ekspor rekap petugas (E-09): batas 10.000 baris pesan dan 5.000.000 karakter per berkas (`haloSimpeg.eksporMaksBaris`,
-  `haloSimpeg.eksporMaksKarakter`). Puncak memori terukur ≤ ±106 MB per request di ambang (README ekspor). Syarat
+- Ekspor rekap petugas (E-09): batas 10.000 baris pesan dan 5.000.000 karakter per berkas (`.env`:
+  `halosimpeg.eksporMaksBaris`, `halosimpeg.eksporMaksKarakter`, prefix **huruf kecil** seperti `arsip.`/`jwt.`; penulisan
+  `haloSimpeg.` tidak terbaca CI4). Puncak memori terukur ≤ ±106 MB per request di ambang (README ekspor). Syarat
   `memory_limit` ≥ 256M yang sudah berlaku untuk unduhan PDF (§1) juga mencukupi ekspor ini. **Bila `memory_limit` produksi
-  < 256M, `haloSimpeg.eksporMaksKarakter` wajib diturunkan.** Mengubah ambang di `.env` (naik atau turun) wajib diukur ulang
-  (`RUN_VOLUME_TEST=1`, `EksporTiketVolumeTest`).
+  < 256M, `halosimpeg.eksporMaksKarakter` wajib diturunkan.** Sesudah `.env` diubah, periksa nilai efektif dengan
+  `php spark config:check HaloSimpeg` (baris `eksporMaksKarakter` harus menampilkan nilai baru). Mengubah ambang (naik atau turun)
+  wajib diukur ulang (`RUN_VOLUME_TEST=1`, `EksporTiketVolumeTest`).
 
 ## 2. Cara push (operator deploy)
 
