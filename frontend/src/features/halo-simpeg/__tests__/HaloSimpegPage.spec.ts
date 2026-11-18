@@ -638,13 +638,18 @@ describe('tab Antrean petugas (B3)', () => {
 })
 
 describe('thread sisi petugas (B3)', () => {
-  it('snapshot NIP/jabatan/satker lewat UiTooltip (tanpa atribut title); pemilik tanpa snapshot → teks biasa', async () => {
+  it('R6: snapshot lewat tombol "Data pelapor" + aria-describedby + tooltip (role tooltip); tanpa title; pemilik tanpa snapshot → tanpa tombol', async () => {
+    const sn = detailPetugas.data.snapshot
     svc.tiket.detail.mockResolvedValueOnce({ ...(detailPetugas.data as TiketDetail), belum_dibaca: false })
     const a = await pasang({ idTiket: detailPetugas.data.id })
     const tombol = a.w.get('[data-testid="halo-thread-snapshot"]')
+    expect(tombol.attributes('aria-label')).toBe('Data pelapor')
     expect(tombol.attributes('title')).toBeUndefined()
-    expect(tombol.attributes('aria-label')).toContain(`NIP: ${detailPetugas.data.snapshot.nip}`)
-    expect(tombol.attributes('aria-label')).toContain('Jabatan: Analis Kepegawaian')
+    const isi = document.getElementById(tombol.attributes('aria-describedby')!)?.textContent
+    expect(isi).toBe(`NIP: ${sn.nip} · Jabatan: ${sn.jabatan} · Satker: ${sn.satker}`)
+    await tombol.trigger('focus')
+    await flushPromises()
+    await vi.waitFor(() => expect(document.querySelector('[role="tooltip"]')?.textContent).toContain(`NIP: ${sn.nip}`))
     expect(document.querySelector('[data-testid="halo-thread"] [title]')).toBeNull()
     a.w.unmount()
     svc.tiket.detail.mockResolvedValueOnce({ ...DETAIL, belum_dibaca: false, snapshot: null, pengingat: null })
@@ -652,10 +657,16 @@ describe('thread sisi petugas (B3)', () => {
     expect(b.w.find('[data-testid="halo-thread-snapshot"]').exists()).toBe(false)
   })
 
-  it('snapshot tanpa jabatan/satker → "—"', async () => {
-    svc.tiket.detail.mockResolvedValueOnce({ ...(detailTanpaJabatan.data as TiketDetail), belum_dibaca: false })
-    const { w } = await pasang({ idTiket: detailTanpaJabatan.data.id })
-    expect(w.get('[data-testid="halo-thread-snapshot"]').attributes('aria-label')).toContain('Jabatan: — · Satker: —')
+  it('R6: snapshot tanpa jabatan/satker → "—"; layar sempit → teks kecil (tanpa tombol tooltip)', async () => {
+    svc.tiket.detail.mockResolvedValue({ ...(detailTanpaJabatan.data as TiketDetail), belum_dibaca: false })
+    const a = await pasang({ idTiket: detailTanpaJabatan.data.id })
+    const tombol = a.w.get('[data-testid="halo-thread-snapshot"]')
+    expect(document.getElementById(tombol.attributes('aria-describedby')!)?.textContent).toContain('Jabatan: — · Satker: —')
+    a.w.unmount()
+    desktop.nilai = false
+    const b = await pasang({ idTiket: detailTanpaJabatan.data.id })
+    expect(b.w.find('[data-testid="halo-thread-snapshot"]').exists()).toBe(false)
+    expect(b.w.get('[data-testid="halo-thread-snapshot-teks"]').text()).toContain('Jabatan: — · Satker: —')
   })
 
   it('centang "Ingatkan Saya Kembali?" hanya bila pengingat !== null; dicentang → ingatkan_24_jam true', async () => {

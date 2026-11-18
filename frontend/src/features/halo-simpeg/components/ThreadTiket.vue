@@ -12,12 +12,13 @@
  * - Form balas hanya bila `bisa_balas`; tiket berkategori NULL → catatan pengganti (H8-16 (a1)); 422 tiket ditutup / tanpa
  *   balasan / tanpa kategori → pesan BE + detail dimuat ulang.
  */
-import { ArrowLeft, Paperclip } from 'lucide-vue-next'
-import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { ArrowLeft, Info, Paperclip } from 'lucide-vue-next'
+import { computed, nextTick, onBeforeUnmount, reactive, ref, useId, watch } from 'vue'
 
 import { simpanBerkas } from '@/features/kepegawaian/services/berkasUnduhan'
 import { isApiError } from '@/lib/axios'
 import FormField from '@/shared/components/FormField.vue'
+import { useIsDesktop } from '@/shared/composables/useIsDesktop'
 import { formatApiDateTime } from '@/shared/utils/dateTime'
 import { UiBadge, UiButton, UiCheckbox, UiFileField, UiNotice, UiTooltip } from '@/shared/ui'
 import { galatPerKolom } from '@/shared/utils/galatKolom'
@@ -106,6 +107,8 @@ const galatKlien = computed<Record<string, string>>(() => {
 })
 /** Centang pengingat hanya untuk petugas tiket bukan pemilik (`pengingat !== null`). */
 const bolehIngatkan = computed(() => detail.value?.pengingat != null)
+const isDesktop = useIsDesktop()
+const idSnapshot = `${useId()}-snapshot`
 const teksSnapshot = computed(() => {
   const sn = detail.value?.snapshot
   return sn ? `NIP: ${sn.nip} · Jabatan: ${sn.jabatan ?? '—'} · Satker: ${sn.satker ?? '—'}` : ''
@@ -175,18 +178,24 @@ async function kirim(): Promise<void> {
           <div><dt class="sr-only">Kategori</dt><dd data-testid="halo-thread-kategori">{{ detail.kategori?.nama ?? '—' }}</dd></div>
           <div>
             <dt class="sr-only">Pemilik</dt>
-            <dd>
-              <UiTooltip v-if="detail.snapshot" :content="teksSnapshot" side="bottom">
-                <button
-                  type="button"
-                  class="rounded text-brand-primary underline decoration-dotted underline-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-tertiary"
-                  :aria-label="`${detail.pemilik_nama}, ${teksSnapshot}`"
-                  data-testid="halo-thread-snapshot"
-                >
-                  {{ detail.pemilik_nama }}
-                </button>
-              </UiTooltip>
-              <template v-else>{{ detail.pemilik_nama }}</template>
+            <dd class="inline-flex items-center gap-1">
+              {{ detail.pemilik_nama }}
+              <!-- Review B3 R6: desktop = tombol ikon + tooltip; pembaca layar: nama tombol "Data pelapor", isi lewat
+                   aria-describedby (tidak dibaca dua kali). Layar sentuh/sempit: snapshot tampil sebagai teks kecil. -->
+              <template v-if="detail.snapshot && isDesktop">
+                <UiTooltip :content="teksSnapshot" side="bottom">
+                  <button
+                    type="button"
+                    class="rounded p-0.5 text-brand-primary hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-tertiary"
+                    aria-label="Data pelapor"
+                    :aria-describedby="idSnapshot"
+                    data-testid="halo-thread-snapshot"
+                  >
+                    <Info class="h-3.5 w-3.5" aria-hidden="true" />
+                  </button>
+                </UiTooltip>
+                <span :id="idSnapshot" class="sr-only">{{ teksSnapshot }}</span>
+              </template>
             </dd>
           </div>
           <div><dt class="sr-only">Dibuat</dt><dd>{{ waktu(detail.dibuat_pada) }}</dd></div>
@@ -202,6 +211,7 @@ async function kirim(): Promise<void> {
             <dt class="inline">Ditutup oleh</dt> <dd class="inline">{{ detail.ditutup_oleh_label }}</dd>
           </div>
         </dl>
+        <p v-if="detail.snapshot && !isDesktop" class="mt-1 text-caption text-slate-500" data-testid="halo-thread-snapshot-teks">{{ teksSnapshot }}</p>
       </header>
 
       <p v-if="galatUnduh" class="mt-3 text-sm text-danger" role="alert" data-testid="halo-thread-galat-unduh">{{ galatUnduh }}</p>
