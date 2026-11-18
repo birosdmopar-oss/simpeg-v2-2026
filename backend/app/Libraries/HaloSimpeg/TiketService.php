@@ -274,8 +274,9 @@ final class TiketService extends MasterHaloSimpeg
             }
         }
 
+        // CR-152 (pola CR-148): wajib-isi sesudah trim Unicode; batas `maksSubjek` pada nilai yang disimpan; isi tidak diubah.
         if (! isset($errors['subject'])) {
-            if ($subjek === '') {
+            if (self::trimUnicode($subjek) === '') {
                 $errors['subject'] = 'Subjek wajib diisi.';
             } elseif (mb_strlen($subjek) > $this->config->maksSubjek) {
                 $errors['subject'] = "Subjek maksimal {$this->config->maksSubjek} karakter.";
