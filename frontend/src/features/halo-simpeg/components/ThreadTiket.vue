@@ -13,7 +13,7 @@
  *   balasan / tanpa kategori → pesan BE + detail dimuat ulang.
  */
 import { ArrowLeft, Paperclip } from 'lucide-vue-next'
-import { computed, nextTick, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
 
 import { simpanBerkas } from '@/features/kepegawaian/services/berkasUnduhan'
 import { isApiError } from '@/lib/axios'
@@ -50,6 +50,15 @@ const WARNA_PENGIRIM = ['bg-slate-100', 'bg-[#E8F1FF]', 'bg-[#EAF7EF]', 'bg-[#FF
 const warna = (p: Pesan): string => (p.milik_saya ? 'bg-brand-tertiary text-white' : (WARNA_PENGIRIM[p.urutan_pengirim % WARNA_PENGIRIM.length] ?? WARNA_PENGIRIM[0]))
 const waktu = (iso: string | null): string => (iso ? (formatApiDateTime(iso) ?? iso) : '—')
 
+/**
+ * Review B2 Q1: instance per tiket (`:key`) bisa sudah di-unmount saat respons tiba (pengguna pindah ke tiket lain). Efek
+ * sesudah unmount dilewati, dan muat ulang detail hanya bila tiket ini masih yang terbuka (`detailTiket.idDibuka`).
+ */
+let aktif = true
+onBeforeUnmount(() => {
+  aktif = false
+})
+
 const galatUnduh = ref('')
 const mengunduh = ref<number | null>(null)
 async function unduh(p: Pesan, lampiran: Lampiran | LampiranRingkas): Promise<void> {
@@ -59,9 +68,9 @@ async function unduh(p: Pesan, lampiran: Lampiran | LampiranRingkas): Promise<vo
     const berkas = await tiketHaloService.lampiran(props.idTiket, p.id_inbox_msg)
     simpanBerkas({ blob: berkas.blob, nama: berkas.nama || lampiran.nama })
   } catch (e) {
-    galatUnduh.value = isApiError(e) ? e.message : TEKS_GALAT_TIKET.lampiranTidakDitemukan
+    if (aktif) galatUnduh.value = isApiError(e) ? e.message : TEKS_GALAT_TIKET.lampiranTidakDitemukan
   } finally {
-    mengunduh.value = null
+    if (aktif) mengunduh.value = null
   }
 }
 
@@ -122,13 +131,14 @@ async function kirim(): Promise<void> {
     kunciBerkas.value += 1
     submitted.value = false
   } catch (e) {
+    if (!aktif) return
     galatKolom.value = galatPerKolom(e, (k) => (k === 'msg' ? 'pesan' : k))
     const pesan = isApiError(e) ? e.message : 'Pesan tidak terkirim. Silakan coba lagi.'
     galatBalas.value = Object.values(galatKolom.value).includes(pesan) ? '' : pesan
     const kode = kodeGalat(e)
-    if (kode !== null && KODE_MUAT_ULANG.includes(kode)) void bukaTiket(props.idTiket)
+    if (kode !== null && KODE_MUAT_ULANG.includes(kode) && detailTiket.idDibuka === props.idTiket) void bukaTiket(props.idTiket)
   } finally {
-    mengirim.value = false
+    if (aktif) mengirim.value = false
   }
 }
 </script>

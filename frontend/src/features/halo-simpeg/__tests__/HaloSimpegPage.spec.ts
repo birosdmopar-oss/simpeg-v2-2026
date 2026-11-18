@@ -43,6 +43,7 @@ import { Role, type RoleCode, type User } from '@/features/auth/types'
 import { rowMenuActions, selectRowAction } from '@/shared/components/__tests__/rowActionsMenu.helpers'
 
 import { resetHaloSimpeg } from '../stores/haloSimpeg'
+import { detailTiket } from '../stores/tiket'
 import type { Halaman, TiketBaris, TiketDetail } from '../types'
 import HaloSimpegPage from '../views/HaloSimpegPage.vue'
 import galat422Ditutup from './fixtures/galat-422-ditutup.json'
@@ -272,6 +273,26 @@ describe('thread per tiket (review B2 P2)', () => {
     expect((w.get('[data-testid="halo-balas-form"] textarea').element as HTMLTextAreaElement).value).toBe('Draf B')
     expect(w.find('[data-testid="halo-balas-galat"]').exists()).toBe(false)
     expect(w.get('[data-testid="halo-thread"]').text()).not.toContain('Pesan wajib diisi.')
+  })
+})
+
+describe('Q1: instance ThreadTiket yang sudah dilepas tidak memuat ulang tiket lama', () => {
+  it('balas A tertahan → pindah ke B → 422 tiket_ditutup (code) untuk A: panel tetap B, idDibuka tetap B', async () => {
+    let tolakA: (e: unknown) => void = () => {}
+    svc.tiket.balas.mockReturnValueOnce(new Promise((_r, j) => (tolakA = j)))
+    svc.tiket.detail.mockImplementation(async (id: number) => ({ ...DETAIL, id, subjek: `Tiket ${id}`, belum_dibaca: false, bisa_balas: true }))
+    const { w, props } = await pasang({ idTiket: 1 })
+    await w.get('[data-testid="halo-balas-form"] textarea').setValue('Balasan A')
+    await w.get('[data-testid="halo-balas-form"]').trigger('submit')
+    props.value = { idTiket: 2, idTidakSah: false }
+    await flushPromises()
+    const panggilanDetail = svc.tiket.detail.mock.calls.length
+    tolakA(apiError(422, galat422Ditutup))
+    await flushPromises()
+    expect(galat422Ditutup.code).toBe('tiket_ditutup')
+    expect(svc.tiket.detail.mock.calls.length).toBe(panggilanDetail)
+    expect(detailTiket.idDibuka).toBe(2)
+    expect(w.get('[data-testid="halo-thread-judul"]').text()).toBe('Tiket 2')
   })
 })
 
