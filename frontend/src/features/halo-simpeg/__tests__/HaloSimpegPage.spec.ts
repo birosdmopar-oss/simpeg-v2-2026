@@ -1174,3 +1174,43 @@ describe('B4 K1: "Data pelapor" lewat keyboard', () => {
     await vi.waitFor(() => expect(document.querySelector('[role="tooltip"]')?.textContent).toContain('NIP:'))
   })
 })
+
+describe('CR-142 T-B3: kolom Aksi selalu terlihat (sticky kanan)', () => {
+  const ukur = (el: HTMLElement, u: { scrollWidth: number; clientWidth: number; scrollLeft: number }) => {
+    Object.defineProperty(el, 'scrollWidth', { configurable: true, value: u.scrollWidth })
+    Object.defineProperty(el, 'clientWidth', { configurable: true, value: u.clientWidth })
+    Object.defineProperty(el, 'scrollLeft', { configurable: true, writable: true, value: u.scrollLeft })
+  }
+
+  it.each([
+    ['pemilik', ''],
+    ['antrean', '?tab=antrean'],
+  ])('tabel %s: header & sel Aksi sticky right-0 berlatar; bayangan selama tabel tergulir (1536 px + sidebar: 694 > 652)', async (_n, query) => {
+    svc.petugas.saya.mockResolvedValue({ petugas: true, aktif: true, kategori: [{ id: 1, nama: 'Cuti', status: 1 }], bisa_ekspor: false })
+    const id = DAFTAR.items[0]!.id
+    const { w } = await pasang({ query })
+    const daftar = w.get(query ? '[data-testid="halo-daftar-antrean"]' : '[data-testid="halo-daftar-saya"]')
+    const th = () => daftar.get('th[data-kolom="aksi"]')
+    const td = () => daftar.get(`[data-testid="halo-tiket-row-${id}"] td[data-kolom="aksi"]`)
+    expect(th().classes()).toEqual(expect.arrayContaining(['sticky', 'right-0', 'z-10', 'bg-slate-50']))
+    expect(td().classes()).toEqual(expect.arrayContaining(['sticky', 'right-0', 'z-10', 'bg-white']))
+    expect(td().find(`[data-testid="halo-tiket-actions-${id}"]`).exists()).toBe(true)
+    const scroller = daftar.get('[data-testid="halo-daftar-scroll"]')
+    ukur(scroller.element as HTMLElement, { scrollWidth: 694, clientWidth: 652, scrollLeft: 0 })
+    await scroller.trigger('scroll')
+    expect(th().classes()).toContain('shadow-sticky-end')
+    expect(td().classes()).toContain('shadow-sticky-end')
+    ukur(scroller.element as HTMLElement, { scrollWidth: 694, clientWidth: 652, scrollLeft: 42 })
+    await scroller.trigger('scroll')
+    expect(td().classes()).not.toContain('shadow-sticky-end')
+  })
+
+  it('baris aktif: sel Aksi sticky ikut warna baris aktif (tidak menutupi dengan putih)', async () => {
+    const id = DAFTAR.items[0]!.id
+    svc.tiket.detail.mockResolvedValue({ ...DETAIL, id, belum_dibaca: false })
+    const { w } = await pasang({ idTiket: id })
+    const td = w.get(`[data-testid="halo-tiket-row-${id}"] td[data-kolom="aksi"]`)
+    expect(td.classes()).toContain('bg-[#E8F1FF]')
+    expect(td.classes()).not.toContain('bg-white')
+  })
+})

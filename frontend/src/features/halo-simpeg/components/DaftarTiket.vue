@@ -18,6 +18,7 @@ import { isApiError } from '@/lib/axios'
 import ConfirmDialog from '@/shared/components/ConfirmDialog.vue'
 import RowActionsMenu from '@/shared/components/RowActionsMenu.vue'
 import type { RowAction } from '@/shared/components/rowActions'
+import { useStickyActionsShadow } from '@/shared/composables/useStickyActionsShadow'
 import { formatApiDateTime } from '@/shared/utils/dateTime'
 import { UiBadge, UiButton, UiNotice, UiPagination, UiSearchInput, UiSelect, type SelectOption } from '@/shared/ui'
 
@@ -105,6 +106,12 @@ onMounted(async () => {
 
 const items = computed(() => st.value.daftar?.items ?? [])
 const total = computed(() => st.value.daftar?.total ?? 0)
+/**
+ * CR-142 T-B3: kolom Aksi menempel di kanan (`sticky right-0`, pola CR-038 / `useStickyActionsShadow`) supaya ⋮ selalu terlihat
+ * walau tabel lebih lebar dari panel (mis. 1536 px dengan sidebar terbuka); bayangan pemisah selama masih ada kolom tersembunyi.
+ */
+const tableScroller = ref<HTMLElement | null>(null)
+const { actionsShadow, updateActionsShadow } = useStickyActionsShadow(tableScroller, [items, () => st.value.statusDaftar])
 const waktu = (iso: string | null | undefined): string => (iso ? (formatApiDateTime(iso) ?? iso) : '—')
 
 function aksiBaris(t: TiketBaris): RowAction[] {
@@ -214,7 +221,12 @@ const teksKosong = computed(() =>
     <UiNotice v-if="galatAksi" tone="danger"><span role="alert">{{ galatAksi }}</span></UiNotice>
     <p v-if="galatUnduh" class="text-sm text-danger" role="alert" data-testid="halo-daftar-galat-unduh">{{ galatUnduh }}</p>
 
-    <div class="table-fill scrollbar-slim overflow-x-auto rounded-xl border border-slate-100">
+    <div
+      ref="tableScroller"
+      class="table-fill scrollbar-slim overflow-x-auto rounded-xl border border-slate-100"
+      data-testid="halo-daftar-scroll"
+      @scroll.passive="updateActionsShadow"
+    >
       <table class="min-w-full text-sm">
         <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
           <tr>
@@ -224,7 +236,7 @@ const teksKosong = computed(() =>
             <th class="px-4 py-3">Status</th>
             <th class="px-4 py-3">Pesan Terakhir</th>
             <th class="px-4 py-3">Lampiran Terakhir</th>
-            <th class="px-4 py-3 text-right">Aksi</th>
+            <th class="sticky right-0 z-10 whitespace-nowrap bg-slate-50 px-4 py-3 text-right" :class="{ 'shadow-sticky-end': actionsShadow }" data-kolom="aksi">Aksi</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
@@ -283,7 +295,11 @@ const teksKosong = computed(() =>
               </span>
               <span v-else class="text-slate-400">—</span>
             </td>
-            <td class="px-4 py-3 text-right">
+            <td
+              class="sticky right-0 z-10 px-4 py-3 text-right"
+              :class="[idAktif === t.id ? 'bg-[#E8F1FF]' : 'bg-white', { 'shadow-sticky-end': actionsShadow }]"
+              data-kolom="aksi"
+            >
               <RowActionsMenu :actions="aksiBaris(t)" :label="`Aksi untuk ${t.subjek}`" :testid="`halo-tiket-actions-${t.id}`" @select="onAksi(t, $event)" />
             </td>
           </tr>
