@@ -48,11 +48,6 @@ final class NotifikasiController extends ApiController
         return $this->tanpaCache($this->respondSuccess($this->service()->historiApproval(service('authContext'), $this->query())));
     }
 
-    private function tanpaCache(ResponseInterface $response): ResponseInterface
-    {
-        return $response->setHeader('Cache-Control', 'private, no-store');
-    }
-
     /**
      * @return array<string, mixed>
      */
