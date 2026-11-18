@@ -70,6 +70,11 @@ async function muat(): Promise<void> {
     const status = statusFilter.value === '' ? null : (Number(statusFilter.value) as StatusMaster)
     const r = await svc.value.list({ page: page.value, per_page: PER_PAGE_MASTER, status, q: q.value })
     if (n !== urutanMuat) return
+    // Review B3 R9: baris terakhir di halaman terakhir dihapus/dinonaktifkan (tersaring) → mundur ke halaman terakhir yang ada.
+    if (r.items.length === 0 && page.value > 1 && r.total > 0) {
+      page.value = Math.max(1, Math.ceil(r.total / PER_PAGE_MASTER))
+      return
+    }
     items.value = r.items
     total.value = r.total
   } catch (e) {

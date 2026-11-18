@@ -304,3 +304,26 @@ describe('R8: kandidat petugas', () => {
     expect(document.body.textContent).toContain('Akun petugas wajib dipilih.')
   })
 })
+
+describe('R9: halaman kosong sesudah hapus', () => {
+  it('hapus baris terakhir di halaman 2 → daftar mundur ke halaman 1', async () => {
+    const k = kontakDaftar.data.items[0]!
+    svc.kontak.list
+      .mockResolvedValueOnce({ items: kontakDaftar.data.items, total: 21, page: 1, per_page: 20 })
+      .mockResolvedValueOnce({ items: [k], total: 21, page: 2, per_page: 20 })
+      .mockResolvedValueOnce({ items: [], total: 20, page: 2, per_page: 20 })
+      .mockResolvedValueOnce({ items: kontakDaftar.data.items, total: 20, page: 1, per_page: 20 })
+    svc.kontak.hapus.mockResolvedValueOnce(k.id)
+    const w = await pasang('kontak')
+    const halaman2 = [...w.findAll('nav[aria-label="Paginasi"] button')].find((b) => b.text() === '2')!
+    await halaman2.trigger('click')
+    await flushPromises()
+    expect(svc.kontak.list).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2 }))
+    await selectRowAction(w, `halo-kontak-actions-${k.id}`, 'delete')
+    konfirmasi('Hapus')
+    await flushPromises()
+    await flushPromises()
+    expect(svc.kontak.list).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1 }))
+    expect(w.find('[data-testid="halo-kontak-kosong"]').exists()).toBe(false)
+  })
+})
