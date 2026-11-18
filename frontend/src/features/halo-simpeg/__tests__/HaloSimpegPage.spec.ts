@@ -418,8 +418,8 @@ describe('responsif < 1024 px', () => {
     // Rute kembali ke daftar (props dari rute halo-simpeg).
     props.value = { idTiket: null, idTidakSah: false }
     await flushPromises()
-    // Daftar belum datang: ±200 ms berlalu (lebih lama dari 20 tick) tanpa fokus jatuh ke judul.
-    await new Promise((r) => setTimeout(r, 200))
+    // Daftar belum datang selama 1 detik (jauh lebih lama dari 20 tick).
+    await new Promise((r) => setTimeout(r, 1000))
     lepas(DAFTAR)
     await flushPromises()
     await flushPromises()
