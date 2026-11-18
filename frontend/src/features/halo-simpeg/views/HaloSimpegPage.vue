@@ -23,7 +23,7 @@ import KontakHelpdeskCard from '../components/KontakHelpdeskCard.vue'
 import PanelPerluTindak from '../components/PanelPerluTindak.vue'
 import ThreadTiket from '../components/ThreadTiket.vue'
 import TiketBaruDialog from '../components/TiketBaruDialog.vue'
-import { HALO_PEMBUAT_TIKET_ROLES, TAB_ANTREAN, TEKS_GALAT_TIKET } from '../constants'
+import { BACA_BAWAAN_ANTREAN, HALO_PEMBUAT_TIKET_ROLES, TAB_ANTREAN, TEKS_GALAT_TIKET } from '../constants'
 import { haloState, muatPetugasSaya, petugasAktif } from '../stores/haloSimpeg'
 import { bukaTiket, daftarAntrean, daftarSaya, tutupPanel, type DaftarTiket as Daftar } from '../stores/tiket'
 import type { TiketDetail } from '../types'
@@ -132,8 +132,17 @@ function onDibuat(t: TiketDetail): void {
   void router.push({ name: 'halo-tiket', params: { id: t.id } })
 }
 
+/**
+ * Review B3 R1: "Lihat semua" menampilkan SEMUA tiket perlu ditindak — `baca` = semua dan filter lain dikosongkan, agar tiket
+ * yang sudah dibaca tetapi pengingatnya jatuh tempo tetap tampil (total tabel = panel = `Ringkasan.perlu_tindak`, AC-E04.13).
+ */
 function lihatSemuaPerluTindak(): void {
-  void daftarAntrean.ubahFilter({ perlu_tindak: true })
+  void daftarAntrean.ubahFilter({ perlu_tindak: true, baca: 'semua', status: null, q: '', kategori: null })
+}
+
+/** "Hapus filter" chip perlu ditindak → kembali ke bawaan antrean (`baca` = belum [K]). */
+function hapusFilterPerluTindak(): void {
+  void daftarAntrean.ubahFilter({ perlu_tindak: false, baca: BACA_BAWAAN_ANTREAN })
 }
 </script>
 
@@ -147,7 +156,7 @@ function lihatSemuaPerluTindak(): void {
             <PanelPerluTindak class="mb-3" @lihat-semua="lihatSemuaPerluTindak" />
             <div v-if="daftarAntrean.state.filter.perlu_tindak" class="mb-2 flex items-center gap-2 text-sm" data-testid="halo-filter-perlu-tindak">
               <span class="rounded-full bg-warning-soft px-2 py-0.5 text-[#8a4f0f]">Hanya perlu ditindak</span>
-              <UiButton size="sm" variant="secondary" appearance="ghost" @click="daftarAntrean.ubahFilter({ perlu_tindak: false })">Hapus filter</UiButton>
+              <UiButton size="sm" variant="secondary" appearance="ghost" data-testid="halo-hapus-filter-perlu-tindak" @click="hapusFilterPerluTindak">Hapus filter</UiButton>
             </div>
             <DaftarTiket :key="TAB_ANTREAN" :daftar="daftarAntrean" :id-aktif="idTiket" :kategori-petugas="kategoriPetugas" />
           </template>

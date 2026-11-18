@@ -43,7 +43,7 @@ import { Role, type RoleCode, type User } from '@/features/auth/types'
 import { rowMenuActions, selectRowAction } from '@/shared/components/__tests__/rowActionsMenu.helpers'
 
 import { resetHaloSimpeg } from '../stores/haloSimpeg'
-import { detailTiket } from '../stores/tiket'
+import { daftarAntrean, detailTiket } from '../stores/tiket'
 import type { Halaman, TiketBaris, TiketDetail } from '../types'
 import HaloSimpegPage from '../views/HaloSimpegPage.vue'
 import galat422Ditutup from './fixtures/galat-422-ditutup.json'
@@ -808,5 +808,25 @@ describe('Q6 (4, 5): galat ⋮ Tutup dan galat per kolom yang tepat', () => {
     await w.get('[data-testid="halo-balas-form"]').trigger('submit')
     await flushPromises()
     expect(galatKontrol(w.get('[data-testid="halo-balas-form"] textarea').element)).toBe('Pesan maksimal 5.000 karakter.')
+  })
+})
+
+describe('R1 (BLOK): Lihat semua Perlu ditindak', () => {
+  it('Lihat semua → perlu_tindak + baca semua, status/q/kategori dikosongkan; Hapus filter → kembali baca belum', async () => {
+    svc.petugas.saya.mockResolvedValue({ petugas: true, aktif: true, kategori: [{ id: 1, nama: 'Cuti', status: 1 }, { id: 2, nama: 'Gaji', status: 1 }], bisa_ekspor: true })
+    const banyak = Array.from({ length: 5 }, (_, i) => baris({ id: 100 + i, pesan_terakhir: null }))
+    svc.tiket.list.mockImplementation(async (f: { perlu_tindak?: boolean }) => (f.perlu_tindak ? { ...DAFTAR, items: banyak, total: 8 } : DAFTAR))
+    const { w } = await pasang({ query: '?tab=antrean' })
+    await daftarAntrean.ubahFilter({ status: 'open', q: 'cuti', kategori: 2 })
+    await flushPromises()
+    await w.get('[data-testid="halo-perlu-tindak-semua"]').trigger('click')
+    await flushPromises()
+    const akhir = svc.tiket.list.mock.calls.at(-1)![0] as Record<string, unknown>
+    expect(akhir).toMatchObject({ peran: 'petugas', perlu_tindak: true, baca: 'semua' })
+    expect([akhir.status ?? null, akhir.q ?? '', akhir.kategori ?? null]).toEqual([null, '', null])
+    expect((w.get('[data-testid="halo-daftar-antrean"] input[type="search"]').element as HTMLInputElement).value).toBe('')
+    await w.get('[data-testid="halo-hapus-filter-perlu-tindak"]').trigger('click')
+    await flushPromises()
+    expect(svc.tiket.list.mock.calls.at(-1)![0]).toMatchObject({ peran: 'petugas', baca: 'belum', perlu_tindak: false })
   })
 })

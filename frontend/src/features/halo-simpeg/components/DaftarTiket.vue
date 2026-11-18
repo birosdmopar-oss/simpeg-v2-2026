@@ -63,8 +63,16 @@ const tampilFilterKategori = computed(() => (antrean.value ? sumberKategori.valu
 
 const cari = ref(props.daftar.state.filter.q ?? '')
 let jedaCari: ReturnType<typeof setTimeout> | null = null
+// Filter `q` diubah dari luar (mis. "Lihat semua" Perlu ditindak) → kotak cari ikut, tanpa memicu muat ulang ganda.
+watch(
+  () => st.value.filter.q ?? '',
+  (q) => {
+    if (q !== cari.value) cari.value = q
+  },
+)
 watch(cari, (v) => {
   if (jedaCari) clearTimeout(jedaCari)
+  if (v === (st.value.filter.q ?? '')) return
   jedaCari = setTimeout(() => void props.daftar.ubahFilter({ q: v }), 300)
 })
 
@@ -171,7 +179,9 @@ async function unduhTerakhir(t: TiketBaris): Promise<void> {
 }
 
 const teksKosong = computed(() =>
-  st.value.filter.q || st.value.filter.status || st.value.filter.kategori || st.value.filter.baca !== bacaBawaan.value
+  st.value.filter.perlu_tindak
+    ? 'Tidak ada tiket yang perlu ditindak.'
+    : st.value.filter.q || st.value.filter.status || st.value.filter.kategori || st.value.filter.baca !== bacaBawaan.value
     ? 'Tidak ada percakapan yang cocok dengan filter.'
     : 'Belum ada percakapan.',
 )
