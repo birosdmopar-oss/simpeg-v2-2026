@@ -69,28 +69,43 @@ const panelDaftarEl = ref<HTMLElement | null>(null)
  * < 1024 px: sesudah kembali dari thread ke daftar, fokus ke tombol ⋮ baris tiket tadi (atau judul kartu bila baris tidak
  * ada), bukan jatuh ke `<body>` (review B2 P4 (b)).
  */
+/** Tunggu daftar aktif selesai dimuat (`siap`/`galat`), paling lama `batasMs` (review B2 Q2: GET daftar nyata bisa lambat). */
+function tungguDaftarSelesai(batasMs = 10_000): Promise<void> {
+  const selesai = () => ['siap', 'galat'].includes(daftarAktif.value.state.statusDaftar)
+  if (selesai()) return Promise.resolve()
+  return new Promise<void>((lepas) => {
+    const batas = setTimeout(() => {
+      henti()
+      lepas()
+    }, batasMs)
+    const henti = watch(
+      () => daftarAktif.value.state.statusDaftar,
+      () => {
+        if (!selesai()) return
+        clearTimeout(batas)
+        henti()
+        lepas()
+      },
+    )
+  })
+}
+
 async function fokusSesudahKembali(idSebelum: number | null): Promise<void> {
-  // Di layar sempit daftar baru dipasang (dan dimuat) sesudah kembali: tunggu muat selesai dan baris dirender.
-  for (let i = 0; i < 20; i += 1) {
-    await nextTick()
-    await new Promise((r) => setTimeout(r, 0))
-    const akar = panelDaftarEl.value
-    if (!akar) continue
-    const st = daftarAktif.value.state
-    const selesaiMuat = st.statusDaftar === 'siap' || st.statusDaftar === 'galat'
-    const tombol = idSebelum === null ? null : akar.querySelector<HTMLElement>(`[data-testid="halo-tiket-actions-${idSebelum}"]`)
-    if (tombol) {
-      tombol.focus()
-      return
-    }
-    const barisAdaDiData = idSebelum !== null && (st.daftar?.items.some((t) => t.id === idSebelum) ?? false)
-    if (!selesaiMuat || barisAdaDiData) continue
-    const judul = akar.querySelector<HTMLElement>('h2, h3')
-    if (judul) {
-      judul.setAttribute('tabindex', '-1')
-      judul.focus()
-    }
+  // Di layar sempit daftar baru dipasang (dan dimuat) sesudah kembali: daftar dipasang dulu, lalu tunggu muatnya selesai.
+  await nextTick()
+  await tungguDaftarSelesai()
+  await nextTick()
+  const akar = panelDaftarEl.value
+  if (!akar) return
+  const tombol = idSebelum === null ? null : akar.querySelector<HTMLElement>(`[data-testid="halo-tiket-actions-${idSebelum}"]`)
+  if (tombol) {
+    tombol.focus()
     return
+  }
+  const judul = akar.querySelector<HTMLElement>('h2, h3')
+  if (judul) {
+    judul.setAttribute('tabindex', '-1')
+    judul.focus()
   }
 }
 

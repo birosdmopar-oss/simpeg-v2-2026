@@ -409,6 +409,23 @@ describe('responsif < 1024 px', () => {
     expect(document.activeElement?.tagName).toMatch(/^H[23]$/)
   })
 
+  it('Q2: GET daftar lambat → Kembali → daftar dilepas sesudahnya → fokus tetap ke ⋮ baris tadi', async () => {
+    desktop.nilai = false
+    const id = DAFTAR.items[0]!.id
+    let lepas: (v: Halaman<TiketBaris>) => void = () => {}
+    svc.tiket.list.mockReturnValueOnce(new Promise((r) => (lepas = r)))
+    const { w, props } = await pasang({ idTiket: id })
+    // Rute kembali ke daftar (props dari rute halo-simpeg).
+    props.value = { idTiket: null, idTidakSah: false }
+    await flushPromises()
+    // Daftar belum datang: ±200 ms berlalu (lebih lama dari 20 tick) tanpa fokus jatuh ke judul.
+    await new Promise((r) => setTimeout(r, 200))
+    lepas(DAFTAR)
+    await flushPromises()
+    await flushPromises()
+    expect(document.activeElement).toBe(w.get(`[data-testid="halo-tiket-actions-${id}"]`).element)
+  })
+
   it('desktop → dua panel bersamaan', async () => {
     const { w } = await pasang({ idTiket: DETAIL.id })
     expect(w.find('[data-testid="halo-panel-daftar"]').exists()).toBe(true)
