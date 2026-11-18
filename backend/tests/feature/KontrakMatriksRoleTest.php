@@ -223,6 +223,7 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
             // `add_conversation`, `close_inbox` = 1–7 (`SC:466`, `:498`, `:550`, `:663`, `:710`); buat tiket = UL_PEGAWAI (`SC:608`);
             // `baca`, lampiran, ringkasan = [V2] 1–7. Kewenangan objek di service (AksesTiket).
             'GET api/v1/halo-simpeg/tiket/ringkasan'                        => [1, 2, 3, 4, 5, 6, 7],
+            'GET api/v1/halo-simpeg/tiket/ekspor'                           => [1, 2, 3, 4, 5, 6, 7],
             'GET api/v1/halo-simpeg/tiket'                                  => [1, 2, 3, 4, 5, 6, 7],
             'POST api/v1/halo-simpeg/tiket'                                 => [2, 6, 7],
             'GET api/v1/halo-simpeg/tiket/([0-9]+)/pesan/([0-9]+)/lampiran' => [1, 2, 3, 4, 5, 6, 7],

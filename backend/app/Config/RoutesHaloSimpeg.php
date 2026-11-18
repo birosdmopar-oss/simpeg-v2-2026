@@ -9,7 +9,7 @@ use CodeIgniter\Router\RouteCollection;
  * Route helpdesk Halo Simpeg (Fase 8 E-02/E-07 master, MAKE-070; PRD Fase 8 v1.3 §6.1). Dimuat lewat Config\Routing::$routeFiles.
  * Chatbot punya berkas sendiri (`RoutesChatbot.php`). Filter `jwt` di level grup; `role:*` per route: baca bersama = role 1–7
  * (F8-04: role 8 tanpa akses), kelola master = role 1 (F8-05), buat tiket = role 2/6/7. Route literal (`kategori/opsi`,
- * `petugas/kandidat`, `petugas/saya`, `kontak/aktif`, `tiket/ringkasan`) didaftarkan sebelum `(:num)`. Kontrak: Controllers/Api/HaloSimpeg/README.md.
+ * `petugas/kandidat`, `petugas/saya`, `kontak/aktif`, `tiket/ringkasan`, `tiket/ekspor`) didaftarkan sebelum `(:num)`. Kontrak: Controllers/Api/HaloSimpeg/README.md.
  *
  * @var RouteCollection $routes
  */
@@ -24,6 +24,7 @@ $routes->group('api/v1/halo-simpeg', ['namespace' => 'App\Controllers\Api\HaloSi
 
     // Tiket (MAKE-071, PRD §6.1): role 1–7, pembuatan role pegawai 2/6/7 (F8-04); kewenangan objek di AksesTiket.
     $routes->get('tiket/ringkasan', 'TiketController::ringkasan', $semua);
+    $routes->get('tiket/ekspor', 'TiketController::ekspor', $semua);
     $routes->get('tiket', 'TiketController::index', $semua);
     $routes->post('tiket', 'TiketController::create', ['filter' => Role::filter(...Role::UL_PEGAWAI)]);
     $routes->get('tiket/(:num)/pesan/(:num)/lampiran', 'TiketController::lampiran/$1/$2', $semua);
