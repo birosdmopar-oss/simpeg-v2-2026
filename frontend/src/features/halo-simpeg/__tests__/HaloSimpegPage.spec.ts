@@ -42,6 +42,7 @@ import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { Role, type RoleCode, type User } from '@/features/auth/types'
 import { rowMenuActions, selectRowAction } from '@/shared/components/__tests__/rowActionsMenu.helpers'
 
+import { RUANG_LAUNCHER_CLASS } from '../constants'
 import { muatRingkasan, resetHaloSimpeg, setRingkasanHalo } from '../stores/haloSimpeg'
 import { bukaTiket, daftarAntrean, detailTiket } from '../stores/tiket'
 import type { Halaman, TiketBaris, TiketDetail } from '../types'
@@ -1212,5 +1213,18 @@ describe('CR-142 T-B3: kolom Aksi selalu terlihat (sticky kanan)', () => {
     const td = w.get(`[data-testid="halo-tiket-row-${id}"] td[data-kolom="aksi"]`)
     expect(td.classes()).toContain('bg-[#E8F1FF]')
     expect(td.classes()).not.toContain('bg-white')
+  })
+})
+
+describe('CR-142 T-B4: ruang bawah untuk launcher Vanya (AC HP24)', () => {
+  it.each([
+    ['role 2 (widget Vanya tampil)', Role.PEGAWAI],
+    ['role 1 (tanpa widget)', Role.SUPER_ADMIN],
+  ])('%s: halaman memberi ruang bawah ≥ tinggi launcher 64 px + offset 24 px', async (_n, role) => {
+    const { w } = await pasang({ role })
+    const halaman = w.get('[data-testid="halo-halaman"]')
+    expect(halaman.classes()).toContain(RUANG_LAUNCHER_CLASS)
+    // pb-24 = 6rem = 96 px > 64 px launcher + 24 px offset `sm:bottom-6` (VanyaWidget).
+    expect(RUANG_LAUNCHER_CLASS).toBe('pb-24')
   })
 })

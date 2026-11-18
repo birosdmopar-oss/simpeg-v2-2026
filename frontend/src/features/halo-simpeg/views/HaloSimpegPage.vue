@@ -24,7 +24,7 @@ import KontakHelpdeskCard from '../components/KontakHelpdeskCard.vue'
 import PanelPerluTindak from '../components/PanelPerluTindak.vue'
 import ThreadTiket from '../components/ThreadTiket.vue'
 import TiketBaruDialog from '../components/TiketBaruDialog.vue'
-import { BACA_BAWAAN_ANTREAN, HALO_PEMBUAT_TIKET_ROLES, TAB_ANTREAN, TEKS_GALAT_TIKET } from '../constants'
+import { BACA_BAWAAN_ANTREAN, HALO_PEMBUAT_TIKET_ROLES, RUANG_LAUNCHER_CLASS, TAB_ANTREAN, TEKS_GALAT_TIKET } from '../constants'
 import { bisaEkspor, haloState, muatPetugasSaya, petugasAktif } from '../stores/haloSimpeg'
 import { bukaTiket, daftarAntrean, daftarSaya, tutupPanel, type DaftarTiket as Daftar } from '../stores/tiket'
 import type { TiketDetail } from '../types'
@@ -161,7 +161,7 @@ function hapusFilterPerluTindak(): void {
 
 <template>
   <RedesignShell :breadcrumbs="crumbs">
-    <div class="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]" data-testid="halo-halaman">
+    <div class="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]" :class="RUANG_LAUNCHER_CLASS" data-testid="halo-halaman">
       <div v-if="tampilDaftar" ref="panelDaftarEl" class="flex min-w-0 flex-col gap-4" data-testid="halo-panel-daftar">
         <UiCard v-if="memuatAntrean" title="Antrean">
           <p class="py-6 text-center text-sm text-slate-500" data-testid="halo-antrean-memuat">Memuat...</p>
