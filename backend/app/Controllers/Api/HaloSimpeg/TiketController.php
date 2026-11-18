@@ -64,13 +64,15 @@ final class TiketController extends HaloSimpegController
     public function ekspor(): ResponseInterface
     {
         $hasil = (new EksporTiketService())->ekspor($this->auth(), $this->query());
+        // Nilai `Cache-Control` persis `private, no-store` (README ekspor): buang nilai bawaan Response CI4 lebih dulu.
+        $this->response->removeHeader('Cache-Control');
 
         if ($hasil['kosong']) {
             return $this->tanpaCache($this->response->setStatusCode(200)->setJSON([
                 'status'  => 'success',
                 'data'    => ['kosong' => true, 'jumlah' => 0],
                 'message' => $hasil['message'],
-            ]));
+            ])->setHeader('X-Content-Type-Options', 'nosniff'));
         }
 
         return $this->response
