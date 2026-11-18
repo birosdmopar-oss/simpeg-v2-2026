@@ -331,6 +331,27 @@ describe('responsif < 1024 px', () => {
     expect(b.w.find('[data-testid="halo-panel-thread"]').exists()).toBe(false)
   })
 
+  it('P4: sesudah "Kembali ke daftar" fokus ke ⋮ baris tiket tadi (bukan body); id tidak sah → UiButton kembali + fokus judul', async () => {
+    desktop.nilai = false
+    const id = DAFTAR.items[0]!.id
+    const { w, props } = await pasang({ idTiket: id })
+    props.value = { idTiket: null, idTidakSah: false }
+    await flushPromises()
+    await flushPromises()
+    expect(document.activeElement).toBe(w.get(`[data-testid="halo-tiket-actions-${id}"]`).element)
+    w.unmount()
+
+    const b = await pasang({ idTidakSah: true })
+    const tombol = b.w.get('[data-testid="halo-tidak-sah-kembali"]')
+    expect(tombol.element.tagName).toBe('BUTTON')
+    expect(tombol.text()).toContain('Kembali ke daftar')
+    svc.tiket.list.mockResolvedValueOnce({ ...DAFTAR, items: [] , total: 0 })
+    b.props.value = { idTiket: null, idTidakSah: false }
+    await flushPromises()
+    await flushPromises()
+    expect(document.activeElement?.tagName).toMatch(/^H[23]$/)
+  })
+
   it('desktop → dua panel bersamaan', async () => {
     const { w } = await pasang({ idTiket: DETAIL.id })
     expect(w.find('[data-testid="halo-panel-daftar"]').exists()).toBe(true)
