@@ -195,10 +195,10 @@ describe('UiAvatar', () => {
 describe('UiPagination', () => {
   const mountPg = (page: number, total = 50, perPage = 10) => mount(UiPagination, { props: { page, perPage, total } })
 
-  it('info "Showing a to b of n entries" (halaman terakhir terpotong, kosong → 0)', () => {
-    expect(mountPg(3).text()).toContain('Showing 21 to 30 of 50 entries')
-    expect(mountPg(6, 57).text()).toContain('Showing 51 to 57 of 57 entries')
-    expect(mountPg(1, 0).text()).toContain('Showing 0 to 0 of 0 entries')
+  it('info "Menampilkan a sampai b dari n data" (halaman terakhir terpotong, kosong → 0; CR-141)', () => {
+    expect(mountPg(3).text()).toContain('Menampilkan 21 sampai 30 dari 50 data')
+    expect(mountPg(6, 57).text()).toContain('Menampilkan 51 sampai 57 dari 57 data')
+    expect(mountPg(1, 0).text()).toContain('Menampilkan 0 sampai 0 dari 0 data')
   })
 
   it('halaman aktif aria-current; halaman berikutnya bertanda biru muda', () => {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * Paginasi tabel — "Showing 1 to 10 of 50 entries" + tombol angka, halaman aktif biru penuh dan
+ * Paginasi tabel — "Menampilkan 1 sampai 10 dari 50 data" (CR-141) + tombol angka, halaman aktif biru penuh dan
  * halaman berikutnya bertanda biru muda (§4.1.4, §4.1.5, §4.2.3).
  *
  * Reusable.
@@ -39,7 +39,7 @@ function go(page: number): void {
 
 <template>
   <div class="flex flex-wrap items-center justify-between gap-3">
-    <p class="text-body2 text-slate-500">Showing {{ from }} to {{ to }} of {{ total }} entries</p>
+    <p class="text-body2 text-slate-500">Menampilkan {{ from }} sampai {{ to }} dari {{ total }} data</p>
 
     <nav class="flex items-center gap-1.5" aria-label="Paginasi">
       <button
