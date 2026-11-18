@@ -19,6 +19,7 @@ import RedesignShell from '@/shared/layouts/RedesignShell.vue'
 import { type Crumb, type TabItem, UiButton, UiCard, UiNotice, UiTabs } from '@/shared/ui'
 
 import DaftarTiket from '../components/DaftarTiket.vue'
+import EksporRekapDialog from '../components/EksporRekapDialog.vue'
 import KontakHelpdeskCard from '../components/KontakHelpdeskCard.vue'
 import PanelPerluTindak from '../components/PanelPerluTindak.vue'
 import ThreadTiket from '../components/ThreadTiket.vue'
@@ -37,6 +38,9 @@ const isDesktop = useIsDesktop()
 
 const bolehBuat = computed(() => auth.role !== null && HALO_PEMBUAT_TIKET_ROLES.includes(auth.role))
 const dialogBaru = ref(false)
+/** B4 (MAKE-074): tombol "Ekspor Rekap" hanya di tab Antrean dan hanya bila `petugas/saya.bisa_ekspor` (bukan role). */
+const bisaEkspor = computed(() => haloState.petugasSaya?.bisa_ekspor === true)
+const dialogEkspor = ref(false)
 
 // Review B3 R4: dimuat paksa sekali per kunjungan (admin bisa baru menambah/menonaktifkan dirinya sebagai petugas).
 onMounted(() => {
@@ -169,6 +173,9 @@ function hapusFilterPerluTindak(): void {
         <UiCard v-else :title="diAntrean ? 'Antrean' : 'Tiket Saya'">
           <UiTabs v-if="tabs.length > 1" v-model="tab" :items="tabs" aria-label="Halo Simpeg" class="mb-4" data-testid="halo-tabs" />
           <template v-if="diAntrean">
+            <div v-if="bisaEkspor" class="mb-3 flex justify-end">
+              <UiButton size="sm" variant="secondary" appearance="outline" data-testid="halo-ekspor-buka" @click="dialogEkspor = true">Ekspor Rekap</UiButton>
+            </div>
             <PanelPerluTindak class="mb-3" @lihat-semua="lihatSemuaPerluTindak" />
             <div v-if="daftarAntrean.state.filter.perlu_tindak" class="mb-2 flex items-center gap-2 text-sm" data-testid="halo-filter-perlu-tindak">
               <span class="rounded-full bg-warning-soft px-2 py-0.5 text-[#8a4f0f]">Hanya perlu ditindak</span>
@@ -206,5 +213,6 @@ function hapusFilterPerluTindak(): void {
     </div>
 
     <TiketBaruDialog v-if="bolehBuat" v-model:open="dialogBaru" @dibuat="onDibuat" />
+    <EksporRekapDialog v-if="bisaEkspor" v-model:open="dialogEkspor" />
   </RedesignShell>
 </template>

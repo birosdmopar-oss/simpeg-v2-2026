@@ -30,4 +30,13 @@ Komponen yang dipakai modul kedua dipindah ke `src/shared/`.
   (`alasan_tidak_bisa_hapus` BE untuk Petugas, teks FE **[V2]** untuk Kategori); kolom Status hanya badge (AGENTS.md §1 butir 5).
   `peringatan` Nonaktifkan/PUT petugas (S8) → notice peringatan. Kandidat petugas: hasil server tanpa saring lokal, dipilih lewat
   id (`UiCombobox` `saringLokal=false` + `pilih`).
-- **Tanpa frame Figma** (H8-9): layar pemilik/petugas/admin mengikuti pola redesign (Gambar 33/34, Master Data); dicatat di B5.
+- Ekspor rekap petugas (B4, MAKE-074): tombol "Ekspor Rekap" hanya di tab Antrean dan hanya bila `petugas/saya.bisa_ekspor`
+  (flag BE, bukan role) → dialog periode `EksporRekapDialog` (dua `UiTextField type="date"`, nilai `YYYY-MM-DD`). Batas picker
+  maks = hari ini **WIB** (`hariIniWib()`, `Asia/Jakarta`, tanpa `toISOString()`) [K `endDate: '0'`], `ds` ≤ `de` dijaga silang
+  antarpicker [K]; ketikan di luar batas ditolak `UiDatePicker` (nilai dikosongkan), jadi tidak terkirim. Teks validasi klien =
+  teks BE ("Tanggal awal dan akhir wajib diisi." / "Tanggal awal tidak boleh melebihi tanggal akhir.") **[V2]** terhadap teks
+  legacy. `GET tiket/ekspor?ds&de&format=xlsx` lewat `ambilBerkas` (tidak diubah): 200 `Content-Type` JSON = periode kosong →
+  notice pesan BE tanpa unduhan; selain itu berkas (nama dari `Content-Disposition`) → `simpanBerkas`. 403 `bukan_petugas` →
+  pesan BE + `petugas/saya` dimuat ulang paksa; 422 per kolom → galat kolom; 422 `ekspor_terlalu_besar` → pesan BE. Fixture
+  ekspor disalin dari `main` @947b94fd.
+- **Tanpa frame Figma** (H8-9): layar pemilik/petugas/admin/dialog ekspor mengikuti pola redesign (Gambar 33/34, Master Data); dicatat di B5.

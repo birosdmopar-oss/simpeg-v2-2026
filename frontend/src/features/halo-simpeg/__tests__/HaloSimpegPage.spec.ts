@@ -20,7 +20,7 @@ vi.mock('@/shared/layouts/RedesignShell.vue', () => ({
   default: defineComponent({ setup: (_p, { slots }) => () => h('div', { 'data-testid': 'shell' }, slots.default?.()) }),
 }))
 const svc = vi.hoisted(() => ({
-  tiket: { list: vi.fn(), detail: vi.fn(), baca: vi.fn(), tutup: vi.fn(), hapus: vi.fn(), balas: vi.fn(), buat: vi.fn(), lampiran: vi.fn(), ringkasan: vi.fn() },
+  tiket: { list: vi.fn(), detail: vi.fn(), baca: vi.fn(), tutup: vi.fn(), hapus: vi.fn(), balas: vi.fn(), buat: vi.fn(), lampiran: vi.fn(), ringkasan: vi.fn(), ekspor: vi.fn() },
   kategori: { opsi: vi.fn() },
   kontak: { aktif: vi.fn() },
   petugas: { saya: vi.fn() },
@@ -967,5 +967,47 @@ describe('R11: ⋮ Hapus di antrean petugas (fixture tiket-daftar-petugas)', () 
     const { w } = await pasang()
     const id = DAFTAR.items[0]!.id
     expect((await rowMenuActions(w, `halo-tiket-actions-${id}`)).some((a) => a.label === 'Hapus')).toBe(false)
+  })
+})
+
+describe('B4 (MAKE-074): tombol Ekspor Rekap di tab Antrean', () => {
+  const PETUGAS = { petugas: true, aktif: true, kategori: [{ id: 1, nama: 'Cuti', status: 1 as const }], bisa_ekspor: true }
+
+  it('bisa_ekspor → tombol hanya di tab Antrean (tidak di Tiket saya)', async () => {
+    svc.petugas.saya.mockResolvedValue(PETUGAS)
+    const { w, router } = await pasang({ query: '?tab=antrean' })
+    expect(w.find('[data-testid="halo-ekspor-buka"]').exists()).toBe(true)
+    await router.push('/halo-simpeg')
+    await flushPromises()
+    expect(w.find('[data-testid="halo-ekspor-buka"]').exists()).toBe(false)
+  })
+
+  it('petugas aktif tetapi bisa_ekspor false → tanpa tombol (gerbang flag BE, bukan role)', async () => {
+    svc.petugas.saya.mockResolvedValue({ ...PETUGAS, bisa_ekspor: false })
+    const { w } = await pasang({ role: Role.SUPER_ADMIN, query: '?tab=antrean' })
+    expect(w.find('[data-testid="halo-daftar-antrean"]').exists()).toBe(true)
+    expect(w.find('[data-testid="halo-ekspor-buka"]').exists()).toBe(false)
+  })
+
+  it('klik → dialog periode terbuka; hasil kosong → notice pesan BE tanpa unduhan', async () => {
+    svc.petugas.saya.mockResolvedValue(PETUGAS)
+    svc.tiket.ekspor.mockResolvedValue({ jenis: 'kosong', pesan: 'Tidak ada data pada periode ini.' })
+    const { w } = await pasang({ query: '?tab=antrean' })
+    await w.get('[data-testid="halo-ekspor-buka"]').trigger('click')
+    await flushPromises()
+    expect(document.querySelector('[data-testid="halo-ekspor-dialog"]')).not.toBeNull()
+    for (const [nama, teks] of [['ds', '01/11/2026'], ['de', '18/11/2026']] as const) {
+      const el = document.querySelector(`input[name="${nama}"]`) as HTMLInputElement
+      el.value = teks
+      el.dispatchEvent(new Event('input'))
+      await flushPromises()
+      el.dispatchEvent(new Event('blur'))
+      await flushPromises()
+    }
+    ;(document.querySelector('[data-testid="halo-ekspor-form"]') as HTMLFormElement).dispatchEvent(new Event('submit'))
+    await flushPromises()
+    expect(svc.tiket.ekspor).toHaveBeenCalledWith('2026-11-01', '2026-11-18')
+    expect(document.querySelector('[data-testid="halo-ekspor-kosong"]')?.textContent?.trim()).toBe('Tidak ada data pada periode ini.')
+    expect(unduhan.simpan).not.toHaveBeenCalled()
   })
 })
