@@ -316,6 +316,36 @@ describe('form tiket baru', () => {
   })
 })
 
+describe('form tiket baru — 422 kategori (review B2 P5 (b))', () => {
+  it('errors.id_question_category → galat di kolom Kategori, pilihan dikosongkan, opsi dimuat ulang', async () => {
+    const { w } = await pasang({ role: Role.PEGAWAI })
+    await w.get('[data-testid="halo-tiket-baru"]').trigger('click')
+    await flushPromises()
+    const form = document.querySelector('[data-testid="halo-tiket-baru-form"]') as HTMLFormElement
+    const isi = (sel: string, v: string) => {
+      const el = form.querySelector(sel) as HTMLInputElement | HTMLTextAreaElement
+      el.value = v
+      el.dispatchEvent(new Event('input'))
+    }
+    isi('input[name="subjek"]', 'Cuti')
+    isi('textarea', 'Berapa sisa cuti?')
+    ;(form.querySelector('[role="combobox"]') as HTMLElement).click()
+    await flushPromises()
+    ;(document.querySelector('[role="option"]') as HTMLElement).click()
+    await flushPromises()
+    const opsiSebelum = svc.kategori.opsi.mock.calls.length
+    svc.tiket.buat.mockRejectedValueOnce(
+      apiError(422, { message: 'Kategori tidak tersedia.', errors: { id_question_category: ['Kategori tidak tersedia.'] } }),
+    )
+    form.dispatchEvent(new Event('submit'))
+    await flushPromises()
+    expect(svc.kategori.opsi.mock.calls.length).toBe(opsiSebelum + 1)
+    expect(document.body.textContent).toContain('Kategori tidak tersedia.')
+    expect(document.querySelector('[data-testid="halo-tiket-baru-galat"]')).toBeNull()
+    expect((form.querySelector('[role="combobox"]') as HTMLElement).textContent).toContain('Pilih kategori')
+  })
+})
+
 describe('responsif < 1024 px', () => {
   it('rute tiket → hanya panel thread + "Kembali ke daftar"; rute daftar → hanya panel daftar', async () => {
     desktop.nilai = false

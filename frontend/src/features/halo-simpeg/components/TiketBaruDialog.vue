@@ -110,6 +110,11 @@ async function onSubmit(): Promise<void> {
     serverErrors.value = galatPerKolom(e, (k) => PETA[k] ?? k)
     const pesan = isApiError(e) ? e.message : 'Terjadi kesalahan. Silakan coba lagi.'
     formError.value = Object.values(serverErrors.value).includes(pesan) ? '' : pesan
+    // Review B2 P5 (b): kategori dinonaktifkan/dihapus di sela → kosongkan pilihan dan muat ulang opsi (galat tetap tampil).
+    if (serverErrors.value.id_kategori) {
+      form.id_kategori = ''
+      void muatOpsi()
+    }
   } finally {
     submitting.value = false
   }

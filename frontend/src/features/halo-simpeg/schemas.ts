@@ -166,6 +166,17 @@ export class KontrakHaloError extends Error {
 /** Panjang dalam code point (sama dengan `mb_strlen` BE), sesudah trim. */
 export const panjang = (s: string): number => [...s.trim()].length
 
+/**
+ * Panjang isi pesan (`msg`) seperti yang diterima BE: multipart mengirim baris baru sebagai CRLF, dan `mb_strlen` menghitungnya
+ * 2 code point (review B2 P5 (a)). Dipakai validasi klien pesan tiket/balasan (dan penghitung karakter bila ada).
+ */
+export const panjangPesan = (s: string): number => [...s.trim().replace(/\r?\n/g, '\r\n')].length
+
+const pesanWajib = z
+  .string()
+  .refine((s) => s.trim() !== '', TT.pesanWajib)
+  .refine((s) => panjangPesan(s) <= BATAS_TIKET.pesan, TT.pesanMaks)
+
 const wajib = (pesanWajib: string, maks: number, pesanMaks: string) =>
   z
     .string()
@@ -214,13 +225,13 @@ export const cariKandidatSchema = z
 export const tiketBaruFormSchema = z.object({
   id_kategori: z.number().int().nullable().refine((v) => v !== null, TT.kategoriWajib),
   subjek: wajib(TT.subjekWajib, BATAS_TIKET.subjek, TT.subjekMaks),
-  pesan: wajib(TT.pesanWajib, BATAS_TIKET.pesan, TT.pesanMaks),
+  pesan: pesanWajib,
   arsip: z.instanceof(File).nullable(),
 })
 
 /** Form balas (E-04). */
 export const balasFormSchema = z.object({
-  pesan: wajib(TT.pesanWajib, BATAS_TIKET.pesan, TT.pesanMaks),
+  pesan: pesanWajib,
   arsip: z.instanceof(File).nullable(),
   ingatkan_24_jam: z.boolean(),
 })
