@@ -74,7 +74,9 @@ describe('admin Kategori', () => {
       const aksi = await rowMenuActions(w, `halo-kategori-actions-${k.id}`)
       expect(aksi.map((a) => a.label)).toEqual(['Edit', k.status === 1 ? 'Nonaktifkan' : 'Aktifkan', 'Hapus'])
       expect(aksi.at(-1)).toMatchObject({ danger: true, disabled: !k.bisa_hapus })
-      expect(w.find(`[data-testid="halo-kategori-alasan-${k.id}"]`).exists()).toBe(!k.bisa_hapus)
+      // R2: alasan di keterangan item ⋮ Hapus (teks FE [V2]), bukan di kolom Status.
+      expect(aksi.at(-1)?.keterangan).toBe(k.bisa_hapus ? undefined : 'Masih dipakai tiket atau petugas. Nonaktifkan bila tidak dipakai lagi.')
+      expect(w.get(`[data-testid="halo-kategori-row-${k.id}"] td:nth-last-child(2)`).text()).toBe(k.status === 1 ? 'Aktif' : 'Tidak Aktif')
     }
     expect(w.get(`[data-testid="halo-kategori-actions-${kategoriDaftar.data.items[0]!.id}"]`).attributes('aria-label')).toBe(
       `Aksi untuk ${kategoriDaftar.data.items[0]!.nama}`,
@@ -121,8 +123,13 @@ describe('admin Petugas (AC-E08.16)', () => {
 
   it('Hapus disabled bila bisa_hapus false, dengan alasan_tidak_bisa_hapus dari BE', async () => {
     const w = await pasang('petugas')
-    expect((await rowMenuActions(w, `halo-petugas-actions-${terkunci.id}`)).at(-1)).toMatchObject({ label: 'Hapus', disabled: true })
-    expect(w.get(`[data-testid="halo-petugas-alasan-${terkunci.id}"]`).text()).toBe(terkunci.alasan_tidak_bisa_hapus)
+    expect((await rowMenuActions(w, `halo-petugas-actions-${terkunci.id}`)).at(-1)).toMatchObject({
+      label: 'Hapus',
+      disabled: true,
+      keterangan: terkunci.alasan_tidak_bisa_hapus,
+    })
+    // R2: kolom Status hanya badge.
+    expect(w.get(`[data-testid="halo-petugas-row-${terkunci.id}"] td:nth-last-child(2)`).text()).toBe(terkunci.status === 1 ? 'Aktif' : 'Tidak Aktif')
     expect((await rowMenuActions(w, `halo-petugas-actions-${bebas.id}`)).at(-1)).toMatchObject({ label: 'Hapus', disabled: false })
   })
 

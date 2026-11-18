@@ -2,8 +2,9 @@
 /**
  * Admin master Halo Simpeg (B3, role 1): Kategori / Petugas / Kontak (E-02, E-07; pola Master Data / Chatbot Manager, tanpa
  * frame Figma H8-9). Tabel `page-fill` + `table-fill` + ⋮ (AGENTS.md §1): **Edit → Aktifkan/Nonaktifkan** (`PATCH …/status`,
- * 0/1; `hidden` sesuai status) **→ Hapus** (`danger`, `ConfirmDialog`; Kategori/Petugas `disabled` bila `!bisa_hapus` dengan
- * keterangan dari BE — `alasan_tidak_bisa_hapus` untuk petugas, AC-E08.16; tidak dihitung ulang di FE). Status hanya badge.
+ * 0/1; `hidden` sesuai status) **→ Hapus** (`danger`, `ConfirmDialog`; Kategori/Petugas `disabled` bila `!bisa_hapus`, alasannya
+ * sebagai `keterangan` item ⋮ — `alasan_tidak_bisa_hapus` BE untuk petugas, teks FE [V2] untuk kategori; AC-E08.16, review B3
+ * R2). Kolom Status hanya badge (AGENTS.md §1 butir 5).
  * `peringatan` PATCH/PUT petugas (S8) → `UiNotice` nada peringatan; 422 `kategori_dipakai` / `petugas_terakhir` → pesan BE.
  * Daftar berhalaman dan tersaring di server (`status` 0/1, `q`).
  */
@@ -132,7 +133,7 @@ const bisaHapus = (row: Row): boolean => !('bisa_hapus' in row) || row.bisa_hapu
 function keteranganHapus(row: Row): string {
   if (bisaHapus(row)) return ''
   if ('alasan_tidak_bisa_hapus' in row && row.alasan_tidak_bisa_hapus) return row.alasan_tidak_bisa_hapus
-  return 'Tidak dapat dihapus: masih dipakai tiket atau petugas. Nonaktifkan bila tidak dipakai lagi.'
+  return 'Masih dipakai tiket atau petugas. Nonaktifkan bila tidak dipakai lagi.'
 }
 
 function aksiBaris(row: Row): RowAction[] {
@@ -140,7 +141,7 @@ function aksiBaris(row: Row): RowAction[] {
     { key: 'edit', label: 'Edit', icon: Pencil },
     { key: 'activate', label: 'Aktifkan', icon: Power, hidden: row.status !== 0, disabled: busy.value },
     { key: 'deactivate', label: 'Nonaktifkan', icon: PowerOff, hidden: row.status !== 1, disabled: busy.value },
-    { key: 'delete', label: 'Hapus', icon: Trash2, danger: true, disabled: busy.value || !bisaHapus(row) },
+    { key: 'delete', label: 'Hapus', icon: Trash2, danger: true, disabled: busy.value || !bisaHapus(row), keterangan: keteranganHapus(row) || undefined },
   ]
 }
 
@@ -265,9 +266,6 @@ const kolom = computed(() => (props.bagian === 'kategori' ? 5 : props.bagian ===
                 <UiBadge :tone="row.status === 1 ? 'success' : 'neutral'" size="sm" :data-status="row.status">
                   {{ row.status === 1 ? 'Aktif' : 'Tidak Aktif' }}
                 </UiBadge>
-                <p v-if="keteranganHapus(row)" class="mt-1 max-w-[16rem] text-caption text-slate-500" :data-testid="`halo-${bagian}-alasan-${row.id}`">
-                  {{ keteranganHapus(row) }}
-                </p>
               </td>
               <td class="px-4 py-3 text-right">
                 <RowActionsMenu :actions="aksiBaris(row)" :label="`Aksi untuk ${nama(row)}`" :testid="`halo-${bagian}-actions-${row.id}`" @select="onAksi(row, $event)" />
