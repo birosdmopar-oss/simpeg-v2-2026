@@ -32,6 +32,9 @@ const memuatOpsi = ref(false)
 const galatOpsi = ref('')
 const submitting = ref(false)
 const submitted = ref(false)
+/** Review B2 Q3: sesudah tiket berhasil dibuat, fokus dipindah ke judul thread baru — FocusScope Radix tidak boleh mengembalikan
+ * fokus ke tombol "Tambah Pertanyaan" saat dialog ditutup. */
+const berhasil = ref(false)
 const formError = ref('')
 const serverErrors = ref<Record<string, string>>({})
 
@@ -53,6 +56,7 @@ watch(
   () => props.open,
   (open) => {
     if (!open) return
+    berhasil.value = false
     form.id_kategori = ''
     form.subjek = ''
     form.pesan = ''
@@ -104,6 +108,7 @@ async function onSubmit(): Promise<void> {
   submitting.value = true
   try {
     const tiket = await buatTiket(tiketBaruFormSchema.parse(isian.value))
+    berhasil.value = tiket !== null
     if (tiket) emit('dibuat', tiket)
     emit('update:open', false)
   } catch (e) {
@@ -128,6 +133,7 @@ async function onSubmit(): Promise<void> {
       <DialogContent
         class="fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl bg-white p-6 shadow-panel focus:outline-none"
         data-testid="halo-tiket-baru-dialog"
+        @close-auto-focus="(e: Event) => berhasil && e.preventDefault()"
       >
         <div class="mb-4 flex items-start justify-between">
           <div>

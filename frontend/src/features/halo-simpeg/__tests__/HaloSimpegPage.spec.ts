@@ -9,7 +9,7 @@ import { AxiosError, AxiosHeaders } from 'axios'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, ref } from 'vue'
-import { createMemoryHistory, createRouter } from 'vue-router'
+import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
 
 const desktop = vi.hoisted(() => ({ nilai: true }))
 vi.mock('@/shared/composables/useIsDesktop', async () => {
@@ -680,5 +680,51 @@ describe('thread sisi petugas (B3)', () => {
     await w.get('[data-testid="halo-balas-form"]').trigger('submit')
     await flushPromises()
     expect(svc.tiket.balas).toHaveBeenCalledWith(DETAIL.id, expect.objectContaining({ ingatkan_24_jam: false }))
+  })
+})
+
+describe('Q3: fokus sesudah tiket baru dibuat (alur nyata lewat router)', () => {
+  it('Kirim → router.push ke tiket baru → timer FocusScope dijalankan → fokus di judul tiket baru', async () => {
+    useAuthStore().setSession({ username: 'uji', user_level: Role.PEGAWAI, must_change_password: false } as User)
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/', name: 'home', component: Stub },
+        { path: '/halo-simpeg', name: 'halo-simpeg', component: HaloSimpegPage, props: { idTiket: null, idTidakSah: false } },
+        {
+          path: '/halo-simpeg/tiket/:id',
+          name: 'halo-tiket',
+          component: HaloSimpegPage,
+          props: (r) => ({ idTiket: Number(r.params.id), idTidakSah: false }),
+        },
+      ],
+    })
+    await router.push('/halo-simpeg')
+    svc.tiket.buat.mockResolvedValueOnce({ ...DETAIL, id: 9, subjek: 'Tiket 9', belum_dibaca: false })
+    svc.tiket.detail.mockResolvedValue({ ...DETAIL, id: 9, subjek: 'Tiket 9', belum_dibaca: false })
+    const w = mount({ render: () => h(RouterView) }, { global: { plugins: [router] }, attachTo: document.body })
+    await flushPromises()
+    await w.get('[data-testid="halo-tiket-baru"]').trigger('click')
+    await flushPromises()
+    const form = document.querySelector('[data-testid="halo-tiket-baru-form"]') as HTMLFormElement
+    const subjek = form.querySelector('input[name="subjek"]') as HTMLInputElement
+    subjek.value = 'Baru'
+    subjek.dispatchEvent(new Event('input'))
+    const pesan = form.querySelector('textarea') as HTMLTextAreaElement
+    pesan.value = 'Isi'
+    pesan.dispatchEvent(new Event('input'))
+    ;(form.querySelector('[role="combobox"]') as HTMLElement).click()
+    await flushPromises()
+    ;(document.querySelector('[role="option"]') as HTMLElement).click()
+    await flushPromises()
+    form.dispatchEvent(new Event('submit'))
+    await flushPromises()
+    for (let i = 0; i < 5; i += 1) {
+      await new Promise((r) => setTimeout(r, 0))
+      await flushPromises()
+    }
+    expect(router.currentRoute.value.fullPath).toBe('/halo-simpeg/tiket/9')
+    expect(document.querySelector('[data-testid="halo-thread-judul"]')?.textContent?.trim()).toBe('Tiket 9')
+    expect(document.activeElement).toBe(document.querySelector('[data-testid="halo-thread-judul"]'))
   })
 })
