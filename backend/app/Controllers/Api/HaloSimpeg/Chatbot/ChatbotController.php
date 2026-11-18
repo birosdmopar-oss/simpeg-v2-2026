@@ -36,17 +36,11 @@ abstract class ChatbotController extends ApiController
 
     protected function berkasXlsx(string $nama, string $isi): ResponseInterface
     {
-        return $this->response
+        return $this->tanpaCache($this->response
             ->setStatusCode(200)
             ->setContentType('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', '')
             ->setHeader('Content-Disposition', 'attachment; filename="' . $nama . '"')
             ->setHeader('X-Content-Type-Options', 'nosniff')
-            ->setHeader('Cache-Control', 'private, no-store')
-            ->setBody($isi);
-    }
-
-    protected function tanpaCache(ResponseInterface $r): ResponseInterface
-    {
-        return $r->setHeader('Cache-Control', 'private, no-store');
+            ->setBody($isi));
     }
 }

@@ -79,6 +79,14 @@ final class WidgetEndpointTest extends DatabaseTestCase
         $this->withHeaders([])->get(self::URL . 'widget/kategori')->assertStatus(401);
     }
 
+    /** CR-147: endpoint ber-`tanpaCache` mengirim `Cache-Control` persis `private, no-store` (tanpa nilai bawaan `noCache()` CI4). */
+    public function testCacheControlPersis(): void
+    {
+        $r = $this->asRole(Role::PEGAWAI)->get(self::URL . 'widget/kategori');
+        $r->assertStatus(200);
+        $this->assertSame('private, no-store', $r->response()->getHeaderLine('Cache-Control'));
+    }
+
     public function testBubbleTopikPertanyaanPopuler(): void
     {
         $this->assertSame([['id' => $this->katCuti, 'judul' => 'Cuti'], ['id' => $this->katCuti + 1, 'judul' => 'Akun']], $this->data($this->asRole(Role::PEGAWAI)->get(self::URL . 'widget/kategori')));

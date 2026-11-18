@@ -88,6 +88,15 @@ abstract class ApiController extends BaseController
         }
     }
 
+    /**
+     * `Cache-Control` akhir persis `private, no-store` (CR-147). Nilai bawaan Response CI4 (`noCache()`) berupa daftar, sehingga
+     * `setHeader` saja menambah nilai, bukan mengganti; header dibuang dulu lalu dipasang ulang.
+     */
+    protected function tanpaCache(ResponseInterface $r): ResponseInterface
+    {
+        return $r->removeHeader('Cache-Control')->setHeader('Cache-Control', 'private, no-store');
+    }
+
     protected function respondSuccess(mixed $data = null, int $status = 200): ResponseInterface
     {
         return $this->response

@@ -67,8 +67,6 @@ final class TiketController extends HaloSimpegController
     public function ekspor(): ResponseInterface
     {
         $hasil = (new EksporTiketService())->ekspor($this->auth(), $this->query());
-        // Nilai `Cache-Control` persis `private, no-store` (README ekspor): buang nilai bawaan Response CI4 lebih dulu.
-        $this->response->removeHeader('Cache-Control');
 
         if ($hasil['kosong']) {
             return $this->tanpaCache($this->response->setStatusCode(200)->setJSON([
@@ -78,13 +76,12 @@ final class TiketController extends HaloSimpegController
             ])->setHeader('X-Content-Type-Options', 'nosniff'));
         }
 
-        return $this->response
+        return $this->tanpaCache($this->response
             ->setStatusCode(200)
             ->setContentType($hasil['mime'], '')
             ->setHeader('Content-Disposition', 'attachment; filename="' . $hasil['nama'] . '"')
             ->setHeader('X-Content-Type-Options', 'nosniff')
-            ->setHeader('Cache-Control', 'private, no-store')
-            ->setBody($hasil['isi']);
+            ->setBody($hasil['isi']));
     }
 
     /** Unduh lampiran lama/baru sesudah cek akses (AC-E04.7, F8-17): header aman, nama `lampiran-{id}-{idPesan}.{ext}`. */
@@ -92,14 +89,13 @@ final class TiketController extends HaloSimpegController
     {
         $b = $this->service()->lampiran($this->auth(), $this->idValid($id), $this->idValid($idPesan));
 
-        return $this->response
+        return $this->tanpaCache($this->response
             ->setStatusCode(200)
             ->setContentType($b['mime'], '')
             ->setHeader('Content-Disposition', ($b['inline'] ? 'inline' : 'attachment') . '; filename="' . $b['nama'] . '"')
             ->setHeader('X-Content-Type-Options', 'nosniff')
             ->setHeader('Content-Security-Policy', Arsip::CSP_BERKAS)
-            ->setHeader('Cache-Control', 'private, no-store')
-            ->setBody($b['isi']);
+            ->setBody($b['isi']));
     }
 
     private function auth(): AuthContext

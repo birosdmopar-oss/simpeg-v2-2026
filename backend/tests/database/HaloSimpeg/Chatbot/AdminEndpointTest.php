@@ -115,6 +115,7 @@ final class AdminEndpointTest extends DatabaseTestCase
         $r = $this->admin()->get(self::URL . 'tag/ekspor?format=xlsx');
         $r->assertStatus(200);
         $this->assertMatchesRegularExpression('/attachment; filename="Export_Tag_QnA_\d{8}_\d{6}\.xlsx"/', $r->response()->getHeaderLine('Content-Disposition'));
+        $this->assertSame('private, no-store', $r->response()->getHeaderLine('Cache-Control'), 'CR-147');
         $baris = $this->bacaXlsx((string) $r->response()->getBody());
         $this->assertSame([['No', 'Tag', 'Status'], ['1', '=SUM(A1)', 'Tidak Aktif'], ['2', 'cuti', 'Aktif']], $baris);
         $this->assertStringNotContainsString('<f>', $this->sheetXml((string) $r->response()->getBody()), 'bukan rumus');
@@ -127,6 +128,7 @@ final class AdminEndpointTest extends DatabaseTestCase
         $r = $this->admin()->get(self::URL . 'qna/template');
         $r->assertStatus(200);
         $this->assertSame('attachment; filename="Template_Import_QnA.xlsx"', $r->response()->getHeaderLine('Content-Disposition'));
+        $this->assertSame('private, no-store', $r->response()->getHeaderLine('Cache-Control'), 'CR-147');
         $baris = $this->bacaXlsx((string) $r->response()->getBody());
         $this->assertCount(2, $baris, 'judul + tepat satu baris contoh');
         $this->assertSame(['Pertanyaan', 'Jawaban', 'Kategori', 'Tag (Pisahkan dengan koma)'], $baris[0], 'literal F8-47');

@@ -94,8 +94,7 @@ final class TiketLampiranTest extends DatabaseTestCase
             $this->assertStringStartsWith('application/pdf', $r->getHeaderLine('Content-Type'));
             $this->assertSame("inline; filename=\"lampiran-{$d['id']}-{$pesan['id_inbox_msg']}.pdf\"", $r->getHeaderLine('Content-Disposition'));
             $this->assertSame(['nosniff', Arsip::CSP_BERKAS], [$r->getHeaderLine('X-Content-Type-Options'), $r->getHeaderLine('Content-Security-Policy')]);
-            $this->assertStringContainsString('private', $r->getHeaderLine('Cache-Control'));
-            $this->assertStringContainsString('no-store', $r->getHeaderLine('Cache-Control'));
+            $this->assertSame('private, no-store', $r->getHeaderLine('Cache-Control'), 'CR-147: tepat satu nilai, tanpa nilai bawaan CI4');
         }
 
         $this->sebagai($this->lain)->get(self::URL . "tiket/{$d['id']}/pesan/{$pesan['id_inbox_msg']}/lampiran")->assertStatus(404);
