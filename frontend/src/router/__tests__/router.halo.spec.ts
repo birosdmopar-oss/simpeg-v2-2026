@@ -37,7 +37,8 @@ describe('route Halo Simpeg', () => {
       expect(router.getRoutes().find((r) => r.name === `halo-admin-${b}`)?.meta.roles).toEqual(HALO_ADMIN_ROLES)
     }
     expect(router.resolve('/halo-simpeg-admin').matched.at(-1)?.redirect).toEqual({ name: 'halo-admin-kategori' })
-    expect(haloRoutes).toHaveLength(6)
+    expect(haloRoutes).toHaveLength(7)
+    expect(router.resolve('/halo-simpeg-admin/xyz').matched.at(-1)?.redirect).toEqual({ name: 'halo-admin-kategori' })
   })
 
   it('admin di prefiks sendiri: /halo-simpeg-admin/* tidak cocok prefiks /halo-simpeg/ (aria-current item halo, CR-135)', () => {

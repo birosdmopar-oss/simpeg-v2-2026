@@ -1,12 +1,14 @@
 <script setup lang="ts">
-// Admin master Halo Simpeg (role 1): Kategori | Petugas | Kontak lewat prop `bagian`. KERANGKA B1: tabel ⋮ (AGENTS.md §1),
-// form, dan status (PATCH …/status) dibangun di B3 (pola Master Data / PIC layanan, H8-9).
+// Admin master Halo Simpeg (role 1): Kategori | Petugas | Kontak lewat prop `bagian` (pola Chatbot Manager), di
+// `/halo-simpeg-admin/:bagian` (keputusan CR-138: tidak ada dua item sidebar aktif bersamaan sesudah CR-135). `:key` = bagian
+// agar data bagian lain tidak terbawa. Tanpa frame Figma (H8-9): pola Master Data.
 import { computed } from 'vue'
 
 import RedesignShell from '@/shared/layouts/RedesignShell.vue'
-import { type Crumb, UiCard } from '@/shared/ui'
+import type { Crumb } from '@/shared/ui'
 
 import { BAGIAN_ADMIN_HALO, type BagianAdminHalo } from '../routes.halo'
+import MasterHaloView from './admin/MasterHaloView.vue'
 
 const props = defineProps<{ bagian: BagianAdminHalo }>()
 
@@ -15,9 +17,6 @@ const crumbs = computed<Crumb[]>(() => [{ label: 'Home', to: { name: 'home' } },
 
 <template>
   <RedesignShell :breadcrumbs="crumbs">
-    <UiCard>
-      <h1 class="text-h5 font-semibold text-slate-900" data-testid="halo-admin-judul">{{ BAGIAN_ADMIN_HALO[bagian] }} Halo Simpeg</h1>
-      <p class="mt-2 text-body2 text-slate-500" data-testid="halo-kerangka">Layar master sedang disiapkan.</p>
-    </UiCard>
+    <MasterHaloView :key="bagian" :bagian="bagian" />
   </RedesignShell>
 </template>

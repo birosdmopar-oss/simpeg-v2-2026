@@ -67,4 +67,6 @@ export const haloRoutes: RouteRecordRaw[] = [
       meta: { roles: HALO_ADMIN_ROLES, title: `Halo Simpeg · ${BAGIAN_ADMIN_HALO[bagian]}` },
     }),
   ),
+  // `:bagian` tidak dikenal → bagian pertama (keputusan reviewer B3).
+  { path: '/halo-simpeg-admin/:lain(.*)*', redirect: { name: 'halo-admin-kategori' } },
 ]
