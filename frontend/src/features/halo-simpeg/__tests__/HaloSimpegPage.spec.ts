@@ -42,7 +42,7 @@ import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { Role, type RoleCode, type User } from '@/features/auth/types'
 import { rowMenuActions, selectRowAction } from '@/shared/components/__tests__/rowActionsMenu.helpers'
 
-import { resetHaloSimpeg } from '../stores/haloSimpeg'
+import { muatRingkasan, resetHaloSimpeg, setRingkasanHalo } from '../stores/haloSimpeg'
 import { daftarAntrean, detailTiket } from '../stores/tiket'
 import type { Halaman, TiketBaris, TiketDetail } from '../types'
 import HaloSimpegPage from '../views/HaloSimpegPage.vue'
@@ -828,5 +828,46 @@ describe('R1 (BLOK): Lihat semua Perlu ditindak', () => {
     await w.get('[data-testid="halo-hapus-filter-perlu-tindak"]').trigger('click')
     await flushPromises()
     expect(svc.tiket.list.mock.calls.at(-1)![0]).toMatchObject({ peran: 'petugas', baca: 'belum', perlu_tindak: false })
+  })
+})
+
+describe('R3: panel Perlu ditindak dimuat sekali per aksi', () => {
+  const R = (perlu: number) => ({ belum_dibaca_saya: 0, belum_dibaca_petugas: 0, perlu_tindak: perlu, badge: perlu, total: 0 })
+  const panelDimuat = () => svc.tiket.list.mock.calls.filter((c) => (c[0] as { perlu_tindak?: boolean }).perlu_tindak === true).length
+
+  async function siapkan() {
+    svc.petugas.saya.mockResolvedValue({ petugas: true, aktif: true, kategori: [{ id: 1, nama: 'Cuti', status: 1 }], bisa_ekspor: true })
+    const t = baris({ id: 5, status: 'open', bisa_tutup: true, belum_dibaca: false, pesan_terakhir: null })
+    svc.tiket.list.mockResolvedValue({ ...DAFTAR, items: [t], total: 1 })
+    svc.tiket.tutup.mockResolvedValue({ ...t, status: 'closed', bisa_tutup: false })
+    const ctx = await pasang({ query: '?tab=antrean' })
+    return ctx
+  }
+  async function tutupLewatMenu(w: Awaited<ReturnType<typeof pasang>>['w']) {
+    await selectRowAction(w, 'halo-tiket-actions-5', 'tutup')
+    ;([...document.querySelectorAll('[role="alertdialog"] button')].find((b) => b.textContent?.trim() === 'Tutup') as HTMLButtonElement).click()
+    await flushPromises()
+    await flushPromises()
+  }
+
+  it('angka perlu_tindak berubah (1 → 0) → tepat 1 GET panel (oleh watcher)', async () => {
+    setRingkasanHalo(R(1))
+    svc.tiket.ringkasan.mockResolvedValue(R(0))
+    const { w } = await siapkan()
+    const awal = panelDimuat()
+    await tutupLewatMenu(w)
+    expect(panelDimuat()).toBe(awal + 1)
+  })
+
+  it('angka perlu_tindak tetap → tepat 1 GET panel (oleh store); muat ringkasan tanpa perubahan → 0 GET panel', async () => {
+    setRingkasanHalo(R(2))
+    svc.tiket.ringkasan.mockResolvedValue(R(2))
+    const { w } = await siapkan()
+    const awal = panelDimuat()
+    await tutupLewatMenu(w)
+    expect(panelDimuat()).toBe(awal + 1)
+    await muatRingkasan()
+    await flushPromises()
+    expect(panelDimuat()).toBe(awal + 1)
   })
 })

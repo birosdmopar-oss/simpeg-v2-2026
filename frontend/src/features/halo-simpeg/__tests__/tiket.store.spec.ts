@@ -230,8 +230,9 @@ describe('pabrik daftar per peran (B3, keputusan reviewer)', () => {
     await tutupTiket(50)
     expect(daftarSaya.state.daftar?.items[0]?.status).toBe('closed')
     expect(daftarAntrean.state.daftar?.items[0]?.status).toBe('closed')
-    expect(svc.ringkasan).toHaveBeenCalledTimes(1)
-    expect(svc.list.mock.calls.length).toBe(panggilanList + 1)
+    await vi.waitFor(() => expect(svc.ringkasan).toHaveBeenCalledTimes(1))
+    // R3: angka perlu_tindak tidak berubah (ringkasan sama) → panel disegarkan tepat sekali oleh store.
+    await vi.waitFor(() => expect(svc.list.mock.calls.length).toBe(panggilanList + 1))
   })
 
   it('hapus dari antrean membuang baris di semua daftar; resetHaloSimpeg mengosongkan ketiga daftar + detail', async () => {

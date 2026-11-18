@@ -19,7 +19,7 @@ import { isApiError } from '@/lib/axios'
 import { BACA_BAWAAN_ANTREAN, BACA_BAWAAN_SAYA, PER_PAGE_MASTER } from '../constants'
 import { tiketHaloService } from '../services/tiket.service'
 import type { BalasForm, FilterTiket, Halaman, PeranTiket, Pesan, TiketBaris, TiketBaruForm, TiketDetail } from '../types'
-import { bacaTiket, daftarkanResetHalo, muatRingkasan, type StatusMuat } from './haloSimpeg'
+import { bacaTiket, daftarkanResetHalo, haloState, muatRingkasan, type StatusMuat } from './haloSimpeg'
 
 export interface GalatMuat {
   status: number | null
@@ -150,6 +150,18 @@ function segarkanPanel(): void {
 }
 
 /**
+ * Review B3 R3 — satu pemicu muat panel per aksi: panel memuat ulang sendiri saat `Ringkasan.perlu_tindak` berubah (watcher
+ * `PanelPerluTindak`). Sesudah aksi, ringkasan dimuat (paksa) dan ditunggu; panel disegarkan langsung hanya bila angkanya
+ * tidak berubah (keanggotaan tetap bisa berubah) atau ringkasan belum pernah ada.
+ */
+async function segarkanSesudahAksi(opsi: { ringkasan: boolean; panel: boolean }): Promise<void> {
+  const sebelum = haloState.ringkasan?.perlu_tindak
+  if (opsi.ringkasan) await muatRingkasan(true)
+  const sesudah = haloState.ringkasan?.perlu_tindak
+  if (opsi.panel && (sebelum === undefined || sesudah === sebelum)) segarkanPanel()
+}
+
+/**
  * Buka tiket di panel kanan: muat detail, lalu `POST baca` sekali bila `belum_dibaca` (respons → ringkasan badge).
  * Membuka ulang id yang sama memuat ulang detail tetapi baca hanya dikirim bila masih belum dibaca.
  */
@@ -167,12 +179,14 @@ export async function bukaTiket(id: number): Promise<void> {
     detailState.statusDetail = 'siap'
     if (detail.belum_dibaca) {
       try {
+        const sebelumBaca = haloState.ringkasan?.perlu_tindak
         const ringkasan = await bacaTiket(id)
         if (ringkasan === null || gen !== generasiDetail) return
         // Review B2 P1 (a): baris ditandai dibaca walau panel sudah pindah/ditutup; detail hanya bila id masih sama.
         for (const d of semuaDaftar) d.tandaiDibaca(id)
         if (detailState.detail?.id === id) detailState.detail = { ...detailState.detail, belum_dibaca: false }
-        if (detail.sebagai_petugas) segarkanPanel()
+        // Ringkasan sudah dipasang dari respons baca; panel hanya bila angkanya tidak berubah (watcher menangani sisanya).
+        if (detail.sebagai_petugas && haloState.ringkasan?.perlu_tindak === sebelumBaca) segarkanPanel()
       } catch {
         // Penanda baca gagal: thread tetap tampil; badge disegarkan polling berikutnya.
       }
@@ -200,8 +214,7 @@ export async function tutupTiket(id: number): Promise<void> {
   const baris = await tiketHaloService.tutup(id)
   if (gen !== generasiDetail) return
   terapkanKeSemua(baris)
-  if (tadinyaBelum || petugas) void muatRingkasan(true)
-  if (petugas) segarkanPanel()
+  void segarkanSesudahAksi({ ringkasan: tadinyaBelum || petugas, panel: petugas })
   if (detailState.idDibuka === id) void bukaTiket(id)
 }
 
@@ -212,10 +225,7 @@ export async function hapusTiket(id: number): Promise<void> {
   await tiketHaloService.hapus(id)
   if (gen !== generasiDetail) return
   for (const d of semuaDaftar) d.buangBaris(id)
-  if (petugas) {
-    void muatRingkasan(true)
-    segarkanPanel()
-  }
+  if (petugas) void segarkanSesudahAksi({ ringkasan: true, panel: true })
   if (detailState.idDibuka === id) tutupPanel()
 }
 
@@ -241,9 +251,8 @@ export async function balasTiket(id: number, form: BalasForm): Promise<Pesan | n
   if (gen !== generasiDetail) return null
   if (detailState.detail?.id === id) detailState.detail = { ...detailState.detail, pesan: [...detailState.detail.pesan, hasil.pesan] }
   terapkanKeSemua(hasil.tiket)
-  if (tadinyaBelum || petugas) void muatRingkasan(true)
+  void segarkanSesudahAksi({ ringkasan: tadinyaBelum || petugas, panel: petugas })
   if (petugas) {
-    segarkanPanel()
     // Pengingat 24 jam diatur BE dari balasan petugas → detail dimuat ulang agar `pengingat` terbaru tampil.
     if (detailState.idDibuka === id) void bukaTiket(id)
   }
