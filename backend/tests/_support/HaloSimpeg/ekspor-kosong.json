@@ -1,0 +1,8 @@
+{
+    "status": "success",
+    "data": {
+        "kosong": true,
+        "jumlah": 0
+    },
+    "message": "Tidak ada data Halo Simpeg pada periode ini."
+}

@@ -1,0 +1,12 @@
+{
+    "status": "error",
+    "message": "Tanggal awal dan akhir wajib diisi.",
+    "errors": {
+        "ds": [
+            "Tanggal awal dan akhir wajib diisi."
+        ],
+        "de": [
+            "Tanggal awal dan akhir wajib diisi."
+        ]
+    }
+}

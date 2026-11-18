@@ -17,6 +17,9 @@ legacy** (PRD Fase 6 F6-11..F6-13, Q6-11/Q6-12, CR-099). Konfigurasi & operasion
   `push-pesan` dengan data `akun` mencari token web per akun aktif (`PenerimaTokenFcm::webAkun`, tanpa syarat role/NIP, jadi
   akun role 1 tanpa NIP ikut) dan token Android lewat NIP akun itu (`nipAkun`); akun nonaktif/terhapus dilewati; token yang sama
   dikirim sekali per platform. Data `nip` lama dan job yang sudah antre diproses seperti sebelumnya.
+  Pemakai: `HaloSimpeg\TicketNotifService` (MAKE-072). Status: H8-8 (kunci `data` tambahan yang dibaca app Android, PN8-1)
+  belum ada, jadi payload Halo Simpeg tetap terbatas F8-16 (`judul`, `isi` terpotong, `data = {modul, id_inbox, url, link}`).
+  Uji push real ke perangkat dicatat ke DEPLOY-001.1 (`README-deploy.md` §1n).
 - Token web: `TokenFcmService` (`POST|DELETE api/v1/integrasi/fcm-token`, semua akun login; unik per pemilik + hash token,
   DBV-Q8). Token Android (`platform` 2) tidak punya endpoint di v2 — penulisnya pertanyaan cutover DEPLOY-001.1.
 - Uji koneksi (CR-101): `php spark integrasi:uji-koneksi fcm` → `FcmV1Adapter::ujiKoneksi()` — token akses OAuth baru +

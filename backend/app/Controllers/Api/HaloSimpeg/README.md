@@ -491,3 +491,108 @@ Acuan: PRD Fase 8 v1.4 §6.4, §7.6, F8-13..F8-16, H8-14 (a). Tidak ada endpoint
 | U7 | Catatan `integrasi_log` dibuat adapter FCM (`KlienHttp`, layanan `fcm`), bukan `TicketNotifService` | [V2] |
 | U8 | Metode `PenerimaTokenFcm::webAkun` / `androidAkun` (PRD §6.4) + helper `nipAkun` | [V2] |
 | U9 | Kanal bawaan `antreAkun` = `android` (sama dengan `antre`); Halo Simpeg selalu mengirim `semua` | [V2] |
+
+---
+
+# Bagian ekspor rekap petugas (MAKE-074)
+
+Acuan: PRD Fase 8 v1.4 §7.9 (E-09), F8-20, §6.1b, §7.3a, AC-E09.1..AC-E09.8 [K `LS:1600-1830`, `SC:751-786`]. Sumber kontrak tombol
+ekspor FE (B4, Worker Muse). Service: `App\Libraries\HaloSimpeg\EksporTiketService`. Bagian ini **beku** di MAKE-074 (V1–V13 diputus
+18-11-2026); perubahan sesudah beku = CR yang disepakati BE dan FE.
+
+`GET api/v1/halo-simpeg/tiket/ekspor?ds=YYYY-MM-DD&de=YYYY-MM-DD&format=xlsx` — role 1–7 (filter route; role 8 → 403 filter).
+
+| Respons | Isi |
+|---|---|
+| 200 xlsx | `Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`, `Content-Disposition: attachment; filename="Rekap_Halo_Simpeg_{ds}_{de}.xlsx"`, `X-Content-Type-Options: nosniff`, `Cache-Control: private, no-store`; diaudit |
+| 200 JSON kosong | `{status: "success", data: {kosong: true, jumlah: 0}, message: "Tidak ada data Halo Simpeg pada periode ini."}`, `Content-Type: application/json`, **tanpa** `Content-Disposition`, `X-Content-Type-Options: nosniff`, `Cache-Control: private, no-store`; **tidak** diaudit |
+| 403 `bukan_petugas` | "Fitur ini hanya untuk petugas Halo Simpeg yang aktif." — bukan petugas atau petugas nonaktif (`bisa_ekspor = false`) |
+| 422 per kolom | `errors.ds` / `errors.de` / `errors.format` (tabel di bawah); parameter berbentuk array → 422 `ListQuery` |
+| 422 `ekspor_terlalu_besar` | "Data pada periode ini terlalu besar untuk diekspor. Persempit periode." — satu teks untuk batas baris dan karakter; tanpa berkas |
+
+Urutan cek: 403 `bukan_petugas` → validasi periode/format (422) → hitung (kosong 200 / terlalu besar 422) → berkas + audit.
+
+| Kolom | Aturan | Teks |
+|---|---|---|
+| `ds`, `de` | wajib, tepat `YYYY-MM-DD` dan ada di kalender (tahun 1900–2100); `ds` ≤ `de`; tanpa batas jumlah hari | kosong: "Tanggal awal dan akhir wajib diisi." (di kolom yang kosong); format: "Tanggal harus berformat YYYY-MM-DD dan ada di kalender."; `ds` > `de`: "Tanggal awal tidak boleh melebihi tanggal akhir." (di `errors.ds`) |
+| `format` | kosong = `xlsx`; selain `xlsx` ditolak | "Format ekspor tidak didukung." |
+
+**Cakupan dan isi berkas**
+- Izin = `bisa_ekspor` dari `PetugasService::saya` (petugas aktif, berapa pun kategorinya; [V2] terhadap `VI:13`).
+- Tiket = tiket di kategori yang dipegang petugas (`AksesTiket::kategoriAktif`), tanggal tiket (`disiplin_ticket.created_at`, UTC) di
+  `[ds 00:00 WIB, de+1 00:00 WIB)` dibandingkan langsung dengan kolom (tanpa `DATE()`). Tiket berkategori NULL dan kategori lain tidak
+  ikut (H8-16 (a1), AC-E09.3). Status tiket apa pun. Kategori nonaktif yang masih dipegang petugas tetap ikut.
+- Baris = pesan tiket itu dalam cakupan V1 di bawah, urut `id_inbox` lalu `id_inbox_msg` [K urutan]. Tiket yang cocok periode tetap
+  ikut walau pengekspor belum menulis (baris pesan pemilik saja; perbaikan F8-20). Tiket tanpa pesan sama sekali (anomali impor,
+  hitungan Q-H16 di runbook `README-deploy.md` §1n) tidak menghasilkan baris (V6).
+- **Cakupan pesan (V1, keputusan Horii 18-11-2026, opsi (a) ikut legacy penuh [K `LS:1626`]):** hanya pesan **pemilik tiket**
+  (`msg_sender = sender`) dan pesan **petugas yang mengekspor** (`msg_sender` = akun pengekspor). Balasan petugas lain di kategori
+  yang sama **tidak** ikut. Pengekspor role 1 mengikuti aturan yang sama. Batas baris dan karakter (COUNT/SUM) dihitung atas cakupan
+  yang sama. Kode: `EksporTiketService::cakupan()`.
+- **Label pengirim (V2, keputusan Horii 18-11-2026, opsi (a) [K `LS:1797-1799`]):** `NAMA PENANYA` / `NIP PENANYA` = nama/NIP
+  pengirim pesan baris itu. Tanpa penyamaran D7 (a), karena hanya baris pemilik dan pengekspor sendiri yang tampil. Kode:
+  `EksporTiketService::barisTerpilih()`.
+- Berkas (`EksporTabel::xlsx`, semua sel teks `inlineStr`, anti formula injection), sheet "Rekap Halo SIMPEG":
+  - baris 1 "REKAP PIC HALO SIMPEG {nama akun}", baris 2 "Periode: {ds} - {de}" (format "1 November 2026"), baris 3 kosong;
+  - baris 4 header: `NO`, `ID PERTANYAAN`, `KATEGORI`, `NAMA PENANYA`, `NIP PENANYA`, `PERTANYAAN / JAWABAN`, `TIMESTAMP` [K];
+  - `NAMA PENANYA` / `NIP PENANYA` = nama/NIP pengirim baris itu (V2); pengirim tanpa NIP (mis. akun role 1) → NIP kosong; NIP tetap teks
+    (AC-E09.4);
+  - `TIMESTAMP` = waktu pesan dalam WIB, `d/m/Y H:i` [K];
+  - isi sel > 32.767 unit UTF-16 (batas sel Excel; emoji = 2 unit) dipotong dengan penanda "… [dipotong]" [V2] (B-27, pengecualian
+    AC-E09.8). Penanda **termasuk** dalam 32.767, pasangan surrogate tidak terbelah (V10). Baris tidak pernah dibuang.
+
+**Pengaman (§7.3a, R8-22)** — dihitung satu kueri agregat sebelum berkas dibangun. Sesudah data diambil, jumlah baris **dan**
+karakter dicek ulang (pesan yang masuk di antara dua kueri, V12); lewat → 422 yang sama, tanpa berkas:
+
+| Batas | Nilai (`Config\HaloSimpeg`, dapat ditimpa `.env`) |
+|---|---|
+| `eksporMaksBaris` | 10.000 baris pesan |
+| `eksporMaksKarakter` | 5.000.000 karakter `SUM(CHAR_LENGTH(msg))` |
+
+Ambang karakter ditetapkan dari pengukuran memori nyata: `EksporTiketVolumeTest` (opt-in `RUN_VOLUME_TEST=1`, tidak jalan di CI,
+V13), request HTTP penuh (kueri, susun baris, `EksporTabel::xlsx`, audit), `memory_reset_peak_usage()` tepat sebelum request, 10.000
+baris dengan total tepat 5.000.000 karakter; PHP 8.4.2, MySQL 8, mesin dev, `memory_limit` 512M saat ukur:
+
+| Isi pesan | Byte data | Puncak memori tambahan per request | Waktu |
+|---|---|---|---|
+| Latin | 5,2 MB | 50,7 MB | 0,4 s |
+| CJK 3 byte | 15 MB | 82,4 MB | 0,7 s |
+| Emoji 4 byte (terburuk utf8mb4) | 20 MB | 105,3 MB | 0,7 s |
+
+Batas uji 128 MB = ½ `memory_limit` 256M (`README-deploy.md` §1). Ukuran awal 10.000.000 karakter: Latin 69 MB, CJK 140 MB (lewat
+batas), jadi ambang diturunkan. **Bila `memory_limit` produksi < 256M, ambang wajib diturunkan** (lalu diukur ulang). CI menguji batas
+10.000/10.001 baris nyata dan ambang karakter lewat override config.
+
+**Audit unduhan (AC-E09.7)** — hanya bila berkas terkirim: `audit_logs.entity = dokumen_unduhan` (pola F7-27), `entity_id =
+rekap_halo_simpeg`, `event = create`, `after_json = {jenis, format, parameter: {ds, de}, jumlah_baris}`, aktor = id dan NIP akun
+pengekspor. Tanpa isi pesan, nama/NIP penanya, atau isi berkas. Ekspor kosong, 403, dan 422 tidak diaudit. Ekspor hanya membaca
+(tidak menulis tabel helpdesk maupun `inbox`, BP8-1).
+
+## Fixture ekspor (`backend/tests/_support/HaloSimpeg/`)
+
+| Fixture | Respons |
+|---|---|
+| `ekspor-kosong` | 200 JSON periode kosong |
+| `galat-422-ekspor` | 422 `ds`/`de` kosong |
+| `galat-422-ekspor-terlalu-besar` | 422 `ekspor_terlalu_besar` |
+| `galat-403-bukan-petugas` | 403 `bukan_petugas` |
+
+Bentuk fixture = respons nyata, diuji `EksporTiketTest` (`cocokFixtureHs`).
+
+## Selisih ekspor terhadap PRD v1.4 (diputus 18-11-2026: V1/V2 Horii, V3–V13 reviewer)
+
+| No | Selisih | Label |
+|---|---|---|
+| V1 | Cakupan pesan = pesan pemilik + pesan pengekspor saja (legacy penuh); batas COUNT/SUM atas cakupan yang sama; tiket tanpa balasan pengekspor tetap ikut (perbaikan F8-20) | [K], keputusan Horii 18-11-2026 |
+| V2 | Nama/NIP = pengirim baris, tanpa penyamaran D7 (a); NIP kosong bila pengirim tanpa NIP | [K], keputusan Horii 18-11-2026 |
+| V3 | `format` kosong = xlsx; nilai lain → 422 `errors.format` "Format ekspor tidak didukung." | [V2] |
+| V4 | Tanggal tak valid → teks `DaftarLogIntegrasi`; kosong dan `ds` > `de` → teks §7.3a | [V2] |
+| V5 | 403 `bukan_petugas` dicek sebelum validasi periode | [V2] |
+| V6 | Tiket tanpa pesan sama sekali tidak menghasilkan baris (dihitung Q-H16 di runbook) | [V2] |
+| V7 | Fixture tambahan `galat-422-ekspor-terlalu-besar` | [V2] |
+| V8 | Judul, periode, sheet, `TIMESTAMP` WIB `d/m/Y H:i` [K]; tanpa gaya/lebar kolom legacy (`EksporTabel` tidak diubah) | [K]/[V2] |
+| V9 | Audit `dokumen_unduhan` / `rekap_halo_simpeg`, `after_json` tanpa isi/penanya | [V2] |
+| V10 | Potong sel dalam unit UTF-16, penanda termasuk dalam 32.767, surrogate tidak terbelah | [V2] |
+| V11 | Kategori nonaktif yang masih dipegang ikut; petugas aktif tanpa `officer_category` → 200 kosong | [K]/[V2] |
+| V12 | Baris dan karakter dicek ulang sesudah data diambil | [V2] |
+| V13 | Uji volume opt-in (`RUN_VOLUME_TEST=1`) | [V2] |

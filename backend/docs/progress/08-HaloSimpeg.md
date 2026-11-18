@@ -145,8 +145,9 @@ CR-134).
 
 ## Helpdesk E-01..E-09 — status (CR-138, 17-11-2026)
 
-**Terakhir diperbarui:** 17 November 2026 (CR-138, lewat reviewer). Per `main` `d659acf6`: DBV-028 dan MAKE-070 di `main`;
-MAKE-071, MAKE-097, dan MAKE-073 B1 berjalan (sampai CR-136 belum ada kode helpdesk di `main`). Bagian ini diisi tiap paket
+**Terakhir diperbarui:** 18 November 2026 (MAKE-074, Handling Case). Per `main` `64d68377`: DBV-028, MAKE-070, MAKE-071,
+MAKE-097, dan MAKE-072 + CR-137 di `main`; MAKE-074 BE berjalan; status MAKE-073 (FE) diisi Worker Muse. Riwayat 17 November
+2026 (CR-138, per `main` `d659acf6`): DBV-028 dan MAKE-070 di `main`; MAKE-071, MAKE-097, dan MAKE-073 B1 berjalan. Bagian ini diisi tiap paket
 helpdesk secara aditif (BE: Handling Case; FE: Worker Muse; T12b: ReadOne). Kontrak final: PRD v1.3 §6.1b (dibekukan di README
 `backend/app/Controllers/Api/HaloSimpeg/README.md` saat MAKE-070/071); selisih README master terhadap PRD v1.3 (S1–S12) diringkas di PRD v1.4 §6.1b.
 
@@ -156,11 +157,11 @@ helpdesk secara aditif (BE: Handling Case; FE: Worker Muse; T12b: ReadOne). Kont
 | B0 Laporan pemahaman FE | — | DONE (disetujui final 16-11-2026) | tanpa commit kode; keputusan FE final di PRD v1.3 §6.3; rencana berkas bersama di PRD v1.3 §3 |
 | A1 Skema helpdesk | DBV-028 | DONE (main, PR #41, `a5cb7300`) | Handling Case menulis; DB Validator WS-2 SETUJU Q1–Q10 (Q8 `last_msg_at` tidak masuk dengan syarat (a)–(c), Q9 Q-H4 INFO, Q10 PK `officer_category.id` [I]); dokumen `backend/docs/db-review/DBV-028-skema-helpdesk.md` |
 | A2 Master | MAKE-070 | DONE (main `56a700b1`) | README master beku; selisih S1–S12 diterima reviewer 17-11-2026, termasuk S8 (b) Horii (PUT petugas → 200 + `peringatan`); kunci transaksi W1 (locking read sebelum kunci terakhir) |
-| A3 Tiket + ringkasan | MAKE-071 | IN_PROGRESS | T1–T13 diputus 17-11-2026 (T2 (b) Horii: pemilik selalu 403 hapus); README tiket beku di branch, belum di `main`; H8-10 ✔ tetap [I] |
-| A4 Push | MAKE-072 + CR-137 | TODO | CR-137 = berkas bersama Push, commit terpisah di branch MAKE-072; H8-8 belum ada → payload terbatas, uji push real ke DEPLOY-001.1 |
-| A5 Ekspor + penutup BE | MAKE-074 | TODO | menunggu MAKE-071; runbook memuat Q-H19 + EXPLAIN daftar petugas pada gladi impor (DBV-028 Q8 (a)) |
+| A3 Tiket + ringkasan | MAKE-071 | DONE (main `066315c5`) | T1–T13 diputus 17-11-2026 (T2 (b) Horii: pemilik selalu 403 hapus); README tiket beku; binding `RingkasanTiket` untuk lonceng F-08 (AC-E06.9); H8-10 ✔ tetap [I] |
+| A4 Push | MAKE-072 + CR-137 | DONE (main `64d68377`) | CR-137 = berkas bersama Push, commit terpisah; penerima per akun (`antreAkun`), pelaku dikecualikan, kanal `semua`; selisih U1–U9 diterima; H8-8 belum ada → payload terbatas F8-16, uji push real ke DEPLOY-001.1 |
+| A5 Ekspor + penutup BE | MAKE-074 | IN_PROGRESS (branch `fase8/make-074-ekspor-penutup`) | E-09 `GET tiket/ekspor` (rincian di bawah); penutup: bagian ini, README modul/Push, runbook cutover `README-deploy.md` §1n (B6, B7, Q-H19 + EXPLAIN gladi, DBV-028 Q8 (a)) |
 | B1–B3, B5 Frontend | MAKE-073 | IN_PROGRESS (B1 bagian master) | B1 bagian master selesai review, masih di branch; R10 langkah 1 pindah ke CR-134 paket 1 (selesai), jadi B1 memakai `shared/utils/galatKolom.ts` dan `shared/ui/UiPilihBanyak.vue` yang sudah ada; route admin `/halo-simpeg-admin/:bagian`; bagian tiket B1 serta B2–B3 mengikuti README MAKE-071 beku |
-| T12b Impor master | MAKE-097 | IN_PROGRESS (PR #42) | ReadOne, review DB WS-2; DBV SETUJU, revisi berjalan |
+| T12b Impor master | MAKE-097 | DONE (main `82d698ec`, PR #42) | ReadOne, review DB WS-2; `id_user` apa adanya, yatim dibuang + dicatat (K-M11/K-M12); lampiran tiket lama di `ManifestLampiran` (T-5/T-8); runbook `docs/migrasi/MAKE-069-rencana.md` T12b |
 | Helper satker | CR-139 | DONE (main `ccb90f78`) | `WebConfigService::satkerKepegawaian()` dipakai `PetugasLayananService` dan `HaloSimpeg\PetugasService` |
 
 **Keputusan Horii 16-11-2026** ("ikut rekomendasi semua", diteruskan reviewer):
@@ -208,3 +209,45 @@ satker), CR-140 (stabilkan test `alurInti.e2e` yang flaky di bawah beban), CR-14
 **Masih terbuka (sampai CR-136):** H8-7 (sebelum QA), H8-8 (sebelum MAKE-072), H8-10 (sebelum MAKE-071; tanpa ekstraksi tetap
 [I], tetapi penanda baca sisi pembalas petugas dan buka-detail sudah [K]). **CR-138:** ketiganya dijawab Horii 17-11-2026; tidak
 ada butir H8 yang terbuka.
+
+### MAKE-074 — ekspor rekap petugas E-09 + penutup BE (18-11-2026)
+
+- **Endpoint:** `GET api/v1/halo-simpeg/tiket/ekspor?ds&de&format=xlsx` (role 1–7, `TiketController::ekspor`,
+  `EksporTiketService`). Kontrak = README `Controllers/Api/HaloSimpeg` bagian ekspor. Izin = `bisa_ekspor` (petugas aktif), selain
+  itu 403 `bukan_petugas`. Periode = hari kalender WIB → `[ds 00:00 WIB, de+1 00:00 WIB)` UTC tanpa `DATE()`. Tiket kategori NULL
+  dan kategori lain tidak ikut. Periode kosong → 200 JSON tanpa audit. Berkas terkirim → audit `dokumen_unduhan` tanpa isi/NIP
+  penanya (AC-E09.7).
+- **Pengaman (§7.3a):** `eksporMaksBaris` = 10.000 baris pesan; `eksporMaksKarakter` = **5.000.000** karakter
+  (`SUM(CHAR_LENGTH(msg))`); lewat salah satu → 422 `ekspor_terlalu_besar`. Sel > 32.767 unit UTF-16 dipotong dengan penanda
+  "… [dipotong]" [V2].
+- **Pengukuran ambang** (`EksporTiketVolumeTest`, `RUN_VOLUME_TEST=1`; request HTTP penuh, `memory_reset_peak_usage()` sebelum
+  request). Mesin dev Windows 11, PHP 8.4.2, MySQL 8 lokal (port uji), `memory_limit` 512M. Data: 10.000 baris tepat di ambang
+  karakter.
+
+  | Isi pesan | Byte | Puncak tambahan | Waktu |
+  |---|---|---|---|
+  | Latin | 5,2 MB | 50,7 MB | 0,4 s |
+  | CJK 3 byte | 15 MB | 82,4 MB | 0,7 s |
+  | Emoji 4 byte (terburuk) | 20 MB | 105,3 MB | 0,7 s |
+
+  Batas test 128 MB (separuh `memory_limit` 256M di `README-deploy.md` §1). Pengukuran awal di 10.000.000 karakter: Latin 69 MB,
+  tetapi CJK 3 byte 140 MB (lewat batas), jadi ambang diturunkan ke 5.000.000 (diterima reviewer 18-11-2026). Bila
+  `memory_limit` produksi < 256M, ambang wajib diturunkan. Isi berulang memampatkan berkas (±0,3 MB); berkas
+  dari teks nyata lebih besar, dan tambahannya paling banyak sebesar ukuran berkas itu.
+- **Selisih V1–V13 (18-11-2026):** V3–V13 diterima reviewer (V10 penanda termasuk 32.767 + surrogate utuh; V12 baris **dan**
+  karakter dicek ulang sesudah data diambil). **V1/V2 diputus Horii: (a) ikut legacy penuh [K `LS:1626`, `LS:1797-1799`]**: hanya
+  pesan pemilik tiket + pesan petugas pengekspor (balasan petugas lain tidak ikut, termasuk bila pengekspor role 1; COUNT/SUM atas
+  cakupan yang sama); nama/NIP = pengirim baris, tanpa penyamaran. README ekspor dan fixture bagian ini **beku**.
+- **Test:** `EksporTiketTest` (AC-E09.1..E09.8: 403 bukan petugas/nonaktif/role 8, batas hari WIB, kolom dan urutan, NIP teks,
+  kosong 200 tanpa audit, validasi periode/format, cakupan V1 (balasan petugas lain tidak ikut; pengekspor role 1 aturan sama, NIP
+  kosong), 10.000 vs 10.001 baris, ambang karakter, potong sel, unit UTF-16 dan emoji di
+  batas, rentang UTC, cek ulang baris/karakter saat pesan masuk di antara dua kueri (koneksi kedua, isolasi penuh)),
+  baris `KontrakMatriksRoleTest`, fixture `ekspor-kosong`, `galat-422-ekspor`, `galat-422-ekspor-terlalu-besar`,
+  `galat-403-bukan-petugas`.
+- **Titipan review MAKE-072:** mock antrean di `TiketNotifTest` memakai pesan unik, sehingga `assertLogContains` tidak bisa
+  terpenuhi log basi `PushRiwayatTest`.
+- **Penutup:** README `Libraries/HaloSimpeg` (peta kelas + aturan bersama), README Push (status H8-8/PN8-1), runbook cutover
+  `README-deploy.md` §1n (merujuk runbook T12b MAKE-097 dan berkas audit DBV-028; lembar hasil B6/B7/Q-H15/Q-H19/EXPLAIN dengan
+  ambang Q8 (a)/(b) 5.000 tiket / 100 ms; butir cutover H8-7, DEPLOY-001.1, §1m, CR-135).
+- **Masih terbuka:** H8-8/PN8-1 (payload push lengkap); saran trim Unicode validasi `msg` (dari MAKE-072, di luar kontrak beku);
+  tombol ekspor FE (B4, Worker Muse, sesudah README ekspor beku + MAKE-073).

@@ -8,7 +8,9 @@ use CodeIgniter\Config\BaseConfig;
 
 /**
  * Angka helpdesk Halo Simpeg (Fase 8 E-02/E-07, MAKE-070; PRD Fase 8 v1.3 §7.3a, angka final dikonfirmasi Horii 16-11-2026).
- * Semua dapat ditimpa `.env` (mis. `haloSimpeg.perHalamanMaks = 50`). Panjang dihitung `mb_strlen` (code point) sesudah trim.
+ * Semua dapat ditimpa `.env` dengan prefix pendek **huruf kecil** `halosimpeg.` (konvensi `BaseConfig` CI4, seperti `arsip.`), mis.
+ * `halosimpeg.perHalamanMaks = 50`; penulisan `haloSimpeg.` tidak terbaca. Periksa nilai efektif: `php spark config:check HaloSimpeg`.
+ * Panjang dihitung `mb_strlen` (code point) sesudah trim.
  * Batas master = panjang kolom DBV-028 / DBV-022 (batas aplikasi = batas kolom).
  *
  * Angka tiket (throttle, `subject`, `msg`, lampiran) MAKE-071; angka ekspor ditambahkan MAKE-074.
@@ -66,4 +68,13 @@ class HaloSimpeg extends BaseConfig
 
     /** @var list<string> */
     public array $lampiranEkstensi = ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'doc', 'docx', 'xls', 'xlsx'];
+
+    /** Ekspor rekap petugas (E-09, MAKE-074): baris pesan maksimum per berkas, dihitung `COUNT` sebelum membangun berkas (§7.3a). */
+    public int $eksporMaksBaris = 10000;
+
+    /**
+     * Ekspor: `SUM(CHAR_LENGTH(msg))` maksimum per berkas (§7.3a). Ambang dari pengukuran memori nyata
+     * (`EksporTiketVolumeTest`, hasil di README bagian ekspor dan `docs/progress/08-HaloSimpeg.md`).
+     */
+    public int $eksporMaksKarakter = 5000000;
 }
