@@ -396,7 +396,7 @@ terlihat petugas mana pun (404) dan tidak dihitung di sisi petugas.
 | Kolom | Teks |
 |---|---|
 | `id_question_category` | "Kategori wajib dipilih." / "Kategori tidak tersedia." |
-| `subject` | "Subjek wajib diisi." / "Subjek maksimal 250 karakter." |
+| `subject` | "Subjek wajib diisi." / "Subjek maksimal 250 karakter." — **wajib** dicek sesudah trim Unicode (CR-152, pola `msg` CR-148): subjek yang hanya berupa spasi Unicode → "Subjek wajib diisi."; **batas 250** diukur pada nilai yang disimpan (sesudah trim ASCII; spasi Unicode di tepi ikut dihitung). Isi yang disimpan tidak diubah |
 | `msg` | "Pesan wajib diisi." / "Pesan maksimal 5.000 karakter." — buat tiket dan balasan. **Wajib** dicek sesudah trim Unicode (CR-148): isi yang hanya berupa spasi `\p{Z}` (NBSP, U+2000–U+200A, U+202F, U+205F, U+3000, …), spasi ASCII, dan lebar-nol U+180E, U+200B–U+200D, U+2060, U+FEFF → "Pesan wajib diisi.". **Batas 5.000** diukur pada nilai yang disimpan (sesudah trim ASCII; spasi Unicode di tepi ikut dihitung), sehingga isi kolom selalu ≤ 5.000 code point. Isi yang disimpan tidak diubah |
 | `arsip` | teks `ValidasiBerkas` (mis. "Jenis berkas tidak diizinkan (hanya jpg, jpeg, png, gif, pdf, doc, docx, xls, xlsx).", "Ukuran berkas melebihi 5 MB.", "Jenis isi berkas tidak sesuai dengan ekstensinya.") |
 | `ingatkan_24_jam` | "Nilai pengingat tidak valid." / "Pengingat 24 jam hanya dapat diatur petugas." |
