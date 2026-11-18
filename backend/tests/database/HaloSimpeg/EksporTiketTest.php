@@ -155,6 +155,56 @@ final class EksporTiketTest extends DatabaseTestCase
     }
 
     /**
+     * V1/V2 (keputusan Horii 18-11, opsi (a) ikut legacy [K `LS:1626`, `LS:1797-1799`]): hanya pesan pemilik tiket + pesan petugas
+     * yang mengekspor; balasan petugas lain di kategori yang sama tidak ikut, juga tidak dihitung batas (COUNT). Label = pengirim
+     * baris, tanpa penyamaran. Tiket tanpa balasan pengekspor tetap ikut.
+     */
+    public function testCakupanPemilikDanPengeksporSaja(): void
+    {
+        $lain = $this->buatAkunUntuk($this->buatPegawai(['nama' => 'Petugas Lain']), Role::ADMIN_SATKER);
+        $this->buatPetugasHs($lain, [$this->k1], 1, 'lain@contoh.test');
+        $t = $this->tiket($this->k1, '2026-11-10 03:00:00', 'Pertanyaan');
+        $this->buatPesanHs($t, $lain, 'Jawaban petugas lain', '2026-11-10 04:00:00', null, 'Petugas Lain');
+        $this->buatPesanHs($t, $this->petugas, 'Jawaban pengekspor', '2026-11-10 05:00:00', null, 'Petugas Ekspor');
+        $tanpaBalasan = $this->tiket($this->k1, '2026-11-11 03:00:00', 'Belum dibalas');
+
+        // Batas 3 baris: pesan petugas lain (baris ke-4 bila ikut) tidak boleh membuat 422.
+        config(HaloSimpeg::class)->eksporMaksBaris = 3;
+        $this->assertSame([
+            ['1', (string) $t, 'Kepegawaian', 'Penanya Ekspor', $this->nipPemilik, 'Pertanyaan', '10/11/2026 10:00'],
+            ['2', (string) $t, 'Kepegawaian', 'Petugas Ekspor', $this->nipPetugas(), 'Jawaban pengekspor', '10/11/2026 12:00'],
+            ['3', (string) $tanpaBalasan, 'Kepegawaian', 'Penanya Ekspor', $this->nipPemilik, 'Belum dibalas', '11/11/2026 10:00'],
+        ], array_slice($this->sel($this->st($this->ekspor($this->petugas), 200)), self::BARIS_HEADER + 1));
+
+        Services::resetSingle('response');
+        $nipLain = (string) $this->db->table('pengguna')->select('nip')->where('id_pengguna', $lain)->get()->getRowArray()['nip'];
+        $this->assertSame([
+            ['1', (string) $t, 'Kepegawaian', 'Penanya Ekspor', $this->nipPemilik, 'Pertanyaan', '10/11/2026 10:00'],
+            ['2', (string) $t, 'Kepegawaian', 'Petugas Lain', $nipLain, 'Jawaban petugas lain', '10/11/2026 11:00'],
+            ['3', (string) $tanpaBalasan, 'Kepegawaian', 'Penanya Ekspor', $this->nipPemilik, 'Belum dibalas', '11/11/2026 10:00'],
+        ], array_slice($this->sel($this->st($this->ekspor($lain), 200)), self::BARIS_HEADER + 1));
+    }
+
+    /**
+     * V1/V2: pengekspor role 1 (tanpa NIP) mengikuti aturan yang sama — balasan petugas lain tidak ikut; NIP PENANYA baris
+     * pengekspor kosong karena pengirim tanpa NIP.
+     */
+    public function testPengeksporRole1AturanSama(): void
+    {
+        $this->db->table('pengguna')->insert(['username' => 'admin.ekspor', 'name' => 'Admin Ekspor', 'user_level' => Role::SUPER_ADMIN, 'status' => '1']);
+        $admin = (int) $this->db->insertID();
+        $this->buatPetugasHs($admin, [$this->k1], 1, 'admin@contoh.test');
+        $t = $this->tiket($this->k1, '2026-11-10 03:00:00', 'Pertanyaan');
+        $this->buatPesanHs($t, $this->petugas, 'Jawaban petugas lain', '2026-11-10 04:00:00', null, 'Petugas Ekspor');
+        $this->buatPesanHs($t, $admin, 'Jawaban admin', '2026-11-10 05:00:00', null, 'Admin Ekspor');
+
+        $this->assertSame([
+            ['1', (string) $t, 'Kepegawaian', 'Penanya Ekspor', $this->nipPemilik, 'Pertanyaan', '10/11/2026 10:00'],
+            ['2', (string) $t, 'Kepegawaian', 'Admin Ekspor', '', 'Jawaban admin', '10/11/2026 12:00'],
+        ], array_slice($this->sel($this->st($this->ekspor($admin), 200)), self::BARIS_HEADER + 1));
+    }
+
+    /**
      * AC-E09.5: periode tanpa data → 200 JSON (fixture `ekspor-kosong`), tanpa `Content-Disposition`, tanpa audit. Tiket kategori
      * lain/NULL di periode itu tidak dihitung.
      */
