@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 import type { z } from 'zod'
 
 import type {
+  hasilBalasSchema,
   kandidatSchema,
   kategoriOpsiSchema,
   kategoriSchema,
@@ -14,11 +15,30 @@ import type {
   kontakSchema,
   kontakStatusSchema,
   petugasPeringatanSchema,
+  pesanSchema,
   petugasSayaSchema,
   petugasSchema,
+  ringkasanSchema,
+  tiketBarisSchema,
+  tiketDetailSchema,
 } from '../schemas'
 import type { kategoriHaloService, kontakHaloService, petugasHaloService } from '../services/master.service'
-import type { DenganPeringatan, Halaman, HasilKandidat, Kategori, KategoriOpsi, Kontak, KontakAktif, Petugas, PetugasSaya } from '../types'
+import type {
+  DenganPeringatan,
+  Halaman,
+  HasilBalas,
+  HasilKandidat,
+  Kategori,
+  KategoriOpsi,
+  Kontak,
+  KontakAktif,
+  Pesan,
+  Petugas,
+  PetugasSaya,
+  Ringkasan,
+  TiketBaris,
+  TiketDetail,
+} from '../types'
 
 /** Ratakan irisan (`T & {peringatan}`) menjadi satu objek agar dua tipe yang setara secara struktur terbanding identik. */
 type Rata<T> = T extends readonly (infer U)[] ? Rata<U>[] : T extends object ? { [K in keyof T]: T[K] } : T
@@ -55,6 +75,14 @@ export type KunciService = [
   Expect<Equal<Hasil<typeof kontakHaloService.ubah>, Kontak>>,
   Expect<Equal<Hasil<typeof kontakHaloService.setStatus>, DenganPeringatan<Kontak>>>,
   Expect<Equal<Hasil<typeof kontakHaloService.aktif>, KontakAktif[]>>,
+]
+
+export type KunciSkemaTiket = [
+  Expect<Equal<z.output<typeof tiketBarisSchema>, TiketBaris>>,
+  Expect<Equal<z.output<typeof tiketDetailSchema>, TiketDetail>>,
+  Expect<Equal<z.output<typeof pesanSchema>, Pesan>>,
+  Expect<Equal<z.output<typeof ringkasanSchema>, Ringkasan>>,
+  Expect<Equal<z.output<typeof hasilBalasSchema>, HasilBalas>>,
 ]
 
 describe('kunci tipe kontrak master', () => {

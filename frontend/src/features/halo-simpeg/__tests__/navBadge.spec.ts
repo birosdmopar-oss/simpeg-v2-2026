@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest'
 import type { NavGroup } from '@/shared/layouts/nav.config'
 
 import { sisipBadgeHalo } from '../navBadge'
-import type { RingkasanHalo } from '../types'
+import type { Ringkasan } from '../types'
 
 const groups = (): NavGroup[] => [
   { key: 'utama', items: [{ key: 'home', label: 'Beranda', icon: MessageCircle, to: '/', phase: 1 }] },
@@ -23,7 +23,7 @@ const groups = (): NavGroup[] => [
 ]
 
 /** Tiket sudah dibaca tetapi pengingat 24 jam lewat: badge > total (R5). */
-const RINGKASAN: RingkasanHalo = { belum_dibaca_saya: 1, belum_dibaca_petugas: 2, perlu_tindak: 2, badge: 4, total: 3 }
+const RINGKASAN: Ringkasan = { belum_dibaca_saya: 1, belum_dibaca_petugas: 2, perlu_tindak: 2, badge: 4, total: 3 }
 
 const halo = (g: NavGroup[]) => g.flatMap((x) => x.items).find((i) => i.key === 'halo')
 

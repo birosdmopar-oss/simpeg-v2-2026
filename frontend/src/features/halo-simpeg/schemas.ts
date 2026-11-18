@@ -7,7 +7,7 @@
  */
 import { z } from 'zod'
 
-import { BATAS_MASTER, TEKS_GALAT_MASTER as T } from './constants'
+import { BATAS_MASTER, BATAS_TIKET, TEKS_GALAT_MASTER as T, TEKS_GALAT_TIKET as TT } from './constants'
 import type { StatusMaster } from './types'
 
 const id = z.coerce.number().int()
@@ -86,6 +86,70 @@ export const kontakStatusSchema = denganPeringatan(kontakSchema)
 
 export const hapusSchema = z.object({ id })
 
+// --- tiket (README MAKE-071; nullability dari README, bukan dari fixture) --------------------------------------------------
+
+const statusTiket = z.enum(['open', 'closed'])
+
+export const kategoriTiketSchema = z.object({ id, nama: teks })
+
+export const lampiranRingkasSchema = z.object({ nama: teks, tipe: teks })
+
+/** T4: `ukuran` selalu `null`. */
+export const lampiranSchema = lampiranRingkasSchema.extend({ ukuran: z.null() })
+
+export const pesanTerakhirSchema = z.object({
+  id_inbox_msg: id,
+  waktu: teks,
+  potongan: teks,
+  pengirim_label: teks,
+  lampiran: lampiranRingkasSchema.nullable(),
+})
+
+export const tiketBarisSchema = z.object({
+  id,
+  subjek: teks,
+  kategori: kategoriTiketSchema.nullable(),
+  status: statusTiket,
+  dibuat_pada: teks,
+  pemilik_nama: teks,
+  sebagai_petugas: bendera,
+  belum_dibaca: bendera,
+  perlu_tindak: bendera,
+  pesan_terakhir: pesanTerakhirSchema.nullable(),
+  bisa_balas: bendera,
+  bisa_tutup: bendera,
+  bisa_hapus: bendera,
+})
+
+export const pesanSchema = z.object({
+  id_inbox_msg: id,
+  waktu: teks,
+  isi: teks,
+  pengirim_label: teks,
+  milik_saya: bendera,
+  dari_pemilik: bendera,
+  urutan_pengirim: angka,
+  lampiran: lampiranSchema.nullable(),
+})
+
+export const tiketDetailSchema = tiketBarisSchema.extend({
+  allow_reply: bendera,
+  snapshot: z.object({ nip: teks, jabatan: teksNull, satker: teksNull }).nullable(),
+  ditutup_oleh_label: teksNull,
+  pengingat: z.object({ aktif: bendera, jatuh_tempo: teksNull }).nullable(),
+  pesan: z.array(pesanSchema),
+})
+
+export const ringkasanSchema = z.object({
+  belum_dibaca_saya: angka,
+  belum_dibaca_petugas: angka,
+  perlu_tindak: angka,
+  badge: angka,
+  total: angka,
+})
+
+export const hasilBalasSchema = z.object({ pesan: pesanSchema, tiket: tiketBarisSchema })
+
 /** Galat parse respons dianggap galat muat data (pesan galat umum, bukan crash). */
 export class KontrakHaloError extends Error {
   readonly path: string
@@ -145,3 +209,19 @@ export const cariKandidatSchema = z
   .string()
   .refine((s) => panjang(s) >= BATAS_MASTER.cariKandidatMin, T.cariMin)
   .refine((s) => panjang(s) <= BATAS_MASTER.cariKandidatMaks, T.cariMaks)
+
+/** Form tiket baru (E-03): kategori aktif wajib, subjek ≤ 250, pesan ≤ 5.000 (code point sesudah trim); lampiran opsional. */
+export const tiketBaruFormSchema = z.object({
+  id_kategori: z.number().int().nullable().refine((v) => v !== null, TT.kategoriWajib),
+  subjek: wajib(TT.subjekWajib, BATAS_TIKET.subjek, TT.subjekMaks),
+  pesan: wajib(TT.pesanWajib, BATAS_TIKET.pesan, TT.pesanMaks),
+  arsip: z.instanceof(File).nullable(),
+})
+
+/** Form balas (E-04). */
+export const balasFormSchema = z.object({
+  pesan: wajib(TT.pesanWajib, BATAS_TIKET.pesan, TT.pesanMaks),
+  arsip: z.instanceof(File).nullable(),
+  ingatkan_24_jam: z.boolean(),
+})
+

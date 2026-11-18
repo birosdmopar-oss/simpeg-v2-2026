@@ -82,3 +82,43 @@ export const TEKS_GALAT_MASTER = {
 
 /** Nilai `?tab=` tab antrean petugas di `/halo-simpeg` (tab pemilik = bawaan tanpa query). */
 export const TAB_ANTREAN = 'antrean'
+
+// --- tiket (README kontrak beku MAKE-071) --------------------------------------------------------------------------------
+
+/** Batas isian tiket (PRD §7.3a, README tiket). Panjang = code point sesudah trim. */
+export const BATAS_TIKET = {
+  subjek: 250,
+  pesan: 5000,
+  /** Lampiran `arsip`: ≤ 5 MB, 9 ekstensi (`ValidasiBerkas`). */
+  lampiranMb: 5,
+} as const
+
+export const EKSTENSI_LAMPIRAN = ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'doc', 'docx', 'xls', 'xlsx'] as const
+
+/** Pembuat tiket baru: role pegawai 2/6/7 (F8-04, README tiket). */
+export const HALO_PEMBUAT_TIKET_ROLES: readonly RoleCode[] = [Role.PEGAWAI, Role.PTT, Role.PPPK]
+
+/** Polling ringkasan helpdesk saat tab terlihat (pola lonceng `useRingkasanNotifikasi`). */
+export const INTERVAL_RINGKASAN_MS = 60_000
+
+/** Kode galat bisnis bernama bagian tiket. */
+export const KODE_GALAT_TIKET = {
+  bukanPihakBerwenang: 'bukan_pihak_berwenang',
+  tiketDitutup: 'tiket_ditutup',
+  tiketTanpaBalasan: 'tiket_tanpa_balasan',
+  tiketSudahDitutup: 'tiket_sudah_ditutup',
+  tiketTanpaKategori: 'tiket_tanpa_kategori',
+  throttle: 'throttle',
+} as const
+
+/** Teks galat per kolom tiket dari README beku (pesan klien = pesan BE). */
+export const TEKS_GALAT_TIKET = {
+  kategoriWajib: 'Kategori wajib dipilih.',
+  subjekWajib: 'Subjek wajib diisi.',
+  subjekMaks: 'Subjek maksimal 250 karakter.',
+  pesanWajib: 'Pesan wajib diisi.',
+  pesanMaks: 'Pesan maksimal 5.000 karakter.',
+  tidakDitemukan: 'Data percakapan tidak ditemukan.',
+  lampiranTidakDitemukan: 'Lampiran tidak ditemukan.',
+} as const
+

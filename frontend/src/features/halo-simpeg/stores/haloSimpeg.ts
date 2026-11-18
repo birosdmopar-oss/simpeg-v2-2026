@@ -13,7 +13,7 @@ import { computed, reactive, readonly } from 'vue'
 import { isApiError } from '@/lib/axios'
 
 import { petugasHaloService } from '../services/master.service'
-import type { PetugasSaya, RingkasanHalo } from '../types'
+import type { PetugasSaya, Ringkasan } from '../types'
 
 export type StatusMuat = 'awal' | 'memuat' | 'siap' | 'galat'
 
@@ -21,7 +21,7 @@ interface StateHalo {
   petugasSaya: PetugasSaya | null
   statusPetugasSaya: StatusMuat
   galatPetugasSaya: string
-  ringkasan: RingkasanHalo | null
+  ringkasan: Ringkasan | null
 }
 
 const awal = (): StateHalo => ({ petugasSaya: null, statusPetugasSaya: 'awal', galatPetugasSaya: '', ringkasan: null })
@@ -76,7 +76,7 @@ export function muatPetugasSaya(paksa = false): Promise<void> {
  * Pasang ringkasan helpdesk (badge menu, tujuan entri lonceng). Sumber = `GET tiket/ringkasan` / respons `POST …/baca`
  * (MAKE-071); sementara belum ada pemanggil di aplikasi.
  */
-export function setRingkasanHalo(ringkasan: RingkasanHalo | null): void {
+export function setRingkasanHalo(ringkasan: Ringkasan | null): void {
   state.ringkasan = ringkasan
 }
 

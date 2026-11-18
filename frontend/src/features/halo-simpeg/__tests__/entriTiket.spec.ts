@@ -2,9 +2,9 @@
 import { describe, expect, it } from 'vitest'
 
 import { tujuanEntriTiket } from '../entriTiket'
-import type { RingkasanHalo } from '../types'
+import type { Ringkasan } from '../types'
 
-const r = (over: Partial<RingkasanHalo>): RingkasanHalo => ({ belum_dibaca_saya: 0, belum_dibaca_petugas: 0, perlu_tindak: 0, badge: 0, total: 0, ...over })
+const r = (over: Partial<Ringkasan>): Ringkasan => ({ belum_dibaca_saya: 0, belum_dibaca_petugas: 0, perlu_tindak: 0, badge: 0, total: 0, ...over })
 
 describe('tujuanEntriTiket', () => {
   it('sisi petugas > 0 (belum dibaca petugas atau perlu ditindak) → tab antrean', () => {

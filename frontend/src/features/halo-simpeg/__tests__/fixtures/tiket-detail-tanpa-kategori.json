@@ -1,0 +1,40 @@
+{
+    "status": "success",
+    "data": {
+        "id": 5,
+        "subjek": "Pertanyaan uji",
+        "kategori": null,
+        "status": "open",
+        "dibuat_pada": "2026-11-17T12:26:50Z",
+        "pemilik_nama": "Pengirim Uji",
+        "sebagai_petugas": false,
+        "belum_dibaca": false,
+        "perlu_tindak": false,
+        "pesan_terakhir": {
+            "id_inbox_msg": 5,
+            "waktu": "2024-01-01T01:00:00Z",
+            "potongan": "Tiket lama tanpa kategori",
+            "pengirim_label": "Pelapor Contoh",
+            "lampiran": null
+        },
+        "bisa_balas": false,
+        "bisa_tutup": true,
+        "bisa_hapus": false,
+        "allow_reply": true,
+        "snapshot": null,
+        "ditutup_oleh_label": null,
+        "pengingat": null,
+        "pesan": [
+            {
+                "id_inbox_msg": 5,
+                "waktu": "2024-01-01T01:00:00Z",
+                "isi": "Tiket lama tanpa kategori",
+                "pengirim_label": "Pelapor Contoh",
+                "milik_saya": true,
+                "dari_pemilik": true,
+                "urutan_pengirim": 0,
+                "lampiran": null
+            }
+        ]
+    }
+}
