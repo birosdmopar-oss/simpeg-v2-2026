@@ -1,0 +1,236 @@
+<script setup lang="ts">
+/**
+ * Panel percakapan tiket (B2, E-04; pola gelembung Gambar 33/34, tanpa frame Figma H8-9). Sumber = `tiketSayaState.detail`.
+ * - Header: subjek (menerima fokus saat panel dibuka), kategori ("—" bila NULL), pemilik, tanggal dibuat, status, dan
+ *   `ditutup_oleh_label` (null pada tiket Closed = tanpa nama penutup).
+ * - Gelembung: `milik_saya` di kanan; `pengirim_label` ditampilkan apa adanya (dihitung BE, D7 (a)); warna per
+ *   `urutan_pengirim` [K `VD:44`]; isi sebagai teks (`white-space: pre-wrap`, tanpa `v-html`, BP8-4).
+ * - Lampiran lama/baru lewat E-04 sebagai blob (AC-E08.9), object URL dicabut sesudah klik unduh (`simpanBerkas`).
+ * - Form balas hanya bila `bisa_balas`; tiket berkategori NULL → catatan pengganti (H8-16 (a1)); 422 tiket ditutup / tanpa
+ *   balasan / tanpa kategori → pesan BE + detail dimuat ulang.
+ */
+import { ArrowLeft, Paperclip } from 'lucide-vue-next'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
+
+import { simpanBerkas } from '@/features/kepegawaian/services/berkasUnduhan'
+import { isApiError } from '@/lib/axios'
+import FormField from '@/shared/components/FormField.vue'
+import { formatApiDateTime } from '@/shared/utils/dateTime'
+import { UiBadge, UiButton, UiFileField, UiNotice } from '@/shared/ui'
+import { galatPerKolom } from '@/shared/utils/galatKolom'
+
+import { BATAS_TIKET, EKSTENSI_LAMPIRAN, KODE_GALAT_TIKET, TEKS_GALAT_TIKET } from '../constants'
+import { balasFormSchema } from '../schemas'
+import { kodeGalat } from '../services/master.service'
+import { tiketHaloService } from '../services/tiket.service'
+import { balasTiket, bukaTiket, tiketSayaState } from '../stores/tiketSaya'
+import type { Lampiran, LampiranRingkas, Pesan } from '../types'
+
+const props = withDefaults(defineProps<{ idTiket: number; tampilKembali?: boolean }>(), { tampilKembali: false })
+const emit = defineEmits<{ kembali: [] }>()
+
+const detail = computed(() => (tiketSayaState.detail?.id === props.idTiket ? tiketSayaState.detail : null))
+const judulEl = ref<HTMLElement | null>(null)
+
+/** Fokus pindah ke judul thread saat tiket dibuka (8_2 §3a). */
+watch(
+  () => detail.value?.id,
+  async (id) => {
+    if (id === undefined) return
+    await nextTick()
+    judulEl.value?.focus()
+  },
+  { immediate: true },
+)
+
+const WARNA_PENGIRIM = ['bg-slate-100', 'bg-[#E8F1FF]', 'bg-[#EAF7EF]', 'bg-[#FFF4E5]', 'bg-[#F3EDFF]'] as const
+const warna = (p: Pesan): string => (p.milik_saya ? 'bg-brand-tertiary text-white' : (WARNA_PENGIRIM[p.urutan_pengirim % WARNA_PENGIRIM.length] ?? WARNA_PENGIRIM[0]))
+const waktu = (iso: string | null): string => (iso ? (formatApiDateTime(iso) ?? iso) : '—')
+
+const galatUnduh = ref('')
+const mengunduh = ref<number | null>(null)
+async function unduh(p: Pesan, lampiran: Lampiran | LampiranRingkas): Promise<void> {
+  galatUnduh.value = ''
+  mengunduh.value = p.id_inbox_msg
+  try {
+    const berkas = await tiketHaloService.lampiran(props.idTiket, p.id_inbox_msg)
+    simpanBerkas({ blob: berkas.blob, nama: berkas.nama || lampiran.nama })
+  } catch (e) {
+    galatUnduh.value = isApiError(e) ? e.message : TEKS_GALAT_TIKET.lampiranTidakDitemukan
+  } finally {
+    mengunduh.value = null
+  }
+}
+
+// --- form balas ---------------------------------------------------------------------------------------------------------
+const balas = reactive({ pesan: '' })
+const arsip = ref<File | null>(null)
+const kunciBerkas = ref(0)
+const mengirim = ref(false)
+const submitted = ref(false)
+const galatBalas = ref('')
+const galatKolom = ref<Record<string, string>>({})
+
+watch(
+  () => props.idTiket,
+  () => {
+    balas.pesan = ''
+    arsip.value = null
+    kunciBerkas.value += 1
+    submitted.value = false
+    galatBalas.value = ''
+    galatKolom.value = {}
+    galatUnduh.value = ''
+  },
+)
+
+const galatKlien = computed<Record<string, string>>(() => {
+  const r = balasFormSchema.safeParse({ pesan: balas.pesan, arsip: arsip.value, ingatkan_24_jam: false })
+  if (r.success) return {}
+  const e: Record<string, string> = {}
+  for (const i of r.error.issues) e[String(i.path[0] ?? '')] ??= i.message
+  return e
+})
+const errBalas = (f: string): string | undefined => galatKolom.value[f] ?? (submitted.value ? galatKlien.value[f] : undefined)
+
+/** Kode yang berarti keadaan tiket berubah di server → detail dimuat ulang agar flag `bisa_*` terbaru. */
+const KODE_MUAT_ULANG: string[] = [KODE_GALAT_TIKET.tiketDitutup, KODE_GALAT_TIKET.tiketTanpaBalasan, KODE_GALAT_TIKET.tiketTanpaKategori]
+
+async function kirim(): Promise<void> {
+  submitted.value = true
+  galatBalas.value = ''
+  galatKolom.value = {}
+  if (Object.keys(galatKlien.value).length > 0 || mengirim.value) return
+  mengirim.value = true
+  try {
+    await balasTiket(props.idTiket, { pesan: balas.pesan, arsip: arsip.value, ingatkan_24_jam: false })
+    balas.pesan = ''
+    arsip.value = null
+    kunciBerkas.value += 1
+    submitted.value = false
+  } catch (e) {
+    galatKolom.value = galatPerKolom(e, (k) => (k === 'msg' ? 'pesan' : k))
+    const pesan = isApiError(e) ? e.message : 'Pesan tidak terkirim. Silakan coba lagi.'
+    galatBalas.value = Object.values(galatKolom.value).includes(pesan) ? '' : pesan
+    const kode = kodeGalat(e)
+    if (kode !== null && KODE_MUAT_ULANG.includes(kode)) void bukaTiket(props.idTiket)
+  } finally {
+    mengirim.value = false
+  }
+}
+</script>
+
+<template>
+  <section class="flex min-h-0 flex-1 flex-col" aria-labelledby="halo-thread-judul" data-testid="halo-thread">
+    <div v-if="tampilKembali" class="mb-3">
+      <UiButton variant="secondary" appearance="soft" size="sm" data-testid="halo-thread-kembali" @click="emit('kembali')">
+        <template #icon-left><ArrowLeft class="h-4 w-4" aria-hidden="true" /></template>
+        Kembali ke daftar
+      </UiButton>
+    </div>
+
+    <p v-if="tiketSayaState.statusDetail === 'memuat' && !detail" class="py-8 text-center text-sm text-slate-500">Memuat...</p>
+    <div v-else-if="tiketSayaState.statusDetail === 'galat'" class="space-y-3 py-6" data-testid="halo-thread-galat">
+      <p class="text-sm text-danger" role="alert">{{ tiketSayaState.galatDetail?.pesan }}</p>
+      <UiButton
+        v-if="(tiketSayaState.galatDetail?.status ?? 500) >= 500 || tiketSayaState.galatDetail?.status === null"
+        size="sm"
+        variant="secondary"
+        appearance="outline"
+        @click="bukaTiket(idTiket)"
+      >
+        Muat ulang
+      </UiButton>
+    </div>
+
+    <template v-else-if="detail">
+      <header class="border-b border-slate-100 pb-3">
+        <h2 id="halo-thread-judul" ref="judulEl" tabindex="-1" class="text-h6 font-semibold text-slate-900 focus:outline-none" data-testid="halo-thread-judul">
+          {{ detail.subjek }}
+        </h2>
+        <dl class="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-caption text-slate-500">
+          <div><dt class="sr-only">Kategori</dt><dd data-testid="halo-thread-kategori">{{ detail.kategori?.nama ?? '—' }}</dd></div>
+          <div><dt class="sr-only">Pemilik</dt><dd>{{ detail.pemilik_nama }}</dd></div>
+          <div><dt class="sr-only">Dibuat</dt><dd>{{ waktu(detail.dibuat_pada) }}</dd></div>
+          <div>
+            <dt class="sr-only">Status</dt>
+            <dd>
+              <UiBadge :tone="detail.status === 'open' ? 'success' : 'neutral'" size="sm" :data-status="detail.status">
+                {{ detail.status === 'open' ? 'Open' : 'Closed' }}
+              </UiBadge>
+            </dd>
+          </div>
+          <div v-if="detail.status === 'closed' && detail.ditutup_oleh_label" data-testid="halo-thread-ditutup">
+            <dt class="inline">Ditutup oleh</dt> <dd class="inline">{{ detail.ditutup_oleh_label }}</dd>
+          </div>
+        </dl>
+      </header>
+
+      <p v-if="galatUnduh" class="mt-3 text-sm text-danger" role="alert" data-testid="halo-thread-galat-unduh">{{ galatUnduh }}</p>
+
+      <ol class="scrollbar-slim mt-3 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1" aria-label="Pesan" data-testid="halo-thread-pesan">
+        <li v-if="detail.pesan.length === 0" class="py-6 text-center text-sm text-slate-500">Belum ada pesan.</li>
+        <li
+          v-for="p in detail.pesan"
+          :key="p.id_inbox_msg"
+          class="flex max-w-[85%] flex-col"
+          :class="p.milik_saya ? 'items-end self-end' : 'items-start self-start'"
+          :data-pesan="p.milik_saya ? 'saya' : 'lawan'"
+          :data-urutan="p.urutan_pengirim"
+          :data-testid="`halo-pesan-${p.id_inbox_msg}`"
+        >
+          <span class="mb-0.5 text-caption font-medium text-slate-600" data-testid="halo-pesan-pengirim">{{ p.pengirim_label }}</span>
+          <p class="whitespace-pre-wrap break-words rounded-2xl px-3 py-2 text-sm" :class="warna(p)" data-testid="halo-pesan-isi">{{ p.isi }}</p>
+          <UiButton
+            v-if="p.lampiran"
+            size="sm"
+            variant="secondary"
+            appearance="soft"
+            class="mt-1"
+            :disabled="mengunduh === p.id_inbox_msg"
+            :data-testid="`halo-pesan-lampiran-${p.id_inbox_msg}`"
+            @click="unduh(p, p.lampiran)"
+          >
+            <template #icon-left><Paperclip class="h-4 w-4" aria-hidden="true" /></template>
+            {{ p.lampiran.nama }}
+          </UiButton>
+          <span class="mt-0.5 text-[0.65rem] text-slate-400">{{ waktu(p.waktu) }}</span>
+        </li>
+      </ol>
+
+      <div class="mt-3 border-t border-slate-100 pt-3">
+        <form v-if="detail.bisa_balas" novalidate class="space-y-3" data-testid="halo-balas-form" @submit.prevent="kirim">
+          <p v-if="galatBalas" class="text-sm text-danger" role="alert" data-testid="halo-balas-galat">{{ galatBalas }}</p>
+          <FormField
+            v-model="balas.pesan"
+            name="pesan"
+            label="Balasan"
+            type="textarea"
+            required
+            :hint="`Maksimal ${BATAS_TIKET.pesan.toLocaleString('id-ID')} karakter.`"
+            :error="errBalas('pesan')"
+          />
+          <UiFileField
+            :key="kunciBerkas"
+            label="Lampiran (opsional)"
+            :allowed="[...EKSTENSI_LAMPIRAN]"
+            :max-mb="BATAS_TIKET.lampiranMb"
+            :disabled="mengirim"
+            @change="arsip = $event"
+          />
+          <p v-if="errBalas('arsip')" class="text-caption text-danger" role="alert">{{ errBalas('arsip') }}</p>
+          <div class="flex justify-end">
+            <UiButton type="submit" :disabled="mengirim" data-testid="halo-balas-kirim">{{ mengirim ? 'Mengirim...' : 'Kirim' }}</UiButton>
+          </div>
+        </form>
+        <UiNotice v-else-if="detail.kategori === null" tone="info" data-testid="halo-balas-tanpa-kategori">
+          Pertanyaan ini tidak memiliki kategori. Silakan tambah pertanyaan baru.
+        </UiNotice>
+        <UiNotice v-else tone="info" data-testid="halo-balas-tertutup">
+          {{ detail.status === 'closed' ? 'Percakapan ini telah ditutup.' : 'Percakapan ini tidak menerima balasan.' }}
+          <template v-if="galatBalas"><br />{{ galatBalas }}</template>
+        </UiNotice>
+      </div>
+    </template>
+  </section>
+</template>
