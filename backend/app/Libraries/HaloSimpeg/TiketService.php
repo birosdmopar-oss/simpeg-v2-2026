@@ -39,6 +39,9 @@ use Throwable;
  */
 final class TiketService extends MasterHaloSimpeg
 {
+    /** Pesan sukses buat tiket [K] (PRD Fase 8 §7.3, CR-143). */
+    public const PESAN_BUAT = 'Berhasil menambahkan data halo simpeg.';
+
     public const PESAN_PEGAWAI = 'Data pegawai tidak ditemukan didalam sistem.';
 
     public const PESAN_THROTTLE_TIKET = 'Terlalu banyak pertanyaan baru. Coba lagi dalam 10 menit.';
