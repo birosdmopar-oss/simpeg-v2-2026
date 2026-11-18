@@ -734,8 +734,9 @@ final class TiketService extends MasterHaloSimpeg
     }
 
     /**
-     * Pesan wajib dan batas panjang `maksPesan` dihitung sesudah trim Unicode (CR-148); pesan yang hanya berisi spasi Unicode → 422
-     * dengan teks yang sama seperti `msg` kosong.
+     * Wajib-isi dicek sesudah trim Unicode (CR-148): pesan yang hanya berisi spasi Unicode → 422 dengan teks yang sama seperti `msg`
+     * kosong. Batas `maksPesan` diukur pada nilai yang **disimpan** (`$pesan`, sesudah trim ASCII), bukan sesudah trim Unicode, agar
+     * isi kolom tetap ≤ `maksPesan` code point (muat di TEXT, anggaran ekspor `SUM(CHAR_LENGTH(msg))`) — review CR-148 R1 (a).
      *
      * @param array<string, string> $errors
      */
@@ -745,11 +746,9 @@ final class TiketService extends MasterHaloSimpeg
             return;
         }
 
-        $inti = self::trimUnicode($pesan);
-
-        if ($inti === '') {
+        if (self::trimUnicode($pesan) === '') {
             $errors['msg'] = 'Pesan wajib diisi.';
-        } elseif (mb_strlen($inti) > $this->config->maksPesan) {
+        } elseif (mb_strlen($pesan) > $this->config->maksPesan) {
             $errors['msg'] = 'Pesan maksimal ' . number_format($this->config->maksPesan, 0, ',', '.') . ' karakter.';
         }
     }
