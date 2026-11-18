@@ -218,16 +218,16 @@ describe('ArsipTable — unggah', () => {
 
     // Berkas di luar aturan lewat seret ditolak dengan pesan yang sama.
     await wrapper.get('[data-testid="arsip-dropzone"]').trigger('drop', { dataTransfer: { files: [new File(['x'], 'foto.png')] } })
-    expect(wrapper.get('[data-testid="arsip-notice"]').text()).toContain('Jenis file .png tidak diperbolehkan.')
+    expect(wrapper.get('[data-testid="arsip-notice"]').text()).toContain('Jenis berkas .png tidak diperbolehkan.')
     expect(svc.upload).toHaveBeenCalledTimes(1)
   })
 
   it('jenis atau ukuran di luar aturan ditolak sebelum dikirim', async () => {
     const wrapper = await mountTable()
     await pilihBerkas(wrapper, new File(['x'], 'foto.png', { type: 'image/png' }))
-    expect(wrapper.get('[data-testid="arsip-notice"]').text()).toContain('Jenis file .png tidak diperbolehkan.')
+    expect(wrapper.get('[data-testid="arsip-notice"]').text()).toContain('Jenis berkas .png tidak diperbolehkan.')
     await pilihBerkas(wrapper, new File([new Uint8Array(1024 * 1024 + 1)], 'besar.pdf', { type: 'application/pdf' }))
-    expect(wrapper.get('[data-testid="arsip-notice"]').text()).toContain('Ukuran file melebihi 1 MB.')
+    expect(wrapper.get('[data-testid="arsip-notice"]').text()).toContain('Ukuran berkas melebihi 1 MB.')
     // CR-055 Q4R2-I2: nama tanpa ekstensi → pesan jelas.
     await pilihBerkas(wrapper, new File(['%PDF'], 'sk', { type: 'application/pdf' }))
     expect(wrapper.get('[data-testid="arsip-notice"]').text()).toContain('Nama berkas tidak memiliki ekstensi.')

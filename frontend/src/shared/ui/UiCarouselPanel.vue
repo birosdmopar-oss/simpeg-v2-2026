@@ -2,8 +2,8 @@
 /**
  * Panel carousel bersama (F-13 MAKE-087; PRD Fase 7 v2.0 §3: `shared/ui/UiCarouselPanel` milik Jalur D) — pengganti carousel
  * Bootstrap legacy (kartu ulang tahun `dashboard_ad.php:245-380`, yang punya tombol Pause/Play). Pola WAI-ARIA Carousel:
- * - wadah `role="region"` + `aria-roledescription="carousel"` + `aria-label` (prop `label`);
- * - tiap slide `role="group"` + `aria-roledescription="slide"` + `aria-label="i dari n"`; hanya slide aktif yang terlihat;
+ * - wadah `role="region"` + `aria-roledescription="tayangan bergilir"` + `aria-label` (prop `label`) (CR-150: Bahasa Indonesia);
+ * - tiap slide `role="group"` + `aria-roledescription="tayangan"` + `aria-label="i dari n"`; hanya slide aktif yang terlihat;
  * - tombol Sebelumnya/Berikutnya, indikator per slide (`aria-current`), tombol Jeda/Putar (`aria-pressed`) bila autoplay;
  * - keyboard di wadah: ←/→ pindah, Home/End ke awal/akhir;
  * - autoplay (bawaan 5 detik) berhenti saat hover/fokus di dalam panel, saat dijeda, dan bila `prefers-reduced-motion`;
@@ -102,7 +102,7 @@ onBeforeUnmount(() => {
 <template>
   <section
     role="region"
-    aria-roledescription="carousel"
+    aria-roledescription="tayangan bergilir"
     :aria-label="label"
     class="relative flex flex-col gap-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-tertiary"
     tabindex="0"
@@ -124,7 +124,7 @@ onBeforeUnmount(() => {
           v-show="i === aktif"
           :key="i"
           role="group"
-          aria-roledescription="slide"
+          aria-roledescription="tayangan"
           :aria-label="`${i + 1} dari ${jumlah}`"
           :data-testid="`ui-carousel-slide-${i}`"
         >
@@ -174,7 +174,7 @@ onBeforeUnmount(() => {
             type="button"
             class="h-2 w-2 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-tertiary"
             :class="i === aktif ? 'bg-brand-tertiary' : 'bg-slate-300'"
-            :aria-label="`Tampilkan slide ${i + 1}`"
+            :aria-label="`Tampilkan tayangan ${i + 1}`"
             :aria-current="i === aktif ? 'true' : undefined"
             @click="ke(i)"
           />

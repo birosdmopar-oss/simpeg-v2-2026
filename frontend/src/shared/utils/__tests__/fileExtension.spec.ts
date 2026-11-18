@@ -22,7 +22,7 @@ describe('fileExtension', () => {
 describe('fileExtensionError', () => {
   it('ekstensi diperbolehkan → null; lainnya → pesan jenis', () => {
     expect(fileExtensionError('sk.PDF', ['pdf', 'jpg'])).toBeNull()
-    expect(fileExtensionError('virus.exe', ['pdf'])).toBe('Jenis file .exe tidak diperbolehkan.')
+    expect(fileExtensionError('virus.exe', ['pdf'])).toBe('Jenis berkas .exe tidak diperbolehkan.')
   })
 
   it('nama tanpa ekstensi ("sk", "sk.") → pesan tanpa ekstensi, bukan ".sk"/".?"', () => {

@@ -57,10 +57,10 @@ describe('UiCarouselPanel', () => {
     const region = w.get('[data-testid="ui-carousel"]')
 
     expect(region.attributes('role')).toBe('region')
-    expect(region.attributes('aria-roledescription')).toBe('carousel')
+    expect(region.attributes('aria-roledescription')).toBe('tayangan bergilir')
     expect(region.attributes('aria-label')).toBe('Ulang tahun hari ini')
     expect(w.findAll('[role="group"]').map((s) => s.attributes('aria-label'))).toEqual(['1 dari 3', '2 dari 3', '3 dari 3'])
-    expect(w.findAll('[role="group"]')[0]?.attributes('aria-roledescription')).toBe('slide')
+    expect(w.findAll('[role="group"]')[0]?.attributes('aria-roledescription')).toBe('tayangan')
     expect(terlihat(w)).toEqual(['A'])
   })
 

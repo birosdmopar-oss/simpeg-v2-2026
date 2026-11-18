@@ -163,7 +163,7 @@ async function unggah(file: File): Promise<void> {
       return
     }
     if (file.size > aturan.batas_mb * 1024 * 1024) {
-      notice.value = { tone: 'danger', text: `Ukuran file melebihi ${aturan.batas_mb} MB.` }
+      notice.value = { tone: 'danger', text: `Ukuran berkas melebihi ${aturan.batas_mb} MB.` }
       return
     }
   }

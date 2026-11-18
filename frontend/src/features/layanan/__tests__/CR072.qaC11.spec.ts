@@ -62,7 +62,7 @@ const teks = (el: Element | null | undefined) => (el?.textContent ?? '').replace
 
 /** Urutan kemunculan teks dalam breadcrumb: `Home` sebelum `Layanan`, lalu halaman. */
 function urutanBreadcrumb(urutan: string[]): void {
-  const crumb = teks(q('nav[aria-label="Breadcrumb"]'))
+  const crumb = teks(q('nav[aria-label="Jejak halaman"]'))
   let posisi = -1
   for (const kata of urutan) {
     const at = crumb.indexOf(kata, posisi + 1)
@@ -232,7 +232,7 @@ describe('CR-072 butir 1 & 2 — breadcrumb dan h1 Cuti/PMK', () => {
     mount(PetugasApprovalCutiPage, { global: { plugins: [router] }, attachTo: document.body })
     await flushPromises()
     urutanBreadcrumb(['Home', 'Layanan', 'Cuti', 'Petugas Approval Cuti'])
-    expect(teks(q('nav[aria-label="Breadcrumb"]'))).not.toMatch(/Petugas Approval(?! Cuti)/)
+    expect(teks(q('nav[aria-label="Jejak halaman"]'))).not.toMatch(/Petugas Approval(?! Cuti)/)
   })
 })
 

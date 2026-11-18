@@ -96,7 +96,7 @@ onBeforeUnmount(bersihkanTimer)
     v-if="aktif"
     class="relative overflow-hidden rounded-2xl bg-slate-100"
     role="region"
-    aria-roledescription="carousel"
+    aria-roledescription="tayangan bergilir"
     aria-label="Banner"
     tabindex="0"
     data-testid="konten-banner"
