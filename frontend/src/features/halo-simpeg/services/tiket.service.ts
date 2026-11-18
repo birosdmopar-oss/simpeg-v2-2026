@@ -8,8 +8,8 @@
 import { ambilBerkas, type BerkasUnduhan } from '@/features/kepegawaian/services/berkasUnduhan'
 import { api } from '@/lib/axios'
 
-import { halaman, hapusSchema, hasilBalasSchema, ringkasanSchema, tiketBarisSchema, tiketDetailSchema } from '../schemas'
-import type { BalasForm, FilterTiket, Halaman, HasilBalas, Ringkasan, TiketBaris, TiketBaruForm, TiketDetail } from '../types'
+import { eksporKosongSchema, halaman, hapusSchema, hasilBalasSchema, KontrakHaloError, ringkasanSchema, tiketBarisSchema, tiketDetailSchema } from '../schemas'
+import type { BalasForm, FilterTiket, Halaman, HasilBalas, HasilEkspor, Ringkasan, TiketBaris, TiketBaruForm, TiketDetail } from '../types'
 import { BASIS_HALO, parse, queryDaftar } from './master.service'
 
 const BASIS_TIKET = `${BASIS_HALO}/tiket`
@@ -80,6 +80,25 @@ export const tiketHaloService = {
   async hapus(id: number): Promise<number> {
     const { data } = await api.delete<unknown>(`${BASIS_TIKET}/${id}`)
     return parse(hapusSchema, data, `tiket/${id}`).id
+  },
+  /**
+   * Ekspor rekap petugas (E-09, B4; README MAKE-074). `ds`/`de` = `YYYY-MM-DD` (tanggal kalender lokal). `ambilBerkas` TIDAK
+   * diubah (8_2 §3a): hasil 200 dibedakan lewat `Content-Type` blob — `application/json` = periode kosong (amplop utuh →
+   * `{jenis: 'kosong', pesan}`, tanpa unduhan, AC-E09.5); selain itu berkas xlsx (nama dari `Content-Disposition`). Galat
+   * 403 `bukan_petugas` / 422 per kolom / 422 `ekspor_terlalu_besar` dilempar sebagai ApiError (blob JSON diurai `ambilBerkas`).
+   */
+  async ekspor(ds: string, de: string): Promise<HasilEkspor> {
+    const berkas = await ambilBerkas(`${BASIS_TIKET}/ekspor`, 'Rekap_Halo_Simpeg', { ds, de, format: 'xlsx' })
+    if (!berkas.blob.type.includes('json')) return { jenis: 'berkas', nama: berkas.nama, blob: berkas.blob }
+    let body: unknown
+    try {
+      body = JSON.parse(await berkas.blob.text())
+    } catch (e) {
+      throw new KontrakHaloError('tiket/ekspor', e)
+    }
+    const hasil = eksporKosongSchema.safeParse(body)
+    if (!hasil.success) throw new KontrakHaloError('tiket/ekspor', hasil.error)
+    return { jenis: 'kosong', pesan: hasil.data.message }
   },
   /** Lampiran lama/baru lewat E-04 (blob); nama dari `Content-Disposition`, cadangan `lampiran-{id}-{idPesan}`. */
   lampiran(id: number, idPesan: number): Promise<BerkasUnduhan> {

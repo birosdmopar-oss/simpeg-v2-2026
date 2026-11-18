@@ -20,7 +20,7 @@ vi.mock('@/shared/layouts/RedesignShell.vue', () => ({
   default: defineComponent({ setup: (_p, { slots }) => () => h('div', { 'data-testid': 'shell' }, slots.default?.()) }),
 }))
 const svc = vi.hoisted(() => ({
-  tiket: { list: vi.fn(), detail: vi.fn(), baca: vi.fn(), tutup: vi.fn(), hapus: vi.fn(), balas: vi.fn(), buat: vi.fn(), lampiran: vi.fn(), ringkasan: vi.fn() },
+  tiket: { list: vi.fn(), detail: vi.fn(), baca: vi.fn(), tutup: vi.fn(), hapus: vi.fn(), balas: vi.fn(), buat: vi.fn(), lampiran: vi.fn(), ringkasan: vi.fn(), ekspor: vi.fn() },
   kategori: { opsi: vi.fn() },
   kontak: { aktif: vi.fn() },
   petugas: { saya: vi.fn() },
@@ -980,6 +980,48 @@ describe('R11: ⋮ Hapus di antrean petugas (fixture tiket-daftar-petugas)', () 
   })
 })
 
+describe('B4 (MAKE-074): tombol Ekspor Rekap di tab Antrean', () => {
+  const PETUGAS = { petugas: true, aktif: true, kategori: [{ id: 1, nama: 'Cuti', status: 1 as const }], bisa_ekspor: true }
+
+  it('bisa_ekspor → tombol hanya di tab Antrean (tidak di Tiket saya)', async () => {
+    svc.petugas.saya.mockResolvedValue(PETUGAS)
+    const { w, router } = await pasang({ query: '?tab=antrean' })
+    expect(w.find('[data-testid="halo-ekspor-buka"]').exists()).toBe(true)
+    await router.push('/halo-simpeg')
+    await flushPromises()
+    expect(w.find('[data-testid="halo-ekspor-buka"]').exists()).toBe(false)
+  })
+
+  it('petugas aktif tetapi bisa_ekspor false → tanpa tombol (gerbang flag BE, bukan role)', async () => {
+    svc.petugas.saya.mockResolvedValue({ ...PETUGAS, bisa_ekspor: false })
+    const { w } = await pasang({ role: Role.SUPER_ADMIN, query: '?tab=antrean' })
+    expect(w.find('[data-testid="halo-daftar-antrean"]').exists()).toBe(true)
+    expect(w.find('[data-testid="halo-ekspor-buka"]').exists()).toBe(false)
+  })
+
+  it('klik → dialog periode terbuka; hasil kosong → notice pesan BE tanpa unduhan', async () => {
+    svc.petugas.saya.mockResolvedValue(PETUGAS)
+    svc.tiket.ekspor.mockResolvedValue({ jenis: 'kosong', pesan: 'Tidak ada data pada periode ini.' })
+    const { w } = await pasang({ query: '?tab=antrean' })
+    await w.get('[data-testid="halo-ekspor-buka"]').trigger('click')
+    await flushPromises()
+    expect(document.querySelector('[data-testid="halo-ekspor-dialog"]')).not.toBeNull()
+    for (const [nama, teks] of [['ds', '01/11/2026'], ['de', '18/11/2026']] as const) {
+      const el = document.querySelector(`input[name="${nama}"]`) as HTMLInputElement
+      el.value = teks
+      el.dispatchEvent(new Event('input'))
+      await flushPromises()
+      el.dispatchEvent(new Event('blur'))
+      await flushPromises()
+    }
+    ;(document.querySelector('[data-testid="halo-ekspor-form"]') as HTMLFormElement).dispatchEvent(new Event('submit'))
+    await flushPromises()
+    expect(svc.tiket.ekspor).toHaveBeenCalledWith('2026-11-01', '2026-11-18')
+    expect(document.querySelector('[data-testid="halo-ekspor-kosong"]')?.textContent?.trim()).toBe('Tidak ada data pada periode ini.')
+    expect(unduhan.simpan).not.toHaveBeenCalled()
+  })
+})
+
 describe('celah R1: teks kosong tabel saat Lihat semua', () => {
   it('perlu_tindak tanpa baris → "Tidak ada tiket yang perlu ditindak." di halo-daftar-kosong', async () => {
     svc.petugas.saya.mockResolvedValue({ petugas: true, aktif: true, kategori: [{ id: 1, nama: 'Cuti', status: 1 }], bisa_ekspor: true })
@@ -1083,5 +1125,52 @@ describe('S5: label pengingat berganti saat jatuh tempo lewat', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+})
+
+describe('B4 T1: pesan 403 bukan_petugas tetap terbaca walau bisa_ekspor jadi false', () => {
+  it('ekspor 403 → petugas/saya berikutnya bisa_ekspor=false → pesan tetap di dialog; sesudah ditutup tombol hilang', async () => {
+    const PETUGAS = { petugas: true, aktif: true, kategori: [{ id: 1, nama: 'Cuti', status: 1 as const }], bisa_ekspor: true }
+    svc.petugas.saya.mockResolvedValueOnce(PETUGAS).mockResolvedValue({ ...PETUGAS, aktif: false, bisa_ekspor: false })
+    svc.tiket.ekspor.mockRejectedValue(apiError(403, { message: 'Fitur ini hanya untuk petugas Halo Simpeg yang aktif.', code: 'bukan_petugas' }))
+    const { w } = await pasang({ query: '?tab=antrean' })
+    await w.get('[data-testid="halo-ekspor-buka"]').trigger('click')
+    await flushPromises()
+    for (const [nama, teks] of [['ds', '01/11/2026'], ['de', '18/11/2026']] as const) {
+      const el = document.querySelector(`input[name="${nama}"]`) as HTMLInputElement
+      el.value = teks
+      el.dispatchEvent(new Event('input'))
+      await flushPromises()
+      el.dispatchEvent(new Event('blur'))
+      await flushPromises()
+    }
+    ;(document.querySelector('[data-testid="halo-ekspor-form"]') as HTMLFormElement).dispatchEvent(new Event('submit'))
+    await flushPromises()
+    await flushPromises()
+    expect(svc.petugas.saya).toHaveBeenCalledTimes(2)
+    expect(document.querySelector('[data-testid="halo-ekspor-galat"]')?.textContent?.trim()).toBe('Fitur ini hanya untuk petugas Halo Simpeg yang aktif.')
+    ;(document.querySelector('[data-testid="halo-ekspor-dialog"] button[aria-label="Tutup"]') as HTMLButtonElement).click()
+    await flushPromises()
+    expect(document.querySelector('[data-testid="halo-ekspor-dialog"]')).toBeNull()
+    expect(w.find('[data-testid="halo-ekspor-buka"]').exists()).toBe(false)
+  })
+})
+
+describe('B4 K1: "Data pelapor" lewat keyboard', () => {
+  it('fokus membuka tooltip; Enter (keydown + click) menutup; Enter lagi membuka', async () => {
+    svc.tiket.detail.mockResolvedValueOnce({ ...(detailPetugas.data as TiketDetail), belum_dibaca: false })
+    const { w } = await pasang({ idTiket: detailPetugas.data.id })
+    const tombol = w.get('[data-testid="halo-thread-snapshot"]')
+    await tombol.trigger('focus')
+    await vi.waitFor(() => expect(document.querySelector('[role="tooltip"]')).not.toBeNull())
+    const enter = async () => {
+      await tombol.trigger('keydown', { key: 'Enter' })
+      await tombol.trigger('click')
+      await flushPromises()
+    }
+    await enter()
+    await vi.waitFor(() => expect(document.querySelector('[role="tooltip"]')).toBeNull())
+    await enter()
+    await vi.waitFor(() => expect(document.querySelector('[role="tooltip"]')?.textContent).toContain('NIP:'))
   })
 })

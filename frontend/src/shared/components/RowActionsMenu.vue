@@ -116,14 +116,14 @@ onBeforeUnmount(() => {
             @select="pilih(action, $event)"
           >
             <div v-bind="nonaktifTerfokus(action) ? { 'aria-disabled': 'true', 'data-nonaktif': '' } : {}">
-            <component :is="action.icon" v-if="action.icon" class="h-4 w-4 shrink-0" :class="nonaktifTerfokus(action) ? 'opacity-40' : ''" aria-hidden="true" />
-            <template v-if="action.keterangan">
-              <span class="flex min-w-0 flex-col">
-                <span :id="idLabel(action.key)" :class="nonaktifTerfokus(action) ? 'opacity-40' : ''">{{ action.label }}</span>
-                <span :id="idKeterangan(action.key)" class="max-w-64 whitespace-normal text-xs text-slate-600" data-keterangan>{{ action.keterangan }}</span>
-              </span>
-            </template>
-            <template v-else>{{ action.label }}</template>
+              <component :is="action.icon" v-if="action.icon" class="h-4 w-4 shrink-0" :class="nonaktifTerfokus(action) ? 'opacity-40' : ''" aria-hidden="true" />
+              <template v-if="action.keterangan">
+                <span class="flex min-w-0 flex-col">
+                  <span :id="idLabel(action.key)" :class="nonaktifTerfokus(action) ? 'opacity-40' : ''">{{ action.label }}</span>
+                  <span :id="idKeterangan(action.key)" class="max-w-64 whitespace-normal text-xs text-slate-600" data-keterangan>{{ action.keterangan }}</span>
+                </span>
+              </template>
+              <template v-else>{{ action.label }}</template>
             </div>
           </DropdownMenuItem>
         </template>

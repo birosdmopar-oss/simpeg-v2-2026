@@ -1,0 +1,5 @@
+{
+    "status": "error",
+    "code": "ekspor_terlalu_besar",
+    "message": "Data pada periode ini terlalu besar untuk diekspor. Persempit periode."
+}

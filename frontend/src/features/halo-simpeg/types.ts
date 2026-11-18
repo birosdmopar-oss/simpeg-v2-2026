@@ -221,6 +221,9 @@ export interface BalasForm {
   ingatkan_24_jam: boolean
 }
 
+/** Hasil ekspor rekap petugas (B4, README MAKE-074): berkas xlsx, atau periode kosong (200 JSON, tanpa unduhan). */
+export type HasilEkspor = { jenis: 'berkas'; nama: string; blob: Blob } | { jenis: 'kosong'; pesan: string }
+
 // --- form (nama masukan legacy dibentuk di service) --------------------------------------------------------------------
 
 export interface KategoriForm {

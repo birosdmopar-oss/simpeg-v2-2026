@@ -122,3 +122,14 @@ export const TEKS_GALAT_TIKET = {
   lampiranTidakDitemukan: 'Lampiran tidak ditemukan.',
 } as const
 
+
+/** Teks validasi periode ekspor rekap (B4) = teks BE README MAKE-074 §7.3a [V2 terhadap teks legacy]. */
+export const TEKS_EKSPOR = {
+  wajib: 'Tanggal awal dan akhir wajib diisi.',
+  urutan: 'Tanggal awal tidak boleh melebihi tanggal akhir.',
+} as const
+
+/** Hari ini menurut WIB (Asia/Jakarta) sebagai `YYYY-MM-DD` — batas picker ekspor, tanpa `toISOString()` (UTC). */
+export function hariIniWib(sekarang: Date = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit' }).format(sekarang)
+}
