@@ -72,7 +72,8 @@ export function renderedActions(menu: HTMLElement): RenderedRowAction[] {
     return {
       key: item.dataset.action ?? '',
       label: keterangan ? teks.slice(0, teks.length - keterangan.length).trim() : teks,
-      disabled: item.hasAttribute('data-disabled'),
+      // Item nonaktif berketerangan tetap bisa difokus (MAKE-073 S1): ditandai `aria-disabled`, bukan `data-disabled`.
+      disabled: item.hasAttribute('data-disabled') || item.getAttribute('aria-disabled') === 'true',
       danger: item.classList.contains('text-red-600'),
       ...(keterangan ? { keterangan } : {}),
     }
