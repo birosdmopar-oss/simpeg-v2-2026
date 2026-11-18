@@ -1,0 +1,170 @@
+/**
+ * Ringkasan helpdesk + gerbang polling (AC-E08.11): `GET tiket/ringkasan` hanya bila `ACTIVE_PHASE >= 8`, role 1–7, dan
+ * tidak wajib ganti password; syarat berubah → polling berhenti + angka dikosongkan (`resetHaloSimpeg`). Polling 60 detik,
+ * muat ulang lembut tanpa request ganda, penjaga generasi/urutan di store.
+ */
+import { flushPromises, mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { defineComponent, h } from 'vue'
+
+const fase = vi.hoisted(() => ({ aktif: 8 }))
+vi.mock('@/shared/layouts/nav.config', async (asli) => ({
+  ...(await asli<typeof import('@/shared/layouts/nav.config')>()),
+  get ACTIVE_PHASE() {
+    return fase.aktif
+  },
+}))
+const svc = vi.hoisted(() => ({ ringkasan: vi.fn() }))
+vi.mock('../services/tiket.service', async (asli) => ({
+  ...(await asli<typeof import('../services/tiket.service')>()),
+  tiketHaloService: svc,
+}))
+
+import { useAuthStore } from '@/features/auth/stores/auth.store'
+import { Role, type RoleCode, type User } from '@/features/auth/types'
+
+import { INTERVAL_RINGKASAN_MS } from '../constants'
+import { resetPolling, useRingkasanHalo } from '../composables/useRingkasanHalo'
+import { haloState, muatRingkasan, resetHaloSimpeg, setRingkasanHalo } from '../stores/haloSimpeg'
+import type { Ringkasan } from '../types'
+import tiketRingkasan from './fixtures/tiket-ringkasan.json'
+
+const RINGKASAN = tiketRingkasan.data as Ringkasan
+
+function login(role: RoleCode, mustChange = false): void {
+  useAuthStore().setSession({ username: 'uji', user_level: role, must_change_password: mustChange } as User)
+}
+
+function pasang() {
+  let api: ReturnType<typeof useRingkasanHalo> | null = null
+  const w = mount(
+    defineComponent({
+      setup() {
+        const r = useRingkasanHalo()
+        api = r
+        return () => h('span', { 'data-testid': 'badge' }, String(r.badge.value))
+      },
+    }),
+  )
+  return { w, api: () => api! }
+}
+
+function tertunda<T>() {
+  let lepas: (v: T) => void = () => {}
+  const janji = new Promise<T>((r) => (lepas = r))
+  return { janji, lepas }
+}
+
+beforeEach(() => {
+  setActivePinia(createPinia())
+  fase.aktif = 8
+  resetPolling()
+  resetHaloSimpeg()
+  svc.ringkasan.mockReset().mockResolvedValue(RINGKASAN)
+})
+
+afterEach(() => {
+  vi.useRealTimers()
+  resetPolling()
+})
+
+describe('gerbang polling ringkasan (AC-E08.11)', () => {
+  it('role 2, fase 8 → tepat satu request; badge = Ringkasan.badge (bukan total)', async () => {
+    login(Role.PEGAWAI)
+    const { w } = pasang()
+    await flushPromises()
+    expect(svc.ringkasan).toHaveBeenCalledTimes(1)
+    expect(w.get('[data-testid="badge"]').text()).toBe(String(RINGKASAN.badge))
+    expect(RINGKASAN.badge).toBeGreaterThan(RINGKASAN.total)
+  })
+
+  it.each([
+    ['role 8 (Pimpinan)', () => login(Role.PIMPINAN)],
+    ['wajib ganti password', () => login(Role.PEGAWAI, true)],
+    ['ACTIVE_PHASE 5', () => {
+      fase.aktif = 5
+      login(Role.PEGAWAI)
+    }],
+    ['tanpa sesi', () => undefined],
+  ])('%s → tanpa request, badge 0', async (_n, siapkan) => {
+    siapkan()
+    const { w, api } = pasang()
+    api().muatUlang()
+    await flushPromises()
+    expect(svc.ringkasan).not.toHaveBeenCalled()
+    expect(w.get('[data-testid="badge"]').text()).toBe('0')
+  })
+
+  it('syarat berubah (role 2 → wajib ganti password) → polling berhenti dan angka dikosongkan; kembali → dimulai lagi', async () => {
+    vi.useFakeTimers()
+    login(Role.PEGAWAI)
+    const { w } = pasang()
+    await flushPromises()
+    expect(haloState.ringkasan).toEqual(RINGKASAN)
+    login(Role.PEGAWAI, true)
+    await flushPromises()
+    expect(haloState.ringkasan).toBeNull()
+    expect(w.get('[data-testid="badge"]').text()).toBe('0')
+    await vi.advanceTimersByTimeAsync(INTERVAL_RINGKASAN_MS * 2)
+    expect(svc.ringkasan).toHaveBeenCalledTimes(1)
+    login(Role.PEGAWAI)
+    await flushPromises()
+    expect(svc.ringkasan).toHaveBeenCalledTimes(2)
+  })
+
+  it('polling 60 detik selama aktif; berhenti saat pemakai terakhir dilepas', async () => {
+    vi.useFakeTimers()
+    login(Role.SUPER_ADMIN)
+    const { w } = pasang()
+    await flushPromises()
+    await vi.advanceTimersByTimeAsync(INTERVAL_RINGKASAN_MS)
+    expect(svc.ringkasan).toHaveBeenCalledTimes(2)
+    w.unmount()
+    await vi.advanceTimersByTimeAsync(INTERVAL_RINGKASAN_MS * 2)
+    expect(svc.ringkasan).toHaveBeenCalledTimes(2)
+  })
+
+  it('shell dipasang ulang (dua pemakai bergantian) tetap satu watch; muat ulang saat request berjalan tidak menggandakan', async () => {
+    const t = tertunda<Ringkasan>()
+    svc.ringkasan.mockReturnValueOnce(t.janji)
+    login(Role.PEGAWAI)
+    const a = pasang()
+    const b = pasang()
+    a.w.unmount()
+    b.api().muatUlang()
+    b.api().muatUlang()
+    t.lepas(RINGKASAN)
+    await flushPromises()
+    expect(svc.ringkasan).toHaveBeenCalledTimes(1)
+    expect(b.w.get('[data-testid="badge"]').text()).toBe(String(RINGKASAN.badge))
+  })
+})
+
+describe('store ringkasan', () => {
+  it('galat → angka terakhir dipertahankan', async () => {
+    setRingkasanHalo(RINGKASAN)
+    svc.ringkasan.mockRejectedValueOnce(new Error('jaringan'))
+    await muatRingkasan()
+    expect(haloState.ringkasan).toEqual(RINGKASAN)
+  })
+
+  it('respons sesudah reset dibuang; setRingkasanHalo (POST baca) menang atas muat yang lebih lama', async () => {
+    const t = tertunda<Ringkasan>()
+    svc.ringkasan.mockReturnValueOnce(t.janji)
+    const muat = muatRingkasan()
+    resetHaloSimpeg()
+    t.lepas(RINGKASAN)
+    await muat
+    expect(haloState.ringkasan).toBeNull()
+
+    const t2 = tertunda<Ringkasan>()
+    svc.ringkasan.mockReturnValueOnce(t2.janji)
+    const muat2 = muatRingkasan()
+    const dariBaca = { ...RINGKASAN, badge: 0, perlu_tindak: 0 }
+    setRingkasanHalo(dariBaca)
+    t2.lepas(RINGKASAN)
+    await muat2
+    expect(haloState.ringkasan).toEqual(dariBaca)
+  })
+})
