@@ -104,6 +104,7 @@ final class SuratCutiPublikTest extends DatabaseTestCase
         $token = str_repeat('ab', 32);
 
         foreach (["api/v1/publik/surat-cuti/{$token}", "api/v1/publik/surat-cuti/{$token}/pdf"] as $url) {
+            Services::resetSingle('response'); // CR-151: Response dipakai bersama antar-request di feature test
             $res = $this->panggil($url);
             $res->assertStatus(404);
             $this->assertSame('noindex, nofollow', $res->response()->getHeaderLine('X-Robots-Tag'));

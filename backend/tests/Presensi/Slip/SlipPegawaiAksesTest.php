@@ -7,6 +7,7 @@ namespace Tests\Presensi\Slip;
 use App\Constants\Role;
 use App\Exceptions\ForbiddenException;
 use CodeIgniter\Test\FeatureTestTrait;
+use Config\Services;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\DatabaseTestCase;
 use Tests\Support\Kepegawaian\PegawaiFixtureTrait;
@@ -58,6 +59,7 @@ final class SlipPegawaiAksesTest extends DatabaseTestCase
         $this->assertSame('3000000.00', $this->json($res)['data']['rincian']['gjpokok'], 'slip milik sendiri');
         $this->seeInDatabase('gaji_pegawai', ['nip' => $lain, 'viewed_at' => null]);
 
+        Services::resetSingle('response'); // CR-151: Response dipakai bersama antar-request di feature test
         $pdf = $this->asUser($akun)->get('api/v1/slip-gaji/saya/2026-09/pdf');
         $pdf->assertStatus(200);
         $this->assertStringStartsWith('%PDF-', (string) $pdf->response()->getBody());

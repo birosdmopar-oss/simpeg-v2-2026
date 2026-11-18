@@ -241,6 +241,7 @@ final class SiklusPegawaiTest extends DatabaseTestCase
 
         $this->asUser($admin3)->withBodyFormat('json')->post('api/v1/pegawai', $this->isian())->assertStatus(403);
 
+        Services::resetSingle('response'); // CR-151: Response dipakai bersama antar-request di feature test
         $result = $this->multipart($super, 'api/v1/pegawai', $this->isian(), $this->berkasPng());
         $result->assertStatus(201);
         $this->assertSame(self::NIP_BARU, $this->json($result)['data']['pegawai']['nip']);

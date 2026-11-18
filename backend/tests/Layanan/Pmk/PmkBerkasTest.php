@@ -11,6 +11,7 @@ use App\Libraries\Layanan\PetugasLayananService;
 use App\Libraries\Layanan\Pmk\PmkPengajuanService;
 use CodeIgniter\Exceptions\PageNotFoundException;
 use CodeIgniter\Test\FeatureTestTrait;
+use Config\Services;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\MasterDataSeeder;
 use Tests\Support\DatabaseTestCase;
@@ -64,6 +65,7 @@ final class PmkBerkasTest extends DatabaseTestCase
 
     public function testPemilikDanPicMengunduhIsiBerkas(): void
     {
+        Services::resetSingle('response'); // CR-151: Response dipakai bersama antar-request di feature test
         $res = $this->sebagai($this->nip)->get("api/v1/pmk/pengajuan/{$this->id}/berkas/file_kontrak");
 
         $res->assertStatus(200);

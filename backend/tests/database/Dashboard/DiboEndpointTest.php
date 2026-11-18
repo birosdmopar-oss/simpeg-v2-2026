@@ -79,8 +79,10 @@ final class DiboEndpointTest extends DatabaseTestCase
 
     public function testBacaSemuaRoleHanyaAktif(): void
     {
+        Services::resetSingle('response');
         $hasil = $this->asRole(Role::PEGAWAI)->get('api/v1/konten/dibo');
         $hasil->assertStatus(200);
+        $this->assertSame('private, no-store', $hasil->response()->getHeaderLine('Cache-Control'), 'JSON Konten tanpaCache persis (CR-151)');
         $data = json_decode($hasil->getJSON(), true)['data'];
 
         $this->assertSame(1, $data['total']);
@@ -89,6 +91,7 @@ final class DiboEndpointTest extends DatabaseTestCase
 
     public function testUnduhBerkasTerautentikasi(): void
     {
+        Services::resetSingle('response'); // CR-151: Response dipakai bersama antar-request di feature test
         $ok = $this->asRole(Role::PEGAWAI)->get("api/v1/konten/dibo/{$this->idAktif}/berkas/1");
         $ok->assertStatus(200);
         $ok->assertHeader('Content-Type', 'application/pdf');

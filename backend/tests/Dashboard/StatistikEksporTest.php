@@ -55,6 +55,7 @@ final class StatistikEksporTest extends DatabaseTestCase
 
     public function testUnduhXlsxUnitKerjaDanAudit(): void
     {
+        Services::resetSingle('response'); // CR-151: Response dipakai bersama antar-request di feature test
         $result = $this->asRole(Role::SUPER_ADMIN)->get(self::BASE . '/unit-kerja/xlsx');
         $result->assertStatus(200);
         $result->assertHeader('Content-Type', EksporTabel::MIME[EksporTabel::XLSX]);

@@ -140,6 +140,7 @@ final class SEsignMudigTest extends DatabaseTestCase
     {
         $this->transport->antre(new Respons(200, self::PDF_TTE, ['id_dokumen' => 'DOK-1']));
 
+        Services::resetSingle('response'); // CR-151: Response dipakai bersama antar-request di feature test
         $res = $this->tandaTangani($this->param(['id_rw' => '12', 'reason' => 'Persetujuan MuDig']));
 
         $res->assertStatus(200);

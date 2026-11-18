@@ -118,6 +118,7 @@ final class VerifikasiSlipTest extends DatabaseTestCase
      */
     private function ok(string $token): array
     {
+        Services::resetSingle('response'); // CR-151: Response dipakai bersama antar-request di feature test
         $res = $this->panggil($token);
         $this->assertSame(200, $res->response()->getStatusCode(), (string) $res->response()->getBody());
         $this->assertHeaderAman($res);

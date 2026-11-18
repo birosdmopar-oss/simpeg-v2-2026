@@ -200,6 +200,7 @@ final class TokenSuratCutiTest extends DatabaseTestCase
         $this->assertSame('ditandatangani', $this->json($sudah)['data']['status_tte']);
         $this->assertStringNotContainsString($a['pemohon']['nip'], (string) $sudah->response()->getBody());
 
+        Services::resetSingle('response'); // CR-151: Response dipakai bersama antar-request di feature test
         $pdf = $this->panggil("api/v1/publik/surat-cuti/{$mentah}/pdf");
         $pdf->assertStatus(200);
         $this->assertSame('application/pdf', explode(';', $pdf->response()->getHeaderLine('Content-Type'))[0]);

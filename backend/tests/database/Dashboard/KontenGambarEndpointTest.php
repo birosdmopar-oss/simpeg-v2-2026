@@ -128,6 +128,7 @@ final class KontenGambarEndpointTest extends DatabaseTestCase
     {
         $url = "api/v1/konten/popup/{$this->idPopup}/gambar";
 
+        Services::resetSingle('response'); // CR-151: Response dipakai bersama antar-request di feature test
         $ok = $this->asRole(Role::PEGAWAI)->get($url);
         $ok->assertStatus(200);
         $ok->assertHeader('Content-Type', 'image/png');
