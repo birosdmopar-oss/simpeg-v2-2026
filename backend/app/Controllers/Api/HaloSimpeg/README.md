@@ -287,7 +287,7 @@ Nama pengirim pesan baru = nama bergelar bila akun punya data pegawai (B-28), se
 | `GET tiket` | `peran?` (`saya` bawaan \| `petugas`), `status?` (`open`\|`closed`), `kategori?` (id), `q?`, `baca?` (`semua` bawaan \| `belum` \| `sudah`), `perlu_tindak?` (`1`, hanya dengan `peran=petugas`), `page`, `per_page` | `Halaman<TiketBaris>` |
 | `GET tiket/ringkasan` | — | `Ringkasan` |
 | `GET tiket/{id}` | — | `TiketDetail` (tanpa efek samping) |
-| `POST tiket` | multipart/JSON `{id_question_category, subject, msg, arsip?}` | 201 `TiketDetail` |
+| `POST tiket` | multipart/JSON `{id_question_category, subject, msg, arsip?}` | 201 `TiketDetail` + `message` "Berhasil menambahkan data halo simpeg." [K] (CR-143, aditif) |
 | `POST tiket/{id}/pesan` | multipart/JSON `{msg, arsip?, ingatkan_24_jam?}` | 201 `{pesan: Pesan, tiket: TiketBaris}` |
 | `POST tiket/{id}/baca` | — | 200 `Ringkasan` |
 | `POST tiket/{id}/tutup` | — | 200 `TiketBaris` |
