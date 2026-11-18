@@ -104,6 +104,111 @@ final class EksporTiketTest extends DatabaseTestCase
     }
 
     /**
+     * S12 di tingkat service (review E1): petugas `support_officer.status = 1` di k1 yang akunnya nonaktif (status '0'), terhapus
+     * (`deleted_at`), atau `user_level` di DB berubah ke 8 sesudah token role 1–7 terbit → 403 `bukan_petugas` dan
+     * `bisa_ekspor = false`. Filter route hanya membaca role di token, jadi ketiganya sampai ke `EksporTiketService`.
+     */
+    public function testS12AkunTidakAktifDitolakService(): void
+    {
+        $this->tiket($this->k1, '2026-11-10 03:00:00');
+
+        $kasus = [
+            'nonaktif'  => ['status' => '0'], // `pengguna.status` enum('0','1') di v2: nonaktif = '0'
+            'terhapus'  => ['deleted_at' => '2026-11-12 01:00:00'],
+            'role 8 db' => ['user_level' => Role::PIMPINAN],
+        ];
+        $i = 0;
+
+        foreach ($kasus as $nama => $ubah) {
+            $akun = $this->buatAkunUntuk($this->buatPegawai(), Role::ADMIN_SATKER);
+            $this->buatPetugasHs($akun, [$this->k1], 1, 's12-' . ++$i . '@contoh.test');
+            $minta = $this->sebagai($akun); // token role 3 terbit sebelum akun diubah
+            $this->assertTrue($this->db->table('pengguna')->where('id_pengguna', $akun)->update($ubah), $nama);
+            $this->assertSame(1, $this->db->affectedRows(), $nama);
+
+            $this->assertFalse($this->json($minta->get('api/v1/halo-simpeg/petugas/saya'))['data']['bisa_ekspor'], $nama);
+            Services::resetSingle('response');
+            $r = $minta->get(self::URL . '?ds=2026-11-01&de=2026-11-30');
+            $this->assertSame('bukan_petugas', $this->json($this->st($r, 403))['code'], $nama);
+            Services::resetSingle('response');
+        }
+
+        $this->assertSame(0, $this->jumlahAudit());
+    }
+
+    /**
+     * V5 (review E2 (c)): non-petugas dengan `ds` kosong → 403 `bukan_petugas`, bukan 422 (izin dicek sebelum validasi).
+     */
+    public function testBukanPetugasSebelumValidasi(): void
+    {
+        $bukan = $this->buatAkunUntuk($this->buatPegawai(), Role::PEGAWAI);
+        $this->assertSame('bukan_petugas', $this->json($this->st($this->ekspor($bukan, ['ds' => '', 'de' => '']), 403))['code']);
+    }
+
+    /**
+     * V11 (review E2 (a)/(b)): kategori nonaktif yang masih dipegang petugas tetap ikut; petugas aktif tanpa `officer_category` →
+     * 200 `ekspor-kosong`, tanpa audit, `bisa_ekspor = true`.
+     */
+    public function testKategoriNonaktifIkutDanPetugasTanpaKategori(): void
+    {
+        $k3 = $this->buatKategoriHs('Pensiun');
+        $this->db->table('question_category')->where('id_question_category', $k3)->update(['status' => 0]);
+        $this->db->table('officer_category')->insert(['id_support_officer' => $this->idPetugasHs($this->petugas), 'id_question_category' => $k3, 'created_at' => '2026-11-17 01:00:00']);
+        $t1 = $this->tiket($this->k1, '2026-11-10 03:00:00', 'Pertanyaan k1');
+        $t3 = $this->tiket($k3, '2026-11-11 03:00:00', 'Pertanyaan k3');
+
+        $this->assertSame([
+            ['1', (string) $t1, 'Kepegawaian', 'Penanya Ekspor', $this->nipPemilik, 'Pertanyaan k1', '10/11/2026 10:00'],
+            ['2', (string) $t3, 'Pensiun', 'Penanya Ekspor', $this->nipPemilik, 'Pertanyaan k3', '11/11/2026 10:00'],
+        ], array_slice($this->sel($this->st($this->ekspor($this->petugas), 200)), self::BARIS_HEADER + 1));
+        Services::resetSingle('response');
+
+        $tanpa = $this->buatAkunUntuk($this->buatPegawai(), Role::ADMIN_SATKER);
+        $this->buatPetugasHs($tanpa, [], 1, 'tanpa@contoh.test');
+        $this->assertTrue($this->json($this->sebagai($tanpa)->get('api/v1/halo-simpeg/petugas/saya'))['data']['bisa_ekspor']);
+        Services::resetSingle('response');
+        $this->cocokFixtureHs('ekspor-kosong', $this->ekspor($tanpa), 200);
+        $this->assertSame(1, $this->jumlahAudit(), 'hanya berkas petugas pertama yang diaudit');
+    }
+
+    /**
+     * Header keamanan (review E2 (d), README ekspor): `nosniff` + `Cache-Control: private, no-store` pada xlsx dan JSON kosong.
+     */
+    public function testHeaderKeamananXlsxDanJsonKosong(): void
+    {
+        $kosong = $this->st($this->ekspor($this->petugas), 200);
+        $this->assertTrue($this->json($kosong)['data']['kosong']);
+        $kosong->assertHeader('X-Content-Type-Options', 'nosniff');
+        $kosong->assertHeader('Cache-Control', 'private, no-store');
+        Services::resetSingle('response');
+
+        $this->tiket($this->k1, '2026-11-10 03:00:00');
+        $xlsx = $this->st($this->ekspor($this->petugas), 200);
+        $xlsx->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        $xlsx->assertHeader('X-Content-Type-Options', 'nosniff');
+        $xlsx->assertHeader('Cache-Control', 'private, no-store');
+    }
+
+    /**
+     * Review E3: kunci `.env` ambang ekspor = prefix pendek huruf kecil `halosimpeg.` (konvensi CI4 `BaseConfig`, seperti `arsip.`).
+     * Penulisan `haloSimpeg.` tidak dibaca.
+     */
+    public function testKunciEnvAmbangEkspor(): void
+    {
+        $simpan = $_ENV;
+
+        try {
+            $_ENV['haloSimpeg.eksporMaksBaris']    = '7';
+            $_ENV['halosimpeg.eksporMaksKarakter'] = '1234';
+            $config                                = new HaloSimpeg();
+            $this->assertSame(1234, $config->eksporMaksKarakter);
+            $this->assertSame(10000, $config->eksporMaksBaris, 'huruf besar tidak cocok dengan prefix pendek');
+        } finally {
+            $_ENV = $simpan;
+        }
+    }
+
+    /**
      * AC-E09.2..AC-E09.4 + F8-20: batas hari WIB inklusif, kategori lain dan NULL tidak ikut, tiket tanpa balasan petugas ikut,
      * urut tiket lalu pesan, kolom TIMESTAMP WIB, NIP tetap teks. AC-E09.7: audit tanpa isi/NIP penanya. BP8-1: baca saja.
      */
@@ -406,6 +511,11 @@ final class EksporTiketTest extends DatabaseTestCase
         $this->buatPesanHs($t, $this->pemilik, $pesan, $waktu, null, 'Penanya Ekspor');
 
         return $t;
+    }
+
+    private function idPetugasHs(int $idUser): int
+    {
+        return (int) $this->db->table('support_officer')->where('id_user', $idUser)->get()->getRow('id_support_officer');
     }
 
     private function nipPetugas(): string
