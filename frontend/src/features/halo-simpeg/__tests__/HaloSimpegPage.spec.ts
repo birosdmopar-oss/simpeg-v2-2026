@@ -94,6 +94,7 @@ beforeEach(() => {
   svc.tiket.detail.mockResolvedValue({ ...DETAIL, belum_dibaca: false })
   svc.kategori.opsi.mockResolvedValue(kategoriOpsi.data)
   svc.kontak.aktif.mockResolvedValue(kontakAktif.data)
+  svc.tiket.ringkasan.mockResolvedValue({ belum_dibaca_saya: 0, belum_dibaca_petugas: 0, perlu_tindak: 0, badge: 0, total: 0 })
 })
 
 afterEach(() => {

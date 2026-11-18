@@ -18,10 +18,10 @@ import type { RowAction } from '@/shared/components/rowActions'
 import { formatApiDateTime } from '@/shared/utils/dateTime'
 import { UiBadge, UiButton, UiNotice, UiPagination, UiSearchInput, UiSelect, type SelectOption } from '@/shared/ui'
 
-import { PER_PAGE_MASTER, TEKS_GALAT_TIKET } from '../constants'
-import { kategoriHaloService } from '../services/master.service'
+import { KODE_GALAT_TIKET, PER_PAGE_MASTER, TEKS_GALAT_TIKET } from '../constants'
+import { kategoriHaloService, kodeGalat } from '../services/master.service'
 import { tiketHaloService } from '../services/tiket.service'
-import { hapusTiket, muatDaftarSaya, tiketSayaState, tutupTiket, ubahFilterSaya } from '../stores/tiketSaya'
+import { bukaTiket, hapusTiket, muatDaftarSaya, tiketSayaState, tutupTiket, ubahFilterSaya } from '../stores/tiketSaya'
 import type { FilterBaca, KategoriOpsi, StatusTiket, TiketBaris } from '../types'
 
 const props = withDefaults(defineProps<{ bolehBuat?: boolean; idAktif?: number | null }>(), { bolehBuat: false, idAktif: null })
@@ -119,6 +119,11 @@ async function jalankan(): Promise<void> {
     }
   } catch (e) {
     galatAksi.value = isApiError(e) ? e.message : 'Tindakan gagal. Silakan coba lagi.'
+    // P1 (d): tiket sudah berubah di server (sudah ditutup / tidak ada) → daftar (dan panel bila terbuka) dimuat ulang.
+    if (kodeGalat(e) === KODE_GALAT_TIKET.tiketSudahDitutup || (isApiError(e) && e.status === 404)) {
+      void muatDaftarSaya()
+      if (props.idAktif === k.tiket.id) void bukaTiket(k.tiket.id)
+    }
   } finally {
     dialogTerbuka.value = false
     memproses.value = false

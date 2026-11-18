@@ -14,6 +14,7 @@ import { balasTiket, bukaTiket, hapusTiket, muatDaftarSaya, tiketSayaState, tutu
 import type { Halaman, HasilBalas, Ringkasan, TiketBaris, TiketDetail } from '../types'
 import baca from './fixtures/baca.json'
 import tiketBalas from './fixtures/tiket-balas.json'
+import detailDitutup from './fixtures/tiket-detail-ditutup.json'
 import daftarPemilik from './fixtures/tiket-daftar-pemilik.json'
 import detailPemilik from './fixtures/tiket-detail-pemilik.json'
 import tiketTutup from './fixtures/tiket-tutup.json'
@@ -92,8 +93,11 @@ describe('tutup, hapus, balas', () => {
     await muatDaftarSaya()
     await bukaTiket(DETAIL.id)
     svc.tutup.mockResolvedValueOnce({ ...(tiketTutup.data as TiketBaris), id: DETAIL.id })
+    // Detail dimuat ulang sesudah tutup (P1 (c)): BE kini mengembalikan tiket Closed.
+    svc.detail.mockResolvedValueOnce({ ...DETAIL, belum_dibaca: false, status: 'closed', bisa_balas: false })
     await tutupTiket(DETAIL.id)
-    expect(tiketSayaState.detail?.status).toBe('closed')
+    expect(tiketSayaState.daftar?.items.find((t) => t.id === DETAIL.id)?.status ?? 'closed').toBe('closed')
+    await vi.waitFor(() => expect(tiketSayaState.detail?.status).toBe('closed'))
   })
 
   it('hapus → baris dibuang, total berkurang, panel tertutup bila tiket itu terbuka', async () => {
@@ -130,5 +134,46 @@ describe('reset (AC-E08.8)', () => {
     expect(tiketSayaState.daftar).toBeNull()
     expect(tiketSayaState.detail).toBeNull()
     expect(tiketSayaState.filter.baca).toBe('semua')
+  })
+})
+
+describe('konsistensi daftar ↔ detail ↔ ringkasan (review B2 P1)', () => {
+  it('(a) baca A tertunda → buka B → lepas: baris A belum_dibaca=false, detail B utuh', async () => {
+    const a = DAFTAR.items[0]!
+    svc.list.mockResolvedValueOnce({ ...DAFTAR, items: [{ ...a, belum_dibaca: true }] })
+    await muatDaftarSaya()
+    const t = tertunda<Ringkasan>()
+    svc.baca.mockReturnValueOnce(t.janji)
+    svc.detail.mockResolvedValueOnce({ ...DETAIL, id: a.id, belum_dibaca: true }).mockResolvedValueOnce({ ...DETAIL, id: 77, subjek: 'B', belum_dibaca: false })
+    const bukaA = bukaTiket(a.id)
+    await vi.waitFor(() => expect(svc.baca).toHaveBeenCalledWith(a.id))
+    await bukaTiket(77)
+    t.lepas(baca.data as Ringkasan)
+    await bukaA
+    expect(tiketSayaState.daftar?.items.find((x) => x.id === a.id)?.belum_dibaca).toBe(false)
+    expect(tiketSayaState.detail).toMatchObject({ id: 77, subjek: 'B' })
+  })
+
+  it('(b) tutup baris belum dibaca → satu GET ringkasan; balas tiket belum dibaca → satu GET ringkasan', async () => {
+    const a = DAFTAR.items[0]!
+    svc.list.mockResolvedValueOnce({ ...DAFTAR, items: [{ ...a, belum_dibaca: true, status: 'open' }] })
+    await muatDaftarSaya()
+    svc.ringkasan.mockResolvedValue(baca.data as Ringkasan)
+    svc.tutup.mockResolvedValueOnce({ ...a, status: 'closed', bisa_tutup: false, belum_dibaca: false })
+    await tutupTiket(a.id)
+    expect(svc.ringkasan).toHaveBeenCalledTimes(1)
+    svc.tutup.mockResolvedValueOnce({ ...a, status: 'closed', bisa_tutup: false, belum_dibaca: false })
+    await tutupTiket(a.id)
+    expect(svc.ringkasan).toHaveBeenCalledTimes(1)
+  })
+
+  it('(c) tutup tiket yang sedang terbuka → detail dimuat ulang (ditutup_oleh_label dari BE)', async () => {
+    const ditutup = detailDitutup.data as TiketDetail
+    svc.detail.mockResolvedValueOnce({ ...DETAIL, id: ditutup.id, belum_dibaca: false }).mockResolvedValueOnce(ditutup)
+    await bukaTiket(ditutup.id)
+    svc.tutup.mockResolvedValueOnce({ ...(tiketTutup.data as TiketBaris), id: ditutup.id })
+    await tutupTiket(ditutup.id)
+    await vi.waitFor(() => expect(tiketSayaState.detail?.ditutup_oleh_label).toBe(ditutup.ditutup_oleh_label))
+    expect(svc.detail).toHaveBeenCalledTimes(2)
   })
 })

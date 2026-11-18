@@ -110,8 +110,9 @@ export function muatRingkasan(): Promise<void> {
   if (janjiRingkasan) return janjiRingkasan
   const gen = generasi
   const urutan = ++urutanRingkasan
-  const janji = tiketHaloService
-    .ringkasan()
+  // Dibungkus Promise agar galat sinkron pun tidak pernah menggagalkan pemanggil (mis. tutup/balas memuat ulang ringkasan).
+  const janji = Promise.resolve()
+    .then(() => tiketHaloService.ringkasan())
     .then((hasil) => {
       if (gen === generasi && urutan === urutanRingkasan) state.ringkasan = hasil
     })

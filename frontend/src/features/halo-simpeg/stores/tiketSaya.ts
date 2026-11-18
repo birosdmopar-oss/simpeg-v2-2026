@@ -14,7 +14,7 @@ import { isApiError } from '@/lib/axios'
 import { BACA_BAWAAN_SAYA, PER_PAGE_MASTER } from '../constants'
 import { tiketHaloService } from '../services/tiket.service'
 import type { BalasForm, FilterTiket, Halaman, Pesan, TiketBaris, TiketBaruForm, TiketDetail } from '../types'
-import { bacaTiket, daftarkanResetHalo, type StatusMuat } from './haloSimpeg'
+import { bacaTiket, daftarkanResetHalo, muatRingkasan, type StatusMuat } from './haloSimpeg'
 
 export interface GalatMuat {
   status: number | null
@@ -103,11 +103,12 @@ export async function bukaTiket(id: number): Promise<void> {
     if (detail.belum_dibaca) {
       try {
         const ringkasan = await bacaTiket(id)
-        if (ringkasan === null || gen !== generasi || state.detail?.id !== id) return
-        state.detail = { ...state.detail, belum_dibaca: false }
+        if (ringkasan === null || gen !== generasi) return
+        // Review B2 P1 (a): baris daftar ditandai dibaca walau panel sudah pindah/ditutup; detail hanya bila id masih sama.
         if (state.daftar) {
           state.daftar = { ...state.daftar, items: state.daftar.items.map((t) => (t.id === id ? { ...t, belum_dibaca: false } : t)) }
         }
+        if (state.detail?.id === id) state.detail = { ...state.detail, belum_dibaca: false }
       } catch {
         // Penanda baca gagal: thread tetap tampil; badge disegarkan polling berikutnya.
       }
@@ -127,11 +128,24 @@ export function tutupPanel(): void {
   state.galatDetail = null
 }
 
-/** E-05 tutup: baris dari BE diterapkan. Galat dilempar ke pemanggil (ditampilkan di layar). */
+/** Apakah tiket `id` belum dibaca menurut data yang sudah dimuat (baris daftar atau detail). */
+function belumDibaca(id: number): boolean {
+  return (state.daftar?.items.find((t) => t.id === id)?.belum_dibaca ?? false) || (state.detail?.id === id && state.detail.belum_dibaca)
+}
+
+/**
+ * E-05 tutup: baris dari BE diterapkan. BE menyetel `is_read = 1` (README tiket) → bila baris tadinya belum dibaca, ringkasan
+ * dimuat ulang (P1 (b)). Tiket yang sedang terbuka dimuat ulang karena `TiketBaris` tidak membawa `ditutup_oleh_label` /
+ * `allow_reply` (P1 (c)). Galat dilempar ke pemanggil (ditampilkan di layar).
+ */
 export async function tutupTiket(id: number): Promise<void> {
   const gen = generasi
+  const tadinyaBelum = belumDibaca(id)
   const baris = await tiketHaloService.tutup(id)
-  if (gen === generasi) terapkanBaris(baris)
+  if (gen !== generasi) return
+  terapkanBaris(baris)
+  if (tadinyaBelum) void muatRingkasan()
+  if (state.idDibuka === id) void bukaTiket(id)
 }
 
 /** E-05 hapus: baris dibuang; panel ditutup bila tiket itu sedang dibuka. */
@@ -161,10 +175,13 @@ export async function buatTiket(form: TiketBaruForm): Promise<TiketDetail | null
 /** E-04: pesan baru ditambahkan ke thread; baris tiket diperbarui (T9). */
 export async function balasTiket(id: number, form: BalasForm): Promise<Pesan | null> {
   const gen = generasi
+  const tadinyaBelum = belumDibaca(id)
   const hasil = await tiketHaloService.balas(id, form)
   if (gen !== generasi) return null
   if (state.detail?.id === id) state.detail = { ...state.detail, pesan: [...state.detail.pesan, hasil.pesan] }
   terapkanBaris(hasil.tiket)
+  // Balasan menyetel penanda baca sisi pembalas (README tiket) → ringkasan disegarkan bila tadinya belum dibaca (P1 (b)).
+  if (tadinyaBelum) void muatRingkasan()
   return hasil.pesan
 }
 
