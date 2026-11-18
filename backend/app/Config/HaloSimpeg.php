@@ -8,7 +8,9 @@ use CodeIgniter\Config\BaseConfig;
 
 /**
  * Angka helpdesk Halo Simpeg (Fase 8 E-02/E-07, MAKE-070; PRD Fase 8 v1.3 §7.3a, angka final dikonfirmasi Horii 16-11-2026).
- * Semua dapat ditimpa `.env` (mis. `haloSimpeg.perHalamanMaks = 50`). Panjang dihitung `mb_strlen` (code point) sesudah trim.
+ * Semua dapat ditimpa `.env` dengan prefix pendek **huruf kecil** `halosimpeg.` (konvensi `BaseConfig` CI4, seperti `arsip.`), mis.
+ * `halosimpeg.perHalamanMaks = 50`; penulisan `haloSimpeg.` tidak terbaca. Periksa nilai efektif: `php spark config:check HaloSimpeg`.
+ * Panjang dihitung `mb_strlen` (code point) sesudah trim.
  * Batas master = panjang kolom DBV-028 / DBV-022 (batas aplikasi = batas kolom).
  *
  * Angka tiket (throttle, `subject`, `msg`, lampiran) MAKE-071; angka ekspor ditambahkan MAKE-074.
