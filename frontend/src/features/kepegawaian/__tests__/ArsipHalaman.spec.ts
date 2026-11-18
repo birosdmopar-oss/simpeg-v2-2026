@@ -298,7 +298,7 @@ describe('ArsipFolderPage', () => {
 
   it('breadcrumb: Arsip › nama pegawai (gelar) › nama folder', async () => {
     const { wrapper } = await pasang(`/arsip/${NIP}/9`)
-    const crumb = wrapper.get('nav[aria-label="Breadcrumb"]')
+    const crumb = wrapper.get('nav[aria-label="Jejak halaman"]')
     expect(crumb.findAll('li').map((li) => li.text())).toEqual(['Arsip', 'Dr. Budi Contoh, S.H.', 'Jabatan'])
     expect(crumb.findAll('a').map((a) => a.attributes('href'))).toEqual(['/arsip', `/arsip/${NIP}`])
     expect(wrapper.get('[data-testid="arsip-kembali"]').attributes('href')).toBe(`/arsip/${NIP}`)

@@ -259,7 +259,7 @@ describe('DaftarPegawaiPage — popup Filter Kolom', () => {
   const checkbox = (label: string) =>
     [...(picker()?.querySelectorAll('label') ?? [])].find((l) => l.textContent?.trim() === label)?.querySelector('input') ?? undefined
 
-  it('memilih Agama lalu Apply Column menambah kolom; Nama/NIP terkunci', async () => {
+  it('memilih Agama lalu Terapkan Kolom menambah kolom; Nama/NIP terkunci', async () => {
     const { wrapper } = await mountList()
     await wrapper.get('[data-testid="column-picker-trigger"]').trigger('click')
     await flushPromises()

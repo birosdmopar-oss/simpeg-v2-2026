@@ -15,7 +15,7 @@ defineProps<{ items: Crumb[] }>()
 </script>
 
 <template>
-  <nav aria-label="Breadcrumb">
+  <nav aria-label="Jejak halaman">
     <ol class="flex flex-wrap items-center gap-1 text-body2">
       <li v-for="(item, index) in items" :key="index" class="flex items-center gap-1">
         <ChevronRight v-if="index > 0" class="h-4 w-4 text-slate-400" aria-hidden="true" />

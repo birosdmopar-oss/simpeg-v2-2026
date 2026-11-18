@@ -66,7 +66,7 @@ function proses(file: File | null): void {
   if (salahJenis !== null) {
     error.value = salahJenis
   } else if (file.size > props.maxMb * 1024 * 1024) {
-    error.value = `Ukuran file melebihi ${props.maxMb} MB.`
+    error.value = `Ukuran berkas melebihi ${props.maxMb} MB.`
   }
 
   if (error.value) {
@@ -131,7 +131,7 @@ function onDrop(event: DragEvent): void {
         <Upload v-if="seret" class="h-4 w-4 shrink-0 text-brand-tertiary" aria-hidden="true" />
         <FileIcon v-else class="h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
         <span class="truncate" :class="fileName ? 'text-slate-900' : 'text-slate-400'">
-          {{ seret ? 'Lepaskan berkas di sini' : fileName || 'Upload File atau seret berkas ke sini' }}
+          {{ seret ? 'Lepaskan berkas di sini' : fileName || 'Unggah berkas atau seret berkas ke sini' }}
         </span>
       </div>
     </div>
@@ -148,10 +148,10 @@ function onDrop(event: DragEvent): void {
     <div :id="`${id}-hint`" class="mt-1 space-y-0.5 text-[0.6875rem] leading-4 text-slate-400">
       <p v-if="hint">{{ hint }}</p>
       <p>
-        Jenis file yang diperbolehkan <strong class="font-semibold">{{ allowed.join(', ') }}</strong>
+        Jenis berkas yang diperbolehkan <strong class="font-semibold">{{ allowed.join(', ') }}</strong>
       </p>
       <p>
-        Ukuran file max. <strong class="font-semibold">{{ maxMb }}mb</strong>
+        Ukuran berkas maks. <strong class="font-semibold">{{ maxMb }} MB</strong>
       </p>
     </div>
   </div>

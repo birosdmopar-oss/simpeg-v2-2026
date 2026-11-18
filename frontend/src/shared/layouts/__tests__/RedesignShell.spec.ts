@@ -190,11 +190,11 @@ describe('RedesignShell — sidebar & layout', () => {
 
   it('breadcrumb hanya dirender bila diberikan; ruas terakhir bertanda halaman aktif', async () => {
     const without = await mountShell(Role.SUPER_ADMIN)
-    expect(without.wrapper.find('nav[aria-label="Breadcrumb"]').exists()).toBe(false)
+    expect(without.wrapper.find('nav[aria-label="Jejak halaman"]').exists()).toBe(false)
     without.wrapper.unmount()
 
     const { wrapper } = await mountShell(Role.SUPER_ADMIN, '/', {}, [{ label: 'Home' }, { label: 'Daftar Pegawai' }])
-    const crumbs = wrapper.get('nav[aria-label="Breadcrumb"]')
+    const crumbs = wrapper.get('nav[aria-label="Jejak halaman"]')
     expect(crumbs.findAll('li').map((li) => li.text())).toEqual(['Home', 'Daftar Pegawai'])
     expect(crumbs.get('[aria-current="page"]').text()).toBe('Daftar Pegawai')
   })

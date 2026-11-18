@@ -45,7 +45,7 @@ describe('UiFileField', () => {
     await lepas(w, new File(['x'], 'virus.exe'))
     expect(w.get('[role="alert"]').text()).toBe('Jenis file .exe tidak diperbolehkan.')
     await lepas(w, new File([new Uint8Array(1024 * 1024 + 1)], 'besar.pdf'))
-    expect(w.get('[role="alert"]').text()).toBe('Ukuran file melebihi 1 MB.')
+    expect(w.get('[role="alert"]').text()).toBe('Ukuran berkas melebihi 1 MB.')
     expect(w.emitted('change')?.at(-1)).toEqual([null])
     expect(w.find('[data-testid="file-preview"]').exists()).toBe(false)
   })

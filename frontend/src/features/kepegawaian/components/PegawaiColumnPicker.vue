@@ -85,7 +85,7 @@ function apply(): void {
             class="min-w-0 flex-1 bg-transparent text-body1 text-slate-900 outline-none placeholder:text-slate-400"
             data-testid="column-picker-search"
           />
-          <UiButton size="sm" data-testid="column-picker-apply" @click="apply">Apply Column</UiButton>
+          <UiButton size="sm" data-testid="column-picker-apply" @click="apply">Terapkan Kolom</UiButton>
           <button
             type="button"
             class="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-100"
@@ -99,7 +99,7 @@ function apply(): void {
         <div class="scrollbar-slim max-h-80 overflow-y-auto pt-3">
           <UiCheckbox
             :model-value="allChecked"
-            :label="searching ? 'Toggle All Result' : 'Toggle All Column'"
+            :label="searching ? 'Pilih semua hasil' : 'Pilih semua kolom'"
             :disabled="listed.length === 0"
             @update:model-value="toggleAll"
           />
