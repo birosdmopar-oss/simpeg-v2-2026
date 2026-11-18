@@ -327,3 +327,75 @@ describe('R9: halaman kosong sesudah hapus', () => {
     expect(w.find('[data-testid="halo-kontak-kosong"]').exists()).toBe(false)
   })
 })
+
+describe('R10: test admin yang mengikat perilaku', () => {
+  it('filter "Tidak Aktif" → status 0 + page 1; pencarian ter-trim dengan jeda 300 ms', async () => {
+    vi.useFakeTimers()
+    const w = await pasang('kategori')
+    // Pola spec lain (ChatbotManager): nilai UiSelect dipancarkan langsung; opsi "Tidak Aktif" bernilai '0'.
+    w.findAllComponents({ name: 'UiSelect' })[0]!.vm.$emit('update:modelValue', '0')
+    await flushPromises()
+    expect(svc.kategori.list).toHaveBeenLastCalledWith(expect.objectContaining({ status: 0, page: 1 }))
+    const cari = w.get('input[type="search"]')
+    await cari.setValue('  cuti  ')
+    await vi.advanceTimersByTimeAsync(299)
+    expect(svc.kategori.list).not.toHaveBeenLastCalledWith(expect.objectContaining({ q: 'cuti' }))
+    await vi.advanceTimersByTimeAsync(1)
+    await flushPromises()
+    expect(svc.kategori.list).toHaveBeenLastCalledWith(expect.objectContaining({ q: 'cuti', page: 1, status: 0 }))
+  })
+
+  it('kategori lama status 0 pada petugas: badge "(Tidak Aktif)", tercentang & berbadge di Edit, ikut PUT; dilepas → hilang dari payload', async () => {
+    const p = { ...petugasDaftar.data.items[0]!, kategori: [{ id: 1, nama: 'Cuti', status: 1 }, { id: 99, nama: 'Lama', status: 0 }] }
+    svc.petugas.list.mockResolvedValue({ ...petugasDaftar.data, items: [p], total: 1 })
+    svc.petugas.ubah.mockResolvedValue({ ...p, peringatan: null })
+    const w = await pasang('petugas')
+    expect(w.get(`[data-testid="halo-petugas-row-${p.id}"] [data-status="0"]`).text()).toContain('Lama (Tidak Aktif)')
+    await selectRowAction(w, `halo-petugas-actions-${p.id}`, 'edit')
+    await flushPromises()
+    const lama = document.querySelector('[data-testid="halo-petugas-kategori-99"]')!
+    expect((lama.querySelector('input') as HTMLInputElement).checked).toBe(true)
+    expect(lama.textContent).toContain('Tidak Aktif')
+    const form = document.querySelector('[data-testid="halo-petugas-form"]') as HTMLFormElement
+    form.dispatchEvent(new Event('submit'))
+    await flushPromises()
+    expect(svc.petugas.ubah).toHaveBeenLastCalledWith(p.id, expect.objectContaining({ kategori: [1, 99] }))
+    await selectRowAction(w, `halo-petugas-actions-${p.id}`, 'edit')
+    await flushPromises()
+    const input99 = document.querySelector('[data-testid="halo-petugas-kategori-99"] input') as HTMLInputElement
+    input99.checked = false
+    input99.dispatchEvent(new Event('change'))
+    await flushPromises()
+    ;(document.querySelector('[data-testid="halo-petugas-form"]') as HTMLFormElement).dispatchEvent(new Event('submit'))
+    await flushPromises()
+    expect(svc.petugas.ubah).toHaveBeenLastCalledWith(p.id, expect.objectContaining({ kategori: [1] }))
+  })
+
+  it('422 kategori_dipakai saat hapus → pesan BE + daftar dimuat ulang', async () => {
+    const k = kategoriDaftar.data.items.find((x) => x.bisa_hapus)!
+    svc.kategori.hapus.mockRejectedValueOnce(apiError(422, { message: 'Kategori masih dipakai tiket atau petugas. Nonaktifkan kategori ini.', code: 'kategori_dipakai' }))
+    const w = await pasang('kategori')
+    const muat0 = svc.kategori.list.mock.calls.length
+    await selectRowAction(w, `halo-kategori-actions-${k.id}`, 'delete')
+    konfirmasi('Hapus')
+    await flushPromises()
+    expect(w.get('[data-testid="halo-kategori-galat"]').text()).toBe('Kategori masih dipakai tiket atau petugas. Nonaktifkan kategori ini.')
+    expect(svc.kategori.list.mock.calls.length).toBe(muat0 + 1)
+  })
+
+  it('422 petugas_duplikat (errors.id_user) → galat di kolom Akun, tanpa notice ganda', async () => {
+    const bebas = petugasDaftar.data.items.find((x) => x.bisa_hapus)!
+    svc.petugas.ubah.mockRejectedValueOnce(
+      apiError(422, { message: 'Akun ini sudah terdaftar sebagai petugas.', code: 'petugas_duplikat', errors: { id_user: ['Akun ini sudah terdaftar sebagai petugas.'] } }),
+    )
+    const w = await pasang('petugas')
+    await selectRowAction(w, `halo-petugas-actions-${bebas.id}`, 'edit')
+    await flushPromises()
+    ;(document.querySelector('[data-testid="halo-petugas-form"]') as HTMLFormElement).dispatchEvent(new Event('submit'))
+    await flushPromises()
+    const akun = document.querySelector('input[name="akun"]') as HTMLInputElement
+    const ids = (akun.getAttribute('aria-describedby') ?? '').split(' ').filter(Boolean)
+    expect(ids.map((i) => document.getElementById(i)?.textContent?.trim()).join(' ')).toContain('Akun ini sudah terdaftar sebagai petugas.')
+    expect(document.querySelector('[data-testid="halo-petugas-form-galat"]')).toBeNull()
+  })
+})

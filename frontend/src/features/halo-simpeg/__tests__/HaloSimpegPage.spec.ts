@@ -52,6 +52,7 @@ import galat429 from './fixtures/galat-429.json'
 import kategoriOpsi from './fixtures/kategori-opsi.json'
 import kontakAktif from './fixtures/kontak-aktif.json'
 import daftarPemilik from './fixtures/tiket-daftar-pemilik.json'
+import daftarPetugas from './fixtures/tiket-daftar-petugas.json'
 import detailDitutup from './fixtures/tiket-detail-ditutup.json'
 import detailPemilik from './fixtures/tiket-detail-pemilik.json'
 import detailPetugas from './fixtures/tiket-detail-petugas.json'
@@ -937,5 +938,34 @@ describe('R7 (a, c): pengingat di form balas petugas', () => {
     svc.tiket.detail.mockResolvedValueOnce({ ...(detailPetugas.data as TiketDetail), belum_dibaca: false, pengingat: { aktif: true, jatuh_tempo: '2020-01-01T00:00:00Z' } })
     const { w } = await pasang({ idTiket: detailPetugas.data.id })
     expect(w.get('[data-testid="halo-pengingat-jatuh-tempo"]').text()).toContain('Pengingat jatuh tempo')
+  })
+})
+
+describe('R11: ⋮ Hapus di antrean petugas (fixture tiket-daftar-petugas)', () => {
+  it('antrean: Hapus danger aktif → ConfirmDialog → hapus + ringkasan dimuat ulang; tab saya: Hapus hidden (T2)', async () => {
+    svc.petugas.saya.mockResolvedValue({ petugas: true, aktif: true, kategori: [{ id: 1, nama: 'Cuti', status: 1 }], bisa_ekspor: true })
+    const ANTREAN = daftarPetugas.data as Halaman<TiketBaris>
+    svc.tiket.list.mockImplementation(async (f: { peran?: string; perlu_tindak?: boolean }) =>
+      f.peran === 'petugas' ? (f.perlu_tindak ? { ...ANTREAN, items: [], total: 0 } : ANTREAN) : DAFTAR,
+    )
+    svc.tiket.ringkasan.mockResolvedValue({ belum_dibaca_saya: 0, belum_dibaca_petugas: 0, perlu_tindak: 0, badge: 0, total: 0 })
+    const t = ANTREAN.items[0]!
+    svc.tiket.hapus.mockResolvedValueOnce(t.id)
+    const { w } = await pasang({ query: '?tab=antrean' })
+    const aksi = await rowMenuActions(w, `halo-tiket-actions-${t.id}`)
+    expect(aksi.find((a) => a.label === 'Hapus')).toMatchObject({ danger: true, disabled: false })
+    await selectRowAction(w, `halo-tiket-actions-${t.id}`, 'hapus')
+    expect(document.body.textContent).toContain('Apakah anda yakin akan menghapus percakapan ini?')
+    ;([...document.querySelectorAll('[role="alertdialog"] button')].find((b) => b.textContent?.trim() === 'Hapus') as HTMLButtonElement).click()
+    await flushPromises()
+    expect(svc.tiket.hapus).toHaveBeenCalledWith(t.id)
+    await vi.waitFor(() => expect(svc.tiket.ringkasan).toHaveBeenCalled())
+    expect(w.find(`[data-testid="halo-tiket-row-${t.id}"]`).exists()).toBe(false)
+  })
+
+  it('tab saya (pemilik): item Hapus tidak ada (bisa_hapus false dari BE)', async () => {
+    const { w } = await pasang()
+    const id = DAFTAR.items[0]!.id
+    expect((await rowMenuActions(w, `halo-tiket-actions-${id}`)).some((a) => a.label === 'Hapus')).toBe(false)
   })
 })
