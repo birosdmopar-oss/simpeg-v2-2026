@@ -125,8 +125,15 @@ export function muatRingkasan(): Promise<void> {
   return janji
 }
 
+/** Store helpdesk lain (mis. `tiketSaya`) mendaftarkan reset-nya di sini agar ikut dikosongkan tanpa import melingkar. */
+const resetTambahan = new Set<() => void>()
+export function daftarkanResetHalo(fn: () => void): void {
+  resetTambahan.add(fn)
+}
+
 /** Dipanggil dari `clearSession()` (logout / sesi berganti): kosongkan semua state helpdesk. */
 export function resetHaloSimpeg(): void {
+  for (const fn of resetTambahan) fn()
   generasi += 1
   urutanMuat += 1
   urutanRingkasan += 1
