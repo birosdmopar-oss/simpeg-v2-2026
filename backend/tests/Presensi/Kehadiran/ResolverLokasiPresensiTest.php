@@ -8,6 +8,7 @@ use App\Exceptions\ApiException;
 use App\Libraries\Presensi\Geo\LokasiGeofence;
 use App\Libraries\Presensi\Kehadiran\KodeGalatPresensi;
 use App\Libraries\Presensi\Kehadiran\ResolverLokasiPresensi;
+use CodeIgniter\Events\Events;
 use DateTimeImmutable;
 use Tests\Support\DatabaseTestCase;
 use Tests\Support\Kepegawaian\PegawaiFixtureTrait;
@@ -105,5 +106,43 @@ final class ResolverLokasiPresensiTest extends DatabaseTestCase
         $this->db->table('pegawai')->where('nip', $this->p['nip'])->update(['status' => 2]);
 
         $this->assertFalse((new ResolverLokasiPresensi($this->db))->untuk($this->p['nip'], new DateTimeImmutable(self::SENIN))['tercakup']);
+    }
+
+    /**
+     * CR-161 (B-27): resolver hanya mengambil kolom aturan yang dipakai; kolom `*_desc` (MEDIUMTEXT) dan `keterangan`
+     * tidak ikut dibaca, dan hasil resolver tidak berubah walau kolom itu berisi.
+     */
+    public function testHanyaKolomYangDipakaiTanpaKolomDesc(): void
+    {
+        $id = $this->aturan([$this->l1, $this->l2], [$this->p['id_unit']], [1], hari: '1,2');
+        $this->db->table('dm_user_lokasi_presensi')->where('id_dm_user_lokasi_presensi', $id)->update([
+            'target_lp_desc'  => str_repeat('L', 5000), 'target_uns_desc' => str_repeat('U', 5000), 'target_jp_desc' => str_repeat('J', 5000),
+            'target_peg_desc' => str_repeat('P', 5000), 'excl_peg_desc' => str_repeat('E', 5000), 'keterangan' => str_repeat('K', 500),
+        ]);
+
+        $kueri  = [];
+        $dengar = static function ($q) use (&$kueri): void {
+            $kueri[] = (string) $q;
+        };
+        Events::on('DBQuery', $dengar);
+
+        try {
+            $hasil = (new ResolverLokasiPresensi($this->db))->untuk($this->p['nip'], new DateTimeImmutable(self::SENIN));
+        } finally {
+            Events::removeListener('DBQuery', $dengar);
+        }
+
+        $this->assertTrue($hasil['tercakup']);
+        $this->assertSame([$this->l1, $this->l2], array_map(static fn (LokasiGeofence $l): int => $l->id, $hasil['lokasi']));
+
+        $aturan = array_values(array_filter($kueri, static fn (string $q): bool => str_contains($q, 'dm_user_lokasi_presensi')));
+        $this->assertCount(1, $aturan);
+        $this->assertStringNotContainsString('*', $aturan[0]);
+        $this->assertStringNotContainsString('_desc', $aturan[0]);
+        $this->assertStringNotContainsString('keterangan', $aturan[0]);
+
+        foreach (['target_lp', 'target_uns', 'target_jp', 'target_peg', 'excl_peg', 'hari_berlaku'] as $kolom) {
+            $this->assertStringContainsString("`{$kolom}`", $aturan[0]);
+        }
     }
 }

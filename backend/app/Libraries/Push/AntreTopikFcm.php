@@ -52,7 +52,9 @@ final class AntreTopikFcm
         }
 
         try {
-            $adaLkh = $db->table('riwayat_lckh')->where(['nip' => $nip, 'tgl_laporan' => $tgl])->countAllResults() > 0;
+            // Cukup tahu ada/tidaknya LKH hari itu: satu baris, bukan COUNT seluruhnya (CR-161).
+            $hasil  = $db->table('riwayat_lckh')->select('1 AS ada', false)->where(['nip' => $nip, 'tgl_laporan' => $tgl])->limit(1)->get();
+            $adaLkh = $hasil !== false && $hasil->getRowArray() !== null;
         } catch (Throwable $e) {
             log_message('warning', 'Topik FCM presensi pulang tidak diantre: {pesan}', ['pesan' => $e->getMessage()]);
 

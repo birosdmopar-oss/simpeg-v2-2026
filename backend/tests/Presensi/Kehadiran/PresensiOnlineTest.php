@@ -7,6 +7,7 @@ namespace Tests\Presensi\Kehadiran;
 use App\Exceptions\ApiException;
 use App\Libraries\Presensi\Geo\Haversine;
 use App\Libraries\Presensi\Kehadiran\KodeGalatPresensi;
+use CodeIgniter\Events\Events;
 use Tests\Support\DatabaseTestCase;
 use Tests\Support\Kepegawaian\PegawaiFixtureTrait;
 use Tests\Support\Presensi\PresensiUjiTrait;
@@ -178,5 +179,63 @@ final class PresensiOnlineTest extends DatabaseTestCase
             $hariIni['presensi'], $hariIni['wajib_geofence'],
         ]);
         $this->assertSame([$this->lokasi], array_column($hariIni['lokasi'], 'id_lokasi_presensi'));
+    }
+
+    /**
+     * CR-161 (B-08): respons masuk/pulang dibentuk dari baris yang ditulis, sama persis dengan baris tersimpan, dan
+     * `dh_online` tidak dibaca ulang sesudah tulis (masuk: cek awal + kunci; pulang: kunci saja).
+     */
+    public function testResponsDariDataTulisSamaDenganBarisTersimpanTanpaBacaUlang(): void
+    {
+        $auth = $this->authPegawai($this->nip);
+        $di   = ['latitude' => self::LAT, 'longitude' => self::LNG];
+
+        [[$s1, $d1], $k1] = $this->rekam(fn (): array => $this->online('2026-10-27 07:00:00')->masuk($auth, $di));
+        $row              = $this->barisDh($this->nip, '2026-10-27');
+        $this->assertSame([201, $row['jam_masuk'], $row['jam_pulang']], [$s1, $d1['jam_masuk'], $d1['jam_pulang']]);
+        $this->assertSame(['07:00:00', null], [$d1['jam_masuk'], $d1['jam_pulang']]);
+        $this->assertCount(2, $this->bacaDh($k1), 'masuk: cek awal + SELECT FOR UPDATE');
+
+        [[$s2, $d2], $k2] = $this->rekam(fn (): array => $this->online('2026-10-27 16:00:00')->pulang($auth, $di));
+        $row              = $this->barisDh($this->nip, '2026-10-27');
+        $this->assertSame([200, $row['jam_masuk'], $row['jam_pulang']], [$s2, $d2['jam_masuk'], $d2['jam_pulang']]);
+        $this->assertSame(['07:00:00', '16:00:00'], [$d2['jam_masuk'], $d2['jam_pulang']]);
+        $this->assertSame(['tgl', 'jam_masuk', 'jam_pulang', 'id_lokasi_pulang', 'jarak_m'], array_keys($d2), 'bentuk respons tetap');
+
+        $baca = $this->bacaDh($k2);
+        $this->assertCount(1, $baca, 'pulang: hanya SELECT FOR UPDATE');
+        $this->assertStringContainsString('FOR UPDATE', $baca[0]);
+    }
+
+    /**
+     * @param list<string> $kueri
+     *
+     * @return list<string>
+     */
+    private function bacaDh(array $kueri): array
+    {
+        return array_values(array_filter($kueri, static fn (string $q): bool => str_starts_with(ltrim($q), 'SELECT') && str_contains($q, 'dh_online')));
+    }
+
+    /**
+     * @template T
+     *
+     * @param callable(): T $f
+     *
+     * @return array{0: T, 1: list<string>}
+     */
+    private function rekam(callable $f): array
+    {
+        $kueri  = [];
+        $dengar = static function ($q) use (&$kueri): void {
+            $kueri[] = (string) $q;
+        };
+        Events::on('DBQuery', $dengar);
+
+        try {
+            return [$f(), $kueri];
+        } finally {
+            Events::removeListener('DBQuery', $dengar);
+        }
     }
 }
