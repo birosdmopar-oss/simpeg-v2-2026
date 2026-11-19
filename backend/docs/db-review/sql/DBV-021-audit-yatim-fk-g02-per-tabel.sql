@@ -34,6 +34,11 @@
 --   mysql --table -vvv --default-character-set=utf8mb4 --user=<akun_baca> -p <db_v2_tujuan> \
 --         < backend/docs/db-review/sql/DBV-021-audit-yatim-fk-g02-per-tabel.sql > hasil_audit_dbv021.txt 2>&1
 --   Perkiraan awal di salinan legacy: nama tabel/kolom anak dan induk = D1 (sama); jalankan di skema salinan/gladi.
+--   Galat di tengah berkas (tanpa `--force`, mis. "Table doesn't exist" di salinan legacy yang tidak memuat salah satu tabel
+--   anak) menghentikan kueri berikutnya: catat galat itu di lembar hasil, buang blok A/B tabel tersebut di salinan kerja
+--   berkas (bukan di repo), lalu jalankan ulang. DB ber-`DBPrefix`: sesuaikan nama tabel di salinan kerja berkas (pola
+--   runbook DBV-028), bukan di repo.
+--   Cakupan hanya 55 FK DBV-019; 28 FK G-02 lain di luar berkas ini (dokumen DBV-021 Bagian 1, batas cakupan).
 --
 -- LARANGAN: jangan jalankan di DB produksi legacy yang sedang melayani aplikasi. Jalankan hanya di DB v2 tujuan (setelah
 -- impor) atau di salinan dump final / salinan gladi (DBV-011 2.4 langkah 1). Perbaikan nilai yatim dikerjakan di salinan

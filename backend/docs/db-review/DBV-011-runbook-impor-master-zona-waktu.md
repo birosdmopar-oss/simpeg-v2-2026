@@ -581,7 +581,7 @@ per tabel anak (`pegawai_plh`), Bagian 3 = FK masuk, Bagian 4 = rujukan ke maste
 **Lengkap per tabel anak (DBV-021, ISSUE-045):** `backend/docs/db-review/sql/DBV-021-audit-yatim-fk-g02-per-tabel.sql` —
 Bagian A = 10 kueri ringkasan (satu per tabel anak, ke-55 FK tertulis lengkap, WAJIB_0), Bagian B = contoh nilai yatim
 per FK (INFO, hanya id master). Berkas ini menggantikan pengulangan manual Bagian 1–2 berkas DBV-019; Bagian 3–4 tetap
-dari berkas DBV-019 (dokumen `DBV-021-audit-yatim-fk-g02-per-tabel.md`).
+dari berkas DBV-019 (dokumen `DBV-021-audit-yatim-fk-g02-per-tabel.md`). Galat di tengah berkas (tanpa `--force`, mis. "Table doesn't exist" di salinan legacy yang tidak memuat salah satu tabel anak) menghentikan kueri berikutnya: catat galat itu di lembar hasil, buang blok A/B tabel tersebut **di salinan kerja berkas** (bukan di repo), lalu jalankan ulang. DB ber-`DBPrefix`: sesuaikan nama tabel di salinan kerja berkas (pola runbook DBV-028), bukan di repo.
 
 **Klasifikasi** (arti awalan = 2.3):
 
