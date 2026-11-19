@@ -25,7 +25,7 @@ concurrency:
 env:
   PHP_VERSION: '8.4'
   PHP_EXTENSIONS: intl, mbstring, mysqli, curl, gd, zip, sodium, fileinfo
-  # Samakan dengan frontend/.nvmrc (24). Seri aman yang diterima guard: 22.x >= 22.23.4, 24.x >= 24.22.1 (CR-154, ISSUE-054).
+  # Samakan dengan frontend/.nvmrc (24). Daftar seri aman PHP/Node satu-satunya ada di deploy/cek-versi-runtime.sh (CR-154, ISSUE-053/054).
   NODE_VERSION: '24'
   # Jumlah shard PHPUnit per DB. Ubah BERSAMAAN dengan matrix.shard di job phpunit (dicek otomatis di job itu).
   PHPUNIT_SHARDS: 4
