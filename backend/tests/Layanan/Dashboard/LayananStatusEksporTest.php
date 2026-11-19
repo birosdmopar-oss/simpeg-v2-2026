@@ -8,6 +8,8 @@ use App\Constants\Role;
 use App\Exceptions\ForbiddenException;
 use App\Exceptions\ValidationException;
 use App\Libraries\Layanan\LayananDashboardService;
+use App\Libraries\Layanan\PetugasLayananService;
+use CodeIgniter\Events\Events;
 use CodeIgniter\Test\FeatureTestTrait;
 use Config\Services;
 use Tests\Support\AuthTestTrait;
@@ -88,6 +90,86 @@ final class LayananStatusEksporTest extends DatabaseTestCase
         $this->assertMatchesRegularExpression('/^\d{2}-\d{2}-\d{4}$/', $baris[1][5]);
         $this->assertSame('Menunggu PIC', $baris[1][6]);
         $this->assertSame(LayananDashboardService::CATATAN_TANPA_PIC, $baris[1][7]);
+    }
+
+    /**
+     * CR-160 (B-07): ekspor role 3 tidak lagi menjalankan cek akses detail per pegawai (hasilnya tidak dipakai kolom
+     * ekspor), jadi jumlah kueri tidak bertambah mengikuti jumlah pegawai; isi kolom PIC tetap terisi.
+     */
+    public function testEksporRole3JumlahKueriTidakMengikutiJumlahPegawai(): void
+    {
+        [$adminSatker] = $this->aktorStudi(Role::ADMIN_SATKER, [], $this->satker);
+        [$pic]         = $this->aktorStudi(Role::PEGAWAI, ['nama' => 'Petugas Tugas Belajar']);
+        $this->jadikanPic($pic, PetugasLayananService::JENIS_TB);
+
+        $ekspor = function () use ($adminSatker): array {
+            $kueri  = [];
+            $dengar = static function ($q) use (&$kueri): void {
+                $kueri[] = (string) $q;
+            };
+            Events::on('DBQuery', $dengar);
+
+            try {
+                Services::resetSingle('response');
+                $res = $this->sebagai($adminSatker)->get('api/v1/layanan/status/ekspor?format=csv');
+                $res->assertStatus(200);
+            } finally {
+                Events::removeListener('DBQuery', $dengar);
+            }
+
+            return [array_map(static fn (string $b): array => str_getcsv($b, ',', '"', ''), array_values(array_filter(explode("\n", substr((string) $res->response()->getBody(), 3))))), count($kueri)];
+        };
+
+        [$barisAwal, $kueriAwal] = $ekspor();
+        $this->assertCount(1 + 4, $barisAwal, 'header + cuti/TB/IB/PMK satu pegawai satker');
+
+        for ($i = 0; $i < 4; $i++) {
+            [$nip] = $this->aktorStudi(Role::PEGAWAI, [], $this->satker);
+            $this->sisipCuti($nip);
+            $this->sisipStudi('tb', $nip);
+        }
+
+        [$baris, $kueri] = $ekspor();
+        $this->assertCount(1 + 4 + 8, $baris);
+        $this->assertSame($kueriAwal, $kueri, 'jumlah kueri sama walau pegawai bertambah (tanpa N+1 cek akses detail)');
+
+        $tb = array_values(array_filter($baris, static fn (array $b): bool => ($b[3] ?? '') === 'Tugas Belajar'));
+        $this->assertCount(5, $tb);
+
+        foreach ($tb as $b) {
+            $this->assertStringStartsWith('PIC: Petugas Tugas Belajar', $b[7]);
+        }
+    }
+
+    /**
+     * CR-160 (B-07): PIC aktif per jenis dimuat sekali untuk seluruh berkas, bukan sekali per potongan 500 baris.
+     */
+    public function testEksporPicDimuatSekaliWalauLebihDariSatuPotongan(): void
+    {
+        [, $admin] = $this->aktorStudi(Role::SUPER_ADMIN);
+        [$pic]     = $this->aktorStudi(Role::PEGAWAI, ['nama' => 'Petugas Tugas Belajar']);
+        $this->jadikanPic($pic, PetugasLayananService::JENIS_TB);
+
+        for ($i = 0; $i < 501; $i++) {
+            $this->sisipStudi('tb', $this->dalam);
+        }
+
+        $kueri  = [];
+        $dengar = static function ($q) use (&$kueri): void {
+            $kueri[] = (string) $q;
+        };
+        Events::on('DBQuery', $dengar);
+
+        try {
+            $hasil = (new LayananDashboardService())->ekspor($admin, ['format' => 'csv', 'jenis' => 'tb']);
+        } finally {
+            Events::removeListener('DBQuery', $dengar);
+        }
+
+        $baris = array_values(array_filter(explode("\n", substr($hasil['isi'], 3))));
+        $this->assertCount(1 + 503, $baris, 'header + 501 baris + 2 baris setUp');
+        $this->assertSame(503, substr_count($hasil['isi'], 'PIC: Petugas Tugas Belajar'), 'setiap baris di kedua potongan memuat PIC');
+        $this->assertCount(1, array_filter($kueri, static fn (string $q): bool => str_contains($q, 'petugas_layanan')), 'PIC TB dibaca sekali untuk dua potongan');
     }
 
     public function testXlsxDefaultDanIsiSheet(): void
