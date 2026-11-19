@@ -8,6 +8,7 @@ use App\Constants\Role;
 use App\Interfaces\Kepegawaian\RiwayatRegistryInterface;
 use App\Libraries\Auth\AuthContext;
 use CodeIgniter\Database\BaseConnection;
+use RuntimeException;
 
 /**
  * S2 — notifikasi hasil proses riwayat/biodata/LKH/Konket lewat kolom `show_notif` tabel sumbernya [K].
@@ -100,9 +101,16 @@ final class SumberShowNotif implements SumberDaftar
             return [];
         }
 
+        $kueri = $this->db->query(implode(' UNION ALL ', $cabang));
+
+        // Tanpa DBDebug kueri gagal mengembalikan false: laporkan galatnya dengan jelas (mis. kolom sumber yang tertinggal).
+        if ($kueri === false) {
+            throw new RuntimeException('Hitung notifikasi show_notif gagal: ' . ($this->db->error()['message'] ?? 'galat DB'));
+        }
+
         $hasil = [];
 
-        foreach ($this->db->query(implode(' UNION ALL ', $cabang))->getResultArray() as $r) {
+        foreach ($kueri->getResultArray() as $r) {
             $hasil[(string) $r['kunci']] = (int) $r['jumlah'];
         }
 
