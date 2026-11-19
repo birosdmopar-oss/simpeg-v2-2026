@@ -25,7 +25,7 @@ concurrency:
 env:
   PHP_VERSION: '8.4'
   PHP_EXTENSIONS: intl, mbstring, mysqli, curl, gd, zip, sodium, fileinfo
-  # Samakan dengan frontend/.nvmrc (24). Versi aman: 22.23.4 / 24.22.1 / 26.12.1 (CR-094, ISSUE-054).
+  # Samakan dengan frontend/.nvmrc (24). Seri aman yang diterima guard: 22.x >= 22.23.4, 24.x >= 24.22.1 (CR-154, ISSUE-054).
   NODE_VERSION: '24'
   # Jumlah shard PHPUnit per DB. Ubah BERSAMAAN dengan matrix.shard di job phpunit (dicek otomatis di job itu).
   PHPUNIT_SHARDS: 4
@@ -52,6 +52,9 @@ jobs:
       - name: Catat versi PHP (CR-094)
         run: php -v
 
+      - name: Guard versi PHP aman (CR-154, ISSUE-053)
+        run: bash ../deploy/cek-versi-runtime.sh php
+
       - name: Lokasi cache Composer
         id: composer-cache
         run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
@@ -61,6 +64,9 @@ jobs:
           path: ${{ steps.composer-cache.outputs.dir }}
           key: composer-${{ runner.os }}-php${{ env.PHP_VERSION }}-${{ hashFiles('backend/composer.lock') }}
           restore-keys: composer-${{ runner.os }}-php${{ env.PHP_VERSION }}-
+
+      - name: Uji logika guard versi runtime dengan versi tiruan (CR-154)
+        run: bash ../deploy/cek-versi-runtime.test.sh
 
       - name: Verifikasi cakupan shard PHPUnit (setiap file test tepat satu shard)
         run: php tests/_support/ci/shard.php --verify "$PHPUNIT_SHARDS"
@@ -93,6 +99,9 @@ jobs:
 
       - name: Catat versi Node (CR-094)
         run: node -v
+
+      - name: Guard versi Node aman (CR-154, ISSUE-054)
+        run: bash ../deploy/cek-versi-runtime.sh node
 
       - name: npm ci
         run: npm ci --no-audit --no-fund
@@ -173,6 +182,9 @@ jobs:
 
       - name: Catat versi PHP (CR-094)
         run: php -v
+
+      - name: Guard versi PHP aman (CR-154, ISSUE-053)
+        run: bash ../deploy/cek-versi-runtime.sh php
 
       - name: Lokasi cache Composer
         id: composer-cache
