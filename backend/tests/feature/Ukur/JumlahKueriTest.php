@@ -31,6 +31,16 @@ use Tests\Support\Ukur\PenghitungKueri;
  * Di-skip kecuali env `RUN_UKUR=1` (pola `RUN_VOLUME_TEST`). Data sintetis minimal: atasan dengan 3 bawahan, cuti dan LKH
  * menunggu atasan, petugas helpdesk dengan satu tiket.
  *
+ * Mode **dingin** (kolom utama) meniru request PHP-FPM pertama: sebelum tiap request terukur, cache yang tidak bertahan
+ * antar-request FPM dikosongkan — `dataCache` koneksi DB (`tableExists`/`getFieldNames`), semua service shared
+ * (`Services::reset(true)`, termasuk memo registry lonceng) dan model (`Factories::reset('models')`); throttler uji dipasang
+ * ulang, override config test tetap. Dengan begitu urutan request tidak lagi memengaruhi hitungan. Kolom **hangat** = request
+ * GET yang sama diulang segera tanpa reset (perilaku proses yang sama); POST tidak diulang (efek samping), ditulis `-`.
+ *
+ * Deviasi config test (kode aplikasi tidak disentuh): `Time::setTestNow` 2026-11-10 10:00 WIB; jendela presensi masuk/pulang
+ * dilebarkan 00:00–23:59 (service presensi memakai jam server); `Dashboard::ttlRingkasanDetik = 0` sehingga beranda diukur
+ * tanpa cache ringkasan (jalur terburuk, bukan jalur ber-cache); `captchaDriver = mock`.
+ *
  * @internal
  */
 #[Group('ukur')]
@@ -50,7 +60,7 @@ final class JumlahKueriTest extends DatabaseTestCase
     protected $seed = MasterDataSeeder::class;
 
     /**
-     * @var list<array{0: string, 1: string, 2: int, 3: int, 4: int, 5: int}>
+     * @var list<array{0: string, 1: string, 2: int, 3: int, 4: int, 5: int|string, 6: int}>
      */
     private array $hasil = [];
 
@@ -135,6 +145,35 @@ final class JumlahKueriTest extends DatabaseTestCase
      */
     private function ukur(string $endpoint, string $role, ?array $akun, string $metode, string $path, array $body = [], array|int $harap = 200): void
     {
+        [$res, $dingin] = $this->satuRequest($akun, $metode, $path, $body, true);
+        $hangat         = $metode === 'get' ? $this->satuRequest($akun, $metode, $path, $body, false)[1]->total() : '-';
+
+        $status        = $res->response()->getStatusCode();
+        $this->hasil[] = [$endpoint, $role, $dingin->total(), $dingin->metadata(), $dingin->data(), $hangat, $status];
+        $hitung        = $dingin;
+
+        $this->assertContains($status, (array) $harap, "{$endpoint} ({$role}): " . substr((string) $res->response()->getBody(), 0, 300));
+        $this->assertGreaterThan(0, $hitung->total(), "{$endpoint} ({$role}): kueri terhitung");
+    }
+
+    /**
+     * Satu request terukur; `$dingin` = kosongkan cache per-proses lebih dulu (meniru request FPM baru).
+     *
+     * @param array<string, mixed>|null $akun
+     * @param array<string, mixed>      $body
+     *
+     * @return array{0: TestResponse, 1: PenghitungKueri}
+     */
+    private function satuRequest(?array $akun, string $metode, string $path, array $body, bool $dingin): array
+    {
+        if ($dingin) {
+            $this->assertSame($this->db, db_connect(), 'aplikasi memakai koneksi yang sama dengan test');
+            Services::reset(true);
+            Factories::reset('models');
+            $this->db->resetDataCache();
+            $this->pasangThrottlerHs();
+        }
+
         Services::resetSingle('response'); // Response dipakai bersama antar-request di feature test (CR-151)
         $klien = $akun === null ? $this : $this->asUser($akun);
 
@@ -153,11 +192,7 @@ final class JumlahKueriTest extends DatabaseTestCase
             $this->clearAuthState();
         }
 
-        $status        = $res->response()->getStatusCode();
-        $this->hasil[] = [$endpoint, $role, $hitung->total(), $hitung->metadata(), $hitung->data(), $status];
-
-        $this->assertContains($status, (array) $harap, "{$endpoint} ({$role}): " . substr((string) $res->response()->getBody(), 0, 300));
-        $this->assertGreaterThan(0, $hitung->total(), "{$endpoint} ({$role}): kueri terhitung");
+        return [$res, $hitung];
     }
 
     /**
@@ -230,7 +265,7 @@ final class JumlahKueriTest extends DatabaseTestCase
 
     private function cetak(): void
     {
-        $kepala = ['endpoint', 'role', 'total', 'metadata', 'data', 'HTTP'];
+        $kepala = ['endpoint', 'role', 'total dingin', 'metadata', 'data', 'total hangat', 'HTTP'];
         $lebar  = array_map('strlen', $kepala);
 
         foreach ($this->hasil as $b) {
@@ -249,7 +284,7 @@ final class JumlahKueriTest extends DatabaseTestCase
             return '| ' . implode(' | ', $isi) . " |\n";
         };
 
-        $out = "\nCR-157 jumlah kueri per endpoint\n" . $garis($kepala) . $garis(array_map(static fn (int $l): string => str_repeat('-', $l), $lebar));
+        $out = "\nCR-157 jumlah kueri per endpoint (dingin = request FPM pertama; hangat = GET diulang di proses yang sama)\n" . $garis($kepala) . $garis(array_map(static fn (int $l): string => str_repeat('-', $l), $lebar));
 
         foreach ($this->hasil as $b) {
             $out .= $garis($b);
