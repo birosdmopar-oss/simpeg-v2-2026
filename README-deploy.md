@@ -430,16 +430,16 @@ Job = command `php spark` + `cron.d` user `deploy` + `flock -n` (tanpa endpoint 
 |---|---|---|
 | `layanan:status-harian` | 00:30 setiap hari | H-11 (MAKE-062) |
 | `pengguna:sinkron-nama` | 01:00 setiap hari (USULAN, PN-5: dicocokkan dengan crontab legacy) | F6-21 bersyarat (MAKE-062) |
-| `cuti:saldo-tahunan "<tahun>"` | 01:00 setiap 1 Januari (keputusan Horii 19-11-2026, opsi (a)) | PRD Fase 4 §6.3.6 (CR-158) |
+| `cuti:saldo-tahunan "<tahun UTC>"` | 08:00 waktu server setiap 1 Januari (keputusan Horii 19-11-2026, opsi (a); jam dipilih aman untuk server WIB maupun UTC, lihat catatan) | PRD Fase 4 §6.3.6 (CR-158) |
 
 ```bash
 # /etc/cron.d/simpeg-v2-status-harian
 30 0 * * * deploy cd /var/www/simpeg-v2/current/backend && flock -n /tmp/simpeg-v2-status-harian.lock php spark layanan:status-harian >> /var/www/simpeg-v2/logs/status-harian.log 2>&1
 # /etc/cron.d/simpeg-v2-sinkron-nama (usulan)
 0 1 * * * deploy cd /var/www/simpeg-v2/current/backend && flock -n /tmp/simpeg-v2-sinkron-nama.lock php spark pengguna:sinkron-nama >> /var/www/simpeg-v2/logs/sinkron-nama.log 2>&1
-# /etc/cron.d/simpeg-v2-cuti-saldo-tahunan — saldo cuti tahun baru, 1 Januari 01:00 (zona waktu server). Tahun dari tanggal server;
-# `%` wajib di-escape (`\%`) di cron.d, kalau tidak cron memotong baris di `%`.
-0 1 1 1 * deploy cd /var/www/simpeg-v2/current/backend && flock -n /tmp/simpeg-v2-cuti-saldo-tahunan.lock php spark cuti:saldo-tahunan "$(date +\%Y)" >> /var/www/simpeg-v2/logs/cuti.log 2>&1
+# /etc/cron.d/simpeg-v2-cuti-saldo-tahunan — saldo cuti tahun baru, 1 Januari 08:00 waktu server. Tahun diambil dalam UTC (`date -u`),
+# sama dengan PHP (`appTimezone` = UTC). `%` wajib di-escape (`\%`) di cron.d, kalau tidak cron memotong baris di `%`.
+0 8 1 1 * deploy cd /var/www/simpeg-v2/current/backend && flock -n /tmp/simpeg-v2-cuti-saldo-tahunan.lock php spark cuti:saldo-tahunan "$(date -u +\%Y)" >> /var/www/simpeg-v2/logs/cuti.log 2>&1
 ```
 
 `cuti:saldo-tahunan` (PRD Fase 4 §6.3.6, Q-02; command sejak Fase 4, jadwalnya di runbook ini sesuai docblock command, PRD Fase 4 dan
@@ -448,18 +448,23 @@ ADR-037; CR-158):
 - **Fungsi.** Membentuk baris `pegawai_sisa_cuti` tahun baru (N, N-1, N-2; rumus `calculate_yearly_sc_2` + lantai N ≥ 0) untuk
   pegawai `status = 1` dan `id_jenis_pegawai IN (1, 6)`. Tanpa baris itu pegawai tidak bisa mengajukan cuti tahunan di tahun baru.
   Legacy: cron `calculate_yearly_sc` 1 Januari.
-- **Argumen tahun wajib** (tanpa angka → `EXIT_USER_INPUT`); eksekusi tulis hanya untuk tahun ≥ 2027 (saldo 2026 sengaja tidak
-  otomatis). Command **tidak** memegang `GET_LOCK`, jadi barisnya memakai `flock -n`.
-- **Zona waktu.** Jam cron mengikuti zona waktu server. Bila server UTC, `0 1 1 1 *` jatuh 08:00 WIB 1 Januari; tanggal dan tahunnya
-  tetap benar, jadi aman.
-- **Langkah tahunan operator.** Sehari atau lebih sebelum 1 Januari: `php spark cuti:saldo-tahunan <tahun_baru> --dry-run` (hanya
-  ringkasan jumlah dibuat/dilewati dan distribusi N-1/N-2, tanpa menulis), serahkan ringkasannya ke Biro SDM. Sesudah 1 Januari: cek
-  `logs/cuti.log` (jumlah baris dibuat > 0, kode keluar 0).
+- **Argumen tahun wajib** (tanpa angka → `EXIT_USER_INPUT`) dan harus **≤ tahun berjalan menurut UTC**
+  (`SaldoTahunanService::jalankan`: `$tahun > (int) date('Y')` ditolak; PHP memakai `appTimezone` = UTC, `Config/App.php`). Eksekusi
+  tulis hanya untuk tahun ≥ 2027 (saldo 2026 sengaja tidak otomatis). Command **tidak** memegang `GET_LOCK`, jadi barisnya memakai `flock -n`.
+- **Zona waktu (kenapa 08:00 dan `date -u`).** Jam cron mengikuti zona waktu server, tetapi tahun berjalan dihitung PHP dalam UTC.
+  Server WIB: 08:00 WIB = 01:00 UTC 1 Januari. Server UTC: 08:00 UTC = 15:00 WIB 1 Januari. Pada kedua kasus tahun UTC sudah tahun baru,
+  dan `date -u` memberi tahun yang sama dengan PHP. Jadwal lebih awal (mis. 01:00 WIB = 31 Desember 18:00 UTC) membuat argumen tahun
+  baru > tahun berjalan PHP → ditolak `EXIT_USER_INPUT` dan saldo **tidak** terbentuk. 1 Januari hari libur, jadi saldo yang terbentuk
+  pagi/siang hari tidak mengganggu pengajuan cuti.
+- **Langkah tahunan operator.** Sesudah cron 1 Januari: cek `logs/cuti.log` (jumlah dibuat/dilewati, distribusi N-1/N-2, kode keluar 0)
+  dan serahkan ringkasannya ke Biro SDM. `--dry-run` untuk tahun baru **tidak bisa** dijalankan sebelum tahun berganti (validasi tahun
+  berjalan lebih dulu dari cek dry-run). Opsi bila Biro SDM ingin pratinjau: `php spark cuti:saldo-tahunan <tahun_baru> --dry-run`
+  pada 1 Januari ≥ 07:00 WIB (= 00:00 UTC) dan sebelum cron 08:00 (server WIB).
 - **Pemulihan.** Gagal (kode keluar ≠ 0, mis. DB tidak terjangkau) → jalankan ulang perintah yang sama secara manual. Idempoten: NIP
   yang sudah punya baris `(nip, tahun)` dilewati.
 - **Pegawai baru di tengah tahun.** Dengan opsi (a), pegawai yang masuk sesudah 1 Januari tidak mendapat baris saldo tahun berjalan dan
   Biro SDM mengisinya manual (menu Tambah saldo), sama dengan legacy dan keputusan 2026. Opsi (b), **belum dipilih, tanpa baris cron
-  aktif**: ulang idempoten tiap tanggal 1 (mis. `30 1 1 * *`, lock dan argumen sama) sehingga pegawai baru mendapat baris otomatis
+  aktif**: ulang idempoten tiap tanggal 1 (mis. `30 8 1 * *` — jam ≥ 08:00 alasan yang sama dengan zona waktu di atas — lock dan argumen `date -u` sama) sehingga pegawai baru mendapat baris otomatis
   (pool 0, N = 12); bila kelak dipilih, jadikan pertanyaan Trello Question lebih dulu.
 
 `layanan:status-harian` (H-11, Q6-24..Q6-27):
