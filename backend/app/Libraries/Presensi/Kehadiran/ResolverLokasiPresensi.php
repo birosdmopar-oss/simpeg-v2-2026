@@ -26,6 +26,13 @@ use DateTimeInterface;
  */
 final class ResolverLokasiPresensi
 {
+    /**
+     * Kolom aturan yang dibaca {@see berlaku()} dan pengambilan `target_lp` (CR-161). Kolom `*_desc` (MEDIUMTEXT) dan
+     * `keterangan` sengaja tidak diambil: tidak dipakai resolver dan dibayar di setiap presensi/cek-lokasi. Bila
+     * `berlaku()` kelak membaca kolom lain, tambahkan di sini.
+     */
+    private const KOLOM_ATURAN = 'target_lp, target_uns, target_jp, target_peg, excl_peg, hari_berlaku';
+
     public function __construct(private readonly BaseConnection $db)
     {
     }
@@ -49,7 +56,7 @@ final class ResolverLokasiPresensi
         $hari  = (string) (int) $tanggalLokal->format('N');
         $idLok = [];
 
-        foreach ($this->db->table('dm_user_lokasi_presensi')->where('status', 1)->get()->getResultArray() as $aturan) {
+        foreach ($this->db->table('dm_user_lokasi_presensi')->select(self::KOLOM_ATURAN)->where('status', 1)->get()->getResultArray() as $aturan) {
             if ($this->berlaku($aturan, $pegawai, $hari)) {
                 array_push($idLok, ...AturanLokasiPresensiHooks::storedIds($aturan['target_lp'] ?? null));
             }

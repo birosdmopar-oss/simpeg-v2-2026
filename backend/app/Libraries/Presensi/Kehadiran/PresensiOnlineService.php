@@ -35,7 +35,9 @@ use Throwable;
  * - Geofence: aturan lokasi dinamis ({@see ResolverLokasiPresensi}) + {@see PenilaianGeofence} (jarak ≤ radius, salah
  *   satu lokasi cukup); tidak tercakup → tanpa syarat koordinat. `cek-lokasi` memakai penilaian yang sama, tanpa menulis.
  * - Tulis satu transaksi, baris `(nip, tgl)` dikunci `FOR UPDATE`; masuk first-wins, pulang last-wins; 1062 (dua permintaan
- *   bersamaan) → baca ulang dan terapkan aturan yang sama (tidak pernah 500). `sumber` 1, tetap 2 bila baris manual.
+ *   bersamaan) atau deadlock 1213 → ulang sekali dengan aturan yang sama; bentrok yang berulang dan lock wait 1205
+ *   berakhir sebagai galat server "Presensi bentrok berulang." (500 lewat handler global). `sumber` 1, tetap 2 bila
+ *   baris manual.
  *   Audit `create`/`update` `dh_online` `{nip}:{tgl}` di transaksi yang sama (§8.1; PK komposit → audit manual).
  */
 final class PresensiOnlineService
@@ -52,6 +54,12 @@ final class PresensiOnlineService
 
     private const ER_DUP_ENTRY = 1062;
 
+    /** Galat kunci karena permintaan lain untuk (nip, tgl) yang sama: 1205 lock wait timeout, 1213 deadlock (CR-161). */
+    private const GALAT_KUNCI = [1205, 1213];
+
+    /** Deadlock: InnoDB sudah memilih transaksi ini sebagai korban dan melepas kuncinya, jadi mengulang langsung masuk akal. */
+    private const ER_LOCK_DEADLOCK = 1213;
+
     private readonly Presensi $config;
 
     /** @var Closure(): DateTimeInterface */
@@ -61,12 +69,15 @@ final class PresensiOnlineService
      * @param (Closure(): DateTimeInterface)|null   $jam              instan sekarang (bawaan jam server); disuntik test
      * @param (Closure(string, string): void)|null $kaitSebelumTulis seam test konkurensi (AC-D02.10): dipanggil setelah
      *                                                                 pemeriksaan awal, tepat sebelum transaksi tulis
+     * @param (Closure(int): void)|null            $kaitAwalTransaksi seam test galat kunci (CR-161): dipanggil di awal tiap
+     *                                                                 transaksi tulis, sebelum baris dikunci, dengan nomor percobaan
      */
     public function __construct(
         private readonly ?BaseConnection $db = null,
         ?Presensi $config = null,
         ?Closure $jam = null,
         private readonly ?Closure $kaitSebelumTulis = null,
+        private readonly ?Closure $kaitAwalTransaksi = null,
     ) {
         $this->config = $config ?? config(Presensi::class);
         $this->jam    = $jam ?? static fn (): DateTimeInterface => new DateTimeImmutable('now', new DateTimeZone('UTC'));
@@ -237,8 +248,9 @@ final class PresensiOnlineService
             ($masuk ? 'akurasi_masuk' : 'akurasi_pulang')     => $akurasi === null ? null : number_format($akurasi, 2, '.', ''),
             ($masuk ? 'id_lokasi_masuk' : 'id_lokasi_pulang') => $pengesah?->id,
         ];
-        $status = $this->tulis($db, $auth, $nip, $tgl, $masuk, $data);
-        $row    = $this->baris($db, $nip, $tgl) ?? throw new RuntimeException('Baris presensi hilang setelah ditulis.');
+        // Respons dibentuk dari baris yang baru ditulis di dalam transaksi (baris terkunci + nilai yang ditulis), tanpa
+        // membaca ulang `dh_online` (CR-161).
+        [$status, $row] = $this->tulis($db, $auth, $nip, $tgl, $masuk, $data);
         // F6-12 (Fase 6 MAKE-066): keanggotaan topik presensi FCM ikut legacy, diantre sesudah commit; gagal tidak dilempar.
         (new \App\Libraries\Push\AntreTopikFcm())->presensi($db, $nip, $tgl, $masuk);
 
@@ -252,11 +264,20 @@ final class PresensiOnlineService
     }
 
     /**
-     * Tulis satu transaksi dengan kunci baris; 1062 → ulang sekali dengan baris yang kini ada.
+     * Tulis satu transaksi dengan kunci baris; 1062 → ulang sekali dengan baris yang kini ada. Galat kunci akibat
+     * permintaan lain untuk (nip, tgl) yang sama, misalnya ketuk ganda, pada kueri `dh_online` maupun INSERT auditnya:
+     * transaksi di-rollback penuh (termasuk audit), sehingga tetap satu entri audit per tulis yang berhasil.
+     *  - Deadlock (1213): diulang sekali, seperti duplikat. Gagal lagi → `RuntimeException` "Presensi bentrok berulang.".
+     *  - Lock wait timeout (1205): TIDAK diulang (mengulang berarti menunggu sampai dua kali `innodb_lock_wait_timeout`);
+     *    langsung "Presensi bentrok berulang.".
+     * "Presensi bentrok berulang." adalah galat server (500 lewat handler global), sama dengan duplikat berulang sebelum
+     * CR-161; bukan 422.
      *
      * @param array<string, mixed> $data kolom jam & bukti lokasi
+     *
+     * @return array{0: int, 1: array{jam_masuk: string|null, jam_pulang: string|null}} status HTTP dan jam baris sesudah ditulis
      */
-    private function tulis(BaseConnection $db, AuthContext $auth, string $nip, string $tgl, bool $masuk, array $data): int
+    private function tulis(BaseConnection $db, AuthContext $auth, string $nip, string $tgl, bool $masuk, array $data): array
     {
         if ($this->kaitSebelumTulis !== null) {
             ($this->kaitSebelumTulis)($nip, $tgl);
@@ -266,8 +287,19 @@ final class PresensiOnlineService
             $db->transBegin();
 
             try {
+                if ($this->kaitAwalTransaksi !== null) {
+                    ($this->kaitAwalTransaksi)($percobaan);
+                }
+
                 $sql   = $db->table('dh_online')->where(['nip' => $nip, 'tgl' => $tgl])->getCompiledSelect() . ' FOR UPDATE';
-                $lama  = $db->query($sql)->getRowArray();
+                $hasil = $db->query($sql);
+
+                // Tanpa DBDebug, kueri gagal mengembalikan false.
+                if ($hasil === false) {
+                    throw self::galatKueri($db, 'Kunci baris presensi gagal');
+                }
+
+                $lama  = $hasil->getRowArray();
                 $waktu = gmdate('Y-m-d H:i:s');
                 $id    = $auth->idPengguna();
 
@@ -276,15 +308,21 @@ final class PresensiOnlineService
                     $this->sisip($db, $baru);
                     $this->audit($db, $auth, $nip, $tgl, AuditLogModel::EVENT_CREATE, null, $baru);
                     $status = 201;
+                    $akhir  = $baru;
                 } else {
                     if ($masuk) {
                         $this->tolakBilaSudahMasuk($lama, $tgl);
                     }
 
                     $ubah = [...$data, 'sumber' => (int) $lama['sumber'] === self::SUMBER_MANUAL ? self::SUMBER_MANUAL : self::SUMBER_ONLINE, 'updated_at' => $waktu, 'updated_by' => $id];
-                    $db->table('dh_online')->where(['nip' => $nip, 'tgl' => $tgl])->update($ubah);
+
+                    if ($db->table('dh_online')->where(['nip' => $nip, 'tgl' => $tgl])->update($ubah) === false) {
+                        throw self::galatKueri($db, 'Ubah dh_online gagal');
+                    }
+
                     $this->audit($db, $auth, $nip, $tgl, AuditLogModel::EVENT_UPDATE, array_intersect_key($lama, $ubah), $ubah);
                     $status = 200;
+                    $akhir  = [...$lama, ...$ubah];
                 }
 
                 if ($db->transStatus() === false) {
@@ -293,7 +331,7 @@ final class PresensiOnlineService
 
                 $db->transCommit();
 
-                return $status;
+                return [$status, ['jam_masuk' => self::jam($akhir['jam_masuk'] ?? null), 'jam_pulang' => self::jam($akhir['jam_pulang'] ?? null)]];
             } catch (DuplikatPresensi) {
                 $this->rollback($db);
 
@@ -303,9 +341,30 @@ final class PresensiOnlineService
             } catch (Throwable $e) {
                 $this->rollback($db);
 
-                throw $e;
+                if (! ($e instanceof DatabaseException) || ! in_array((int) $e->getCode(), self::GALAT_KUNCI, true)) {
+                    throw $e;
+                }
+
+                if ($percobaan >= 1 || (int) $e->getCode() !== self::ER_LOCK_DEADLOCK) {
+                    throw new RuntimeException('Presensi bentrok berulang.', 0, $e);
+                }
             }
         }
+    }
+
+    /**
+     * Galat kueri saat DBDebug mati (kueri mengembalikan false): kode MySQL dibawa supaya galat kunci tetap dikenali.
+     */
+    private static function galatKueri(BaseConnection $db, string $apa): DatabaseException
+    {
+        $galat = $db->error();
+
+        return new DatabaseException($apa . ': ' . $galat['message'], (int) $galat['code']);
+    }
+
+    private static function jam(mixed $nilai): ?string
+    {
+        return $nilai === null ? null : (string) $nilai;
     }
 
     /**
@@ -324,8 +383,14 @@ final class PresensiOnlineService
         }
 
         if ($ok === false) {
-            if ((int) ($db->error()['code'] ?? 0) === self::ER_DUP_ENTRY) {
+            $kode = (int) ($db->error()['code'] ?? 0);
+
+            if ($kode === self::ER_DUP_ENTRY) {
                 throw new DuplikatPresensi();
+            }
+
+            if (in_array($kode, self::GALAT_KUNCI, true)) {
+                throw self::galatKueri($db, 'Tulis dh_online gagal');
             }
 
             throw new RuntimeException('Tulis dh_online gagal.');
@@ -341,6 +406,11 @@ final class PresensiOnlineService
         $id = (new AuditLogModel($db))->record('dh_online', "{$nip}:{$tgl}", $event, $before, $after, $auth->idPengguna(), $auth->nip());
 
         if ($id <= 0) {
+            // Galat kunci saat INSERT audit diperlakukan sama dengan galat kunci pada `dh_online` (lihat `tulis()`).
+            if (in_array((int) ($db->error()['code'] ?? 0), self::GALAT_KUNCI, true)) {
+                throw self::galatKueri($db, 'Audit presensi gagal ditulis');
+            }
+
             throw new RuntimeException('Audit presensi gagal ditulis.');
         }
     }
