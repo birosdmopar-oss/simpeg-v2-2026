@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Layanan\Cuti;
 
+use App\Constants\Role;
 use App\Libraries\Layanan\Cuti\ApproverTerjangkau;
+use App\Libraries\Layanan\Cuti\CutiApprovalService;
 use App\Libraries\Layanan\Cuti\StatusCuti;
 use App\Libraries\Layanan\Cuti\TteAtasNama;
 use CodeIgniter\Events\Events;
@@ -124,6 +126,98 @@ final class CutiDaftarPrefetchTest extends DatabaseTestCase
         $svc = new ApproverTerjangkau($this->db);
 
         $this->assertSame(['AP01X' => $svc->alasanTakTerjangkau('AP01X'), 'TIDAKADA' => ApproverTerjangkau::ALASAN_TANPA_AKUN], $svc->alasanBanyak(['AP01X', 'TIDAKADA']));
+    }
+
+    /**
+     * Review CR-160 S1: dua masukan yang beda byte tetapi setara menurut collation dalam satu halaman tidak boleh membuat
+     * salah satunya terbaca "tanpa akun". NIP bukan angka selalu dihitung per NIP; NIP angka tetap satu kueri.
+     */
+    public function testAlasanBanyakDuaNipSetaraCollationSamaDenganPerNip(): void
+    {
+        $this->db->table('pegawai')->insert(['nip' => 'ap01x', 'nama' => 'Approver', 'tgl_lahir' => '1980-01-01', 'jenis_kelamin' => 1, 'status' => 1]);
+        $this->db->table('pengguna')->insert([
+            'nip'    => 'ap01x', 'username' => 'ap01x', 'name' => 'Approver', 'password' => 'x', 'user_level' => 2,
+            'status' => '1', 'created_at' => '2026-01-01 00:00:00',
+        ]);
+        $angka = $this->buatPejabat(4)['nip'];
+        $lain  = $this->buatPejabat(2)['nip'];
+        $this->assertTrue(ctype_digit($angka) && ctype_digit($lain));
+
+        $svc = new ApproverTerjangkau($this->db);
+
+        [$banyak, $kueri] = $this->rekam(static fn (): array => $svc->alasanBanyak(['ap01x', 'AP01X', $angka, $lain, 'TIDAK-ADA']));
+
+        foreach (['ap01x', 'AP01X', $angka, $lain, 'TIDAK-ADA'] as $nip) {
+            $this->assertSame($svc->alasanTakTerjangkau($nip), $banyak[$nip], $nip);
+        }
+
+        $this->assertSame([null, null], [$banyak['ap01x'], $banyak['AP01X']], 'keduanya terjangkau, sama seperti jalur per baris');
+        $this->assertSame(ApproverTerjangkau::ALASAN_ROLE, $banyak[$angka]);
+        $this->assertCount(1, $this->cocok($kueri, 'pengguna', '`nip` IN'), 'NIP angka tetap satu kueri');
+        $this->assertCount(3, $this->cocok($kueri, 'pengguna', "`nip` = '"), 'tiga NIP bukan angka dihitung per NIP');
+    }
+
+    /**
+     * Review CR-160 S2(a): daftar admin role 3 (lingkup satker) sama dengan item per baris, lookup akun tetap satu kueri
+     * dan audit atas nama tidak dibaca (hanya untuk role 1).
+     */
+    public function testDaftarAdminRole3SamaDenganItemPerBaris(): void
+    {
+        $satker = $this->buatSatker();
+        $admin  = $this->authUntukAkun($this->buatAkunUntuk($this->buatPegawaiDiSatker($satker), Role::ADMIN_SATKER));
+        $al4    = $this->buatPejabat(4)['nip'];
+        $ok     = $this->buatPejabat(2)['nip'];
+        $ids    = [];
+
+        foreach ([['nip_atasan_langsung' => $al4, 'nip_yang_menyetujui' => $ok], ['nip_atasan_langsung' => $ok], [], ['nip_yang_menyetujui' => $ok, 'status' => StatusCuti::EFEK_FINAL[0]]] as $i => $lebih) {
+            $ids[] = $this->buatBarisCuti($this->buatPegawaiDiSatker($satker), $lebih + ['tgl_mulai' => sprintf('2026-11-%02d', 9 + $i), 'tgl_akhir' => sprintf('2026-11-%02d', 9 + $i)]);
+        }
+
+        $this->buatBarisCuti($this->buatPejabat(2)['nip'], ['nip_atasan_langsung' => $al4]); // satker lain: di luar lingkup
+
+        $svc = $this->cutiService();
+
+        [$hasil, $kueri] = $this->rekam(static fn (): array => $svc->daftar($admin, ['mode' => 'admin', 'per_page' => '100']));
+
+        $this->assertSame(4, $hasil['total']);
+        $this->assertCount(1, $this->cocok($kueri, 'pengguna', '`nip` IN'));
+        $this->assertSame([], $this->cocok($kueri, 'pengguna', "`nip` = '"));
+        $this->assertSame([], $this->cocok($kueri, 'audit_logs', 'entity_id'), 'role 3 tidak membaca audit atas nama');
+
+        $perId = array_column($hasil['items'], null, 'id_riwayat_cuti');
+
+        foreach ($ids as $id) {
+            $this->assertSame($svc->item($admin, (array) $svc->ambil($id), ['lampiran' => false, 'surat' => false, 'tte' => false], true), $perId[$id], "cuti {$id}");
+        }
+
+        $this->assertSame([true, false, true], [$perId[$ids[0]]['perlu_atas_nama'], $perId[$ids[1]]['perlu_atas_nama'], $perId[$ids[2]]['perlu_atas_nama']]);
+        $this->assertFalse($perId[$ids[0]]['aksi']['proses_atas_nama'], 'role 3 tidak memproses atas nama');
+    }
+
+    /**
+     * Review CR-160 S2(c): entri audit yang `entity_id`-nya cocok menurut collation tetapi tidak identik (spasi akhir)
+     * membuat versi banyak jatuh ke jalur per cuti; hasilnya tetap sama dengan `finalAtasNama()`.
+     */
+    public function testFinalAtasNamaBanyakFallbackCollationSamaDenganPerCuti(): void
+    {
+        $s    = $this->skenario();
+        $svc  = $this->cutiService();
+        $cuti = array_map(static fn (int $id): array => (array) $svc->ambil($id), array_values($s['id']));
+        $id   = $s['id']['finalBiasa'];
+
+        $this->db->table('audit_logs')->insert([
+            'entity'     => 'riwayat_cuti', 'entity_id' => $id . ' ', 'event' => 'update',
+            'after_json' => json_encode(['jenis_audit' => CutiApprovalService::JENIS_AUDIT_ATAS_NAMA, 'status' => StatusCuti::EFEK_FINAL[0]]),
+            'created_at' => '2026-11-02 03:00:00',
+        ]);
+
+        $banyak = TteAtasNama::finalAtasNamaBanyak($this->db, $cuti);
+
+        foreach ($cuti as $c) {
+            $this->assertSame(TteAtasNama::finalAtasNama($this->db, $c), $banyak[(int) $c['id_riwayat_cuti']], 'cuti ' . $c['id_riwayat_cuti']);
+        }
+
+        $this->assertTrue($banyak[$s['id']['finalAtasNama']]);
     }
 
     public function testFinalAtasNamaBanyakSamaDenganPerCuti(): void

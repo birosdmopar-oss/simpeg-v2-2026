@@ -83,12 +83,26 @@ class ApproverTerjangkau
             }
         }
 
-        if ($cari === []) {
+        // Jalur satu kueri hanya untuk NIP berupa angka: dua teks angka yang berbeda tidak pernah dianggap sama oleh
+        // collation kolom. NIP lain (huruf, tanda baca) bisa setara menurut collation walau beda byte (mis. 'ap01x' dan
+        // 'AP01X'), jadi dihitung per NIP supaya hasilnya tetap sama dengan {@see alasanTakTerjangkau()}.
+        $daftar = [];
+
+        foreach (array_keys($cari) as $nip) {
+            $nip = (string) $nip;
+
+            if (ctype_digit($nip)) {
+                $daftar[] = $nip;
+            } else {
+                $hasil[$nip] = $this->alasanTakTerjangkau($nip);
+            }
+        }
+
+        if ($daftar === []) {
             return $hasil;
         }
 
-        $daftar = array_map('strval', array_keys($cari));
-        $rows   = $this->db->table('pengguna')
+        $rows = $this->db->table('pengguna')
             ->select('nip, status, user_level, deleted_at')
             ->whereIn('nip', $daftar)
             ->orderBy('id_pengguna', 'ASC')
@@ -98,7 +112,7 @@ class ApproverTerjangkau
 
         foreach ($rows as $r) {
             if (! in_array((string) $r['nip'], $daftar, true)) {
-                // Collation mencocokkan NIP yang tidak identik byte-per-byte (huruf besar/kecil, spasi akhir): jangan
+                // Baris yang cocok menurut collation tetapi tidak identik byte-per-byte (mis. spasi akhir di data): jangan
                 // menebak pengelompokannya, pakai jalur per NIP supaya hasilnya tetap sama.
                 foreach ($daftar as $nip) {
                     $hasil[$nip] = $this->alasanTakTerjangkau($nip);
