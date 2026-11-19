@@ -38,13 +38,16 @@ harap 0 node v24.22.1
 harap 0 node 24.30.0
 harap 0 node v22.23.4
 harap 0 node 22.24.0
+harap 0 node v26.12.1
+harap 0 node v26.13.1
 # Node rentan / seri di luar daftar
 harap 1 node v24.22.0
 harap 1 node v24.10.0
 harap 1 node v22.23.3
 harap 1 node v20.19.0
 harap 1 node v25.0.0
-harap 1 node v26.12.1
+harap 1 node v26.12.0
+harap 1 node v27.0.0
 harap 1 node v23.11.0
 # Argumen salah
 harap 2 ruby 3.3.0

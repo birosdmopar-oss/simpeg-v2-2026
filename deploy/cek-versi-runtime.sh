@@ -12,7 +12,7 @@
 #
 # Daftar aman (seri lain, termasuk yang lebih baru, ditolak sampai daftar ini diperbarui lewat CR):
 #   PHP  : 8.3.x >= 8.3.36, 8.4.x >= 8.4.27
-#   Node : 22.x  >= 22.23.4, 24.x >= 24.22.1
+#   Node : 22.x  >= 22.23.4, 24.x >= 24.22.1, 26.x >= 26.12.1
 # =============================================================================
 set -euo pipefail
 
@@ -58,7 +58,7 @@ case "$runtime" in
             versi_mentah="$("${NODE_BIN:-node}" -v 2>/dev/null)" || tolak "Node (${NODE_BIN:-node}) tidak bisa dijalankan; $ISU_NODE"
         fi
         isu="$ISU_NODE"
-        aman='22.x >= 22.23.4 atau 24.x >= 24.22.1'
+        aman='22.x >= 22.23.4, 24.x >= 24.22.1, atau 26.x >= 26.12.1'
         ;;
     *)
         echo "Pemakaian: $0 php|node [VERSI]" >&2
@@ -75,6 +75,7 @@ case "$runtime:$seri" in
     php:8.4) minimum=8.4.27 ;;
     node:22.*) minimum=22.23.4 ;;
     node:24.*) minimum=24.22.1 ;;
+    node:26.*) minimum=26.12.1 ;;
     *) minimum="" ;;
 esac
 
