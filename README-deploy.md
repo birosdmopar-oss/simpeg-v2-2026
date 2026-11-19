@@ -146,6 +146,17 @@ server {
         try_files $uri /index.php$is_args$args;
     }
 
+    # Jalur kompatibilitas legacy untuk sistem lain (SIMAPI, MuDig, E-Talenta), §1h–§1j. WAJIB ke PHP, bukan ke SPA:
+    # tanpa dua blok ini `/simapi/...` dan `/services/...` jatuh ke `location /` dan klien menerima index.html (CR-158).
+    location /simapi/ {
+        root /var/www/simpeg-v2/current/backend/public;
+        try_files $uri /index.php$is_args$args;
+    }
+    location /services/ {
+        root /var/www/simpeg-v2/current/backend/public;
+        try_files $uri /index.php$is_args$args;
+    }
+
     # F-10 (PRD F-10 §7, F10-18 (a)): berkas arsip LEGACY lewat URL publik, persis legacy. Tanpa PHP, tanpa listing (§1l).
     # Berkas unggahan v2 (kunci YYYY/MM/<32 hex>) SENGAJA tidak ada di sini: privat lewat endpoint aplikasi `buka`.
     # Prefix ^~ wajib, supaya blok regex PHP di bawah tidak pernah terpakai untuk /berkas/.
@@ -173,6 +184,8 @@ server {
         # Batas body untuk SEMUA request PHP (/api/ dan /services/ berakhir di sini lewat try_files): §1o butir 5 (usulan)
         client_max_body_size 13M;
         include fastcgi_params;
+        # §1h: header Basic/Bearer klien layanan dan token SIMAPI harus sampai ke PHP (tanpa ini: "Authentication failed")
+        fastcgi_param HTTP_AUTHORIZATION $http_authorization;
         # $realpath_root = path release nyata di balik symlink `current` (§1o butir 3, usulan)
         fastcgi_param SCRIPT_FILENAME $realpath_root/index.php;
         fastcgi_param DOCUMENT_ROOT $realpath_root;
@@ -268,8 +281,8 @@ Setiap perubahan tercatat di `audit_logs` (`entity` `surat_cuti_token`, `jenis_a
    `php spark integrasi:klien buat --nama="MuDig" --username=<huruf-kecil> --jenis=3 --hak=esign[,stat,dm] [--ip=<ip/cidr>]`.
 3. Batas unggahan (`Config\EsignMudig`, bisa diubah lewat `.env` `esignmudig.pdfMaks`/`esignmudig.gambarMaks` — prefiks HURUF KECIL, byte): PDF maks 10 MB,
    gambar tanda tangan (`imageTTD`, JPEG/PNG) maks 2 MB. Nginx `client_max_body_size` minimal 12 MB (disarankan 13M karena overhead
-   multipart) di blok yang menjalankan PHP, `location ~ ^/(api/)?index\.php` contoh §1 — `/services/` tidak punya blok sendiri (§1j),
-   jadi batas di blok `/services/` atau `/api/` yang hanya `try_files` tidak berlaku (§1o butir 5) — dan PHP
+   multipart) di blok yang menjalankan PHP, `location ~ ^/(api/)?index\.php` contoh §1 — blok `location /services/` dan `/api/` di
+   contoh itu hanya `try_files` ke `index.php` (§1j), jadi batas yang dipasang di sana tidak berlaku (§1o butir 5) — dan PHP
    `upload_max_filesize`/`post_max_size` setara; kalau tidak, permintaan besar ditolak sebelum
    sampai aplikasi. Lewat batas di aplikasi → `status` "2" "Invalid parameter.".
 4. Kontrak untuk PIC MuDig (PN-4, re-handshake): parameter, parameter wajib (`nik`, `passphrase`, `file`, `imageTTD`), dan amplop
@@ -417,13 +430,37 @@ Job = command `php spark` + `cron.d` user `deploy` + `flock -n` (tanpa endpoint 
 |---|---|---|
 | `layanan:status-harian` | 00:30 setiap hari | H-11 (MAKE-062) |
 | `pengguna:sinkron-nama` | 01:00 setiap hari (USULAN, PN-5: dicocokkan dengan crontab legacy) | F6-21 bersyarat (MAKE-062) |
+| `cuti:saldo-tahunan "<tahun>"` | 01:00 setiap 1 Januari (keputusan Horii 19-11-2026, opsi (a)) | PRD Fase 4 §6.3.6 (CR-158) |
 
 ```bash
 # /etc/cron.d/simpeg-v2-status-harian
 30 0 * * * deploy cd /var/www/simpeg-v2/current/backend && flock -n /tmp/simpeg-v2-status-harian.lock php spark layanan:status-harian >> /var/www/simpeg-v2/logs/status-harian.log 2>&1
 # /etc/cron.d/simpeg-v2-sinkron-nama (usulan)
 0 1 * * * deploy cd /var/www/simpeg-v2/current/backend && flock -n /tmp/simpeg-v2-sinkron-nama.lock php spark pengguna:sinkron-nama >> /var/www/simpeg-v2/logs/sinkron-nama.log 2>&1
+# /etc/cron.d/simpeg-v2-cuti-saldo-tahunan — saldo cuti tahun baru, 1 Januari 01:00 (zona waktu server). Tahun dari tanggal server;
+# `%` wajib di-escape (`\%`) di cron.d, kalau tidak cron memotong baris di `%`.
+0 1 1 1 * deploy cd /var/www/simpeg-v2/current/backend && flock -n /tmp/simpeg-v2-cuti-saldo-tahunan.lock php spark cuti:saldo-tahunan "$(date +\%Y)" >> /var/www/simpeg-v2/logs/cuti.log 2>&1
 ```
+
+`cuti:saldo-tahunan` (PRD Fase 4 §6.3.6, Q-02; command sejak Fase 4, jadwalnya di runbook ini sesuai docblock command, PRD Fase 4 dan
+ADR-037; CR-158):
+
+- **Fungsi.** Membentuk baris `pegawai_sisa_cuti` tahun baru (N, N-1, N-2; rumus `calculate_yearly_sc_2` + lantai N ≥ 0) untuk
+  pegawai `status = 1` dan `id_jenis_pegawai IN (1, 6)`. Tanpa baris itu pegawai tidak bisa mengajukan cuti tahunan di tahun baru.
+  Legacy: cron `calculate_yearly_sc` 1 Januari.
+- **Argumen tahun wajib** (tanpa angka → `EXIT_USER_INPUT`); eksekusi tulis hanya untuk tahun ≥ 2027 (saldo 2026 sengaja tidak
+  otomatis). Command **tidak** memegang `GET_LOCK`, jadi barisnya memakai `flock -n`.
+- **Zona waktu.** Jam cron mengikuti zona waktu server. Bila server UTC, `0 1 1 1 *` jatuh 08:00 WIB 1 Januari; tanggal dan tahunnya
+  tetap benar, jadi aman.
+- **Langkah tahunan operator.** Sehari atau lebih sebelum 1 Januari: `php spark cuti:saldo-tahunan <tahun_baru> --dry-run` (hanya
+  ringkasan jumlah dibuat/dilewati dan distribusi N-1/N-2, tanpa menulis), serahkan ringkasannya ke Biro SDM. Sesudah 1 Januari: cek
+  `logs/cuti.log` (jumlah baris dibuat > 0, kode keluar 0).
+- **Pemulihan.** Gagal (kode keluar ≠ 0, mis. DB tidak terjangkau) → jalankan ulang perintah yang sama secara manual. Idempoten: NIP
+  yang sudah punya baris `(nip, tahun)` dilewati.
+- **Pegawai baru di tengah tahun.** Dengan opsi (a), pegawai yang masuk sesudah 1 Januari tidak mendapat baris saldo tahun berjalan dan
+  Biro SDM mengisinya manual (menu Tambah saldo), sama dengan legacy dan keputusan 2026. Opsi (b), **belum dipilih, tanpa baris cron
+  aktif**: ulang idempoten tiap tanggal 1 (mis. `30 1 1 * *`, lock dan argumen sama) sehingga pegawai baru mendapat baris otomatis
+  (pool 0, N = 12); bila kelak dipilih, jadikan pertanyaan Trello Question lebih dulu.
 
 `layanan:status-harian` (H-11, Q6-24..Q6-27):
 
@@ -471,7 +508,7 @@ hanya jumlah, tanpa NIP/nama.
 
 Semua endpoint masuk dari sistem lain (SIMAPI `/simapi/v1/*` dan `services/*`) wajib auth; klien dibuat operator, bukan diimpor (F6-08).
 
-1. **Header `Authorization` harus sampai ke PHP.** Nginx: pada blok `location ~ \.php$` tambahkan `fastcgi_param HTTP_AUTHORIZATION $http_authorization;`
+1. **Header `Authorization` harus sampai ke PHP.** Nginx: pada blok PHP (`location ~ ^/(api/)?index\.php` contoh §1, sudah memuat barisnya) pasang `fastcgi_param HTTP_AUTHORIZATION $http_authorization;`
    (Apache: `SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1`). Tanpa ini semua klien Basic ditolak "Authentication failed". Uji:
    panggil endpoint dengan kredensial sah dari alamat yang diizinkan dan pastikan bukan 401.
 2. **Buat klien** (rahasia tampil SEKALI; kirim lewat kanal aman di luar repo, jangan ditempel di tiket/chat):
@@ -521,14 +558,33 @@ Semua endpoint masuk dari sistem lain (SIMAPI `/simapi/v1/*` dan `services/*`) w
 Kedua jalur kompatibilitas ini dilayani aplikasi yang sama dengan `api/v1` (rute di `Config/RoutesSimapi.php` dan `Config/RoutesServices.php`,
 tanpa JWT/CORS SPA); auth ada di filter `klienLayanan:<hak>` dan `simapiToken` (§1h, ADR-036).
 
-1. **Routing.** Tidak perlu blok `location` khusus: `try_files $uri $uri/ /index.php?$query_string` yang sama dengan aplikasi sudah mencakup
-   `/simapi/v1/...` dan `/services/...`. Izinkan metode GET dan POST (SIMAPI legacy menerima keduanya). Header `Authorization` harus diteruskan
-   ke PHP (§1h langkah 1) dan IP klien asli harus sampai sebagai `REMOTE_ADDR` (§1h langkah 5).
+1. **Routing.** Contoh §1 sudah memuat blok `location /simapi/` dan `location /services/` yang meneruskan ke `index.php`
+   (`try_files $uri /index.php$is_args$args`, pola yang sama dengan `/api/`); **jangan dihapus**. Tanpa blok itu, kedua jalur jatuh ke
+   `location /` dan klien menerima `index.html` SPA (HTTP 200 HTML) alih-alih JSON. `/simapi/` mencakup `simapi/v1/*` dan
+   `simapi/a_pegawai/*` (`Config/RoutesSimapi.php`), `/services/` mencakup `s_stat`, `s_dm`, `s_esign` (`Config/RoutesServices.php`).
+   - Blok prefix `/simapi/` dan `/services/` lebih spesifik daripada `location /`, jadi menang tanpa `^~`; blok regex PHP tidak cocok dengan
+     `/simapi/...`/`/services/...`, jadi tidak bentrok. Internal redirect ke `/index.php` mempertahankan `REQUEST_URI`, dan CI4 merutekan
+     dari path asli (`simapi/v1/...`).
+   - `client_max_body_size 13M` di blok PHP (§1o butir 5) berlaku juga untuk `services/s_esign/sign_pdf`.
+   - Izinkan metode GET dan POST (SIMAPI legacy menerima keduanya). Header `Authorization` harus diteruskan ke PHP (§1h langkah 1; baris
+     `fastcgi_param HTTP_AUTHORIZATION` di blok PHP contoh §1) dan IP klien asli harus sampai sebagai `REMOTE_ADDR` (§1h langkah 5).
+   - **Uji sesudah pasang** (baca saja, tanpa kredensial): yang dicek terutama `content_type` = `application/json` (respons aplikasi),
+     bukan `text/html` (SPA).
+
+     ```bash
+     curl -s -o /dev/null -w '%{http_code} %{content_type}\n' https://<host>/simapi/v1/a_employee/change_history
+     curl -s -o /dev/null -w '%{http_code} %{content_type}\n' https://<host>/services/s_stat/rekomendasi_kp
+     ```
+
+     Harapan: SIMAPI `200 application/json` berisi `{"status":"02", …}` (pola legacy: galat token tetap HTTP 200,
+     `ResponsAuthKlien::gagal`); `services/*` `401 application/json` dengan `WWW-Authenticate: Basic`. `200 text/html` = masih ke SPA
+     (blok §1 belum terpasang); `404` HTML Nginx = path/`root` salah.
 2. **Jangan mencatat kredensial.** Format log akses Nginx untuk dua jalur ini tidak boleh memuat header `Authorization` maupun query yang
    berisi token/NIP bila dapat dihindari; log aplikasi sudah tanpa username/rahasia/IP (ADR-036).
 3. **Batas waktu dan ukuran respons.** `s_stat/rekomendasi_*` dan `a_sinkron/ambil_riwayat_mutasi` mengembalikan daftar tanpa paginasi (ikut
    legacy, untuk sinkron MuDig/E-Talenta). Ukur waktu dan ukuran respons pada data nyata saat uji klien; naikkan `fastcgi_read_timeout`/`send_timeout`
-   untuk dua jalur ini bila perlu, jangan global. `limit_req` Nginx per IP boleh dipasang di atas throttle aplikasi (bukan penggantinya).
+   untuk dua jalur ini bila perlu, jangan global: lewat blok PHP khusus atau `location` regex terpisah untuk path itu, bukan di blok PHP
+   umum contoh §1 (angka ditetapkan dari hasil ukur). `limit_req` Nginx per IP boleh dipasang di atas throttle aplikasi (bukan penggantinya).
 4. **Pembatasan jaringan.** Allowlist IP klien di aplikasi (`integrasi:klien buat --ip=...`) adalah pagar utama; bila infrastruktur
    mengizinkan, tambahkan pembatasan firewall/ACL ke alamat keluar klien yang diketahui.
 5. **Job terjadwal Jalur A** (ringkasan; rinci di §1f-§1h): `layanan:status-harian` 00:30, `pengguna:sinkron-nama` 01:00 (usulan, PN-5),
@@ -918,10 +974,10 @@ Berkas terbesar yang diterima endpoint `/api/` = **5 MB per berkas**: lampiran r
 | PHP `post_max_size` | `13M` | ≥ total body terbesar (§1c); harus ≥ `upload_max_filesize`. |
 
 **Di blok mana `client_max_body_size` dipasang.** Nginx memeriksa batas body di `location` yang **akhirnya menangani** request.
-`location /api/` pada contoh §1 hanya `try_files … /index.php$is_args$args` (internal redirect), dan `/services/` tidak punya blok sendiri
-(§1j), jadi keduanya berakhir di `location ~ ^/(api/)?index\.php` (fastcgi_pass). Batas yang dipasang di `location /api/` atau
-`location /services/` yang tidak menjalankan PHP **diabaikan**; pasang di blok fastcgi itu (contoh §1) atau di level `server`. Bila
-kelak `/services/` diberi blok sendiri yang langsung `fastcgi_pass`, batasnya dipasang di blok itu juga.
+`location /api/`, `location /simapi/`, dan `location /services/` pada contoh §1 hanya `try_files … /index.php$is_args$args` (internal
+redirect, §1j), jadi semuanya berakhir di `location ~ ^/(api/)?index\.php` (fastcgi_pass). Batas yang dipasang di blok prefix yang tidak
+menjalankan PHP **diabaikan**; pasang di blok fastcgi itu (contoh §1) atau di level `server`. Bila kelak salah satu jalur diberi blok
+sendiri yang langsung `fastcgi_pass`, batasnya dipasang di blok itu juga.
 
 **6. Cron tanpa kunci internal**
 
