@@ -7,6 +7,7 @@ namespace Tests\Support;
 use CodeIgniter\Test\CIUnitTestCase;
 use CodeIgniter\Test\DatabaseTestTrait;
 use CodeIgniter\Test\Fabricator;
+use Config\Services;
 use PHPUnit\Framework\AssertionFailedError;
 use PHPUnit\Framework\Attributes\Group;
 use ReflectionClass;
@@ -92,6 +93,11 @@ abstract class DatabaseTestCase extends CIUnitTestCase
     protected function setUpDatabase()
     {
         $this->loadDependencies();
+
+        // CIUnitTestCase memasang MockCache baru tiap test, tetapi instance shared `cacheService`/`webConfigService` dari
+        // test sebelumnya masih memegang cache lama: reset supaya nilai web_config ter-cache tidak terbawa antar-test.
+        Services::resetSingle('webConfigService');
+        Services::resetSingle('cacheService');
 
         $this->koneksi();
 

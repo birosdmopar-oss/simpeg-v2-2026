@@ -317,26 +317,10 @@ final class AturanLokasiPresensiHooks implements MasterHooks, MasterStatusHooks
      */
     private function namaKementerian(): string
     {
-        if ($this->tableExists('web_config')) {
-            $row = $this->db()->table('web_config')->select('config_value')
-                ->where('config_name', 'nama_kementerian')->get()->getRowArray();
-            $nama = trim((string) ($row['config_value'] ?? ''));
+        // Hasilnya disimpan permanen (`target_uns_desc`), jadi dibaca segar dari tabel, tanpa cache (CR-162).
+        $nama = trim(service('webConfigService')->mentah(true)['nama_kementerian'] ?? '');
 
-            if ($nama !== '') {
-                return $nama;
-            }
-        }
-
-        return self::SELURUH_KEMENTERIAN;
-    }
-
-    /**
-     * Cek tabel tanpa cache daftar tabel koneksi (tabel G-09 bisa dibuat setelah koneksi dibuka). Mode tanpa cache
-     * CI4 tidak menambahkan DBPrefix sendiri.
-     */
-    private function tableExists(string $table): bool
-    {
-        return $this->db()->tableExists($this->db()->prefixTable($table), false);
+        return $nama !== '' ? $nama : self::SELURUH_KEMENTERIAN;
     }
 
     private static function isId(string $value): bool

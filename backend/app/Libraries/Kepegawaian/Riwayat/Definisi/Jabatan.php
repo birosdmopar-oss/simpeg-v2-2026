@@ -836,19 +836,8 @@ final class Jabatan extends RiwayatDefinisi
      */
     private function namaKementerian(): ?string
     {
-        $db = $this->db();
-        // information_schema, bukan tableExists(): cache daftar tabel CI4 per koneksi bisa basi (lihat NipCascadeService).
-        $ada = $db->query(
-            'SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?',
-            [$db->prefixTable('web_config')],
-        )->getRowArray() !== null;
-
-        if (! $ada) {
-            return null;
-        }
-
-        $nilai = $db->table('web_config')->select('config_value')->where('config_name', 'nama_kementerian')->get()->getRowArray();
-        $nama  = trim((string) ($nilai['config_value'] ?? ''));
+        // Hasilnya disimpan permanen (`nama_instansi` riwayat jabatan), jadi dibaca segar dari tabel, tanpa cache (CR-162).
+        $nama = trim(service('webConfigService')->mentah(true)['nama_kementerian'] ?? '');
 
         return $nama === '' ? null : $nama;
     }

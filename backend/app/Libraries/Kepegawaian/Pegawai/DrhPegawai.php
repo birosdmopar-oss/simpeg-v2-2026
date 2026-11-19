@@ -233,15 +233,9 @@ final class DrhPegawai
      */
     private function kop(array $pmj): string
     {
-        $db  = $this->db();
-        $wc  = [];
-        $ada = $db->query('SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?', [$db->prefixTable('web_config')])->getRowArray() !== null;
-
-        if ($ada) {
-            foreach ($db->table('web_config')->select('config_name, config_value')->get()->getResultArray() as $r) {
-                $wc[(string) $r['config_name']] = (string) ($r['config_value'] ?? '');
-            }
-        }
+        // Nilai mentah lewat WebConfigService (cache bersama), bukan baca tabel + cek information_schema per panggilan (CR-162).
+        $wc = service('webConfigService')->mentah();
+        $db = $this->db();
 
         $idUnit  = (int) ($pmj['id_unit'] ?? 0);
         $unitPdf = in_array($idUnit, [6, 7], true) ? (string) ($pmj['satker'] ?? '') : (string) ($pmj['unit'] ?? '');

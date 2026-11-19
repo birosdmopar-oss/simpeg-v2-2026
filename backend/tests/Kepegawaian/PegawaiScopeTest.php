@@ -7,6 +7,9 @@ namespace Tests\Kepegawaian;
 use App\Constants\Role;
 use App\Libraries\Auth\AuthContext;
 use App\Libraries\Kepegawaian\Scope\PegawaiScope;
+use CodeIgniter\Events\Events;
+use CodeIgniter\HTTP\IncomingRequest;
+use Config\Services;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Support\DatabaseTestCase;
 use Tests\Support\Kepegawaian\PegawaiFixtureTrait;
@@ -425,5 +428,131 @@ final class PegawaiScopeTest extends DatabaseTestCase
         sort($hasil);
 
         return $hasil;
+    }
+    /**
+     * CR-162 (A-05): cek lingkup role 3 dimemo hanya di antara `mulaiMemoRequest()` dan `akhiriMemoRequest()` untuk
+     * satu request HTTP baca. Kunci memo memuat akun, klaim, NIP, dan jalur. Tanpa request aktif (unit test, CLI,
+     * worker), di request tulis, atau sesudah request berganti/berakhir, setiap cek membaca DB. Hasil otorisasi selalu
+     * sama dengan tanpa memo.
+     */
+    public function testMemoRole3HanyaSelamaSatuRequestBaca(): void
+    {
+        $admin  = $this->authAkunDi($this->satkerA1, Role::ADMIN_SATKER);
+        $lain   = $this->authAkunDi($this->satkerB, Role::ADMIN_SATKER);
+        $nip    = $this->nip['a1'];
+        $hitung = fn (callable $f): int => count(array_filter($this->rekamKueri($f)[1], static fn (string $q): bool => str_contains($q, 'pegawai_mutasi_jabatan') && str_starts_with(ltrim($q), 'SELECT')));
+        $dua    = function () use ($admin, $nip): void {
+            $this->scope->bolehLihat($admin, $nip);
+            $this->scope->bolehLihat($admin, $nip);
+        };
+
+        // Memo belum pernah dimulai (unit test, CLI, worker): setiap cek membaca DB.
+        $this->assertSame(2, $hitung($dua));
+
+        // Request GET aktif: cek yang sama satu kali baca; jalur, NIP, dan akun lain punya entri sendiri.
+        $get = $this->permintaan('GET');
+        $this->scope->mulaiMemoRequest($get);
+        $this->assertSame(4, $hitung(function () use ($admin, $lain, $nip): void {
+            $this->assertTrue($this->scope->bolehLihat($admin, $nip));
+            $this->assertTrue($this->scope->bolehUbah($admin, $nip));
+            $this->assertTrue($this->scope->bolehLihat($admin, $nip));
+            $this->assertTrue($this->scope->bolehProses($admin, $nip));
+            $this->assertTrue($this->scope->bolehProses($admin, $nip));
+            $this->assertFalse($this->scope->bolehLihat($admin, $this->nip['b']));
+            $this->assertFalse($this->scope->bolehLihat($admin, $this->nip['b']));
+            $this->assertFalse($this->scope->bolehLihat($lain, $nip), 'akun lain tidak memakai hasil akun ini');
+            $this->assertFalse($this->scope->bolehLihat($lain, $nip));
+        }), 'detail a1, proses a1, detail b, detail a1 oleh akun lain');
+
+        // Request berakhir: memo dibuang, perubahan snapshot jabatan langsung terlihat.
+        $this->scope->akhiriMemoRequest();
+        $this->db->table('pegawai_mutasi_jabatan')->where('nip', $nip)->update(['id_satker' => $this->satkerB]);
+        $this->assertFalse($this->scope->bolehLihat($admin, $nip));
+        $this->assertSame(2, $hitung($dua));
+
+        // Memo milik request lama tidak dipakai bila objek request yang aktif sudah berganti.
+        $this->scope->mulaiMemoRequest($get);
+        $this->assertSame(1, $hitung($dua));
+        Services::injectMock('request', $this->permintaan('GET', false));
+        $this->assertSame(2, $hitung($dua), 'request aktif bukan pemilik memo');
+
+        // Request tulis: tanpa memo.
+        $put = $this->permintaan('PUT');
+        $this->scope->mulaiMemoRequest($put);
+        $this->assertSame(2, $hitung(function () use ($admin, $nip): void {
+            $this->assertFalse($this->scope->bolehUbah($admin, $nip));
+            $this->db->table('pegawai_mutasi_jabatan')->where('nip', $nip)->update(['id_satker' => $this->satkerA1]);
+            $this->assertTrue($this->scope->bolehUbah($admin, $nip));
+        }));
+
+        Services::resetSingle('request');
+    }
+
+    /**
+     * CR-162 (A-05): lewat HTTP, memo dimulai dan diakhiri oleh event request (`Config/Events.php`), jadi tidak ada yang
+     * terbawa sesudah respons dikirim.
+     */
+    public function testEventRequestMemulaiDanMengakhiriMemo(): void
+    {
+        $scope = new PegawaiScope($this->db);
+        Services::injectMock('pegawaiScope', $scope);
+        $admin = $this->authAkunDi($this->satkerA1, Role::ADMIN_SATKER);
+        $nip   = $this->nip['a1'];
+        $pmj   = static fn (array $kueri): int => count(array_filter($kueri, static fn (string $q): bool => str_contains($q, 'pegawai_mutasi_jabatan') && str_starts_with(ltrim($q), 'SELECT')));
+
+        $dua = fn (): int => $pmj($this->rekamKueri(static fn (): array => [$scope->bolehLihat($admin, $nip), $scope->bolehLihat($admin, $nip)])[1]);
+
+        try {
+            Services::injectMock('request', $this->permintaan('GET', false));
+            Events::trigger('post_controller_constructor');
+            $this->assertSame(1, $dua());
+
+            Events::trigger('post_system');
+            $this->assertSame(2, $dua());
+
+            // Exception lolos dari controller (tanpa `post_system`): awal request berikutnya ikut mengakhiri memo.
+            Events::trigger('post_controller_constructor');
+            $this->assertSame(1, $dua());
+            Events::trigger('pre_system');
+            $this->assertSame(2, $dua());
+        } finally {
+            $scope->akhiriMemoRequest();
+            Services::resetSingle('request');
+            Services::resetSingle('pegawaiScope');
+        }
+    }
+
+    private function permintaan(string $metode, bool $pasang = true): IncomingRequest
+    {
+        $request = Services::incomingrequest(null, false);
+        $request->setMethod($metode);
+
+        if ($pasang) {
+            Services::injectMock('request', $request);
+        }
+
+        return $request;
+    }
+
+    /**
+     * @template T
+     *
+     * @param callable(): T $f
+     *
+     * @return array{0: T, 1: list<string>}
+     */
+    private function rekamKueri(callable $f): array
+    {
+        $kueri  = [];
+        $dengar = static function ($q) use (&$kueri): void {
+            $kueri[] = (string) $q;
+        };
+        Events::on('DBQuery', $dengar);
+
+        try {
+            return [$f(), $kueri];
+        } finally {
+            Events::removeListener('DBQuery', $dengar);
+        }
     }
 }

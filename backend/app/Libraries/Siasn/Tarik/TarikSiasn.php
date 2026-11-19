@@ -38,8 +38,23 @@ final class TarikSiasn
     public const LIMIT_BAWAAN = 20;
 
     /**
+     * Status hasil yang berarti SIASN tidak terjangkau (bukan jawaban SIASN untuk NIP itu): timeout, koneksi, token.
+     * Dipakai pemutus batch (CR-162). NIP yang SUDAH dicoba tetap ditandai seperti legacy walau gagal transport (dicoba
+     * lagi pada jendela usang berikutnya): bila dikembalikan ke flag 0, satu NIP yang selalu timeout akan terpilih paling
+     * depan di setiap jalan dan menahan antrean di belakangnya.
+     */
+    public const GAGAL_TRANSPORT = ['timeout', 'koneksi', 'token'];
+
+    /** Pemutus: sisa batch dihentikan sesudah gagal transport beruntun sebanyak ini (SIASN sedang tidak terjangkau). */
+    public const BATAS_GAGAL_BERUNTUN = 3;
+
+    /** Anggaran waktu satu batch (detik), di bawah jadwal 15 menit; NIP berikutnya tidak dimulai sesudah lewat. */
+    public const ANGGARAN_DETIK = 600;
+
+    /**
      * @param array<string, JenisTarikSiasn> $jenis nama → jenis
      * @param (Closure(): string)|null       $jam   waktu sekarang UTC `Y-m-d H:i:s` (test); bawaan `gmdate()`
+     * @param (Closure(): float)|null        $detik jam monoton dalam detik untuk anggaran waktu (test); bawaan `hrtime()`
      */
     public function __construct(
         private readonly BaseConnection $db,
@@ -48,6 +63,9 @@ final class TarikSiasn
         private readonly AkunSistemIntegrasi $akun,
         private readonly array $jenis,
         private readonly ?Closure $jam = null,
+        private readonly int $batasGagalBeruntun = self::BATAS_GAGAL_BERUNTUN,
+        private readonly int $anggaranDetik = self::ANGGARAN_DETIK,
+        private readonly ?Closure $detik = null,
     ) {
     }
 
@@ -96,7 +114,7 @@ final class TarikSiasn
     }
 
     /**
-     * @return array{jenis: string, nip: int, sukses: int, gagal: int, jumlah: array<string, int>, ditolak: array<string, int>, info: array<string, int>, dry_run: bool}
+     * @return array{jenis: string, nip: int, sukses: int, gagal: int, jumlah: array<string, int>, ditolak: array<string, int>, info: array<string, int>, dry_run: bool, gagal_transport: int, tidak_dicoba: int, diputus: bool}
      *
      * @throws SiasnTarikSibuk   jenis yang sama sedang berjalan
      * @throws DatabaseException galat DB (flag status sudah dikembalikan ke 0)
@@ -125,7 +143,7 @@ final class TarikSiasn
     }
 
     /**
-     * @return array{jenis: string, nip: int, sukses: int, gagal: int, jumlah: array<string, int>, ditolak: array<string, int>, info: array<string, int>, dry_run: bool}
+     * @return array{jenis: string, nip: int, sukses: int, gagal: int, jumlah: array<string, int>, ditolak: array<string, int>, info: array<string, int>, dry_run: bool, gagal_transport: int, tidak_dicoba: int, diputus: bool}
      */
     private function proses(string $nama, JenisTarikSiasn $jenis, int $idAkun, int $limit, ?string $nip, bool $dryRun): array
     {
@@ -144,13 +162,34 @@ final class TarikSiasn
 
         $sukses  = 0;
         $rencana = new RencanaTarik();
+        $putus   = false;
+
+        $gagalTransport = 0;
+        $tidakDicoba    = 0;
 
         try {
-            $hasil = [];
+            $hasil    = [];
+            $beruntun = 0;
+            $mulai    = $this->detik();
 
+            // AC-03.1: gagal per NIP tidak menghentikan batch. Yang menghentikan hanya tanda SIASN tidak terjangkau
+            // (gagal transport beruntun) atau anggaran waktu habis; NIP sisanya TIDAK dicoba dan dikembalikan ke flag 0
+            // supaya dipilih lagi pada jalan berikutnya (dulu ikut ditandai selesai).
             foreach ($daftar as $n) {
+                if ($beruntun >= $this->batasGagalBeruntun || ($hasil !== [] && $this->detik() - $mulai >= $this->anggaranDetik)) {
+                    $putus = true;
+
+                    break;
+                }
+
                 $hasil[$n] = $jenis->ambil($this->siasn, $n);
+                $beruntun  = in_array($hasil[$n]['status_code'], self::GAGAL_TRANSPORT, true) ? $beruntun + 1 : 0;
             }
+
+            // Selesai = semua NIP yang sudah dicoba, apa pun hasilnya (ikut legacy: yang gagal dicoba lagi sesudah usang).
+            // Hanya yang belum sempat dicoba yang tidak ditandai selesai.
+            $selesai = array_values(array_filter($daftar, static fn (string $n): bool => isset($hasil[$n])));
+            $ulang   = array_values(array_diff($daftar, $selesai));
 
             $sukses  = count(array_filter($hasil, static fn (array $h): bool => $h['status_code'] === SiasnAdapter::SUKSES));
             $rencana = $jenis->rencana($this->db, $hasil, $idAkun, $sekarang);
@@ -158,9 +197,13 @@ final class TarikSiasn
             // Putusan reviewer B6 M1 (2): sukses dengan data kosong = INFO, tanpa aksi destruktif (dijaga tiap jenis).
             $rencana->info['data_kosong'] = count(array_filter($hasil, static fn (array $h): bool => $h['status_code'] === SiasnAdapter::SUKSES && $h['data'] === []));
 
+            $tidakDicoba    = count($ulang);
+            $gagalTransport = count(array_filter($hasil, static fn (array $h): bool => in_array($h['status_code'], self::GAGAL_TRANSPORT, true)));
+
             if (! $dryRun) {
                 (new PenulisTarik($this->db))->terapkan($rencana);
-                $status->tandaiSelesai($jenis, $daftar, $this->sekarang());
+                $status->tandaiSelesai($jenis, $selesai, $this->sekarang());
+                $status->tandaiBatal($jenis, $ulang, $this->sekarang());
             }
         } catch (Throwable $e) {
             if (! $dryRun) {
@@ -173,18 +216,23 @@ final class TarikSiasn
 
         if (! $dryRun && $daftar !== []) {
             $semua = $sukses === count($daftar);
-            $this->catat($nama, $semua ? CatatanIntegrasi::SUKSES : CatatanIntegrasi::GAGAL, $semua ? null : 'sebagian_gagal', count($daftar), $sukses, $rencana);
+            $this->catat($nama, $semua ? CatatanIntegrasi::SUKSES : CatatanIntegrasi::GAGAL, $semua ? null : ($putus ? 'diputus' : 'sebagian_gagal'), count($daftar), $sukses, $rencana, $gagalTransport, $tidakDicoba);
         }
 
         return [
             'jenis'   => $nama,
             'nip'     => count($daftar),
             'sukses'  => $sukses,
-            'gagal'   => count($daftar) - $sukses,
+            'gagal'   => count($daftar) - $sukses - $tidakDicoba,
             'jumlah'  => $rencana->jumlah,
             'ditolak' => $rencana->ditolak,
             'info'    => $rencana->info,
             'dry_run' => $dryRun,
+            // CR-162: `gagal` hanya menghitung NIP yang dicoba. `tidak_dicoba` = NIP yang dikembalikan ke flag 0 karena
+            // batch diputus; `gagal_transport` = bagian dari `gagal` yang karena SIASN tidak terjangkau.
+            'gagal_transport' => $gagalTransport,
+            'tidak_dicoba'    => $tidakDicoba,
+            'diputus'         => $putus,
         ];
     }
 
@@ -202,19 +250,25 @@ final class TarikSiasn
         }
     }
 
+    private function detik(): float
+    {
+        return $this->detik === null ? hrtime(true) / 1_000_000_000 : ($this->detik)();
+    }
+
     private function sekarang(): string
     {
         return $this->jam === null ? gmdate('Y-m-d H:i:s') : ($this->jam)();
     }
 
-    private function catat(string $nama, int $statusLog, ?string $kode, int $nip, int $sukses, RencanaTarik $r): void
+    private function catat(string $nama, int $statusLog, ?string $kode, int $nip, int $sukses, RencanaTarik $r, int $gagalTransport = 0, int $tidakDicoba = 0): void
     {
         $j     = $r->jumlah;
         $i     = $r->info;
-        $pesan = "nip {$nip}, sukses {$sukses}, gagal " . ($nip - $sukses)
+        $pesan = "nip {$nip}, sukses {$sukses}, gagal " . ($nip - $sukses - $tidakDicoba)
             . ", sisip {$j['sisip']}, ubah {$j['ubah']}, pasang {$j['pasang']}, lepas {$j['lepas']}, hapus {$j['hapus']}, ganda {$j['ganda']}, ditolak " . array_sum($r->ditolak)
             . ", data_kosong {$i['data_kosong']}, pairing_ganda {$i['pairing_ganda']}, referensi_tak_terpetakan {$i['referensi_tak_terpetakan']}"
-            . ", ditolak_tanpa_destruktif {$i['ditolak_tanpa_destruktif']}";
+            . ", ditolak_tanpa_destruktif {$i['ditolak_tanpa_destruktif']}"
+            . ", gagal_transport {$gagalTransport}, tidak_dicoba {$tidakDicoba}";
 
         $this->log->catat(new CatatanIntegrasi(CatatanIntegrasi::ARAH_KELUAR, SiasnAdapter::LAYANAN, 'tarik_' . str_replace('-', '_', $nama), $statusLog, null, $kode, $pesan));
     }

@@ -429,7 +429,9 @@ final class LokasiPresensiTest extends DatabaseTestCase
         $result->assertStatus(201);
         $this->assertSame('["Seluruh Kementerian"]', $this->json($result)['data']['target_uns_desc']);
 
-        // Nilai terisi.
+        // Nilai terisi. Tabel ditulis langsung (bukan lewat WebConfigService) dan cache service sengaja diisi nilai lama
+        // lebih dulu: deskripsi yang DISIMPAN wajib nilai tabel terbaru, bukan nilai cache (CR-162, review R1).
+        service('webConfigService')->mentah();
         $this->db->table('web_config')->where('config_name', 'nama_kementerian')->update(['config_value' => 'Kementerian Uji Coba']);
         $result = $this->sendJson('POST', self::ATURAN, $this->aturan(['target_uns' => '["0"]']));
         $result->assertStatus(201);

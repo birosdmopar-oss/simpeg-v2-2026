@@ -583,4 +583,59 @@ final class EksporTiketTest extends DatabaseTestCase
     {
         return $this->asUser((array) $this->db->table('pengguna')->where('id_pengguna', $idPengguna)->get()->getRowArray());
     }
+    /**
+     * CR-162 (C-22): `potongSel` melewati konversi UTF-16 bila jumlah byte sudah muat. Hasilnya wajib sama persis dengan
+     * aturan lama (selalu menghitung unit UTF-16), termasuk di sekitar batas dan untuk byte UTF-8 tidak sah.
+     */
+    public function testPotongSelPintasByteSamaDenganHitungUnitUtf16(): void
+    {
+        $unit = static fn (string $s): int => intdiv(strlen((string) mb_convert_encoding($s, 'UTF-16LE', 'UTF-8')), 2);
+        $lama = static function (string $nilai) use ($unit): string {
+            if ($unit($nilai) <= EksporTiketService::MAKS_SEL) {
+                return $nilai;
+            }
+
+            $sisa = EksporTiketService::MAKS_SEL - $unit(EksporTiketService::PENANDA_POTONG);
+            $isi  = mb_substr($nilai, 0, $sisa);
+
+            while (($lebih = $unit($isi) - $sisa) > 0) {
+                $isi = mb_substr($isi, 0, max(0, mb_strlen($isi) - (int) ceil($lebih / 2)));
+            }
+
+            return $isi . EksporTiketService::PENANDA_POTONG;
+        };
+
+        $m     = EksporTiketService::MAKS_SEL;
+        $kasus = [
+            'kosong'                   => '',
+            'ascii di batas byte'      => str_repeat('a', $m),
+            'ascii lewat satu'         => str_repeat('a', $m + 1),
+            '2 byte: unit muat'        => str_repeat('é', $m),
+            '2 byte: unit lewat'       => str_repeat('é', $m + 1),
+            '3 byte: byte lewat'       => str_repeat('漢', intdiv($m, 3) + 1),
+            '3 byte: unit lewat'       => str_repeat('漢', $m + 5),
+            '4 byte: unit pas'         => str_repeat("\u{1F600}", intdiv($m, 2)) . 'a',
+            '4 byte: unit lewat'       => str_repeat("\u{1F600}", intdiv($m, 2) + 1),
+            'byte tidak sah pendek'    => "abc\xFF\xFEdef",
+            'byte tidak sah di batas'  => str_repeat("\xFF", $m),
+            'byte tidak sah lewat'     => str_repeat("\xFF", $m + 3),
+            'campuran lewat byte saja' => str_repeat('a', $m - 10) . str_repeat('é', 10),
+            'campuran lewat unit'      => str_repeat('a', $m - 1) . "\u{1F600}",
+        ];
+
+        foreach ($kasus as $nama => $nilai) {
+            $this->assertSame($lama($nilai), EksporTiketService::potongSel($nilai), $nama);
+        }
+
+        // Jalur pintas (byte ≤ batas): dikembalikan apa adanya tanpa konversi, termasuk tepat di batas.
+        foreach (['kosong', 'ascii di batas byte', 'byte tidak sah pendek', 'byte tidak sah di batas'] as $nama) {
+            $this->assertLessThanOrEqual($m, strlen($kasus[$nama]), "{$nama}: memang lewat jalur pintas");
+            $this->assertSame($kasus[$nama], EksporTiketService::potongSel($kasus[$nama]), $nama);
+        }
+
+        // Bukan jalur pintas (byte > batas) tetapi unit UTF-16 masih muat: tetap utuh lewat hitungan unit.
+        $this->assertGreaterThan($m, strlen($kasus['2 byte: unit muat']));
+        $this->assertLessThanOrEqual($m, $unit($kasus['2 byte: unit muat']));
+        $this->assertSame($kasus['2 byte: unit muat'], EksporTiketService::potongSel($kasus['2 byte: unit muat']));
+    }
 }

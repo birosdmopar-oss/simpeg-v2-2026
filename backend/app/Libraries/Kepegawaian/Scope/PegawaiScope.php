@@ -10,6 +10,8 @@ use App\Interfaces\Kepegawaian\PegawaiScopeProsesInterface;
 use App\Libraries\Auth\AuthContext;
 use CodeIgniter\Database\BaseBuilder;
 use CodeIgniter\Database\ConnectionInterface;
+use CodeIgniter\HTTP\IncomingRequest;
+use WeakReference;
 
 /**
  * Lingkup akses data pegawai — implementasi nyata WS-2 (MAKE-009) untuk PegawaiScopeInterface.
@@ -108,6 +110,20 @@ final class PegawaiScope implements PegawaiScopeInterface, PegawaiScopeProsesInt
     private const JALUR_DETAIL = 'detail';
 
     private const JALUR_PROSES = 'proses';
+
+    /**
+     * Memo hasil cek lingkup role 3 selama satu request HTTP baca (CR-162); lihat {@see kunciMemo()}.
+     *
+     * @var array<string, bool>
+     */
+    private array $memo = [];
+
+    /**
+     * Request pemilik memo.
+     *
+     * @var WeakReference<IncomingRequest>|null
+     */
+    private ?WeakReference $memoUntuk = null;
 
     public function __construct(private readonly ?ConnectionInterface $db = null)
     {
@@ -243,9 +259,62 @@ final class PegawaiScope implements PegawaiScopeInterface, PegawaiScopeProsesInt
             return false;
         }
 
-        $builder = $this->koneksi()->table(self::TABEL_PMJ)->where('nip', $nip);
+        $kunci = $this->kunciMemo($auth, $nip, $jalur);
 
-        return $this->terapkanPredikat($builder, $lingkup, $jalur)->countAllResults() > 0;
+        if ($kunci !== null && isset($this->memo[$kunci])) {
+            return $this->memo[$kunci];
+        }
+
+        $builder = $this->koneksi()->table(self::TABEL_PMJ)->where('nip', $nip);
+        $hasil   = $this->terapkanPredikat($builder, $lingkup, $jalur)->countAllResults() > 0;
+
+        if ($kunci !== null) {
+            $this->memo[$kunci] = $hasil;
+        }
+
+        return $hasil;
+    }
+
+    /**
+     * Mulai memo untuk satu request HTTP baca (GET/HEAD); request lain mematikan memo. Dipanggil dari event
+     * `post_controller_constructor` (`Config/Events.php`), jadi hanya request HTTP yang sedang dilayani yang memakainya:
+     * CLI/worker tidak pernah mengaktifkan memo.
+     */
+    public function mulaiMemoRequest(IncomingRequest $request): void
+    {
+        $this->memo      = [];
+        $this->memoUntuk = in_array(strtoupper($request->getMethod()), ['GET', 'HEAD'], true) ? WeakReference::create($request) : null;
+    }
+
+    /**
+     * Akhiri memo (event `post_system`): tidak ada hasil yang terbawa ke request atau pekerjaan berikutnya.
+     */
+    public function akhiriMemoRequest(): void
+    {
+        $this->memo      = [];
+        $this->memoUntuk = null;
+    }
+
+    /**
+     * Kunci memo cek lingkup role 3, atau null bila memo tidak aktif.
+     *
+     * Memo hanya hidup di antara {@see mulaiMemoRequest()} dan {@see akhiriMemoRequest()} untuk SATU request HTTP baca:
+     * satu request detail pegawai menanyakan (akun, NIP, jalur) yang sama berulang kali. Di luar itu selalu membaca DB:
+     * request tulis (snapshot jabatan bisa berubah di tengah request) dan CLI/worker berumur panjang. Bila objek request
+     * yang aktif sudah berganti, memo dibuang. Kuncinya memuat seluruh klaim yang menentukan hasil, jadi tidak tertukar
+     * antar-akun.
+     */
+    private function kunciMemo(AuthContext $auth, string $nip, string $jalur): ?string
+    {
+        $pemilik = $this->memoUntuk?->get();
+
+        if ($pemilik === null || $pemilik !== service('request')) {
+            $this->akhiriMemoRequest();
+
+            return null;
+        }
+
+        return json_encode([$auth->idPengguna(), $auth->role(), $auth->idSatker(), $auth->idUnit(), $nip, $jalur]) ?: null;
     }
 
     /**

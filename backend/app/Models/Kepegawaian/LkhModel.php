@@ -23,4 +23,33 @@ class LkhModel extends BaseAuditableModel
         'output', 'jumlah_diselesaikan', 'jam_mulai', 'jam_selesai', 'catatan', 'status', 'auto_approval', 'updated_by',
         'approved_by', 'show_notif', 'show_atasan', 'show_history_atasan',
     ];
+
+    /**
+     * Baris terakhir yang dibaca audit (isi tersimpan, termasuk kolom bawaan DB).
+     *
+     * @var list<array<string, mixed>>
+     */
+    private array $barisAudit = [];
+
+    /**
+     * Baris `$id` persis seperti yang dibaca audit sesudah INSERT/UPDATE terakhir lewat model ini (CR-162), supaya
+     * pemanggil tidak membaca ulang baris yang sama. `null` bila audit tidak membaca baris itu.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function barisTersimpan(int $id): ?array
+    {
+        foreach ($this->barisAudit as $baris) {
+            if ((int) ($baris[$this->primaryKey] ?? 0) === $id) {
+                return $baris;
+            }
+        }
+
+        return null;
+    }
+
+    protected function fetchRows(array $ids): array
+    {
+        return $this->barisAudit = parent::fetchRows($ids);
+    }
 }
