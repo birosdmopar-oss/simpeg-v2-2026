@@ -58,6 +58,14 @@ final class ButuhApproval
      */
     public function grup(AuthContext $auth): array
     {
+        return $this->susunGrup($auth, true);
+    }
+
+    /**
+     * @return list<array{kode: string, label: string, jumlah: int, url_fe: ?string}>
+     */
+    private function susunGrup(AuthContext $auth, bool $denganUrl): array
+    {
         $role = (int) $auth->role();
 
         if (! in_array($role, self::ROLE, true)) {
@@ -77,7 +85,10 @@ final class ButuhApproval
             $grup[] = ['kode' => 'konket', 'label' => 'Usulan Konket', 'jumlah' => $this->builderKonket($auth)->countAllResults(), 'url_fe' => '/konket'];
 
             if ($role === Role::SUPER_ADMIN && $this->berita->tersedia()) {
-                $grup[] = ['kode' => $this->berita->kode(), 'label' => 'Berita', 'jumlah' => $this->berita->jumlahMenunggu($auth), 'url_fe' => $this->berita->daftarMenunggu($auth, 1, 1)['url_fe']];
+                // CR-159 (C-03): `url_fe` grup berita hanya dibutuhkan bila grupnya tampil (jumlah > 0) dan dimintai rincian;
+                // lonceng (`total()`) cukup angkanya, jadi tidak lagi menjalankan daftarMenunggu (COUNT + SELECT) per poll.
+                $jumlah = $this->berita->jumlahMenunggu($auth);
+                $grup[] = ['kode' => $this->berita->kode(), 'label' => 'Berita', 'jumlah' => $jumlah, 'url_fe' => $denganUrl && $jumlah > 0 ? $this->berita->daftarMenunggu($auth, 1, 1)['url_fe'] : null];
             }
         } else {
             $grup[] = $this->grupLayanan($auth, 'lkh', 'Verifikasi LKH', '/lkh/verifikasi?tab=verifikasi');
@@ -92,7 +103,7 @@ final class ButuhApproval
 
     public function total(AuthContext $auth): int
     {
-        return array_sum(array_column($this->grup($auth), 'jumlah'));
+        return array_sum(array_column($this->susunGrup($auth, false), 'jumlah'));
     }
 
     /**

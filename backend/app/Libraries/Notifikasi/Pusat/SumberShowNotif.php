@@ -36,6 +36,16 @@ final class SumberShowNotif implements SumberDaftar
     private const KHUSUS = ['konket', 'lkh', 'biodata'];
 
     /**
+     * CR-159 (C-01): bentuk kolom tabel sumber ditetapkan di sini, bukan lewat introspeksi skema per request (dulu 17
+     * `tableExists` + 17 `SHOW COLUMNS` per poll lonceng). Semua tabel sumber punya `nip`, `status`, `show_notif`,
+     * `notif_date`, dan `reason_note`, KECUALI kunci di bawah (LKH: waktu = `updated_at` [K `LN:3990`], tanpa alasan).
+     * Tabelnya dibuat migration yang sudah ada di `main`; kecocokan dengan skema dijaga `SumberShowNotifSkemaTest`.
+     */
+    public const TANPA_NOTIF_DATE = ['lkh'];
+
+    public const TANPA_REASON_NOTE = ['lkh'];
+
+    /**
      * @var array<string, array{tabel: string, pk: string, status: string, waktu: string, alasan: ?string, hapus: bool, label: string, url: string}>|null
      */
     private ?array $definisi = null;
@@ -65,14 +75,38 @@ final class SumberShowNotif implements SumberDaftar
 
     public function jumlah(AuthContext $auth, bool $hanyaBelumDibaca): int
     {
-        $nip   = (string) $this->nip($auth);
-        $total = 0;
+        return array_sum($this->jumlahPerKunci($auth, $hanyaBelumDibaca));
+    }
+
+    /**
+     * CR-159 (C-02): COUNT per sumber dalam SATU kueri `UNION ALL` (dulu satu round-trip per tabel). Setiap cabang memakai
+     * builder kondisi yang sama dengan daftar ({@see self::builder()}), sehingga angka tetap satu kondisi dengan halaman
+     * modul (B-F8-1). Tanpa cache.
+     *
+     * @return array<string, int> kunci sumber => jumlah
+     */
+    public function jumlahPerKunci(AuthContext $auth, bool $hanyaBelumDibaca): array
+    {
+        $nip    = (string) $this->nip($auth);
+        $cabang = [];
 
         foreach ($this->kunci($auth) as $k) {
-            $total += $this->builder($k, $nip, $hanyaBelumDibaca)->countAllResults();
+            $cabang[] = '(' . $this->builder($k, $nip, $hanyaBelumDibaca)
+                ->select($this->db->escape($k) . ' AS kunci, COUNT(*) AS jumlah', false)
+                ->getCompiledSelect() . ')';
         }
 
-        return $total;
+        if ($cabang === []) {
+            return [];
+        }
+
+        $hasil = [];
+
+        foreach ($this->db->query(implode(' UNION ALL ', $cabang))->getResultArray() as $r) {
+            $hasil[(string) $r['kunci']] = (int) $r['jumlah'];
+        }
+
+        return $hasil;
     }
 
     public function daftar(AuthContext $auth, bool $hanyaBelumDibaca, int $batas): array
@@ -161,8 +195,8 @@ final class SumberShowNotif implements SumberDaftar
     }
 
     /**
-     * Definisi tabel per kunci; tabel tanpa kolom `show_notif` dilewati. Kolom waktu = `notif_date` bila ada, selain itu
-     * `updated_at` (LKH legacy: `updated_at`, `LN:3990`).
+     * Definisi tabel per kunci dari registry + konstanta (CR-159: tanpa kueri metadata). Kolom waktu = `notif_date`, kecuali
+     * {@see self::TANPA_NOTIF_DATE} → `updated_at` (LKH legacy: `updated_at`, `LN:3990`).
      *
      * @return array<string, array{tabel: string, pk: string, status: string, waktu: string, alasan: ?string, hapus: bool, label: string, url: string}>
      */
@@ -192,20 +226,10 @@ final class SumberShowNotif implements SumberDaftar
         $hasil = [];
 
         foreach ($calon as $kunci => $c) {
-            if (! $this->db->tableExists($this->db->prefixTable($c['tabel']), false)) {
-                continue;
-            }
-
-            $kolom = $this->db->getFieldNames($c['tabel']);
-
-            if (! in_array('show_notif', $kolom, true) || ! in_array($c['status'], $kolom, true) || ! in_array('nip', $kolom, true)) {
-                continue;
-            }
-
             $hasil[$kunci] = $c + [
-                'waktu'  => in_array('notif_date', $kolom, true) ? 'notif_date' : 'updated_at',
-                'alasan' => in_array('reason_note', $kolom, true) ? 'reason_note' : null,
-                'hapus'  => in_array('status', $kolom, true),
+                'waktu'  => in_array($kunci, self::TANPA_NOTIF_DATE, true) ? 'updated_at' : 'notif_date',
+                'alasan' => in_array($kunci, self::TANPA_REASON_NOTE, true) ? null : 'reason_note',
+                'hapus'  => true,
             ];
         }
 
