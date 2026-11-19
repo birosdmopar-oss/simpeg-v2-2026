@@ -27,14 +27,34 @@ File terkait di repo ini:
 
 Prasyarat di server: `git`, `php` dengan patch aman (+ ext mysqli, intl, mbstring, json), `composer`, `node` dengan patch aman + `npm`, MySQL 8.x, web server (nginx/Apache).
 
-**Versi minimum aman (CR-094, ISSUE-053 dan ISSUE-054):**
+**Versi minimum aman (CR-094, ISSUE-053 dan ISSUE-054) — ditegakkan sejak CR-154:**
 
-| Runtime | Versi minimum aman | Alasan |
+| Runtime | Seri yang diterima | Alasan |
 |---|---|---|
-| PHP | 8.2.35 (cabang 8.2); atau 8.3.36, 8.4.27, 8.5.12 | PHP2Shell, CVE-2026-109618 / CVE-2026-109619 (RCE di PHP core) |
-| Node.js | 22.23.4 (cabang 22); 24.22.1 (cabang 24, dipakai proyek, lihat `frontend/.nvmrc`); 26.12.1 | Node2Shell, CVE-2026-111497 (dekoder Brotli). Node 20 sudah EOL dan tidak mendapat patch. |
+| PHP | 8.4.x ≥ **8.4.27** (dipakai proyek dan CI); 8.3.x ≥ **8.3.36** | PHP2Shell, CVE-2026-109618 / CVE-2026-109619 (RCE di PHP core) |
+| Node.js | 24.x ≥ **24.22.1** (dipakai proyek, lihat `frontend/.nvmrc`); 22.x ≥ **22.23.4** | Node2Shell, CVE-2026-111497 (dekoder Brotli). Node 20 sudah EOL dan tidak mendapat patch. |
 
-Versi di bawah daftar di atas tidak boleh dipakai di server, termasuk Node 20 dan PHP 8.2.x di bawah 8.2.35. `composer.json` masih `php ^8.2`; menaikkan batas itu adalah keputusan terpisah.
+Seri lain ditolak, termasuk seri yang sudah dipatch tetapi tidak diuji proyek (PHP 8.2.35 / 8.5.12, Node 25 / 26.12.1). Menambah seri
+= CR yang memperbarui `deploy/cek-versi-runtime.sh`, `frontend/package.json` `engines.node`, dan tabel ini bersamaan.
+
+Penegakan:
+- **CI** (`.github/workflows/quality-gate.yml`): langkah "Guard versi PHP/Node aman" sesudah setup PHP/Node gagal bila runtime runner di
+  luar tabel. Logika guard diuji dengan versi tiruan (`deploy/cek-versi-runtime.test.sh`).
+- **Deploy** (`deploy/post-receive`): sebelum `composer install`, hook menjalankan `deploy/cek-versi-runtime.sh` dari release untuk
+  `PHP_BIN` dan `NODE_BIN` (deploy.env; default `node` di direktori `NPM_BIN` bila berupa path). Ditolak → build gagal, release dihapus,
+  `current` dan database tidak disentuh.
+- **npm** (`frontend/.npmrc` `engine-strict=true`, `engines.node` `>=22.23.4 <23 || >=24.22.1 <25`): `npm ci` menolak Node di luar rentang.
+- `composer.json` tetap `php ^8.2`: menaikkan batasnya mengubah hash `composer.lock` (perlu `composer update --lock`), jadi tidak
+  dilakukan di CR-154; guard CI + post-receive sudah menolak PHP rentan.
+
+Verifikasi di server (tanpa build), dari checkout repo atau release terbaru:
+
+```bash
+PHP_BIN=/path/ke/php bash deploy/cek-versi-runtime.sh php
+NODE_BIN=/path/ke/node bash deploy/cek-versi-runtime.sh node
+```
+
+Keluaran `==> [cek-versi-runtime] … aman` = lolos; `!!  … DITOLAK` (exit 1) = perbarui runtime dulu.
 
 PHP untuk unduhan PDF dokumen F-09 (MAKE-037, ADR-034): `memory_limit` ≥ 256M dan batas waktu request ≥ 30 detik (`max_execution_time` PHP-FPM serta timeout proxy web server, mis. `fastcgi_read_timeout`). PDF 1.700 baris terukur ±238 MB dan ±10 detik di mesin dev.
 
