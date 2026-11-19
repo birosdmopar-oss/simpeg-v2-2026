@@ -33,6 +33,16 @@ harap 1 php 7.4.33
 harap 1 php 9.0.0
 harap 1 php 8.4
 harap 1 php abc
+# Pra-rilis pada/di atas minimum tetap ditolak (review R1); akhiran distro diterima.
+harap 1 php 8.4.27-dev
+harap 1 php 8.4.27RC1
+harap 1 php 8.4.30-rc2
+harap 1 php 8.3.36beta1
+harap 1 php 8.4.28-alpha
+harap 1 node v24.22.1-pre
+harap 1 node v26.12.1-nightly20261101abc
+harap 1 node v24.23.0-RC.1
+harap 0 php 8.4.28-2+deb12u1
 # Node aman
 harap 0 node v24.22.1
 harap 0 node 24.30.0

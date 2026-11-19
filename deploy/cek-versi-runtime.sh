@@ -69,6 +69,16 @@ esac
 versi="$(normalisasi "$versi_mentah")"
 [ -n "$versi" ] || tolak "versi $runtime tidak terbaca ('$versi_mentah'); aman: $aman; $isu"
 
+# Build pra-rilis (mis. 8.4.27-dev, 8.4.27RC1, v24.22.1-pre, v26.12.1-nightly…) belum tentu memuat patch → ditolak. Akhiran distro
+# (mis. 8.4.27-1ubuntu1) tetap diterima. Review CR-154 R1.
+akhiran="${versi_mentah#v}"
+akhiran="${akhiran#"$versi"}"
+shopt -s nocasematch
+if [[ "$akhiran" =~ ^[-.~+_]?(dev|alpha|beta|rc|pre|nightly) ]]; then
+    tolak "$runtime '$versi_mentah' adalah build pra-rilis; aman: $aman; $isu"
+fi
+shopt -u nocasematch
+
 seri="${versi%.*}"
 case "$runtime:$seri" in
     php:8.3) minimum=8.3.36 ;;
