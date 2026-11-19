@@ -51,7 +51,8 @@ Penegakan:
 - **CI** (`.github/workflows/quality-gate.yml`): langkah "Guard versi PHP/Node aman" sesudah setup PHP/Node gagal bila runtime runner di
   luar tabel. Logika guard diuji dengan versi tiruan (`deploy/cek-versi-runtime.test.sh`).
 - **Deploy** (`deploy/post-receive`): sebelum `composer install`, hook menjalankan `deploy/cek-versi-runtime.sh` dari release untuk
-  `PHP_BIN` dan `NODE_BIN` (deploy.env; default `node` di direktori `NPM_BIN` bila berupa path). Ditolak → build gagal, release dihapus,
+  `PHP_BIN` dan `NODE_BIN` (deploy.env; default `node` di direktori `NPM_BIN` bila berupa path; bila `NODE_BIN` berupa path,
+  direktorinya disisipkan di depan `PATH` supaya `npm ci`/`npm run build` memakai node yang sama). Ditolak → build gagal, release dihapus,
   `current` dan database tidak disentuh.
 - **npm** (`frontend/.npmrc` `engine-strict=true`, `engines.node` `>=22.23.4 <23 || >=24.22.1 <25 || >=26.12.1 <27`): `npm ci` menolak Node di luar rentang.
 - `composer.json` tetap `php ^8.2`: menaikkan batasnya mengubah hash `composer.lock` (perlu `composer update --lock`), jadi tidak
@@ -105,7 +106,8 @@ DEPLOY_ROOT=/var/www/simpeg-v2
 KEEP_RELEASES=5
 # 0 = hook tidak menjalankan migration; migrate manual lewat runbook setelah approval DBV (§3a)
 RUN_MIGRATIONS=0
-# PHP_BIN=/usr/bin/php8.3  COMPOSER_BIN=/usr/local/bin/composer  NPM_BIN=/usr/bin/npm
+# PHP_BIN=/usr/bin/php8.4  COMPOSER_BIN=/usr/local/bin/composer  NPM_BIN=/opt/node-24/bin/npm  NODE_BIN=/opt/node-24/bin/node
+# NODE_BIN berupa path → direktorinya disisipkan di depan PATH, jadi npm memakai node yang sama dengan yang dicek guard (CR-154)
 # Tidak ada DEPLOY_BRANCH: hook selalu mendeploy main (ISSUE-014)
 EOF
 
@@ -955,6 +957,7 @@ Skenario minimal yang diuji ulang bila hook atau `rollback.sh` diubah:
 | Rollback ke release lama | `rollback.sh` tanpa argumen setelah release pembawa migration aktif | lolos pemeriksaan (migration release lama sudah tercatat) |
 | Status tidak terbaca / format asing | DB release tidak ada; `PHP_BIN` palsu yang mengganti header `Batch` | hook: `GAGAL ... sebelum migrate`; `rollback.sh`: `DIBATALKAN`; `--force` melewati pemeriksaan |
 | Build gagal | commit dengan impor modul frontend yang tidak ada, `RUN_MIGRATIONS=1`, plus migration baru | `GAGAL ... database tidak diubah`; release dihapus; migration baru tidak jalan |
+| Runtime rentan (CR-154) | `deploy.env` `PHP_BIN`/`NODE_BIN` menunjuk biner tiruan yang mencetak versi rentan (mis. `8.4.2`, `v24.22.0`) atau pra-rilis (`8.4.27-dev`) | `!!  [cek-versi-runtime] DITOLAK` lalu `GAGAL` sebelum `composer install`; release dihapus; `current` dan database tetap |
 | `RUN_MIGRATIONS=1` eksplisit | `deploy.env` berisi `RUN_MIGRATIONS=1` | migrate setelah build, lalu `SUKSES` |
 | Migration gagal di tengah | `RUN_MIGRATIONS=1`, migration yang melempar exception | `GAGAL saat/setelah migrate`; release disimpan tanpa `.deploy-ditahan`; `current` tetap |
 | Branch lain / konfigurasi salah | push ke branch lain; `DEPLOY_BRANCH=dev` di `deploy.env`; `RUN_MIGRATIONS=yes`; `RUN_MIGRATIONS=1`/`DEPLOY_BRANCH=dev` hanya di environment `git push` | dilewati; `DIBATALKAN`; `DIBATALKAN`; diabaikan (tetap `main`, `0`) |
