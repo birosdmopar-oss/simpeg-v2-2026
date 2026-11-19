@@ -13,7 +13,7 @@ dicadangkan untuk ISSUE-045 sejak PRD Fase 4. Berkas `DBV-019-audit-yatim-fk-g02
 menurunkan sendiri 54 kueri lain dari DBV-019 Bagian 2.3. DBV-021 menuliskannya lengkap.
 
 **Rujukan:** `DBV-019-fk-g02-pegawai-schema.md` (Bagian 2.3, 6), `DBV-011-runbook-impor-master-zona-waktu.md` 2.10,
-`docs/migrasi/MAKE-069-rencana.md` (T10/T11, Bagian 6), migration `2026-10-07-100000_AddFkG02Pegawai` dan
+`docs/migrasi/MAKE-069-rencana.md` (T3/T10/T11, Bagian 6), migration `2026-10-07-100000_AddFkG02Pegawai` dan
 `2026-10-07-100100_AddFkG02Riwayat`.
 
 **Label sumber:** **[K]** ikut kode/DDL legacy; **[V2]** deviasi v2 yang disengaja; **[I]** inferensi.
@@ -27,7 +27,7 @@ menurunkan sendiri 54 kueri lain dari DBV-019 Bagian 2.3. DBV-021 menuliskannya 
 | 1 | `backend/docs/db-review/sql/DBV-021-audit-yatim-fk-g02-per-tabel.sql` | baru, baca-saja | Bagian A: 10 kueri ringkasan (satu per tabel anak, 55 kolom FK, WAJIB_0). Bagian B: contoh nilai yatim per FK (INFO, maksimal 10 id master) |
 | 2 | `backend/tests/database/Kepegawaian/AuditYatimFkG02Test.php` | baru | Mengunci cakupan = konstanta `FOREIGN_KEYS` kedua migration DBV-019; kueri berjalan di skema v2; DB bersih = 0; nilai `0` dan id asing terhitung, NULL tidak; contoh tanpa NIP |
 | 3 | `DBV-011-runbook-impor-master-zona-waktu.md` 2.10 | ubah teks | Langkah 1 "Audit = 0" memakai berkas DBV-021 (Bagian A), berkas DBV-019 tetap untuk Bagian 3–4 |
-| 4 | `docs/migrasi/MAKE-069-rencana.md` | ubah teks | Prasyarat gladi T10/T11: audit DBV-021 di salinan legacy dan di DB gladi |
+| 4 | `docs/migrasi/MAKE-069-rencana.md` | ubah teks | Prasyarat gladi T3/T10/T11: audit DBV-021 di salinan legacy dan di DB gladi |
 
 Tidak ada objek DB yang dibuat/diubah. Skrip tidak menulis apa pun.
 
@@ -36,19 +36,19 @@ Tidak ada objek DB yang dibuat/diubah. Skrip tidak menulis apa pun.
 Sumber tunggal = konstanta `FOREIGN_KEYS` kedua migration DBV-019 (sama dengan DBV-019 Bagian 2.3). Semua kolom anak
 nullable [K] (`DEFAULT NULL`); induk = PK master G-02.
 
-| Kode | Tabel anak | FK | Induk |
-|---|---|---:|---|
-| A01 | `pegawai_mutasi_jabatan` | 13 | `jabatan` (5), `jabatan_koordinasi` (3), `group_jabatan`, `sub_group_jabatan`, `unit`, `satker`, `rumpun_jabatan` |
-| A02 | `pegawai_ak` | 1 | `jabatan` |
-| A03 | `pegawai_ak_siasn` | 1 | `jabatan` |
-| A04 | `riwayat_mutasi_jabatan` | 13 | sama dengan A01 |
-| A05 | `pegawai_plt` | 10 | `group_jabatan` (2), `sub_group_jabatan` (2), `unit` (2), `satker` (2), `jabatan`, `jabatan_koordinasi` |
-| A06 | `pegawai_plh` | 10 | sama dengan A05 (contoh Bagian 2 DBV-019, disalin ulang di sini agar satu berkas lengkap) |
-| A07 | `riwayat_lckh` | 2 | `unit`, `satker` |
-| A08 | `riwayat_ak` | 1 | `jabatan` |
-| A09 | `riwayat_ak_siasn` | 1 | `jabatan` |
-| A10 | `konv_ak` | 3 | `jabatan`, `unit`, `satker` |
-| | **Jumlah** | **55** | |
+| Kode | Tabel anak | FK | Induk | Tier impor |
+|---|---|---:|---|---|
+| A01 | `pegawai_mutasi_jabatan` | 13 | `jabatan` (5), `jabatan_koordinasi` (3), `group_jabatan`, `sub_group_jabatan`, `unit`, `satker`, `rumpun_jabatan` | T3 |
+| A02 | `pegawai_ak` | 1 | `jabatan` | T11 |
+| A03 | `pegawai_ak_siasn` | 1 | `jabatan` | T11 |
+| A04 | `riwayat_mutasi_jabatan` | 13 | sama dengan A01 | T3 |
+| A05 | `pegawai_plt` | 10 | `group_jabatan` (2), `sub_group_jabatan` (2), `unit` (2), `satker` (2), `jabatan`, `jabatan_koordinasi` | T3 |
+| A06 | `pegawai_plh` | 10 | sama dengan A05 (contoh Bagian 2 DBV-019, disalin ulang di sini agar satu berkas lengkap) | T3 |
+| A07 | `riwayat_lckh` | 2 | `unit`, `satker` | T10 |
+| A08 | `riwayat_ak` | 1 | `jabatan` | T10 |
+| A09 | `riwayat_ak_siasn` | 1 | `jabatan` | T10 |
+| A10 | `konv_ak` | 3 | `jabatan`, `unit`, `satker` | T10 |
+| | **Jumlah** | **55** | | T3 (4), T10 (4), T11 (2) |
 
 Daftar brief ISSUE-045 menyebut 9 tabel anak tanpa `pegawai_plh` (sudah punya contoh di DBV-019); dicek ulang terhadap
 migration: tabel anak FK G-02 = 10, sehingga 10 kueri ringkasan sesuai keputusan PR #26.
@@ -81,7 +81,7 @@ LEFT JOIN <induk> pNN ON pNN.<pk_induk> = c.<kolom> …;
 
 | Temuan Bagian B | Tindakan | Catatan |
 |---|---|---|
-| `contoh_nilai` = `0` (atau `''`) | → NULL di transformasi impor | Importer T10/T11 sudah menerapkan "id G-02 = 0 → NULL" (MAKE-069 T10); di salinan legacy angka ini wajar, di DB v2 harus 0 |
+| `contoh_nilai` = `0` (atau `''`) | → NULL di transformasi impor | Transformasi impor tier tabel itu (T3/T10/T11, lihat §1) menerapkan "id G-02 = 0 → NULL" (MAKE-069 T10; B-01/B-02 §6 #4); di salinan legacy angka ini wajar, di DB v2 harus 0 |
 | id asing | impor dulu baris master yang hilang (status 10 bila tidak dipakai), atau NULL-kan dengan catatan rekonsiliasi | Diputus per kasus, dicatat di log 2.8; tidak dihapus diam-diam |
 | di DB v2 sesudah impor (FK nonaktif) | audit diulang sesudah perbaikan; aplikasi tidak dibuka sebelum Bagian A = 0 | Pra-cek migration DBV-019 menjadi pemeriksaan kedua (fail-closed) |
 
@@ -89,7 +89,7 @@ LEFT JOIN <induk> pNN ON pNN.<pk_induk> = c.<kolom> …;
 
 1. **Salinan legacy, sebelum gladi impor** (perkiraan awal): nama tabel/kolom = D1. Hasil `0`/id asing dicatat per FK di
    lembar hasil; id asing diputus sebelum gladi (impor master hilang / NULL + catatan).
-2. **DB gladi v2 sesudah T10/T11**: bila impor berjalan dengan FK aktif (jalur disarankan: `migrate` di DB kosong lebih
+2. **DB gladi v2 sesudah T3, T10, dan T11** (tier per tabel di §1): bila impor berjalan dengan FK aktif (jalur disarankan: `migrate` di DB kosong lebih
    dulu, MAKE-069 Bagian 6 langkah 1), Bagian A harus 0 dan berfungsi sebagai bukti. Bila impor memakai
    FOREIGN_KEY_CHECKS = 0, Bagian A = 0 **wajib** sebelum aplikasi dibuka.
 3. Bagian 3 (FK masuk `pengguna`/`faq_rate`) dan Bagian 4 (master status 10) tetap dari `DBV-019-audit-yatim-fk-g02.sql`.
@@ -98,7 +98,7 @@ LEFT JOIN <induk> pNN ON pNN.<pk_induk> = c.<kolom> …;
 
 | Pemeriksaan | Hasil |
 |---|---|
-| Cakupan berkas = konstanta `FOREIGN_KEYS` (nama FK, kolom, induk, PK induk), 10 kueri A + 10 kueri B, 55 FK di B | `AuditYatimFkG02Test::testBerkasMencakupTepat55FkMigration` |
+| Cakupan berkas = konstanta `FOREIGN_KEYS`: Bagian A tepat 55 kolom FK tanpa duplikat (nama, kolom, induk, PK induk, JOIN); Bagian B tepat 55 SELECT tanpa duplikat, label + kolom anak + FROM/JOIN/ON/WHERE cocok per FK; 10 kueri A + 10 kueri B | `AuditYatimFkG02Test::testBerkasMencakupTepat55FkMigration` |
 | Kueri berjalan di skema v2; DB bersih = 0; `0` dan id asing terhitung per baris; NULL bukan yatim; contoh = id master, tanpa NIP | `AuditYatimFkG02Test::testDbBersihNolDanYatimTerhitung` (data sintetis, FK dinonaktifkan sementara untuk menanam yatim) |
 | Uji di DB scratch lokal | menunggu jeda test lokal dicabut (izin #13); hasil ditambahkan di sini |
 

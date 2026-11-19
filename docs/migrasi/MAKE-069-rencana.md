@@ -97,8 +97,8 @@ dikonversi R1a dan semua kolom teks ikut `stripslashes` bawaan. Kolom `siasn_lu`
 - **Prasyarat gladi FK G-02 (DBV-021, ISSUE-045):** sebelum gladi, jalankan
   `backend/docs/db-review/sql/DBV-021-audit-yatim-fk-g02-per-tabel.sql` di salinan legacy (perkiraan awal; Bagian B
   membedakan `0` → NULL dari id asing) dan putuskan id asing (impor master hilang / NULL + catatan, DBV-011 2.10). Sesudah
-  T10/T11 di DB gladi, Bagian A wajib 0 untuk ke-10 tabel anak (`pegawai_mutasi_jabatan`, `pegawai_ak`, `pegawai_ak_siasn`,
-  `riwayat_mutasi_jabatan`, `pegawai_plt`, `pegawai_plh`, `riwayat_lckh`, `riwayat_ak`, `riwayat_ak_siasn`, `konv_ak`).
+  T3, T10, dan T11 di DB gladi, Bagian A wajib 0 untuk ke-10 tabel anak: T3 `pegawai_mutasi_jabatan`, `riwayat_mutasi_jabatan`,
+  `pegawai_plt`, `pegawai_plh`; T10 `riwayat_lckh`, `riwayat_ak`, `riwayat_ak_siasn`, `konv_ak`; T11 `pegawai_ak`, `pegawai_ak_siasn`.
 
 ### T11 snapshot
 - Disalin apa adanya, tidak diturunkan ulang (B-01/B-02 §6 #1).
