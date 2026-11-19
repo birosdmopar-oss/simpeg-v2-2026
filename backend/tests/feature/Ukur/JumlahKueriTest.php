@@ -131,6 +131,10 @@ final class JumlahKueriTest extends DatabaseTestCase
         $this->ukur('GET cuti/opsi', 'role 2', $s['bawahan'], 'get', 'cuti/opsi');
         $this->ukur('GET cuti?mode=admin&per_page=100', 'role 1', $s['admin'], 'get', 'cuti?mode=admin&per_page=100');
         $this->ukur('GET cuti?mode=admin&per_page=100', 'role 3', $s['adminSatker'], 'get', 'cuti?mode=admin&per_page=100');
+        $this->ukur('GET cuti/pengingat', 'role 2 atasan (3 bawahan)', $s['atasan'], 'get', 'cuti/pengingat');
+
+        $this->ukur('GET layanan/status/ekspor?format=csv', 'role 1', $s['admin'], 'get', 'layanan/status/ekspor?format=csv');
+        $this->ukur('GET layanan/status/ekspor?format=csv', 'role 3', $s['adminSatker'], 'get', 'layanan/status/ekspor?format=csv');
 
         $this->ukur('POST auth/login', 'role 2', null, 'post', 'auth/login', ['username' => AuthSeeder::nipForRole(Role::PEGAWAI), 'password' => AuthSeeder::PASSWORD, 'captcha_token' => 'ok']);
 

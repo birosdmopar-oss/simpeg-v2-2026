@@ -153,8 +153,12 @@ class LayananDashboardService
 
             $urut = $db->query("SELECT * FROM ({$union}) u ORDER BY u.created_at DESC, u.jenis ASC, u.id DESC")->getResultArray();
 
+            // Ekspor tidak memakai `url_detail`/`aksi` (lihat `barisEkspor`), jadi cek akses detail per pegawai dilewati;
+            // PIC aktif per jenis dimuat sekali untuk seluruh berkas, bukan sekali per potongan (CR-160).
+            $pic = [];
+
             foreach (array_chunk($urut, self::CHUNK_EKSPOR) as $bagian) {
-                foreach ($this->isi($auth, $bagian) as $item) {
+                foreach ($this->isi($auth, $bagian, false, $pic) as $item) {
                     $baris[] = $this->barisEkspor($item);
                 }
             }
@@ -301,11 +305,16 @@ class LayananDashboardService
     /**
      * Muat baris lengkap halaman ini per jenis lalu bentuk item (urutan union dipertahankan).
      *
-     * @param list<array<string, mixed>> $baris
+     * `$denganDetail = false` (jalur ekspor): tanpa cek akses detail, sehingga `url_detail` null dan `aksi.lihat_detail`
+     * false; kedua field itu tidak dibaca `barisEkspor`. `$pic` adalah memo PIC aktif per jenis milik pemanggil, supaya
+     * ekspor yang memanggil `isi()` per potongan tidak memuat ulang PIC yang sama.
+     *
+     * @param list<array<string, mixed>>                                             $baris
+     * @param array<string, list<array{peran: string, nip: string, nama: ?string}>> $pic
      *
      * @return list<array<string, mixed>>
      */
-    private function isi(AuthContext $auth, array $baris): array
+    private function isi(AuthContext $auth, array $baris, bool $denganDetail = true, array &$pic = []): array
     {
         $db   = $this->koneksi();
         $data = [];
@@ -324,7 +333,6 @@ class LayananDashboardService
 
         $nips    = array_values(array_unique(array_map(static fn (array $r): string => (string) $r['nip'], array_merge([], ...array_map('array_values', array_values($data))))));
         $pegawai = $this->pegawai($nips);
-        $pic     = [];
         $detail  = [];
         $items   = [];
 
@@ -343,8 +351,12 @@ class LayananDashboardService
                 $pic[$jenis] = $this->picAktif(self::JENIS_LAYANAN[$jenis]);
             }
 
-            $detail[$jenis . '|' . $nip] ??= $this->bolehDetail($auth, $jenis, $nip);
-            $boleh = $detail[$jenis . '|' . $nip];
+            $boleh = false;
+
+            if ($denganDetail) {
+                $detail[$jenis . '|' . $nip] ??= $this->bolehDetail($auth, $jenis, $nip);
+                $boleh = $detail[$jenis . '|' . $nip];
+            }
 
             $item = [
                 'jenis'             => $jenis,

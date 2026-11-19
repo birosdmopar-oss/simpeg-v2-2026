@@ -56,6 +56,72 @@ class ApproverTerjangkau
             ->orderBy('id_pengguna', 'ASC')
             ->get()->getResultArray();
 
+        return self::nilai($akun);
+    }
+
+    /**
+     * Versi banyak NIP untuk daftar (CR-160): satu kueri untuk seluruh halaman, hasil per NIP sama persis dengan
+     * {@see alasanTakTerjangkau()}. Dibaca saat dipanggil dan tidak disimpan di objek ini, sehingga jalur tulis
+     * (persetujuan dalam transaksi) tetap selalu membaca keadaan akun terbaru.
+     *
+     * @param list<string|null> $daftarNip
+     *
+     * @return array<string, string|null> kunci = NIP yang sudah di-trim ('' = eselon I)
+     */
+    public function alasanBanyak(array $daftarNip): array
+    {
+        $hasil = [];
+        $cari  = [];
+
+        foreach ($daftarNip as $nip) {
+            $nip = trim((string) $nip);
+
+            if ($nip === '') {
+                $hasil[''] = self::ALASAN_ESELON_I;
+            } else {
+                $cari[$nip] = true;
+            }
+        }
+
+        if ($cari === []) {
+            return $hasil;
+        }
+
+        $daftar = array_map('strval', array_keys($cari));
+        $rows   = $this->db->table('pengguna')
+            ->select('nip, status, user_level, deleted_at')
+            ->whereIn('nip', $daftar)
+            ->orderBy('id_pengguna', 'ASC')
+            ->get()->getResultArray();
+
+        $perNip = [];
+
+        foreach ($rows as $r) {
+            if (! in_array((string) $r['nip'], $daftar, true)) {
+                // Collation mencocokkan NIP yang tidak identik byte-per-byte (huruf besar/kecil, spasi akhir): jangan
+                // menebak pengelompokannya, pakai jalur per NIP supaya hasilnya tetap sama.
+                foreach ($daftar as $nip) {
+                    $hasil[$nip] = $this->alasanTakTerjangkau($nip);
+                }
+
+                return $hasil;
+            }
+
+            $perNip[(string) $r['nip']][] = $r;
+        }
+
+        foreach ($daftar as $nip) {
+            $hasil[$nip] = self::nilai($perNip[$nip] ?? []);
+        }
+
+        return $hasil;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $akun akun ber-NIP sama, urut `id_pengguna` ASC
+     */
+    private static function nilai(array $akun): ?string
+    {
         if ($akun === []) {
             return self::ALASAN_TANPA_AKUN;
         }

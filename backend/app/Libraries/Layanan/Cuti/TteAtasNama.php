@@ -52,6 +52,69 @@ final class TteAtasNama
             ->like('after_json', CutiApprovalService::JENIS_AUDIT_ATAS_NAMA)
             ->orderBy('id_log', 'DESC')->get()->getResultArray();
 
+        return self::putus($baris, $status);
+    }
+
+    /**
+     * Versi banyak cuti untuk daftar (CR-160): satu kueri audit untuk seluruh halaman, hasil per cuti sama persis dengan
+     * {@see finalAtasNama()} (urutan `id_log` DESC per cuti dipertahankan). Tidak disimpan di mana pun: jalur TTE tetap
+     * memakai {@see boleh()} yang membaca langsung.
+     *
+     * @param list<array<string, mixed>> $daftarCuti baris `riwayat_cuti`
+     *
+     * @return array<int, bool> kunci = `id_riwayat_cuti`
+     */
+    public static function finalAtasNamaBanyak(BaseConnection $db, array $daftarCuti): array
+    {
+        $hasil = [];
+        $cari  = [];
+
+        foreach ($daftarCuti as $cuti) {
+            $id         = (int) $cuti['id_riwayat_cuti'];
+            $hasil[$id] = false;
+
+            if (in_array((int) ($cuti['status'] ?? 0), StatusCuti::EFEK_FINAL, true) && EsignCutiService::penandaTangan($cuti) !== null) {
+                $cari[$id] = $cuti;
+            }
+        }
+
+        if ($cari === []) {
+            return $hasil;
+        }
+
+        $daftar = array_map('strval', array_keys($cari));
+        $rows   = $db->table('audit_logs')->select('entity_id, after_json')
+            ->where('entity', 'riwayat_cuti')->whereIn('entity_id', $daftar)
+            ->like('after_json', CutiApprovalService::JENIS_AUDIT_ATAS_NAMA)
+            ->orderBy('id_log', 'DESC')->get()->getResultArray();
+
+        $perCuti = [];
+
+        foreach ($rows as $r) {
+            if (! in_array((string) $r['entity_id'], $daftar, true)) {
+                // `entity_id` yang cocok menurut collation tetapi tidak identik: pakai jalur per cuti supaya hasil tetap sama.
+                foreach ($cari as $id => $cuti) {
+                    $hasil[$id] = self::finalAtasNama($db, $cuti);
+                }
+
+                return $hasil;
+            }
+
+            $perCuti[(int) $r['entity_id']][] = $r;
+        }
+
+        foreach ($cari as $id => $cuti) {
+            $hasil[$id] = self::putus($perCuti[$id] ?? [], (int) $cuti['status']);
+        }
+
+        return $hasil;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $baris entri audit satu cuti, urut `id_log` DESC
+     */
+    private static function putus(array $baris, int $status): bool
+    {
         foreach ($baris as $b) {
             $after = json_decode((string) $b['after_json'], true);
 
