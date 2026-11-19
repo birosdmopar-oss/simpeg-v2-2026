@@ -122,7 +122,7 @@ Branch yang dideploy selalu `main` dan tidak bisa diubah. `deploy.env` lama yang
 
 `rollback.sh` membaca `deploy.env` di sampingnya (symlink langkah 6) sama seperti hook: `DEPLOY_ROOT` dan `PHP_BIN` diambil dari sana. Tanpa file itu, `DEPLOY_ROOT` = direktori tempat `rollback.sh` dipasang; nilai `DEPLOY_ROOT` dari environment shell diabaikan.
 
-Web server mengarah ke symlink `current` (di-resolve ulang tiap request, tidak perlu reload saat deploy):
+Web server mengarah ke symlink `current`. Dengan OPcache aktif, symlink **wajib** di-resolve lewat `$realpath_root` dan/atau php-fpm di-reload sesudah switch (§1o butir 3); tanpa itu worker bisa mencampur kode release lama dan baru:
 
 - API (CI4): document root `/var/www/simpeg-v2/current/backend/public`
 - SPA (Vue): root `/var/www/simpeg-v2/current/frontend/dist` dengan fallback `try_files $uri /index.html`
@@ -171,9 +171,11 @@ server {
     location ~ ^/(api/)?index\.php {
         root /var/www/simpeg-v2/current/backend/public;
         include fastcgi_params;
-        fastcgi_param SCRIPT_FILENAME $document_root/index.php;
-        # php8.3-fpm harus ≥ 8.3.36 (PHP2Shell, CVE-2026-109618/109619)
-        fastcgi_pass unix:/run/php/php8.3-fpm.sock;
+        # $realpath_root = path release nyata di balik symlink `current` (§1o butir 3, usulan)
+        fastcgi_param SCRIPT_FILENAME $realpath_root/index.php;
+        fastcgi_param DOCUMENT_ROOT $realpath_root;
+        # php8.4-fpm harus ≥ 8.4.27 (seri 8.3: ≥ 8.3.36) — PHP2Shell, CVE-2026-109618/109619; daftar = deploy/cek-versi-runtime.sh (CR-154)
+        fastcgi_pass unix:/run/php/php8.4-fpm.sock;
     }
 }
 ```
@@ -352,8 +354,8 @@ berbeda, ADR-037 yang berlaku dan baris di bawah disesuaikan.
 B=/var/www/simpeg-v2/current/backend
 L=/var/www/simpeg-v2/logs
 # e-Kinerja (H-10): periode baru harian; SKP periodik periode terpilih + satu periode sebelumnya (--sebelumnya)
-0  1 * * *   deploy cd $B && php spark bkn:tarik-periode                    >> $L/bkn.log 2>&1
-0  2 * * *   deploy cd $B && php spark bkn:tarik-skp-periodik --sebelumnya  >> $L/bkn.log 2>&1
+0  1 * * *   deploy cd $B && flock -n /tmp/simpeg-v2-bkn-tarik-periode.lock php spark bkn:tarik-periode                   >> $L/bkn.log 2>&1
+0  2 * * *   deploy cd $B && flock -n /tmp/simpeg-v2-bkn-tarik-skp-periodik.lock php spark bkn:tarik-skp-periodik --sebelumnya >> $L/bkn.log 2>&1
 # SIASN tarik (H-03): batch kecil berulang; tiap jalan hanya mengambil NIP yang sudah usang (data utama 1 hari, lainnya 6 jam)
 */15 * * * * deploy cd $B && php spark siasn:tarik --jenis=data-utama --limit=50 >> $L/siasn.log 2>&1
 3-59/15 * * * * deploy cd $B && php spark siasn:tarik --jenis=golongan   --limit=50 >> $L/siasn.log 2>&1
@@ -372,12 +374,14 @@ L=/var/www/simpeg-v2/logs
 * * * * *    deploy cd $B && php spark siasn:unggah-arsip --langkah=unggah >> $L/siasn-arsip.log 2>&1
 45 * * * *   deploy cd $B && php spark siasn:unggah-arsip --langkah=antre  >> $L/siasn-arsip.log 2>&1
 # Pemeliharaan & pemantauan log integrasi (F6-24)
-0  4 * * 0   deploy cd $B && php spark integrasi:bersihkan-log             >> $L/integrasi.log 2>&1
+0  4 * * 0   deploy cd $B && flock -n /tmp/simpeg-v2-integrasi-bersihkan-log.lock php spark integrasi:bersihkan-log >> $L/integrasi.log 2>&1
 5  * * * *   deploy cd $B && php spark integrasi:status --jam=1 > /dev/null 2>&1 || echo "integrasi:status: ada kegagalan/peringatan" | logger -t simpeg-v2
 ```
 
-Setiap command memegang kunci DB (`GET_LOCK`) per jenis: jalan kedua jenis yang sama ditolak "sedang berjalan" (exit 1,
+Command `siasn:*` memegang kunci DB (`GET_LOCK`) per jenis: jalan kedua jenis yang sama ditolak "sedang berjalan" (exit 1,
 tanpa panggilan API), jadi tumpang tindih tidak merusak data, tetapi baris log exit 1 itu tanda jadwal terlalu rapat.
+`bkn:tarik-periode`, `bkn:tarik-skp-periodik`, dan `integrasi:bersihkan-log` **tidak** memegang `GET_LOCK` (dicek CR-156), jadi
+barisnya memakai `flock -n` seperti cron lain; `flock` yang sibuk keluar 1 tanpa menjalankan command.
 `--limit` bawaan 20 baris/NIP per jalan (tarik maks 500); naikkan hanya bila antrean menumpuk.
 
 **Kode keluar & pemantauan.** `0` = berhasil (termasuk sebagian NIP/baris gagal di sisi BKN, tercatat); `1` = konfigurasi
@@ -797,6 +801,146 @@ WHERE t.status = 0 AND t.id_question_category IS NOT NULL
   < 256M, `halosimpeg.eksporMaksKarakter` wajib diturunkan.** Sesudah `.env` diubah, periksa nilai efektif dengan
   `php spark config:check HaloSimpeg` (baris `eksporMaksKarakter` harus menampilkan nilai baru). Mengubah ambang (naik atau turun)
   wajib diukur ulang (`RUN_VOLUME_TEST=1`, `EksporTiketVolumeTest`).
+
+### 1o. Baseline runtime produksi (usulan, CR-156)
+
+> **Semua nilai di bagian ini = usulan.** Nilai final ditetapkan TL/infra sesudah melihat spesifikasi server dan hasil ukur
+> (gladi/awal go-live). Bagian ini hanya dokumentasi; `deploy/post-receive` dan kode aplikasi tidak diubah di CR-156.
+
+**1. PHP: OPcache, realpath cache, PHP-FPM**
+
+| Setelan | Usulan | Catatan |
+|---|---|---|
+| `opcache.enable` | `1` | |
+| `opcache.validate_timestamps` | `0` | **Syarat:** php-fpm di-reload (graceful) sesudah setiap switch symlink deploy/rollback, dan/atau Nginx memakai `$realpath_root` (butir 3). Tanpa keduanya, worker terus menjalankan kode release lama dari cache. Dengan `$realpath_root` saja, kode baru terbaca (path release berbeda), tetapi entri release lama tetap memenuhi cache sampai reload. |
+| `opcache.memory_consumption` | `192`–`256` (MB) | Naikkan bila `opcache_get_status()['memory_usage']['free_memory']` mendekati 0 atau `oom_restarts` > 0. |
+| `opcache.max_accelerated_files` | ≥ jumlah berkas PHP satu release × 2 | Hitung, jangan pakai angka mati (lihat di bawah). Kali 2 karena sesaat sesudah switch, release lama dan baru sama-sama ada di cache. PHP membulatkan ke bilangan prima berikutnya. |
+| `opcache.interned_strings_buffer` | `16`–`32` (MB) | |
+| `realpath_cache_size` | `4096K` | Banyak berkas vendor + symlink `current`. |
+| `realpath_cache_ttl` | `600` | Aman karena path release tidak berubah sesudah dibuat; switch symlink ditangani `$realpath_root` + reload (butir 3). |
+| `memory_limit` | ≥ `256M` | Sudah wajib (§1, unduhan PDF F-09; ekspor Halo Simpeg §1n). |
+
+Menghitung berkas PHP release aktif (baca saja):
+
+```bash
+find /var/www/simpeg-v2/current/backend -name '*.php' | wc -l   # app + vendor + system CI4; × 2 → max_accelerated_files
+```
+
+PHP-FPM (`pm = dynamic` atau `static`, usulan):
+
+```
+pm.max_children = RAM yang disediakan untuk FPM ÷ RSS rata-rata satu worker
+```
+
+- RSS rata-rata diukur di server sesudah beban nyata, mis. `ps -o rss= -C php-fpm8.4 | awk '{s+=$1; n++} END {print s/n/1024 " MB"}'`.
+- Sisakan RAM untuk OS, Nginx, cron/worker `php spark`, dan MySQL bila satu server.
+- Batas atas per request tetap `memory_limit` (≥ 256M); `pm.max_children × memory_limit` boleh melebihi RAM hanya bila TL menerima
+  risiko puncak serentak (kebanyakan request jauh di bawah `memory_limit`).
+- Usulan awal `pm.max_requests = 500` (mendaur ulang worker, mencegah memori bocor menumpuk).
+
+Cara cek (baca saja):
+
+```bash
+php -i | grep -Ei '^(opcache\.(enable|validate_timestamps|memory_consumption|max_accelerated_files)|realpath_cache_(size|ttl)|memory_limit) '
+php -r 'var_export(function_exists("opcache_get_status") ? opcache_get_status(false) : "opcache tidak aktif di CLI");'
+```
+
+`php -i` dan CLI membaca `php.ini` **CLI**, bukan pool FPM. Untuk FPM: cek `php-fpm8.4 -i` (bila tersedia) atau berkas ini di pool
+(`/etc/php/8.4/fpm/…`). `opcache_get_status()` sisi FPM hanya terlihat lewat request web: pakai endpoint lokal **sementara** yang
+hanya terjangkau dari server itu sendiri (mis. berkas PHP di luar document root aplikasi, `allow` hanya alamat loopback lalu `deny all;`), lalu **hapus** sesudah dicek.
+Jangan menaruhnya di repo atau di `current/backend/public`.
+
+**2. gzip di Nginx (usulan)**
+
+```nginx
+gzip on;
+gzip_comp_level 5;
+gzip_min_length 1024;
+gzip_vary on;
+gzip_proxied any;
+gzip_types application/json application/javascript text/css image/svg+xml;
+```
+
+`zlib.output_compression` PHP **wajib off**: aplikasi melempar `FrameworkException` (pre_system,
+`backend/app/Config/Events.php:43-46`) bila aktif. Kompresi dilakukan Nginx, bukan PHP.
+
+**3. Deploy/rollback lewat symlink + OPcache**
+
+`deploy/post-receive` dan `rollback.sh` memindah symlink `current` secara atomik. Dengan OPcache, path skrip di-cache per path
+**sesudah** symlink di-resolve oleh PHP saat request pertama. Akibatnya, tanpa langkah di bawah, worker FPM bisa terus menjalankan
+release lama, atau mencampur berkas release lama dan baru dalam satu request (autoload memuat kelas dari release yang berbeda).
+
+Lakukan **keduanya** (usulan):
+1. Nginx meneruskan path nyata: `fastcgi_param SCRIPT_FILENAME $realpath_root/index.php;` dan `fastcgi_param DOCUMENT_ROOT
+   $realpath_root;` (contoh §1 sudah memakainya). Request baru langsung memakai release baru.
+2. Reload graceful php-fpm sesudah switch symlink (deploy sukses, aktivasi release DITAHAN, rollback):
+   `sudo systemctl reload php8.4-fpm`. Worker lama menyelesaikan request yang berjalan; OPcache dibersihkan.
+
+Hook saat ini **tidak** me-reload php-fpm (butuh hak sudo terbatas untuk user `deploy`). Selama itu belum diputus TL/infra, operator
+me-reload manual sesudah `==> [deploy] SUKSES` atau `rollback.sh`. Cron `php spark` (CLI) tidak terdampak: tiap jalan memakai proses baru
+lewat `current`.
+
+**4. Cache aset frontend (usulan)**
+
+```nginx
+location = /index.html { add_header Cache-Control "no-cache" always; try_files $uri =404; }
+location /assets/ {
+    # nama berkas ber-hash Vite: aman di-cache setahun
+    add_header Cache-Control "public, max-age=31536000, immutable" always;
+    try_files $uri =404;
+}
+```
+
+Fallback SPA (`try_files $uri $uri/ /index.html`) tetap; `index.html` yang dikirim lewat fallback juga perlu `no-cache` (header di
+`location /` atau `location = /index.html`). Tanpa `no-cache`, browser bisa memakai `index.html` lama yang merujuk aset release lama.
+
+**5. Batas unggah (usulan)**
+
+Berkas terbesar yang diterima endpoint `/api/` = **5 MB per berkas**: lampiran riwayat/layanan
+(`AturanLampiran::BATAS_MB` = 1/2/5, `backend/app/Libraries/Kepegawaian/Riwayat/AturanLampiran.php`), lampiran tiket Halo Simpeg
+(`Config\HaloSimpeg::$lampiranMaksMb` = 5), gambar konten (`Config\Konten::$gambarMaksMb` = 5), impor slip presensi
+(`Config\Presensi::$maksUkuranImporByte` = 5 MB), impor QnA chatbot 2 MB. Form digital boleh memuat beberapa pertanyaan berkas
+(masing-masing ≤ 5 MB, `SkemaForm::MAKS_MB_BERKAS`) dalam satu kiriman.
+
+| Setelan | Usulan | Alasan |
+|---|---|---|
+| Nginx `client_max_body_size` di `location /api/` | `12M` | 5 MB + overhead multipart, cukup untuk dua berkas form digital sekaligus. Bawaan Nginx 1 MB menolak sebagian besar unggahan (413). Form digital dengan lebih banyak pertanyaan berkas → TL menaikkan nilai atau membatasi jumlah berkas per form. |
+| Nginx `client_max_body_size` di `location /services/` | `13M` (tetap) | §1c: PDF e-sign maks 10 MB + gambar TTD 2 MB. |
+| PHP `upload_max_filesize` | `11M` | Ikut kebutuhan terbesar (PDF e-sign 10 MB, §1c); PHP satu nilai untuk semua lokasi. |
+| PHP `post_max_size` | `13M` | ≥ total body terbesar (§1c); harus ≥ `upload_max_filesize`. |
+
+**6. Cron tanpa kunci internal**
+
+Hasil cek CR-156: `bkn:tarik-periode`, `bkn:tarik-skp-periodik` (e-Kinerja), dan `integrasi:bersihkan-log` **tidak** memegang
+`GET_LOCK` (hanya `siasn:*` yang memegangnya). Baris cron ketiganya di §1e kini memakai `flock -n /tmp/simpeg-v2-<nama>.lock`, sama
+dengan cron lain. Untuk `siasn:*`, `GET_LOCK` sudah mencegah run ganda jenis yang sama; `flock` tidak ditambahkan supaya jenis yang
+berbeda tetap bisa berjalan bersamaan.
+
+**7. Versi PHP di contoh**
+
+Contoh Nginx §1 memakai `php8.4-fpm` (seri 8.4 ≥ 8.4.27). Server dengan seri 8.3 harus ≥ 8.3.36. Seri lain ditolak guard
+`deploy/cek-versi-runtime.sh` (CR-154, tabel versi §1).
+
+**8. MySQL 8 (usulan)**
+
+| Setelan | Usulan | Catatan |
+|---|---|---|
+| `slow_query_log` | `ON` selama awal go-live | Log ke berkas di server DB; tinjau berkala, lalu matikan atau naikkan ambang sesudah stabil. |
+| `long_query_time` | `0.5` (detik) awal go-live | Rendah supaya kueri lambat terlihat; dinaikkan sesudah stabil. |
+| `innodb_buffer_pool_size` | ±50–70% RAM server DB khusus; lebih kecil bila DB berbagi server dengan PHP-FPM | Idealnya ≥ ukuran data + indeks aktif. |
+| `max_connections` | ≥ total `pm.max_children` semua pool FPM + proses cron/worker `php spark` serentak + margin (mis. +20) | Satu worker FPM = paling banyak satu koneksi DB per request. |
+| `innodb_lock_wait_timeout` (sesi web) | **diukur dulu**, belum ada angka | Bawaan 50 detik. Ukur durasi kunci transaksi nyata (gladi/slow log) sebelum menurunkannya; menurunkan tanpa data bisa memunculkan galat 1205 di alur berkunci (helpdesk, LKH, cuti). |
+
+**9. Ditunda (catatan)**
+
+- `php spark optimize` / config cache **belum dipakai**: `writable/` dipakai bersama lintas release (`shared/writable`,
+  `deploy/post-receive` §build_release), jadi cache konfigurasi satu release bisa terbaca release lain; `.env` juga tetap di-parse per
+  request. Dibahas lagi bila cache dipisah per release.
+- Threshold logger produksi: `Config\Logger::$threshold` = 4 di `production` (hanya `error` ke atas). Langkah cek deploy §1m
+  ("tidak boleh ada baris `[chatbot] kunci token feedback tidak tersedia`") mencari baris level `warning`
+  (`ChatbotService`), dan peringatan lain (mis. push Halo Simpeg gagal diantre) juga `warning`. Dengan threshold 4 baris itu
+  **tidak pernah tertulis**, jadi cek §1m selalu "lolos". Selaraskan sebelum go-live: naikkan threshold produksi (mis. ke 5 untuk
+  `warning`) atau ubah langkah cek; keputusan TL/infra.
 
 ## 2. Cara push (operator deploy)
 
