@@ -627,7 +627,14 @@ final class EksporTiketTest extends DatabaseTestCase
             $this->assertSame($lama($nilai), EksporTiketService::potongSel($nilai), $nama);
         }
 
-        // Nilai yang byte-nya muat selalu dikembalikan apa adanya (jalur pintas).
+        // Jalur pintas (byte ≤ batas): dikembalikan apa adanya tanpa konversi, termasuk tepat di batas.
+        foreach (['kosong', 'ascii di batas byte', 'byte tidak sah pendek', 'byte tidak sah di batas'] as $nama) {
+            $this->assertLessThanOrEqual($m, strlen($kasus[$nama]), "{$nama}: memang lewat jalur pintas");
+            $this->assertSame($kasus[$nama], EksporTiketService::potongSel($kasus[$nama]), $nama);
+        }
+
+        // Bukan jalur pintas (byte > batas) tetapi unit UTF-16 masih muat: tetap utuh lewat hitungan unit.
+        $this->assertGreaterThan($m, strlen($kasus['2 byte: unit muat']));
         $this->assertLessThanOrEqual($m, $unit($kasus['2 byte: unit muat']));
         $this->assertSame($kasus['2 byte: unit muat'], EksporTiketService::potongSel($kasus['2 byte: unit muat']));
     }

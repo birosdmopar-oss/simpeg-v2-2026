@@ -110,6 +110,14 @@ class SiasnTarik extends BaseCommand
             CLI::write("  info {$info}: {$n}");
         }
 
+        // CR-162: batch dihentikan sebelum semua NIP dicoba (SIASN tidak terjangkau atau anggaran waktu habis). Exit code
+        // bukan sukses supaya terlihat di log cron; NIP yang belum dicoba dipilih lagi pada jalan berikutnya.
+        if ($h['diputus']) {
+            CLI::error(sprintf('Tarik SIASN %s DIPUTUS: %d NIP tidak dicoba (gagal transport %d); dicoba lagi pada jalan berikutnya.', $h['jenis'], $h['tidak_dicoba'], $h['gagal_transport']));
+
+            return EXIT_ERROR;
+        }
+
         return EXIT_SUCCESS;
     }
 

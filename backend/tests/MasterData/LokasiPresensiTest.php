@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\MasterData;
 
 use App\Constants\Role;
-use App\Libraries\MasterData\WebConfigService;
 use CodeIgniter\Test\FeatureTestTrait;
 use PHPUnit\Framework\Attributes\Group;
 use Tests\Support\AuthTestTrait;
@@ -417,12 +416,7 @@ final class LokasiPresensiTest extends DatabaseTestCase
             $this->createTempTable('web_config', '`id_web_config` INT NOT NULL AUTO_INCREMENT PRIMARY KEY, `config_name` VARCHAR(255) NOT NULL, `config_value` TEXT NULL');
         }
 
-        // CR-162: nama kementerian dibaca lewat WebConfigService (ter-cache). Test ini menulis `web_config` langsung ke
-        // DB, bukan lewat service, jadi cache dikosongkan sendiri sesudah tiap tulisan (service melakukannya saat simpan).
-        $segarkan = static fn (): bool => service('cacheService')->invalidate(WebConfigService::CACHE_KEY);
-
         $this->db->table('web_config')->where('config_name', 'nama_kementerian')->delete();
-        $segarkan();
 
         // Baris belum ada.
         $this->sendJson('PUT', self::ATURAN . '/1', ['target_uns' => '["sat_1"]'])->assertStatus(200);
@@ -431,14 +425,14 @@ final class LokasiPresensiTest extends DatabaseTestCase
 
         // Nilai kosong/spasi.
         $this->db->table('web_config')->insert(['config_name' => 'nama_kementerian', 'config_value' => '   ']);
-        $segarkan();
         $result = $this->sendJson('POST', self::ATURAN, $this->aturan(['target_uns' => '["0"]']));
         $result->assertStatus(201);
         $this->assertSame('["Seluruh Kementerian"]', $this->json($result)['data']['target_uns_desc']);
 
-        // Nilai terisi.
+        // Nilai terisi. Tabel ditulis langsung (bukan lewat WebConfigService) dan cache service sengaja diisi nilai lama
+        // lebih dulu: deskripsi yang DISIMPAN wajib nilai tabel terbaru, bukan nilai cache (CR-162, review R1).
+        service('webConfigService')->mentah();
         $this->db->table('web_config')->where('config_name', 'nama_kementerian')->update(['config_value' => 'Kementerian Uji Coba']);
-        $segarkan();
         $result = $this->sendJson('POST', self::ATURAN, $this->aturan(['target_uns' => '["0"]']));
         $result->assertStatus(201);
         $this->assertSame('["Kementerian Uji Coba"]', $this->json($result)['data']['target_uns_desc']);

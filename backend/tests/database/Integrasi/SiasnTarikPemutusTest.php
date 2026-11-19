@@ -21,10 +21,11 @@ use Tests\Support\Integrasi\SiasnUjiTrait;
 use Tests\Support\Kepegawaian\PegawaiFixtureTrait;
 
 /**
- * CR-162 (C-20) — `siasn:tarik` saat SIASN tidak terjangkau atau lambat: NIP yang gagal transport (timeout/koneksi/token)
- * dan NIP yang belum sempat dicoba TIDAK ditandai selesai (dipilih lagi pada jalan berikutnya); batch diputus sesudah
- * gagal transport beruntun atau anggaran waktu habis. AC-03.1 tetap: gagal per NIP (jawaban SIASN, atau gagal transport
- * yang tidak beruntun) tidak menghentikan batch, dan NIP yang dijawab SIASN tetap ditandai selesai seperti sebelumnya.
+ * CR-162 (C-20) — `siasn:tarik` saat SIASN tidak terjangkau atau lambat: batch diputus sesudah gagal transport
+ * (timeout/koneksi/token) beruntun atau anggaran waktu habis, dan NIP yang BELUM sempat dicoba tidak ditandai selesai
+ * (dipilih lagi pada jalan berikutnya). NIP yang sudah dicoba tetap ditandai seperti legacy apa pun hasilnya, termasuk
+ * gagal transport, supaya satu NIP yang selalu timeout tidak menahan antrean (review R2). AC-03.1 tetap: gagal per NIP
+ * yang tidak beruntun tidak menghentikan batch.
  *
  * @internal
  */
@@ -53,7 +54,7 @@ final class SiasnTarikPemutusTest extends DatabaseTestCase
         parent::tearDown();
     }
 
-    public function testTimeoutBeruntunMemutusBatchDanNipGagalAtauBelumDicobaDipilihLagi(): void
+    public function testTimeoutBeruntunMemutusBatchDanHanyaNipBelumDicobaDipilihLagi(): void
     {
         $this->antreToken();
         $this->transport->antreJson(200, ['code' => 1, 'data' => ['id' => 'PNS-UJI-A']]);
@@ -65,25 +66,28 @@ final class SiasnTarikPemutusTest extends DatabaseTestCase
 
         $h = $this->tarik()->jalankan('data-utama');
 
-        $this->assertSame([5, 1, 4], [$h['nip'], $h['sukses'], $h['gagal']]);
+        $this->assertSame([5, 1, 3], [$h['nip'], $h['sukses'], $h['gagal']], '`gagal` tidak menghitung NIP yang tidak dicoba');
         $this->assertSame([TarikSiasn::BATAS_GAGAL_BERUNTUN, 1, true], [$h['gagal_transport'], $h['tidak_dicoba'], $h['diputus']]);
 
         $url = array_map(static fn (array $t): string => $t['permintaan']->url, $this->transport->tercatat());
         $this->assertSame([], array_filter($url, static fn (string $u): bool => str_ends_with($u, '/' . self::NIP[4])), 'NIP kelima tidak pernah dipanggil');
 
         $status = array_column($this->db->table('siasn_status_pegawai')->get()->getResultArray(), null, 'nip');
-        $this->assertNotNull($status[self::NIP[0]]['du_lu'], 'NIP yang dijawab SIASN ditandai selesai');
 
-        foreach (array_slice(self::NIP, 1) as $nip) {
-            $this->assertSame(['0', null], [(string) $status[$nip]['du'], $status[$nip]['du_lu']], "{$nip}: flag kembali 0 tanpa tanda selesai");
+        foreach (array_slice(self::NIP, 0, 4) as $nip) {
+            $this->assertSame('0', (string) $status[$nip]['du']);
+            $this->assertNotNull($status[$nip]['du_lu'], "{$nip}: sudah dicoba → ditandai seperti legacy walau timeout");
         }
+
+        $this->assertSame(['0', null], [(string) $status[self::NIP[4]]['du'], $status[self::NIP[4]]['du_lu']], 'belum dicoba: flag 0 tanpa tanda selesai');
 
         $log = $this->db->table('integrasi_log')->where('operasi', 'tarik_data_utama')->get()->getRowArray();
         $this->assertSame('diputus', $log['kode']);
+        $this->assertStringContainsString('sukses 1, gagal 3,', (string) $log['pesan']);
         $this->assertStringContainsString('gagal_transport 3, tidak_dicoba 1', (string) $log['pesan']);
 
-        // Jalan berikutnya (hari yang sama): hanya empat NIP yang belum selesai yang dipilih lagi.
-        $this->assertSame(4, $this->tarik()->jalankan('data-utama', TarikSiasn::LIMIT_BAWAAN, null, true)['nip']);
+        // Jalan berikutnya (hari yang sama): hanya NIP yang belum dicoba yang dipilih; NIP yang timeout tidak menahan antrean.
+        $this->assertSame(1, $this->tarik()->jalankan('data-utama', TarikSiasn::LIMIT_BAWAAN, null, true)['nip']);
     }
 
     public function testGagalTransportTidakBeruntunTidakMemutusBatch(): void
@@ -97,11 +101,7 @@ final class SiasnTarikPemutusTest extends DatabaseTestCase
         $this->assertSame(self::NIP, $dipanggil->getArrayCopy());
 
         $flag = array_map('strval', array_column($this->db->table('siasn_status_pegawai')->orderBy('nip', 'ASC')->get()->getResultArray(), 'rw_gol', 'nip'));
-        $this->assertSame(
-            [self::NIP[0] => '0', self::NIP[1] => '1', self::NIP[2] => '0', self::NIP[3] => '1', self::NIP[4] => '0'],
-            $flag,
-            'dijawab SIASN (sukses maupun HTTP 500) → selesai seperti sebelumnya; gagal transport → kembali 0',
-        );
+        $this->assertSame(array_fill_keys(self::NIP, '1'), $flag, 'semua NIP yang dicoba ditandai seperti sebelumnya, apa pun hasilnya');
         $this->assertSame('sebagian_gagal', $this->db->table('integrasi_log')->where('operasi', 'tarik_tiruan')->get()->getRow()->kode);
     }
 

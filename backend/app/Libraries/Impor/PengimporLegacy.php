@@ -114,7 +114,25 @@ final class PengimporLegacy
             $this->laporan->waktuTier($t, (hrtime(true) - $mulai) / 1e9);
         }
 
+        if (! $dryRun) {
+            $this->segarkanCacheWebConfig();
+        }
+
         return $this->laporan;
+    }
+
+    /**
+     * Impor menulis `web_config` langsung ke tabel (bukan lewat WebConfigService), jadi cache nilainya dikosongkan supaya
+     * pembaca tidak memakai nilai sebelum impor sampai TTL habis (CR-162). Gagal mengosongkan tidak menggagalkan impor
+     * yang sudah commit; cukup dicatat.
+     */
+    private function segarkanCacheWebConfig(): void
+    {
+        try {
+            service('cacheService')->invalidate(\App\Libraries\MasterData\WebConfigService::CACHE_KEY);
+        } catch (\Throwable $e) {
+            log_message('warning', 'Cache web_config tidak dikosongkan sesudah impor ({kelas}).', ['kelas' => $e::class]);
+        }
     }
 
     private function aturSesi(BaseConnection $db): void

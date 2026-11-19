@@ -500,15 +500,26 @@ final class PegawaiScopeTest extends DatabaseTestCase
         $nip   = $this->nip['a1'];
         $pmj   = static fn (array $kueri): int => count(array_filter($kueri, static fn (string $q): bool => str_contains($q, 'pegawai_mutasi_jabatan') && str_starts_with(ltrim($q), 'SELECT')));
 
-        Services::injectMock('request', $this->permintaan('GET', false));
-        Events::trigger('post_controller_constructor');
-        $this->assertSame(1, $pmj($this->rekamKueri(static fn (): array => [$scope->bolehLihat($admin, $nip), $scope->bolehLihat($admin, $nip)])[1]));
+        $dua = fn (): int => $pmj($this->rekamKueri(static fn (): array => [$scope->bolehLihat($admin, $nip), $scope->bolehLihat($admin, $nip)])[1]);
 
-        Events::trigger('post_system');
-        $this->assertSame(2, $pmj($this->rekamKueri(static fn (): array => [$scope->bolehLihat($admin, $nip), $scope->bolehLihat($admin, $nip)])[1]));
+        try {
+            Services::injectMock('request', $this->permintaan('GET', false));
+            Events::trigger('post_controller_constructor');
+            $this->assertSame(1, $dua());
 
-        Services::resetSingle('request');
-        Services::resetSingle('pegawaiScope');
+            Events::trigger('post_system');
+            $this->assertSame(2, $dua());
+
+            // Exception lolos dari controller (tanpa `post_system`): awal request berikutnya ikut mengakhiri memo.
+            Events::trigger('post_controller_constructor');
+            $this->assertSame(1, $dua());
+            Events::trigger('pre_system');
+            $this->assertSame(2, $dua());
+        } finally {
+            $scope->akhiriMemoRequest();
+            Services::resetSingle('request');
+            Services::resetSingle('pegawaiScope');
+        }
     }
 
     private function permintaan(string $metode, bool $pasang = true): IncomingRequest

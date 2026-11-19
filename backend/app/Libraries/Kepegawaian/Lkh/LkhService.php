@@ -689,10 +689,9 @@ final class LkhService implements LkhServiceInterface
     /**
      * Baris (status ≠ 10) yang boleh dilihat: pemilik, atasan langsung, role 1, role 3 dalam lingkup. Selain itu 404.
      *
-     * @return array<string, mixed>
-     */
-    /**
      * @param array<string, mixed>|null $tersimpan baris yang baru dibaca dari DB oleh pemanggil (null = baca di sini)
+     *
+     * @return array<string, mixed>
      */
     private function barisTerlihat(AuthContext $auth, int $id, ?array $tersimpan = null): array
     {

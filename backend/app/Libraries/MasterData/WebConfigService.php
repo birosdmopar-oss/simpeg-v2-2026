@@ -37,6 +37,9 @@ class WebConfigService
 
     public const CACHE_KEY = 'web_config_values';
 
+    /** MySQL 1146: tabel tidak ada. */
+    private const ER_NO_SUCH_TABLE = 1146;
+
     public const CACHE_TTL = CacheService::DEFAULT_TTL;
 
     public const REMARK_MAX_LENGTH = 255;
@@ -118,19 +121,30 @@ class WebConfigService
      * Nilai mentah seluruh baris `web_config` (termasuk key di luar katalog), dari cache yang sama dengan `values()`:
      * config_name → config_value apa adanya (NULL → ''), tanpa cast, tanpa nilai bawaan, dan tanpa key yang barisnya
      * tidak ada. Untuk pembaca lama yang dulu membaca tabel langsung dan bergantung pada "baris ada/tidak ada" serta teks
-     * mentahnya (kop PDF, struktur organisasi; CR-162), supaya keluarannya tidak berubah. Tabel belum ada atau gagal
-     * dibaca → kosong, sama seperti pembaca lama saat tabel belum ada (preseden `KopDokumen::webConfig()`); hasil kosong
-     * karena galat tidak disimpan ke cache.
+     * mentahnya (kop PDF, struktur organisasi; CR-162), supaya keluarannya tidak berubah.
+     *
+     * `$segar = true` membaca tabel langsung, melewati cache. Wajib dipakai pembaca yang hasilnya DISIMPAN permanen ke
+     * tabel lain (nama instansi riwayat jabatan, deskripsi target aturan lokasi): `web_config` bisa ditulis di luar
+     * service (impor, perbaikan data), dan nilai cache yang basi tidak boleh ikut tersimpan.
+     *
+     * Hanya "tabel belum ada" (MySQL 1146) yang menjadi kosong, sama seperti pembaca lama; galat DB lain dilempar supaya
+     * gangguan sesaat tidak diam-diam menghasilkan kop kosong.
      *
      * @return array<string, string>
      */
-    public function mentah(): array
+    public function mentah(bool $segar = false): array
     {
         try {
-            return array_map(static fn (?string $nilai): string => (string) $nilai, $this->cachedValues());
-        } catch (Throwable) {
+            $nilai = $segar ? array_column($this->rows(), 'config_value', 'config_name') : $this->cachedValues();
+        } catch (DatabaseException $e) {
+            if ((int) $e->getCode() !== self::ER_NO_SUCH_TABLE) {
+                throw $e;
+            }
+
             return [];
         }
+
+        return array_map(static fn (mixed $v): string => (string) $v, $nilai);
     }
 
     /**
@@ -364,8 +378,17 @@ class WebConfigService
      */
     private function rows(): array
     {
+        $hasil = $this->db->table('web_config')->select(self::COLUMNS)->orderBy('config_name', 'ASC')->get();
+
+        // Tanpa DBDebug atau di dalam transaksi, kueri gagal mengembalikan false: bawa kode MySQL-nya.
+        if ($hasil === false) {
+            $galat = $this->db->error();
+
+            throw new DatabaseException('Baca web_config gagal: ' . $galat['message'], (int) $galat['code']);
+        }
+
         /** @var list<array<string, mixed>> $rows */
-        $rows = $this->db->table('web_config')->select(self::COLUMNS)->orderBy('config_name', 'ASC')->get()->getResultArray();
+        $rows = $hasil->getResultArray();
 
         return array_column($rows, null, 'config_name');
     }

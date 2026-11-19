@@ -339,6 +339,19 @@ final class WebConfigTest extends DatabaseTestCase
         $this->assertArrayNotHasKey('pdf_header_nama_kementerian', $mentah, 'key tanpa baris tidak muncul (pembaca lama memakai ?? ke key lain)');
         $this->assertSame('06:00:00', service('webConfigService')->value('email_sent_time'), 'value() tetap bertipe + bawaan');
 
+        // Fallback kop pembaca lama: baris tidak ada → jatuh ke key lain; baris ada tetapi kosong → tetap kosong.
+        // Pola pembaca kop lama.
+        $kop = static fn (array $m): string => $m['pdf_header_nama_kementerian'] ?? $m['nama_kementerian'] ?? '';
+        $this->assertSame('  Kementerian Uji  ', $kop($lagi));
+        $this->db->table('web_config')->insert(['config_name' => 'pdf_header_nama_kementerian', 'config_value' => '']);
+        $this->assertSame('', $kop(service('webConfigService')->mentah(true)));
+
+        // Tulisan langsung ke tabel (impor, perbaikan data): cache masih nilai lama, baca segar langsung benar (review R1).
+        $this->db->table('web_config')->where('config_name', 'nama_kementerian')->update(['config_value' => 'Diubah Langsung']);
+        $this->assertSame('  Kementerian Uji  ', service('webConfigService')->mentah()['nama_kementerian'], 'cache belum diinvalidasi');
+        $this->assertSame('Diubah Langsung', service('webConfigService')->mentah(true)['nama_kementerian']);
+        $this->assertSame('  Kementerian Uji  ', service('webConfigService')->mentah()['nama_kementerian'], 'baca segar tidak menulis cache');
+
         // Simpan lewat service → cache diinvalidasi → mentah() ikut berubah.
         $this->sendJson('PUT', self::BASE . '/nama_kementerian', ['config_value' => 'Kementerian Baru'])->assertStatus(200);
         $this->assertSame('Kementerian Baru', service('webConfigService')->mentah()['nama_kementerian']);

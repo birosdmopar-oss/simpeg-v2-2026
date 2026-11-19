@@ -39,7 +39,8 @@ Events::on(RiwayatEngine::EVENT_NOTIFIKASI, [\App\Libraries\Push\AntrePushRiwaya
 Events::on(AuthService::EVENT_LOGIN_SUKSES, [ResetTundaCuti::class, 'tangani']);
 
 // CR-162 (A-05): memo cek lingkup PegawaiScope hanya selama satu request HTTP baca. Dimulai sesudah controller dibuat
-// (request sudah lolos filter) dan diakhiri di akhir request; CLI/worker tidak memicu kedua event ini.
+// (request sudah lolos filter) dan diakhiri di akhir request; CLI/worker tidak memicu event-event ini. Sebagai lapis
+// kedua, memo terikat objek request: begitu request aktif berganti, memo tidak dipakai (PegawaiScope::kunciMemo).
 Events::on('post_controller_constructor', static function (): void {
     $scope   = service('pegawaiScope');
     $request = service('request');
@@ -48,13 +49,16 @@ Events::on('post_controller_constructor', static function (): void {
         $scope->mulaiMemoRequest($request);
     }
 });
-Events::on('post_system', static function (): void {
+$akhiriMemoScope = static function (): void {
     $scope = service('pegawaiScope');
 
     if ($scope instanceof \App\Libraries\Kepegawaian\Scope\PegawaiScope) {
         $scope->akhiriMemoRequest();
     }
-});
+};
+Events::on('post_system', $akhiriMemoScope);
+// `post_system` tidak terpicu bila exception lolos dari controller; awal request berikutnya ikut mengakhiri memo.
+Events::on('pre_system', $akhiriMemoScope);
 
 Events::on('pre_system', static function (): void {
     if (ENVIRONMENT !== 'testing') {

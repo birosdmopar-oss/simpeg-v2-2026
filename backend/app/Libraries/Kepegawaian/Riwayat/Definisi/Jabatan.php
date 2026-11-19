@@ -836,8 +836,8 @@ final class Jabatan extends RiwayatDefinisi
      */
     private function namaKementerian(): ?string
     {
-        // Nilai mentah lewat WebConfigService (cache bersama), bukan baca tabel + cek information_schema per panggilan (CR-162).
-        $nama = trim(service('webConfigService')->mentah()['nama_kementerian'] ?? '');
+        // Hasilnya disimpan permanen (`nama_instansi` riwayat jabatan), jadi dibaca segar dari tabel, tanpa cache (CR-162).
+        $nama = trim(service('webConfigService')->mentah(true)['nama_kementerian'] ?? '');
 
         return $nama === '' ? null : $nama;
     }

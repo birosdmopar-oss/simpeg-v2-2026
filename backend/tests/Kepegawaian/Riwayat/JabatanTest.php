@@ -587,4 +587,21 @@ final class JabatanTest extends DatabaseTestCase
 
         $this->fail('Diharapkan 422 untuk ' . implode(', ', $fields));
     }
+
+    /**
+     * CR-162 (review R1): `nama_instansi` disimpan permanen, jadi nama kementerian dibaca segar dari tabel. Perubahan
+     * `web_config` di luar WebConfigService (impor, perbaikan data) langsung terpakai walau cache masih berisi nilai lama.
+     */
+    public function testNamaInstansiMemakaiWebConfigTerbaruBukanCache(): void
+    {
+        $this->db->table('web_config')->where('config_name', 'nama_kementerian')->delete();
+        $this->db->table('web_config')->insert(['config_name' => 'nama_kementerian', 'config_value' => 'Kementerian Lama']);
+        $this->assertSame('Kementerian Lama', service('webConfigService')->mentah()['nama_kementerian'], 'cache terisi nilai lama');
+
+        $this->db->table('web_config')->where('config_name', 'nama_kementerian')->update(['config_value' => 'Kementerian Baru']);
+
+        $row = $this->tambah($this->dataStruk('2018-03-01'));
+        $this->assertSame('Kementerian Baru', $row['nama_instansi']);
+        $this->assertSame('Kementerian Baru', $this->db->table('riwayat_mutasi_jabatan')->where('nama_instansi', 'Kementerian Baru')->get()->getRow()->nama_instansi ?? null);
+    }
 }

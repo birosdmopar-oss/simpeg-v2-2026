@@ -67,7 +67,12 @@ final class ImporLegacyTier1Test extends ImporLegacyTestCase
             ['id_web_config' => 12, 'config_name' => 'kunci_tak_dikenal', 'config_value' => 'x', 'updated_at' => '2026-01-01 07:00:00'],
         ]);
 
+        // CR-162 (review R1): cache nilai web_config terisi sebelum impor; sesudah impor harus langsung memuat nilai baru.
+        $this->assertArrayNotHasKey('TL1/PSW1', service('webConfigService')->mentah());
+
         $lap = $this->impor();
+
+        $this->assertSame('0.5', service('webConfigService')->mentah()['TL1/PSW1'] ?? null, 'cache web_config dikosongkan sesudah impor, tanpa menunggu TTL');
 
         $unit = $this->db->table('unit')->where('id_unit', 5)->get()->getRowArray();
         $this->assertSame("Biro's Umum", $unit['unit'], 'stripslashes + normalisasi nama');

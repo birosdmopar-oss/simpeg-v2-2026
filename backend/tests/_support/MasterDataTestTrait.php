@@ -315,9 +315,7 @@ trait MasterDataTestTrait
 
     protected function resetMasterState(): void
     {
-        // `webConfigService` ikut direset: instance shared-nya memegang CacheService saat dibuat, dan pembaca nama kementerian
-        // di hook aturan lokasi kini lewat service itu (CR-162).
-        foreach (['masterRegistry', 'masterService', 'cacheService', 'faqService', 'htmlSanitizer', 'webConfigService'] as $name) {
+        foreach (['masterRegistry', 'masterService', 'cacheService', 'faqService', 'htmlSanitizer'] as $name) {
             Services::resetSingle($name);
         }
 

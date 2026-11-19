@@ -39,7 +39,9 @@ final class TarikSiasn
 
     /**
      * Status hasil yang berarti SIASN tidak terjangkau (bukan jawaban SIASN untuk NIP itu): timeout, koneksi, token.
-     * NIP dengan hasil ini tidak ditandai selesai, supaya dipilih lagi pada jalan berikutnya (CR-162).
+     * Dipakai pemutus batch (CR-162). NIP yang SUDAH dicoba tetap ditandai seperti legacy walau gagal transport (dicoba
+     * lagi pada jendela usang berikutnya): bila dikembalikan ke flag 0, satu NIP yang selalu timeout akan terpilih paling
+     * depan di setiap jalan dan menahan antrean di belakangnya.
      */
     public const GAGAL_TRANSPORT = ['timeout', 'koneksi', 'token'];
 
@@ -171,7 +173,8 @@ final class TarikSiasn
             $mulai    = $this->detik();
 
             // AC-03.1: gagal per NIP tidak menghentikan batch. Yang menghentikan hanya tanda SIASN tidak terjangkau
-            // (gagal transport beruntun) atau anggaran waktu habis; NIP sisanya tidak dicoba dan dikembalikan ke flag 0.
+            // (gagal transport beruntun) atau anggaran waktu habis; NIP sisanya TIDAK dicoba dan dikembalikan ke flag 0
+            // supaya dipilih lagi pada jalan berikutnya (dulu ikut ditandai selesai).
             foreach ($daftar as $n) {
                 if ($beruntun >= $this->batasGagalBeruntun || ($hasil !== [] && $this->detik() - $mulai >= $this->anggaranDetik)) {
                     $putus = true;
@@ -183,9 +186,9 @@ final class TarikSiasn
                 $beruntun  = in_array($hasil[$n]['status_code'], self::GAGAL_TRANSPORT, true) ? $beruntun + 1 : 0;
             }
 
-            // Selesai = sudah dicoba dan SIASN menjawab (sukses maupun ditolak/galat HTTP, ikut legacy: dicoba lagi sesudah
-            // usang). Gagal transport dan yang belum sempat dicoba TIDAK ditandai selesai.
-            $selesai = array_values(array_filter($daftar, static fn (string $n): bool => isset($hasil[$n]) && ! in_array($hasil[$n]['status_code'], self::GAGAL_TRANSPORT, true)));
+            // Selesai = semua NIP yang sudah dicoba, apa pun hasilnya (ikut legacy: yang gagal dicoba lagi sesudah usang).
+            // Hanya yang belum sempat dicoba yang tidak ditandai selesai.
+            $selesai = array_values(array_filter($daftar, static fn (string $n): bool => isset($hasil[$n])));
             $ulang   = array_values(array_diff($daftar, $selesai));
 
             $sukses  = count(array_filter($hasil, static fn (array $h): bool => $h['status_code'] === SiasnAdapter::SUKSES));
@@ -194,8 +197,8 @@ final class TarikSiasn
             // Putusan reviewer B6 M1 (2): sukses dengan data kosong = INFO, tanpa aksi destruktif (dijaga tiap jenis).
             $rencana->info['data_kosong'] = count(array_filter($hasil, static fn (array $h): bool => $h['status_code'] === SiasnAdapter::SUKSES && $h['data'] === []));
 
-            $tidakDicoba    = count($daftar) - count($hasil);
-            $gagalTransport = count($ulang) - $tidakDicoba;
+            $tidakDicoba    = count($ulang);
+            $gagalTransport = count(array_filter($hasil, static fn (array $h): bool => in_array($h['status_code'], self::GAGAL_TRANSPORT, true)));
 
             if (! $dryRun) {
                 (new PenulisTarik($this->db))->terapkan($rencana);
@@ -220,12 +223,13 @@ final class TarikSiasn
             'jenis'   => $nama,
             'nip'     => count($daftar),
             'sukses'  => $sukses,
-            'gagal'   => count($daftar) - $sukses,
+            'gagal'   => count($daftar) - $sukses - $tidakDicoba,
             'jumlah'  => $rencana->jumlah,
             'ditolak' => $rencana->ditolak,
             'info'    => $rencana->info,
             'dry_run' => $dryRun,
-            // CR-162: NIP yang tidak ditandai selesai (dipilih lagi pada jalan berikutnya) dan apakah batch diputus.
+            // CR-162: `gagal` hanya menghitung NIP yang dicoba. `tidak_dicoba` = NIP yang dikembalikan ke flag 0 karena
+            // batch diputus; `gagal_transport` = bagian dari `gagal` yang karena SIASN tidak terjangkau.
             'gagal_transport' => $gagalTransport,
             'tidak_dicoba'    => $tidakDicoba,
             'diputus'         => $putus,
@@ -260,7 +264,7 @@ final class TarikSiasn
     {
         $j     = $r->jumlah;
         $i     = $r->info;
-        $pesan = "nip {$nip}, sukses {$sukses}, gagal " . ($nip - $sukses)
+        $pesan = "nip {$nip}, sukses {$sukses}, gagal " . ($nip - $sukses - $tidakDicoba)
             . ", sisip {$j['sisip']}, ubah {$j['ubah']}, pasang {$j['pasang']}, lepas {$j['lepas']}, hapus {$j['hapus']}, ganda {$j['ganda']}, ditolak " . array_sum($r->ditolak)
             . ", data_kosong {$i['data_kosong']}, pairing_ganda {$i['pairing_ganda']}, referensi_tak_terpetakan {$i['referensi_tak_terpetakan']}"
             . ", ditolak_tanpa_destruktif {$i['ditolak_tanpa_destruktif']}"

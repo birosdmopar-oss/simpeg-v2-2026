@@ -317,8 +317,8 @@ final class AturanLokasiPresensiHooks implements MasterHooks, MasterStatusHooks
      */
     private function namaKementerian(): string
     {
-        // Nilai mentah lewat WebConfigService (cache bersama), bukan baca tabel + cek daftar tabel per panggilan (CR-162).
-        $nama = trim(service('webConfigService')->mentah()['nama_kementerian'] ?? '');
+        // Hasilnya disimpan permanen (`target_uns_desc`), jadi dibaca segar dari tabel, tanpa cache (CR-162).
+        $nama = trim(service('webConfigService')->mentah(true)['nama_kementerian'] ?? '');
 
         return $nama !== '' ? $nama : self::SELURUH_KEMENTERIAN;
     }
