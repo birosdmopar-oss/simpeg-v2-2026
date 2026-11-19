@@ -27,14 +27,45 @@ File terkait di repo ini:
 
 Prasyarat di server: `git`, `php` dengan patch aman (+ ext mysqli, intl, mbstring, json), `composer`, `node` dengan patch aman + `npm`, MySQL 8.x, web server (nginx/Apache).
 
-**Versi minimum aman (CR-094, ISSUE-053 dan ISSUE-054):**
+**Versi minimum aman (CR-094, ISSUE-053 dan ISSUE-054) — ditegakkan sejak CR-154:**
 
-| Runtime | Versi minimum aman | Alasan |
+| Runtime | Seri yang diterima | Alasan |
 |---|---|---|
-| PHP | 8.2.35 (cabang 8.2); atau 8.3.36, 8.4.27, 8.5.12 | PHP2Shell, CVE-2026-109618 / CVE-2026-109619 (RCE di PHP core) |
-| Node.js | 22.23.4 (cabang 22); 24.22.1 (cabang 24, dipakai proyek, lihat `frontend/.nvmrc`); 26.12.1 | Node2Shell, CVE-2026-111497 (dekoder Brotli). Node 20 sudah EOL dan tidak mendapat patch. |
+| PHP | 8.4.x ≥ **8.4.27** (dipakai proyek dan CI); 8.3.x ≥ **8.3.36** | PHP2Shell, CVE-2026-109618 / CVE-2026-109619 (RCE di PHP core) |
+| Node.js | 24.x ≥ **24.22.1** (dipakai proyek dan CI, lihat `frontend/.nvmrc`); 26.x ≥ **26.12.1** (Active LTS, mis. mesin dev); 22.x ≥ **22.23.4** | Node2Shell, CVE-2026-111497 (dekoder Brotli). Node 20 sudah EOL dan tidak mendapat patch. |
 
-Versi di bawah daftar di atas tidak boleh dipakai di server, termasuk Node 20 dan PHP 8.2.x di bawah 8.2.35. `composer.json` masih `php ^8.2`; menaikkan batas itu adalah keputusan terpisah.
+Seri lain ditolak (default aman), termasuk seri yang sudah dipatch tetapi tidak diuji proyek (PHP 8.2.35 / 8.5.12, Node 25).
+
+**Menambah seri baru** (atau menaikkan minimum sesudah CVE baru) = satu CR yang mengubah bersamaan:
+1. `deploy/cek-versi-runtime.sh` — **satu-satunya tempat** daftar seri: blok `case "$runtime:$seri"` (mis. tambah baris
+   `php:8.5) minimum=8.5.12 ;;` atau `node:28.*) minimum=28.x.y ;;`), lalu teks `aman=` dan komentar daftar di kepala berkas;
+2. `deploy/cek-versi-runtime.test.sh` — kasus seri baru: tepat minimum → 0, satu patch di bawahnya → 1 (hapus kasus "ditolak" lama
+   seri itu);
+3. Node saja: `frontend/package.json` + entri root `package-lock.json` `engines.node` (mis. `… || >=28.x.y <29`), dan
+   `NODE_VERSION`/`.nvmrc` bila proyek pindah seri;
+4. tabel di atas.
+
+CI menjalankan `cek-versi-runtime.test.sh` (job static), jadi daftar dan kasus uji yang tidak cocok langsung merah.
+
+Penegakan:
+- **CI** (`.github/workflows/quality-gate.yml`): langkah "Guard versi PHP/Node aman" sesudah setup PHP/Node gagal bila runtime runner di
+  luar tabel. Logika guard diuji dengan versi tiruan (`deploy/cek-versi-runtime.test.sh`).
+- **Deploy** (`deploy/post-receive`): sebelum `composer install`, hook menjalankan `deploy/cek-versi-runtime.sh` dari release untuk
+  `PHP_BIN` dan `NODE_BIN` (deploy.env; default `node` di direktori `NPM_BIN` bila berupa path; bila `NODE_BIN` berupa path,
+  direktorinya disisipkan di depan `PATH` supaya `npm ci`/`npm run build` memakai node yang sama). Ditolak → build gagal, release dihapus,
+  `current` dan database tidak disentuh.
+- **npm** (`frontend/.npmrc` `engine-strict=true`, `engines.node` `>=22.23.4 <23 || >=24.22.1 <25 || >=26.12.1 <27`): `npm ci` menolak Node di luar rentang.
+- `composer.json` tetap `php ^8.2`: menaikkan batasnya mengubah hash `composer.lock` (perlu `composer update --lock`), jadi tidak
+  dilakukan di CR-154; guard CI + post-receive sudah menolak PHP rentan.
+
+Verifikasi di server (tanpa build), dari checkout repo atau release terbaru:
+
+```bash
+PHP_BIN=/path/ke/php bash deploy/cek-versi-runtime.sh php
+NODE_BIN=/path/ke/node bash deploy/cek-versi-runtime.sh node
+```
+
+Keluaran `==> [cek-versi-runtime] … aman` = lolos; `!!  … DITOLAK` (exit 1) = perbarui runtime dulu.
 
 PHP untuk unduhan PDF dokumen F-09 (MAKE-037, ADR-034): `memory_limit` ≥ 256M dan batas waktu request ≥ 30 detik (`max_execution_time` PHP-FPM serta timeout proxy web server, mis. `fastcgi_read_timeout`). PDF 1.700 baris terukur ±238 MB dan ±10 detik di mesin dev.
 
@@ -75,7 +106,8 @@ DEPLOY_ROOT=/var/www/simpeg-v2
 KEEP_RELEASES=5
 # 0 = hook tidak menjalankan migration; migrate manual lewat runbook setelah approval DBV (§3a)
 RUN_MIGRATIONS=0
-# PHP_BIN=/usr/bin/php8.3  COMPOSER_BIN=/usr/local/bin/composer  NPM_BIN=/usr/bin/npm
+# PHP_BIN=/usr/bin/php8.4  COMPOSER_BIN=/usr/local/bin/composer  NPM_BIN=/opt/node-24/bin/npm  NODE_BIN=/opt/node-24/bin/node
+# NODE_BIN berupa path → direktorinya disisipkan di depan PATH, jadi npm memakai node yang sama dengan yang dicek guard (CR-154)
 # Tidak ada DEPLOY_BRANCH: hook selalu mendeploy main (ISSUE-014)
 EOF
 
@@ -925,6 +957,7 @@ Skenario minimal yang diuji ulang bila hook atau `rollback.sh` diubah:
 | Rollback ke release lama | `rollback.sh` tanpa argumen setelah release pembawa migration aktif | lolos pemeriksaan (migration release lama sudah tercatat) |
 | Status tidak terbaca / format asing | DB release tidak ada; `PHP_BIN` palsu yang mengganti header `Batch` | hook: `GAGAL ... sebelum migrate`; `rollback.sh`: `DIBATALKAN`; `--force` melewati pemeriksaan |
 | Build gagal | commit dengan impor modul frontend yang tidak ada, `RUN_MIGRATIONS=1`, plus migration baru | `GAGAL ... database tidak diubah`; release dihapus; migration baru tidak jalan |
+| Runtime rentan (CR-154) | `deploy.env` `PHP_BIN`/`NODE_BIN` menunjuk biner tiruan yang mencetak versi rentan (mis. `8.4.2`, `v24.22.0`) atau pra-rilis (`8.4.27-dev`) | `!!  [cek-versi-runtime] DITOLAK` lalu `GAGAL` sebelum `composer install`; release dihapus; `current` dan database tetap |
 | `RUN_MIGRATIONS=1` eksplisit | `deploy.env` berisi `RUN_MIGRATIONS=1` | migrate setelah build, lalu `SUKSES` |
 | Migration gagal di tengah | `RUN_MIGRATIONS=1`, migration yang melempar exception | `GAGAL saat/setelah migrate`; release disimpan tanpa `.deploy-ditahan`; `current` tetap |
 | Branch lain / konfigurasi salah | push ke branch lain; `DEPLOY_BRANCH=dev` di `deploy.env`; `RUN_MIGRATIONS=yes`; `RUN_MIGRATIONS=1`/`DEPLOY_BRANCH=dev` hanya di environment `git push` | dilewati; `DIBATALKAN`; `DIBATALKAN`; diabaikan (tetap `main`, `0`) |
