@@ -24,7 +24,8 @@
 #   DEPLOY_ROOT     : direktori aplikasi di server, mis. /var/www/simpeg-v2
 #   KEEP_RELEASES   : jumlah release yang disimpan untuk rollback (default: 5)
 #   PHP_BIN, COMPOSER_BIN, NPM_BIN : path binary (default: php, composer, npm)
-#   NODE_BIN        : path node (default: `node` di direktori NPM_BIN bila NPM_BIN berupa path, selain itu `node`)
+#   NODE_BIN        : path node (default: `node` di direktori NPM_BIN bila NPM_BIN berupa path, selain itu `node`).
+#                     Bila berupa path, direktorinya disisipkan di depan PATH supaya npm memakai node yang sama.
 # Sebelum build, versi PHP_BIN dan NODE_BIN dicek `deploy/cek-versi-runtime.sh` dari release (CR-154, ISSUE-053/054):
 # runtime rentan atau di luar seri aman → build gagal, release dihapus, `current` dan database tidak disentuh.
 #   RUN_MIGRATIONS  : 0 = migration manual lewat runbook (default); 1 = `php spark migrate --all` otomatis
@@ -73,6 +74,11 @@ if [ -z "${NODE_BIN:-}" ]; then
     esac
 fi
 export NODE_BIN
+# npm memakai `node` pertama di PATH (shebang `env node`), bukan NODE_BIN. Direktori NODE_BIN disisipkan di depan PATH agar
+# guard versi dan `npm ci`/`npm run build` memakai node yang sama (review CR-154 R2).
+case "$NODE_BIN" in
+    */*) PATH="$(dirname "$NODE_BIN"):$PATH"; export PATH ;;
+esac
 export RUN_MIGRATIONS="${RUN_MIGRATIONS:-0}"
 
 export RELEASES_DIR="$DEPLOY_ROOT/releases"
