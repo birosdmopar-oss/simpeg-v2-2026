@@ -229,7 +229,9 @@ final class AturanLokasiPresensiHooks implements MasterHooks, MasterStatusHooks
     private function parseList(string $field, mixed $raw, callable $validId): array
     {
         $label   = self::LABELS[$field];
-        $decoded = is_string($raw) && trim($raw) !== '' ? json_decode($raw, true) : null;
+        // Dekode tanpa mode asosiatif (CR-155, ISSUE-027): objek JSON → stdClass, jadi ditolak di bawah. Dengan `true`, objek
+        // bernomor seperti {"0":"0"} menjadi [0 => '0'] dan lolos `array_is_list`.
+        $decoded = is_string($raw) && trim($raw) !== '' ? json_decode($raw) : null;
 
         if (! is_array($decoded) || $decoded === [] || ! array_is_list($decoded)) {
             throw ValidationException::forField($field, "{$label} wajib dipilih minimal satu.");
