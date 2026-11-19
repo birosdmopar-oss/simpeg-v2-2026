@@ -24,6 +24,9 @@
 #   DEPLOY_ROOT     : direktori aplikasi di server, mis. /var/www/simpeg-v2
 #   KEEP_RELEASES   : jumlah release yang disimpan untuk rollback (default: 5)
 #   PHP_BIN, COMPOSER_BIN, NPM_BIN : path binary (default: php, composer, npm)
+#   NODE_BIN        : path node (default: `node` di direktori NPM_BIN bila NPM_BIN berupa path, selain itu `node`)
+# Sebelum build, versi PHP_BIN dan NODE_BIN dicek `deploy/cek-versi-runtime.sh` dari release (CR-154, ISSUE-053/054):
+# runtime rentan atau di luar seri aman → build gagal, release dihapus, `current` dan database tidak disentuh.
 #   RUN_MIGRATIONS  : 0 = migration manual lewat runbook (default); 1 = `php spark migrate --all` otomatis
 # RUN_MIGRATIONS hanya dibaca dari deploy.env; nilai dari environment proses git diabaikan.
 # DEPLOY_BRANCH bukan lagi pilihan: deploy.env yang masih mengisinya dengan nilai selain `main` (dulu
@@ -63,6 +66,13 @@ export KEEP_RELEASES="${KEEP_RELEASES:-5}"
 export PHP_BIN="${PHP_BIN:-php}"
 export COMPOSER_BIN="${COMPOSER_BIN:-composer}"
 export NPM_BIN="${NPM_BIN:-npm}"
+if [ -z "${NODE_BIN:-}" ]; then
+    case "$NPM_BIN" in
+        */*) NODE_BIN="$(dirname "$NPM_BIN")/node" ;;
+        *) NODE_BIN=node ;;
+    esac
+fi
+export NODE_BIN
 export RUN_MIGRATIONS="${RUN_MIGRATIONS:-0}"
 
 export RELEASES_DIR="$DEPLOY_ROOT/releases"
@@ -148,6 +158,10 @@ build_release() {
     echo "--- checkout $sha"
     mkdir -p "$release_dir"
     git --git-dir="$BARE_REPO" archive "$sha" | tar -x -C "$release_dir"
+
+    echo "--- runtime: cek versi PHP dan Node (CR-154, ISSUE-053/054)"
+    PHP_BIN="$PHP_BIN" bash "$release_dir/deploy/cek-versi-runtime.sh" php
+    NODE_BIN="$NODE_BIN" bash "$release_dir/deploy/cek-versi-runtime.sh" node
 
     echo "--- backend: composer install --no-dev"
     cd "$release_dir/backend"
