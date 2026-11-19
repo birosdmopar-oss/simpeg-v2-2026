@@ -50,23 +50,39 @@ final class AuditYatimFkG02Test extends DatabaseTestCase
             foreach ($kolom as [, $kol, $alias, $pk, $fk]) {
                 $this->assertSame(1, preg_match('/LEFT JOIN (\w+)\s+' . $alias . ' ON ' . $alias . '\.' . $pk . ' = c\.' . $kol . '\b/', $q), "{$fk}: join induk");
                 preg_match('/LEFT JOIN (\w+)\s+' . $alias . ' /', $q, $j);
+                $this->assertArrayNotHasKey($fk, $ditemukan, "{$fk}: muncul dua kali di Bagian A");
                 $ditemukan[$fk] = [$anak, $kol, $j[1], $pk];
             }
         }
 
+        $this->assertCount(55, $ditemukan, 'Bagian A tepat 55 kolom FK');
         ksort($diharapkan);
         ksort($ditemukan);
         $this->assertSame($diharapkan, $ditemukan, 'Bagian A = konstanta FOREIGN_KEYS DBV-019');
 
+        // Bagian B: tiap SELECT = satu FK; label, kolom yang dihitung, FROM, JOIN induk (ON) dan WHERE cocok dengan FOREIGN_KEYS.
         $fkContoh = [];
+        $polaB    = '/^SELECT \'(\w+)\' AS fk, \'(\w+)\.(\w+)\' AS kolom, \'(\w+)\' AS induk, COUNT\(DISTINCT c\.(\w+)\) AS nilai_yatim_berbeda,\s+'
+            . 'SUBSTRING_INDEX\(GROUP_CONCAT\(DISTINCT c\.(\w+) ORDER BY c\.(\w+) SEPARATOR \',\'\), \',\', 10\) AS contoh_nilai\s+'
+            . 'FROM (\w+) c LEFT JOIN (\w+) x ON x\.(\w+) = c\.(\w+)\s+WHERE c\.(\w+) IS NOT NULL AND x\.(\w+) IS NULL$/';
 
         foreach ($contoh as $q) {
-            preg_match_all("/SELECT '(\\w+)' AS fk/", $q, $m);
-            $fkContoh = [...$fkContoh, ...$m[1]];
+            $pilih = array_map('trim', explode('UNION ALL', $q));
+
+            foreach ($pilih as $s) {
+                $this->assertSame(1, preg_match($polaB, $s, $m), "bentuk Bagian B: {$s}");
+                [, $fk, $anakLabel, $kolLabel, $indukLabel, $k1, $k2, $k3, $anak, $induk, $pk, $kOn, $kWhere, $pkWhere] = $m;
+                $this->assertArrayHasKey($fk, $diharapkan, "{$fk}: FK DBV-019");
+                [$anakFk, $kolFk, $indukFk, $pkFk] = $diharapkan[$fk];
+                $this->assertSame([$anakFk, $kolFk, $indukFk], [$anakLabel, $kolLabel, $indukLabel], "{$fk}: label");
+                $this->assertSame(array_fill(0, 6, $kolFk), [$k1, $k2, $k3, $kOn, $kWhere, $kolFk], "{$fk}: kolom anak di semua klausa");
+                $this->assertSame([$anakFk, $indukFk, $pkFk, $pkFk], [$anak, $induk, $pk, $pkWhere], "{$fk}: FROM/JOIN/ON/WHERE");
+                $this->assertArrayNotHasKey($fk, $fkContoh, "{$fk}: muncul dua kali di Bagian B");
+                $fkContoh[$fk] = true;
+            }
         }
 
-        sort($fkContoh);
-        $this->assertSame(array_keys($ditemukan), $fkContoh, 'Bagian B memuat semua FK');
+        $this->assertCount(55, $fkContoh, 'Bagian B tepat 55 FK');
     }
 
     public function testDbBersihNolDanYatimTerhitung(): void
