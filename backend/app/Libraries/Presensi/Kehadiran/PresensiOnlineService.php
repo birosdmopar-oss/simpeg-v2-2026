@@ -35,7 +35,9 @@ use Throwable;
  * - Geofence: aturan lokasi dinamis ({@see ResolverLokasiPresensi}) + {@see PenilaianGeofence} (jarak ≤ radius, salah
  *   satu lokasi cukup); tidak tercakup → tanpa syarat koordinat. `cek-lokasi` memakai penilaian yang sama, tanpa menulis.
  * - Tulis satu transaksi, baris `(nip, tgl)` dikunci `FOR UPDATE`; masuk first-wins, pulang last-wins; 1062 (dua permintaan
- *   bersamaan) → baca ulang dan terapkan aturan yang sama (tidak pernah 500). `sumber` 1, tetap 2 bila baris manual.
+ *   bersamaan) atau deadlock 1213 → ulang sekali dengan aturan yang sama; bentrok yang berulang dan lock wait 1205
+ *   berakhir sebagai galat server "Presensi bentrok berulang." (500 lewat handler global). `sumber` 1, tetap 2 bila
+ *   baris manual.
  *   Audit `create`/`update` `dh_online` `{nip}:{tgl}` di transaksi yang sama (§8.1; PK komposit → audit manual).
  */
 final class PresensiOnlineService
@@ -54,6 +56,9 @@ final class PresensiOnlineService
 
     /** Galat kunci karena permintaan lain untuk (nip, tgl) yang sama: 1205 lock wait timeout, 1213 deadlock (CR-161). */
     private const GALAT_KUNCI = [1205, 1213];
+
+    /** Deadlock: InnoDB sudah memilih transaksi ini sebagai korban dan melepas kuncinya, jadi mengulang langsung masuk akal. */
+    private const ER_LOCK_DEADLOCK = 1213;
 
     private readonly Presensi $config;
 
@@ -259,9 +264,14 @@ final class PresensiOnlineService
     }
 
     /**
-     * Tulis satu transaksi dengan kunci baris; 1062 → ulang sekali dengan baris yang kini ada. Deadlock (1213) atau lock
-     * wait timeout (1205) akibat permintaan lain untuk (nip, tgl) yang sama, misalnya ketuk ganda, diperlakukan sama:
-     * transaksi di-rollback (termasuk auditnya) lalu diulang sekali, sehingga tetap satu entri audit per tulis.
+     * Tulis satu transaksi dengan kunci baris; 1062 → ulang sekali dengan baris yang kini ada. Galat kunci akibat
+     * permintaan lain untuk (nip, tgl) yang sama, misalnya ketuk ganda, pada kueri `dh_online` maupun INSERT auditnya:
+     * transaksi di-rollback penuh (termasuk audit), sehingga tetap satu entri audit per tulis yang berhasil.
+     *  - Deadlock (1213): diulang sekali, seperti duplikat. Gagal lagi → `RuntimeException` "Presensi bentrok berulang.".
+     *  - Lock wait timeout (1205): TIDAK diulang (mengulang berarti menunggu sampai dua kali `innodb_lock_wait_timeout`);
+     *    langsung "Presensi bentrok berulang.".
+     * "Presensi bentrok berulang." adalah galat server (500 lewat handler global), sama dengan duplikat berulang sebelum
+     * CR-161; bukan 422.
      *
      * @param array<string, mixed> $data kolom jam & bukti lokasi
      *
@@ -335,7 +345,7 @@ final class PresensiOnlineService
                     throw $e;
                 }
 
-                if ($percobaan >= 1) {
+                if ($percobaan >= 1 || (int) $e->getCode() !== self::ER_LOCK_DEADLOCK) {
                     throw new RuntimeException('Presensi bentrok berulang.', 0, $e);
                 }
             }
@@ -396,6 +406,11 @@ final class PresensiOnlineService
         $id = (new AuditLogModel($db))->record('dh_online', "{$nip}:{$tgl}", $event, $before, $after, $auth->idPengguna(), $auth->nip());
 
         if ($id <= 0) {
+            // Galat kunci saat INSERT audit diperlakukan sama dengan galat kunci pada `dh_online` (lihat `tulis()`).
+            if (in_array((int) ($db->error()['code'] ?? 0), self::GALAT_KUNCI, true)) {
+                throw self::galatKueri($db, 'Audit presensi gagal ditulis');
+            }
+
             throw new RuntimeException('Audit presensi gagal ditulis.');
         }
     }

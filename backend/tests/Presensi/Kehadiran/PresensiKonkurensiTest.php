@@ -132,10 +132,12 @@ final class PresensiKonkurensiTest extends DatabaseTestCase
     }
 
     /**
-     * CR-161 (B-09): lock wait timeout (1205) pada percobaan pertama → diulang sekali dan berhasil; respons kasus normal
-     * (201 + jam) dan tepat satu entri audit.
+     * CR-161 (B-09): deadlock (1213) pada percobaan pertama → diulang sekali dan berhasil; respons kasus normal (201 + jam)
+     * dan tepat satu entri audit. Deadlock InnoDB sungguhan butuh dua transaksi yang saling menunggu pada saat yang sama,
+     * tidak bisa dibuat dalam satu thread PHPUnit, jadi korban deadlock ditiru lewat seam; jalur galat kunci yang
+     * sebenarnya (kueri mengembalikan false + errno) dikunci test lock wait di bawah.
      */
-    public function testPulangLockWaitDiulangSekaliSatuAudit(): void
+    public function testPulangKorbanDeadlockDiulangSekaliSatuAudit(): void
     {
         $nip  = $this->pegawaiPresensi()['nip'];
         $kali = 0;
@@ -143,7 +145,7 @@ final class PresensiKonkurensiTest extends DatabaseTestCase
             $kali++;
 
             if ($percobaan === 0) {
-                throw new DatabaseException('Lock wait timeout exceeded; try restarting transaction', 1205);
+                throw new DatabaseException('Deadlock found when trying to get lock; try restarting transaction', 1213);
             }
         };
 
@@ -195,6 +197,95 @@ final class PresensiKonkurensiTest extends DatabaseTestCase
         $this->assertSame(1, $kali, 'galat bukan kunci tidak diulang');
         $this->assertNull($this->barisDh($nip, '2026-10-27'));
         $this->assertSame(0, $this->jumlahAudit($nip, '2026-10-27'));
+    }
+
+    /**
+     * CR-161 (B-09, review R1): lock wait SUNGGUHAN. Koneksi kedua memegang kunci baris `(nip, tgl)` di transaksi yang
+     * belum selesai; permintaan presensi menunggu sampai `innodb_lock_wait_timeout` lalu terkena 1205 asli dari server
+     * (kueri mengembalikan false di dalam transaksi, errno dibaca `galatKueri()`). 1205 tidak diulang: langsung "Presensi
+     * bentrok berulang.", tanpa perubahan baris dan tanpa audit. Sesudah kunci dilepas, koneksi yang sama dipakai lagi dan
+     * presensi berhasil dengan tepat satu audit (status transaksi koneksi sudah dipulihkan).
+     */
+    public function testPulangLockWaitSungguhanTidakDiulangLaluBerhasilSetelahKunciLepas(): void
+    {
+        $nip = $this->pegawaiPresensi()['nip'];
+        $this->db->table('dh_online')->insert(['nip' => $nip, 'tgl' => '2026-10-27', 'jam_masuk' => '07:00:00', 'sumber' => 1, 'created_at' => gmdate('Y-m-d H:i:s')]);
+
+        $lain = db_connect('tests', false);
+        $kali = 0;
+        $kait = static function () use (&$kali): void {
+            $kali++;
+        };
+        $this->db->query('SET SESSION innodb_lock_wait_timeout = 1');
+
+        try {
+            $lain->transBegin();
+            $lain->query($lain->table('dh_online')->where(['nip' => $nip, 'tgl' => '2026-10-27'])->getCompiledSelect() . ' FOR UPDATE');
+
+            try {
+                $this->service('2026-10-27 16:00:05', null, $kait)->pulang($this->authPegawai($nip), []);
+                $this->fail('lock wait harus berakhir sebagai bentrok');
+            } catch (RuntimeException $e) {
+                $this->assertSame('Presensi bentrok berulang.', $e->getMessage());
+                $asal = $e->getPrevious();
+                $this->assertInstanceOf(DatabaseException::class, $asal);
+                $this->assertSame(1205, (int) $asal->getCode(), 'errno 1205 asli dari server');
+                $this->assertStringStartsWith('Kunci baris presensi gagal: ', $asal->getMessage(), 'jalur produksi: kueri mengembalikan false di dalam transaksi, errno dibaca dari koneksi');
+            }
+
+            $this->assertSame(1, $kali, '1205 tidak diulang');
+            $lain->transRollback();
+
+            $this->assertNull($this->barisDh($nip, '2026-10-27')['jam_pulang'], 'baris tidak berubah');
+            $this->assertSame(0, $this->jumlahAudit($nip, '2026-10-27'), 'pihak yang kalah tidak meninggalkan audit');
+
+            // Kunci sudah lepas: koneksi aplikasi yang sama dipakai lagi tanpa sisa status transaksi gagal.
+            [$status, $data] = $this->service('2026-10-27 16:00:09', null, $kait)->pulang($this->authPegawai($nip), []);
+            $this->assertSame([200, '07:00:00', '16:00:09'], [$status, $data['jam_masuk'], $data['jam_pulang']]);
+            $this->assertSame(1, $this->jumlahAudit($nip, '2026-10-27'), 'tepat satu audit untuk tulis yang berhasil');
+        } finally {
+            $lain->transRollback();
+            $lain->close();
+            $this->db->query('SET SESSION innodb_lock_wait_timeout = DEFAULT');
+        }
+    }
+
+    /**
+     * CR-161 (B-09, review R1): jalur masuk. Koneksi kedua sudah meng-INSERT baris `(nip, tgl)` tetapi belum commit
+     * (ketuk ganda yang masih berjalan); permintaan ini menunggu kunci baris itu lalu terkena 1205 asli. Tidak ada baris
+     * maupun audit dari permintaan yang kalah, dan sesudah pihak lain batal, presensi masuk berikutnya berhasil.
+     */
+    public function testMasukLockWaitSungguhanTanpaBarisDanAudit(): void
+    {
+        $nip  = $this->pegawaiPresensi()['nip'];
+        $lain = db_connect('tests', false);
+        $this->db->query('SET SESSION innodb_lock_wait_timeout = 1');
+
+        try {
+            $lain->transBegin();
+            $lain->table('dh_online')->insert(['nip' => $nip, 'tgl' => '2026-10-27', 'jam_masuk' => '07:00:00', 'sumber' => 1, 'created_at' => gmdate('Y-m-d H:i:s')]);
+
+            try {
+                $this->service('2026-10-27 07:00:01', null)->masuk($this->authPegawai($nip), []);
+                $this->fail('lock wait harus berakhir sebagai bentrok');
+            } catch (RuntimeException $e) {
+                $this->assertSame('Presensi bentrok berulang.', $e->getMessage());
+                $this->assertSame(1205, (int) $e->getPrevious()?->getCode());
+            }
+
+            $lain->transRollback();
+
+            $this->assertNull($this->barisDh($nip, '2026-10-27'), 'tidak ada baris dari pihak mana pun');
+            $this->assertSame(0, $this->jumlahAudit($nip, '2026-10-27'));
+
+            [$status, $data] = $this->service('2026-10-27 07:00:05', null)->masuk($this->authPegawai($nip), []);
+            $this->assertSame([201, '07:00:05'], [$status, $data['jam_masuk']]);
+            $this->assertSame(1, $this->jumlahAudit($nip, '2026-10-27'));
+        } finally {
+            $lain->transRollback();
+            $lain->close();
+            $this->db->query('SET SESSION innodb_lock_wait_timeout = DEFAULT');
+        }
     }
 
     private function jumlahAudit(string $nip, string $tgl): int
