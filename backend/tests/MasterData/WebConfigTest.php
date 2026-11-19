@@ -302,6 +302,48 @@ final class WebConfigTest extends DatabaseTestCase
         $this->assertSame(3.5, service('webConfigService')->value('TK'));
     }
 
+    /**
+     * CR-162 (A-03): `mentah()` untuk pembaca lama yang dulu membaca tabel langsung: teks tersimpan apa adanya (tanpa
+     * cast dan tanpa nilai bawaan), key di luar katalog ikut, key tanpa baris tidak ada, NULL menjadi '', dan dibaca dari
+     * cache yang sama dengan `values()` (diinvalidasi saat simpan lewat service).
+     */
+    public function testMentahNilaiTersimpanApaAdanyaDanTerCache(): void
+    {
+        $this->db->table('web_config')->insertBatch([
+            ['config_name' => 'nama_kementerian', 'config_value' => '  Kementerian Uji  '],
+            ['config_name' => 'email_sent_time', 'config_value' => 'jam enam'],
+            ['config_name' => 'kunci_impor_lama', 'config_value' => 'nilai lama'],
+            ['config_name' => 'nama_menteri', 'config_value' => null],
+        ]);
+
+        $kueri  = 0;
+        $dengar = static function ($q) use (&$kueri): void {
+            $kueri += str_contains((string) $q, 'web_config') ? 1 : 0;
+        };
+        \CodeIgniter\Events\Events::on('DBQuery', $dengar);
+
+        try {
+            $mentah = service('webConfigService')->mentah();
+            $lagi   = service('webConfigService')->mentah();
+        } finally {
+            \CodeIgniter\Events\Events::removeListener('DBQuery', $dengar);
+        }
+
+        $this->assertSame(1, $kueri, 'dua pembacaan, satu kueri (cache)');
+        $this->assertSame($mentah, $lagi);
+        $this->assertSame(
+            ['email_sent_time' => 'jam enam', 'kunci_impor_lama' => 'nilai lama', 'nama_kementerian' => '  Kementerian Uji  ', 'nama_menteri' => ''],
+            $mentah,
+            'apa adanya: nilai tidak sah tidak diganti bawaan, key luar katalog ikut, NULL → string kosong',
+        );
+        $this->assertArrayNotHasKey('pdf_header_nama_kementerian', $mentah, 'key tanpa baris tidak muncul (pembaca lama memakai ?? ke key lain)');
+        $this->assertSame('06:00:00', service('webConfigService')->value('email_sent_time'), 'value() tetap bertipe + bawaan');
+
+        // Simpan lewat service → cache diinvalidasi → mentah() ikut berubah.
+        $this->sendJson('PUT', self::BASE . '/nama_kementerian', ['config_value' => 'Kementerian Baru'])->assertStatus(200);
+        $this->assertSame('Kementerian Baru', service('webConfigService')->mentah()['nama_kementerian']);
+    }
+
     // ------------------------------------------------------------------
 
     /**

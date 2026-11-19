@@ -121,23 +121,8 @@ final class TandaTerimaUsulan
      */
     private function webConfig(): array
     {
-        $db  = $this->db();
-        $ada = $db->query(
-            'SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?',
-            [$db->prefixTable('web_config')],
-        )->getRowArray() !== null;
-
-        if (! $ada) {
-            return [];
-        }
-
-        $hasil = [];
-
-        foreach ($db->table('web_config')->select('config_name, config_value')->get()->getResultArray() as $row) {
-            $hasil[(string) $row['config_name']] = (string) ($row['config_value'] ?? '');
-        }
-
-        return $hasil;
+        // Nilai mentah lewat WebConfigService (cache bersama), bukan baca tabel + cek information_schema per panggilan (CR-162).
+        return service('webConfigService')->mentah();
     }
 
     private function db(): BaseConnection

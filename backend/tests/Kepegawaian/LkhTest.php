@@ -12,6 +12,7 @@ use App\Libraries\Kepegawaian\Lkh\AtasanLangsung;
 use App\Libraries\Kepegawaian\Lkh\LkhService;
 use App\Libraries\Kepegawaian\Scope\PegawaiScope;
 use Closure;
+use CodeIgniter\Events\Events;
 use CodeIgniter\I18n\Time;
 use CodeIgniter\Test\FeatureTestTrait;
 use Config\Services;
@@ -404,6 +405,63 @@ final class LkhTest extends DatabaseTestCase
             $this->fail("Diharapkan {$status}");
         } catch (ApiException $e) {
             $this->assertSame($status, $e->getStatusCode());
+        }
+    }
+    /**
+     * CR-162 (A-14): respons `tambah` dibentuk dari baris yang dibaca audit sesudah INSERT, tanpa membaca ulang
+     * `riwayat_lckh`; isinya wajib sama persis dengan `detail` (baris tersimpan, termasuk kolom bawaan DB).
+     */
+    public function testTambahTanpaBacaUlangDanSamaDenganDetail(): void
+    {
+        [$row, $kueri] = $this->rekamKueri(fn (): array => $this->tambah($this->pegawai, '2026-10-12'));
+
+        $this->assertSame($this->svc()->detail($this->pegawai, (int) $row['id']), $row);
+
+        $baca = array_values(array_filter($kueri, static fn (string $q): bool => str_starts_with(ltrim($q), 'SELECT') && str_contains($q, 'riwayat_lckh') && str_contains($q, 'id_riwayat_lckh')));
+        $this->assertCount(1, $baca, 'hanya satu baca baris baru (oleh audit)');
+    }
+
+    /**
+     * CR-162 (A-14): baris yang diteruskan ke push dan respons = baris tersimpan persis (termasuk kolom bawaan DB yang
+     * tidak dikirim saat INSERT), jadi isi push sama dengan jalur lama yang membaca ulang dari DB.
+     */
+    public function testBarisTersimpanModelSamaDenganBarisDiDb(): void
+    {
+        $model = new \App\Models\Kepegawaian\LkhModel($this->db);
+        $this->assertNull($model->barisTersimpan(1), 'belum ada yang dibaca audit');
+
+        $id = (int) $model->withActor($this->pegawai, fn () => $model->insert([
+            'nip'      => $this->nip, 'tgl_laporan' => '2026-10-12', 'nama' => 'Pegawai Uji', 'nip_atasan' => $this->nipAtasan, 'nama_atasan' => 'Atasan Uji',
+            'kegiatan' => '["A"]', 'output' => '["B"]', 'jumlah_diselesaikan' => '["1"]', 'jam_mulai' => '["08:00"]', 'jam_selesai' => '["09:00"]', 'status' => 0,
+        ]));
+
+        $db = $this->db->table('riwayat_lckh')->where('id_riwayat_lckh', $id)->get()->getRowArray();
+        $this->assertNotNull($db);
+        $this->assertSame($db, $model->barisTersimpan($id));
+        $this->assertArrayHasKey('created_at', $db);
+        $this->assertNotNull($db['created_at'], 'kolom bawaan DB ikut terbaca');
+        $this->assertNull($model->barisTersimpan($id + 1));
+    }
+
+    /**
+     * @template T
+     *
+     * @param callable(): T $f
+     *
+     * @return array{0: T, 1: list<string>}
+     */
+    private function rekamKueri(callable $f): array
+    {
+        $kueri  = [];
+        $dengar = static function ($q) use (&$kueri): void {
+            $kueri[] = (string) $q;
+        };
+        Events::on('DBQuery', $dengar);
+
+        try {
+            return [$f(), $kueri];
+        } finally {
+            Events::removeListener('DBQuery', $dengar);
         }
     }
 }

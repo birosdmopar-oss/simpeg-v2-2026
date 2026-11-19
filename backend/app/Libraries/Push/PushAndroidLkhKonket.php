@@ -38,10 +38,13 @@ final class PushAndroidLkhKonket
         $this->driver = $driver ?? config(\Config\Integrations::class)->push['driver'];
     }
 
-    public function lkhDiajukan(int $id, bool $baru): void
+    /**
+     * @param array<string, mixed>|null $tersimpan baris `riwayat_lckh` yang baru dibaca pemanggil dari DB (CR-162); null = baca di sini
+     */
+    public function lkhDiajukan(int $id, bool $baru, ?array $tersimpan = null): void
     {
-        $this->aman(function () use ($id, $baru): void {
-            $lkh = $this->db()->table('riwayat_lckh')->where('id_riwayat_lckh', $id)->get(1)->getRowArray();
+        $this->aman(function () use ($id, $baru, $tersimpan): void {
+            $lkh = $tersimpan ?? $this->db()->table('riwayat_lckh')->where('id_riwayat_lckh', $id)->get(1)->getRowArray();
             $nip = trim((string) ($lkh['nip_atasan'] ?? ''));
 
             if ($lkh === null || $nip === '') {

@@ -38,6 +38,24 @@ Events::on(RiwayatEngine::EVENT_NOTIFIKASI, [\App\Libraries\Push\AntrePushRiwaya
 // Fase 4 C-04 (MAKE-022, PRD §6.4.7): login sukses mereset penanda tunda pengingat persetujuan cuti milik NIP itu.
 Events::on(AuthService::EVENT_LOGIN_SUKSES, [ResetTundaCuti::class, 'tangani']);
 
+// CR-162 (A-05): memo cek lingkup PegawaiScope hanya selama satu request HTTP baca. Dimulai sesudah controller dibuat
+// (request sudah lolos filter) dan diakhiri di akhir request; CLI/worker tidak memicu kedua event ini.
+Events::on('post_controller_constructor', static function (): void {
+    $scope   = service('pegawaiScope');
+    $request = service('request');
+
+    if ($scope instanceof \App\Libraries\Kepegawaian\Scope\PegawaiScope && $request instanceof \CodeIgniter\HTTP\IncomingRequest) {
+        $scope->mulaiMemoRequest($request);
+    }
+});
+Events::on('post_system', static function (): void {
+    $scope = service('pegawaiScope');
+
+    if ($scope instanceof \App\Libraries\Kepegawaian\Scope\PegawaiScope) {
+        $scope->akhiriMemoRequest();
+    }
+});
+
 Events::on('pre_system', static function (): void {
     if (ENVIRONMENT !== 'testing') {
         $value = ini_get('zlib.output_compression');

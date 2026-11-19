@@ -201,10 +201,13 @@ final class LkhService implements LkhServiceInterface
         (new \App\Libraries\Push\AntreTopikFcm())->lkhDibuat($nip);
         // F6-13 (Fase 6 MAKE-066): push web ke atasan langsung [K `L_lkh.php:329-332`].
         (new \App\Libraries\Push\AntrePushRiwayat())->antre(1, 'lkh', $id);
+        // Baris yang dibaca audit tepat sesudah INSERT (isi tersimpan, termasuk kolom bawaan DB) diteruskan ke push dan
+        // respons, tanpa membaca ulang (CR-162). Bila audit tidak membacanya, jalur lama: baca dari DB.
+        $tersimpan = $model->barisTersimpan($id);
         // F6-13 (review MAKE-066 P1): push Android ke atasan ikut legacy `andr_notif_queue` [K `L_lkh.php:335-404`].
-        (new \App\Libraries\Push\PushAndroidLkhKonket())->lkhDiajukan($id, true);
+        (new \App\Libraries\Push\PushAndroidLkhKonket())->lkhDiajukan($id, true, $tersimpan);
 
-        return $this->detail($auth, $id);
+        return $this->bentuk($this->barisTerlihat($auth, $id, $tersimpan), $auth, true);
     }
 
     public function ubah(AuthContext $auth, int $id, array $data): array
@@ -688,10 +691,13 @@ final class LkhService implements LkhServiceInterface
      *
      * @return array<string, mixed>
      */
-    private function barisTerlihat(AuthContext $auth, int $id): array
+    /**
+     * @param array<string, mixed>|null $tersimpan baris yang baru dibaca dari DB oleh pemanggil (null = baca di sini)
+     */
+    private function barisTerlihat(AuthContext $auth, int $id, ?array $tersimpan = null): array
     {
         $this->wajibRole($auth);
-        $row  = $this->baris($id);
+        $row  = $tersimpan !== null && (int) $tersimpan['status'] !== self::DIHAPUS ? $tersimpan : $this->baris($id);
         $saya = (string) $auth->nip();
 
         $boleh = $row !== null && (
@@ -855,23 +861,8 @@ final class LkhService implements LkhServiceInterface
      */
     private function webConfig(): array
     {
-        $db  = $this->db();
-        $ada = $db->query(
-            'SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?',
-            [$db->prefixTable('web_config')],
-        )->getRowArray() !== null;
-
-        if (! $ada) {
-            return [];
-        }
-
-        $hasil = [];
-
-        foreach ($db->table('web_config')->select('config_name, config_value')->get()->getResultArray() as $row) {
-            $hasil[(string) $row['config_name']] = (string) ($row['config_value'] ?? '');
-        }
-
-        return $hasil;
+        // Nilai mentah lewat WebConfigService (cache bersama), bukan baca tabel + cek information_schema per panggilan (CR-162).
+        return service('webConfigService')->mentah();
     }
 
     private function wajibRole(AuthContext $auth): void

@@ -115,6 +115,25 @@ class WebConfigService
     }
 
     /**
+     * Nilai mentah seluruh baris `web_config` (termasuk key di luar katalog), dari cache yang sama dengan `values()`:
+     * config_name → config_value apa adanya (NULL → ''), tanpa cast, tanpa nilai bawaan, dan tanpa key yang barisnya
+     * tidak ada. Untuk pembaca lama yang dulu membaca tabel langsung dan bergantung pada "baris ada/tidak ada" serta teks
+     * mentahnya (kop PDF, struktur organisasi; CR-162), supaya keluarannya tidak berubah. Tabel belum ada atau gagal
+     * dibaca → kosong, sama seperti pembaca lama saat tabel belum ada (preseden `KopDokumen::webConfig()`); hasil kosong
+     * karena galat tidak disimpan ke cache.
+     *
+     * @return array<string, string>
+     */
+    public function mentah(): array
+    {
+        try {
+            return array_map(static fn (?string $nilai): string => (string) $nilai, $this->cachedValues());
+        } catch (Throwable) {
+            return [];
+        }
+    }
+
+    /**
      * Id satker kepegawaian (`id_satker_kepegawaian`) untuk penyaring kandidat/petugas (Layanan, Halo Simpeg). Belum
      * diatur atau bukan bilangan bulat non-negatif → null (konsumen menganggap satker belum diatur).
      */

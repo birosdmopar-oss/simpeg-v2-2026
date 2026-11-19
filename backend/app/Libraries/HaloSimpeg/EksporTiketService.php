@@ -187,7 +187,9 @@ final class EksporTiketService extends MasterHaloSimpeg
      */
     public static function potongSel(string $nilai): string
     {
-        if (self::unitUtf16($nilai) <= self::MAKS_SEL) {
+        // Jumlah unit UTF-16 tidak pernah melebihi jumlah byte UTF-8 (1–3 byte = 1 unit, 4 byte = 2 unit, byte tidak sah
+        // diganti satu karakter), jadi nilai yang byte-nya sudah muat pasti muat: konversi dilewati (CR-162).
+        if (strlen($nilai) <= self::MAKS_SEL || self::unitUtf16($nilai) <= self::MAKS_SEL) {
             return $nilai;
         }
 
