@@ -94,6 +94,11 @@ dikonversi R1a dan semua kolom teks ikut `stripslashes` bawaan. Kolom `siasn_lu`
 - **Transaksi per tabel untuk T10/T11 (K-M8, DBV-029):** pra-cek seluruh tier dijalankan di depan sebelum tabel pertama
   ditulis; setiap tabel satu transaksi; tabel yang selesai dicatat di berkas jejak di folder kerja; jalankan ulang dengan
   `--tier N --lanjut` untuk meneruskan dari tabel berikutnya; tidak ada TRUNCATE. Rincian aturan di DBV-029.
+- **Prasyarat gladi FK G-02 (DBV-021, ISSUE-045):** sebelum gladi, jalankan
+  `backend/docs/db-review/sql/DBV-021-audit-yatim-fk-g02-per-tabel.sql` di salinan legacy (perkiraan awal; Bagian B
+  membedakan `0` → NULL dari id asing) dan putuskan id asing (impor master hilang / NULL + catatan, DBV-011 2.10). Sesudah
+  T3, T10, dan T11 di DB gladi, Bagian A wajib 0 untuk ke-10 tabel anak: T3 `pegawai_mutasi_jabatan`, `riwayat_mutasi_jabatan`,
+  `pegawai_plt`, `pegawai_plh`; T10 `riwayat_lckh`, `riwayat_ak`, `riwayat_ak_siasn`, `konv_ak`; T11 `pegawai_ak`, `pegawai_ak_siasn`.
 
 ### T11 snapshot
 - Disalin apa adanya, tidak diturunkan ulang (B-01/B-02 §6 #1).
