@@ -25,6 +25,9 @@ final class AuditYatimFkG02Test extends DatabaseTestCase
 
     private const NIP = '999900000000000021';
 
+    /** `konv_ak` ber-PK `nip`: baris kedua butuh pegawai kedua. */
+    private const NIP_2 = '999900000000000022';
+
     private const ID_ASING = 424242;
 
     public function testBerkasMencakupTepat55FkMigration(): void
@@ -79,11 +82,12 @@ final class AuditYatimFkG02Test extends DatabaseTestCase
 
         try {
             $this->db->table('pegawai')->insert(['nip' => self::NIP, 'nama' => 'Pegawai Uji DBV-021', 'tgl_lahir' => '1990-01-01']);
+            $this->db->table('pegawai')->insert(['nip' => self::NIP_2, 'nama' => 'Pegawai Uji DBV-021 B', 'tgl_lahir' => '1990-01-01']);
             $this->db->table('pegawai_mutasi_jabatan')->insert($this->barisMinimal(SkemaD1::B01['pegawai_mutasi_jabatan'], [
                 'nip' => self::NIP, 'id_jabatan' => self::ID_ASING, 'id_atasan_es_1' => 0, 'id_unit' => null,
             ]));
             $this->db->table('konv_ak')->insert($this->barisMinimal(SkemaD1::B02['konv_ak'], ['nip' => self::NIP, 'id_unit' => self::ID_ASING]));
-            $this->db->table('konv_ak')->insert($this->barisMinimal(SkemaD1::B02['konv_ak'], ['nip' => self::NIP, 'id_unit' => self::ID_ASING]));
+            $this->db->table('konv_ak')->insert($this->barisMinimal(SkemaD1::B02['konv_ak'], ['nip' => self::NIP_2, 'id_unit' => self::ID_ASING]));
         } finally {
             $this->db->query('SET FOREIGN_KEY_CHECKS = 1');
         }
@@ -111,6 +115,7 @@ final class AuditYatimFkG02Test extends DatabaseTestCase
         $this->assertSame([1, '0'], $contoh['fk_id_atasan_es_1_pmj_to_jabatan']);
         $this->assertSame([0, null], $contoh['fk_id_satker_konvak_to_satker']);
         $this->assertStringNotContainsString(self::NIP, (string) json_encode($contoh), 'contoh tanpa NIP');
+        $this->assertStringNotContainsString(self::NIP_2, (string) json_encode($contoh));
     }
 
     /**
