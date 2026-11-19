@@ -271,7 +271,8 @@ final class LokasiPresensiTest extends DatabaseTestCase
      */
     public function testMalformedTargetJsonIsRejectedWith422(): void
     {
-        $bad = ['', '   ', '[]', '{}', 'null', '"1"', '1', '{bad', '[1,', '[[1]]', '[{"id":1}]', '{"a":"1"}', '[1.5]', '[true]', '[null]', '["", "1"]', '["01"]', '["-1"]', '["99999999999"]'];
+        // CR-155 (ISSUE-027): objek bernomor ({"0":"0"}, {"0":"1","1":"2"}) dan skalar bukan array JSON juga ditolak.
+        $bad = ['', '   ', '[]', '{}', 'null', '"1"', '1', 'true', '{bad', '[1,', '[[1]]', '[{"id":1}]', '{"a":"1"}', '{"0":"0"}', '{"0":"1"}', '{"0":"1","1":"2"}', '{"0":1}', '[1.5]', '[true]', '[null]', '["", "1"]', '["01"]', '["-1"]', '["99999999999"]'];
 
         foreach (['target_lp', 'target_uns', 'target_jp'] as $field) {
             foreach ($bad as $value) {
@@ -281,6 +282,10 @@ final class LokasiPresensiTest extends DatabaseTestCase
 
                 $this->sendJson('PUT', self::ATURAN . '/1', [$field => $value])->assertStatus(422);
             }
+
+            // CR-155: objek bernomor memakai pesan yang sama dengan objek/format tidak sah lain ({}).
+            $harap = $this->json($this->sendJson('POST', self::ATURAN, $this->aturan([$field => '{}'])))['errors'][$field];
+            $this->assertSame($harap, $this->json($this->sendJson('POST', self::ATURAN, $this->aturan([$field => '{"0":"0"}'])))['errors'][$field], $field);
 
             // Nilai JSON non-teks di body (array/objek) → 422 dari controller.
             foreach ([[1], ['a' => '1'], [[1]]] as $value) {
