@@ -170,6 +170,8 @@ server {
 
     location ~ ^/(api/)?index\.php {
         root /var/www/simpeg-v2/current/backend/public;
+        # Batas body untuk SEMUA request PHP (/api/ dan /services/ berakhir di sini lewat try_files): §1o butir 5 (usulan)
+        client_max_body_size 13M;
         include fastcgi_params;
         # $realpath_root = path release nyata di balik symlink `current` (§1o butir 3, usulan)
         fastcgi_param SCRIPT_FILENAME $realpath_root/index.php;
@@ -265,8 +267,10 @@ Setiap perubahan tercatat di `audit_logs` (`entity` `surat_cuti_token`, `jenis_a
 2. Buat klien MuDig dengan hak `esign` (bisa digabung dengan `stat`/`dm` pada klien yang sama):
    `php spark integrasi:klien buat --nama="MuDig" --username=<huruf-kecil> --jenis=3 --hak=esign[,stat,dm] [--ip=<ip/cidr>]`.
 3. Batas unggahan (`Config\EsignMudig`, bisa diubah lewat `.env` `esignmudig.pdfMaks`/`esignmudig.gambarMaks` — prefiks HURUF KECIL, byte): PDF maks 10 MB,
-   gambar tanda tangan (`imageTTD`, JPEG/PNG) maks 2 MB. Nginx `client_max_body_size` untuk `/services/` minimal 12 MB (disarankan
-   13M karena overhead multipart) dan PHP `upload_max_filesize`/`post_max_size` setara; kalau tidak, permintaan besar ditolak sebelum
+   gambar tanda tangan (`imageTTD`, JPEG/PNG) maks 2 MB. Nginx `client_max_body_size` minimal 12 MB (disarankan 13M karena overhead
+   multipart) di blok yang menjalankan PHP, `location ~ ^/(api/)?index\.php` contoh §1 — `/services/` tidak punya blok sendiri (§1j),
+   jadi batas di blok `/services/` atau `/api/` yang hanya `try_files` tidak berlaku (§1o butir 5) — dan PHP
+   `upload_max_filesize`/`post_max_size` setara; kalau tidak, permintaan besar ditolak sebelum
    sampai aplikasi. Lewat batas di aplikasi → `status` "2" "Invalid parameter.".
 4. Kontrak untuk PIC MuDig (PN-4, re-handshake): parameter, parameter wajib (`nik`, `passphrase`, `file`, `imageTTD`), dan amplop
    `{"status":"1"|"2","msg","data"}` (status string) sama dengan legacy. Yang berubah: auth (username + rahasia baru, gagal → HTTP 401),
@@ -894,6 +898,11 @@ location /assets/ {
 Fallback SPA (`try_files $uri $uri/ /index.html`) tetap; `index.html` yang dikirim lewat fallback juga perlu `no-cache` (header di
 `location /` atau `location = /index.html`). Tanpa `no-cache`, browser bisa memakai `index.html` lama yang merujuk aset release lama.
 
+`add_header` di dalam sebuah `location` **menimpa semua** `add_header` dari level `server` (tidak digabung). Bila TL memasang header
+keamanan di level server (mis. `X-Content-Type-Options: nosniff`, `Referrer-Policy`), header itu wajib diulang di
+`location = /index.html` dan `location /assets/`, paling rapi lewat satu snippet `include` seperti `snippets/simpeg-berkas-header.conf`
+di §1l.
+
 **5. Batas unggah (usulan)**
 
 Berkas terbesar yang diterima endpoint `/api/` = **5 MB per berkas**: lampiran riwayat/layanan
@@ -904,10 +913,15 @@ Berkas terbesar yang diterima endpoint `/api/` = **5 MB per berkas**: lampiran r
 
 | Setelan | Usulan | Alasan |
 |---|---|---|
-| Nginx `client_max_body_size` di `location /api/` | `12M` | 5 MB + overhead multipart, cukup untuk dua berkas form digital sekaligus. Bawaan Nginx 1 MB menolak sebagian besar unggahan (413). Form digital dengan lebih banyak pertanyaan berkas → TL menaikkan nilai atau membatasi jumlah berkas per form. |
-| Nginx `client_max_body_size` di `location /services/` | `13M` (tetap) | §1c: PDF e-sign maks 10 MB + gambar TTD 2 MB. |
+| Nginx `client_max_body_size` di `location ~ ^/(api/)?index\.php` (atau level `server`) | `13M` | Satu nilai untuk semua request PHP: kebutuhan terbesar = PDF e-sign 10 MB + TTD 2 MB di `/services/` (§1c); `/api/` (5 MB per berkas, dua berkas form digital sekaligus) ikut tercakup. Bawaan Nginx 1 MB menolak sebagian besar unggahan (413). Form digital dengan lebih banyak pertanyaan berkas → TL menaikkan nilai atau membatasi jumlah berkas per form. |
 | PHP `upload_max_filesize` | `11M` | Ikut kebutuhan terbesar (PDF e-sign 10 MB, §1c); PHP satu nilai untuk semua lokasi. |
 | PHP `post_max_size` | `13M` | ≥ total body terbesar (§1c); harus ≥ `upload_max_filesize`. |
+
+**Di blok mana `client_max_body_size` dipasang.** Nginx memeriksa batas body di `location` yang **akhirnya menangani** request.
+`location /api/` pada contoh §1 hanya `try_files … /index.php$is_args$args` (internal redirect), dan `/services/` tidak punya blok sendiri
+(§1j), jadi keduanya berakhir di `location ~ ^/(api/)?index\.php` (fastcgi_pass). Batas yang dipasang di `location /api/` atau
+`location /services/` yang tidak menjalankan PHP **diabaikan**; pasang di blok fastcgi itu (contoh §1) atau di level `server`. Bila
+kelak `/services/` diberi blok sendiri yang langsung `fastcgi_pass`, batasnya dipasang di blok itu juga.
 
 **6. Cron tanpa kunci internal**
 
