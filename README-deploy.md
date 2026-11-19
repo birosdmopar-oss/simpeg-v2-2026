@@ -32,16 +32,16 @@ Prasyarat di server: `git`, `php` dengan patch aman (+ ext mysqli, intl, mbstrin
 | Runtime | Seri yang diterima | Alasan |
 |---|---|---|
 | PHP | 8.4.x ≥ **8.4.27** (dipakai proyek dan CI); 8.3.x ≥ **8.3.36** | PHP2Shell, CVE-2026-109618 / CVE-2026-109619 (RCE di PHP core) |
-| Node.js | 24.x ≥ **24.22.1** (dipakai proyek, lihat `frontend/.nvmrc`); 22.x ≥ **22.23.4** | Node2Shell, CVE-2026-111497 (dekoder Brotli). Node 20 sudah EOL dan tidak mendapat patch. |
+| Node.js | 24.x ≥ **24.22.1** (dipakai proyek dan CI, lihat `frontend/.nvmrc`); 26.x ≥ **26.12.1** (Active LTS, mis. mesin dev); 22.x ≥ **22.23.4** | Node2Shell, CVE-2026-111497 (dekoder Brotli). Node 20 sudah EOL dan tidak mendapat patch. |
 
-Seri lain ditolak (default aman), termasuk seri yang sudah dipatch tetapi tidak diuji proyek (PHP 8.2.35 / 8.5.12, Node 25 / 26.12.1).
+Seri lain ditolak (default aman), termasuk seri yang sudah dipatch tetapi tidak diuji proyek (PHP 8.2.35 / 8.5.12, Node 25).
 
 **Menambah seri baru** (atau menaikkan minimum sesudah CVE baru) = satu CR yang mengubah bersamaan:
 1. `deploy/cek-versi-runtime.sh` — **satu-satunya tempat** daftar seri: blok `case "$runtime:$seri"` (mis. tambah baris
-   `php:8.5) minimum=8.5.12 ;;` atau `node:26.*) minimum=26.12.1 ;;`), lalu teks `aman=` dan komentar daftar di kepala berkas;
+   `php:8.5) minimum=8.5.12 ;;` atau `node:28.*) minimum=28.x.y ;;`), lalu teks `aman=` dan komentar daftar di kepala berkas;
 2. `deploy/cek-versi-runtime.test.sh` — kasus seri baru: tepat minimum → 0, satu patch di bawahnya → 1 (hapus kasus "ditolak" lama
    seri itu);
-3. Node saja: `frontend/package.json` + entri root `package-lock.json` `engines.node` (mis. `… || >=26.12.1 <27`), dan
+3. Node saja: `frontend/package.json` + entri root `package-lock.json` `engines.node` (mis. `… || >=28.x.y <29`), dan
    `NODE_VERSION`/`.nvmrc` bila proyek pindah seri;
 4. tabel di atas.
 
@@ -53,7 +53,7 @@ Penegakan:
 - **Deploy** (`deploy/post-receive`): sebelum `composer install`, hook menjalankan `deploy/cek-versi-runtime.sh` dari release untuk
   `PHP_BIN` dan `NODE_BIN` (deploy.env; default `node` di direktori `NPM_BIN` bila berupa path). Ditolak → build gagal, release dihapus,
   `current` dan database tidak disentuh.
-- **npm** (`frontend/.npmrc` `engine-strict=true`, `engines.node` `>=22.23.4 <23 || >=24.22.1 <25`): `npm ci` menolak Node di luar rentang.
+- **npm** (`frontend/.npmrc` `engine-strict=true`, `engines.node` `>=22.23.4 <23 || >=24.22.1 <25 || >=26.12.1 <27`): `npm ci` menolak Node di luar rentang.
 - `composer.json` tetap `php ^8.2`: menaikkan batasnya mengubah hash `composer.lock` (perlu `composer update --lock`), jadi tidak
   dilakukan di CR-154; guard CI + post-receive sudah menolak PHP rentan.
 
