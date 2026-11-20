@@ -217,22 +217,45 @@ final class StrukturService implements StrukturServiceInterface
             ->where('jab.id_group_jabatan', 1)->where('jab.id_sub_group_jabatan', 1)
             ->get()->getResultArray();
 
+        // Es.II semua sekretaris/deputi dimuat SEKALI (CR-166; dulu satu kueri per es1), lalu dipilah per es1 di bawah dengan
+        // syarat yang sama. Urutan kueri (level, urutan, id_struktur_jabatan) terbawa ke tiap kelompok atasan.
+        $idAtasan = [];
+
+        foreach ($es1 as $row) {
+            $nama = strtolower((string) $row['jabatan']);
+
+            if (str_starts_with($nama, 'sekretaris') || str_starts_with($nama, 'deputi')) {
+                $idAtasan[(int) $row['id_jabatan']] = true;
+            }
+        }
+
+        $es2PerAtasan = [];
+
+        if ($idAtasan !== []) {
+            $semuaEs2 = $this->jabatanStruktur($idPeriode)
+                ->select('s.id_unit')
+                ->where('sj.level_struktur', 3)->whereIn('sj.id_jabatan_atasan', array_keys($idAtasan))
+                ->get()->getResultArray();
+
+            foreach ($semuaEs2 as $r) {
+                $es2PerAtasan[(int) $r['id_jabatan_atasan']][] = $r;
+            }
+        }
+
         foreach ($es1 as $row) {
             $nama = strtolower((string) $row['jabatan']);
 
             if (str_starts_with($nama, 'staf ahli')) {
                 $data['staf_ahli'][] = $this->simpul($row);
             } elseif (str_starts_with($nama, 'sekretaris') || str_starts_with($nama, 'deputi')) {
-                $sek = str_starts_with($nama, 'sekretaris');
-                $es2 = $this->jabatanStruktur($idPeriode)
-                    ->where('s.id_unit', (int) $row['id_unit'])->where('sj.level_struktur', 3)->where('sj.id_jabatan_atasan', (int) $row['id_jabatan']);
-
-                if ($sek) {
-                    $es2->where('jab.id_satker !=', self::SATKER_INSPEKTORAT);
-                }
-
-                // Jalankan dulu: alias tabel builder CI4 dicatat per koneksi, query lain (simpul()) menimpanya.
-                $barisEs2           = $es2->get()->getResultArray();
+                $sek    = str_starts_with($nama, 'sekretaris');
+                $idUnit = (int) $row['id_unit'];
+                // Setara `s.id_unit = <unit es1>` dan, untuk sekretaris, `jab.id_satker != 104`: baris ber-NULL tidak lolos.
+                $barisEs2 = array_values(array_filter(
+                    $es2PerAtasan[(int) $row['id_jabatan']] ?? [],
+                    static fn (array $r): bool => $r['id_unit'] !== null && (int) $r['id_unit'] === $idUnit
+                        && (! $sek || ($r['id_satker'] !== null && (int) $r['id_satker'] !== self::SATKER_INSPEKTORAT)),
+                ));
                 $simpul             = $this->simpul($row);
                 $simpul['list_es2'] = array_map(fn (array $r): array => $this->simpul($r, true), $barisEs2);
 

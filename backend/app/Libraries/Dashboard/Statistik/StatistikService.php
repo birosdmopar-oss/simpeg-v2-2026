@@ -142,22 +142,30 @@ final class StatistikService
         $this->wajibRole($auth);
         $this->wajibJenis($jenis);
 
-        $lingkup = $this->lingkup($auth, ListQuery::from($query, ['lingkup', 'id']));
-        $key     = StatistikCache::key($jenis, $lingkup, $auth);
-        $cache   = $this->cacheService();
-        $hit     = false;
-        $hasil   = null;
+        $lingkup     = $this->lingkup($auth, ListQuery::from($query, ['lingkup', 'id']));
+        $key         = StatistikCache::key($jenis, $lingkup, $auth);
+        $cache       = $this->cacheService();
+        $tersimpan   = null;
+        $bolehSimpan = false;
 
+        // Satu baca cache per permintaan (CR-166; dulu has() lalu remember() = dua baca). Perilaku yang dijaga: nilai bukan
+        // array dihitung ulang TANPA ditimpa, dan cache yang gagal dibaca tidak dicoba ditulis.
         try {
-            $hit   = $cache->has($key);
-            $hasil = $cache->remember($key, StatistikCache::TTL, fn (): array => $this->hitung($auth, $jenis, $lingkup));
+            $tersimpan   = $cache->get($key);
+            $bolehSimpan = $tersimpan === null;
         } catch (Throwable $e) {
             log_message('warning', '[dashboard] cache statistik {key} gagal: {msg}', ['key' => $key, 'msg' => $e->getMessage()]);
         }
 
-        if (! is_array($hasil)) {
-            $hit   = false;
-            $hasil = $this->hitung($auth, $jenis, $lingkup);
+        $hit   = is_array($tersimpan);
+        $hasil = $hit ? $tersimpan : $this->hitung($auth, $jenis, $lingkup);
+
+        if ($bolehSimpan) {
+            try {
+                $cache->set($key, $hasil, StatistikCache::TTL);
+            } catch (Throwable $e) {
+                log_message('warning', '[dashboard] cache statistik {key} gagal: {msg}', ['key' => $key, 'msg' => $e->getMessage()]);
+            }
         }
 
         $hasil['cache'] = ['hit' => $hit, 'ttl' => StatistikCache::TTL];

@@ -192,6 +192,17 @@ final class KelengkapanData
         $kolom  = 100 / count($daftar);
         $persen = 0;
 
+        // Jenjang yang dimiliki pegawai dimuat SEKALI (CR-166; dulu satu COUNT per jenjang aturan). Saringan status tetap di
+        // SQL; id dibandingkan sebagai string (kolom int, jadi sama dengan perbandingan `IN` sebelumnya).
+        $punya = [];
+
+        foreach ($this->db->table('riwayat_pendidikan')->distinct()->select('id_jenjang_pendidikan')->where('nip', $nip)
+            ->whereNotIn('status', [2, 10])->get()->getResultArray() as $r) {
+            if ($r['id_jenjang_pendidikan'] !== null) {
+                $punya[(string) $r['id_jenjang_pendidikan']] = true;
+            }
+        }
+
         foreach ($daftar as $jp) {
             $id = [$idJenjang[$jp] ?? ''];
 
@@ -199,11 +210,12 @@ final class KelengkapanData
                 $id[] = $idJenjang['D.IV'] ?? '';
             }
 
-            $id = array_values(array_filter($id, static fn (string $v): bool => $v !== ''));
+            foreach ($id as $v) {
+                if ($v !== '' && isset($punya[$v])) {
+                    $persen += $kolom;
 
-            if ($id !== [] && $this->db->table('riwayat_pendidikan')->where('nip', $nip)->whereIn('id_jenjang_pendidikan', $id)
-                ->whereNotIn('status', [2, 10])->countAllResults() > 0) {
-                $persen += $kolom;
+                    break;
+                }
             }
         }
 

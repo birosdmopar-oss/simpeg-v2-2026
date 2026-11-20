@@ -65,6 +65,11 @@ final class BawahanPegawai
         $presensi = [];
         $ak       = [];
         $kelasAk  = $this->ak ?? new AkPermenpanrb($this->db);
+        // AK semua bawahan JF dimuat sekali (CR-166; dulu dua kueri per bawahan JF).
+        $akPerNip = $kelasAk->hitungBanyak(array_values(array_map(
+            static fn (array $r): string => (string) $r['nip'],
+            array_filter($rows, static fn (array $r): bool => (int) ($r['id_group_jabatan'] ?? 0) === PrediksiPegawai::ID_GROUP_JF),
+        )));
 
         foreach ($rows as $r) {
             $nip        = (string) $r['nip'];
@@ -75,7 +80,7 @@ final class BawahanPegawai
             ];
 
             if ((int) ($r['id_group_jabatan'] ?? 0) === PrediksiPegawai::ID_GROUP_JF) {
-                $h      = $kelasAk->hitung($nip);
+                $h      = $akPerNip[$nip] ?? $kelasAk->hitung($nip);
                 $now    = (float) $h['current_ak'];
                 $target = (float) $h['ak_for_kp'];
                 $ak[]   = [
