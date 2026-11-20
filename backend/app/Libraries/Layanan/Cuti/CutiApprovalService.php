@@ -161,9 +161,12 @@ class CutiApprovalService
 
         $this->notifikasi?->antrekan($idNotif);
         // F6-13 (Fase 6 MAKE-066): push Android keputusan cuti ikut legacy `andr_notif_queue` [K `L_cuti.php:2462-2548`].
-        (new \App\Libraries\Push\PushAndroidCuti())->diproses($this->muat($id), $auth);
+        // Satu baca sesudah commit dipakai untuk push dan detail (CR-167): `diproses()` hanya mengantre push dan membaca
+        // pegawai/pengguna, tidak menulis `riwayat_cuti`, jadi baris yang sama masih berlaku untuk detail.
+        $sesudah = $this->muat($id);
+        (new \App\Libraries\Push\PushAndroidCuti())->diproses($sesudah, $auth);
 
-        return $this->cuti->itemDetail($auth, $this->muat($id));
+        return $this->cuti->itemDetail($auth, $sesudah);
     }
 
     /**

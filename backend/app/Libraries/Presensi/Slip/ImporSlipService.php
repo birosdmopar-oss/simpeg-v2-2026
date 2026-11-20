@@ -111,7 +111,7 @@ final class ImporSlipService
         try {
             $muat = $this->penyimpan->muat($simpan['token'], (int) $auth->idPengguna(), $sekarang)
                 ?? throw new RuntimeException('Pratinjau yang baru disimpan tidak dapat dimuat.');
-            $analisis = $this->analisis($muat['path'], $periodeFilter, $cakupan, $this->kunciSudahAda(...));
+            $analisis = $this->analisis($this->uraiBerkas($muat['path']), $periodeFilter, $cakupan, $this->kunciSudahAda(...));
             $this->auditNamaTidakCocok($auth, $analisis, $simpan['token']);
         } catch (Throwable $e) {
             $this->penyimpan->hapus($simpan['token']);
@@ -177,10 +177,16 @@ final class ImporSlipService
         $waktu  = gmdate('Y-m-d H:i:s', $sekarang);
         $id     = $auth->idPengguna();
 
-        $db->transBegin();
+        $mulai = false;
 
         try {
-            $analisis = $this->analisis($muat['path'], $filter, $cakupan, fn (array $nip): array => $this->kunciSudahAda($nip, true));
+            // Berkas dibaca dan diuraikan SEBELUM transaksi dibuka (CR-167), jadi kunci baris tidak dipegang selama parse.
+            // Tetap di dalam try yang sama supaya pemetaan galatnya tidak berubah (422 `errors.berkas`, selain itu 500).
+            $urai = $this->uraiBerkas($muat['path']);
+
+            $db->transBegin();
+            $mulai    = true;
+            $analisis = $this->analisis($urai, $filter, $cakupan, fn (array $nip): array => $this->kunciSudahAda($nip, true));
             $hitung   = ['disisip' => 0, 'diperbarui' => 0, 'dilewati' => 0, 'gagal' => 0];
             $keluaran = [];
             $periode  = [];
@@ -226,7 +232,7 @@ final class ImporSlipService
 
             return [...$hitung, 'baris' => $keluaran];
         } catch (KonflikImporSlip $e) {
-            $this->rollback($db);
+            $this->rollbackBila($db, $mulai);
 
             throw new ApiException(
                 "Data slip NIP {$e->nip} periode {$e->periode->label()} sudah ditambahkan proses lain. Tidak ada data yang disimpan; ulangi unggah dan pratinjau.",
@@ -235,11 +241,11 @@ final class ImporSlipService
                 kode: KodeGalatSlip::KONFLIK_DATA,
             );
         } catch (ApiException $e) {
-            $this->rollback($db);
+            $this->rollbackBila($db, $mulai);
 
             throw $e;
         } catch (Throwable $e) {
-            $this->rollback($db);
+            $this->rollbackBila($db, $mulai);
             log_message('error', 'Commit impor slip gagal: {kelas} {pesan}', ['kelas' => $e::class, 'pesan' => $e->getMessage()]);
 
             throw new ApiException(self::PESAN_GAGAL_COMMIT, 500);
@@ -288,13 +294,11 @@ final class ImporSlipService
     }
 
     /**
-     * Baca berkas + uraikan sheet + susun pratinjau dengan data DB.
+     * Baca berkas + uraikan sheet, TANPA menyentuh DB.
      *
-     * @param Closure(list<string>): array<string, true> $kunciSudahAda
-     *
-     * @return array{susun: array<string, mixed>, nama: array<string, string>, info: array<string, mixed>, periodeBaris: array<string, PeriodeSlip>}
+     * @return array{sheet: array{GPP: list<BarisSheet>, TK: list<BarisSheet>}, info: array{baris_tanpa_nip: array<string, list<int>>, kolom_diabaikan: array<string, list<string>>}}
      */
-    private function analisis(string $path, ?PeriodeSlip $filter, ?string $cakupan, Closure $kunciSudahAda): array
+    private function uraiBerkas(string $path): array
     {
         try {
             $baca = (new PembacaExcelSlip($this->config->maksBarisImporPerSheet))->baca($path);
@@ -316,6 +320,22 @@ final class ImporSlipService
             $info['baris_tanpa_nip'][$nama] = $nilai['baris_tanpa_nip'];
             $info['kolom_diabaikan'][$nama] = $nilai['kolom_diabaikan'];
         }
+
+        return ['sheet' => $sheet, 'info' => $info];
+    }
+
+    /**
+     * Susun pratinjau dari hasil {@see uraiBerkas()} dengan data DB (pegawai, kunci yang sudah ada).
+     *
+     * @param array{sheet: array{GPP: list<BarisSheet>, TK: list<BarisSheet>}, info: array<string, mixed>} $urai
+     * @param Closure(list<string>): array<string, true>                                                   $kunciSudahAda
+     *
+     * @return array{susun: array<string, mixed>, nama: array<string, string>, info: array<string, mixed>, periodeBaris: array<string, PeriodeSlip>}
+     */
+    private function analisis(array $urai, ?PeriodeSlip $filter, ?string $cakupan, Closure $kunciSudahAda): array
+    {
+        $sheet = $urai['sheet'];
+        $info  = $urai['info'];
 
         $semua                = [...$sheet[KolomGaji::SHEET_GPP], ...$sheet[KolomGaji::SHEET_TK]];
         $nip                  = array_values(array_unique(array_filter(array_map(static fn (BarisSheet $b): ?string => $b->nip, $semua), static fn (?string $n): bool => $n !== null)));
@@ -540,6 +560,17 @@ final class ImporSlipService
         $mb   = $byte % (1024 * 1024) === 0 ? (string) intdiv($byte, 1024 * 1024) : number_format($byte / (1024 * 1024), 1, ',', '');
 
         return "Ukuran berkas maksimal {$mb} MB.";
+    }
+
+    /**
+     * Rollback hanya bila transaksi commit impor sudah dibuka: galat saat parse terjadi sebelum `transBegin`, dan rollback di
+     * titik itu akan membatalkan transaksi milik pemanggil (bila ada).
+     */
+    private function rollbackBila(BaseConnection $db, bool $mulai): void
+    {
+        if ($mulai) {
+            $this->rollback($db);
+        }
     }
 
     private function rollback(BaseConnection $db): void
