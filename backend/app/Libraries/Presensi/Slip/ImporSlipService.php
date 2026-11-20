@@ -177,15 +177,21 @@ final class ImporSlipService
         $waktu  = gmdate('Y-m-d H:i:s', $sekarang);
         $id     = $auth->idPengguna();
 
-        $mulai = false;
+        // Berkas dibaca dan diuraikan SEBELUM transaksi dibuka (CR-167). Pemetaan galatnya sama dengan saat parse masih di
+        // dalam transaksi: ApiException (422 `errors.berkas`) diteruskan, galat lain dicatat lalu 500 "gagal commit".
+        try {
+            $urai = $this->uraiBerkas($muat['path']);
+        } catch (ApiException $e) {
+            throw $e;
+        } catch (Throwable $e) {
+            log_message('error', 'Commit impor slip gagal: {kelas} {pesan}', ['kelas' => $e::class, 'pesan' => $e->getMessage()]);
+
+            throw new ApiException(self::PESAN_GAGAL_COMMIT, 500);
+        }
+
+        $db->transBegin();
 
         try {
-            // Berkas dibaca dan diuraikan SEBELUM transaksi dibuka (CR-167), jadi kunci baris tidak dipegang selama parse.
-            // Tetap di dalam try yang sama supaya pemetaan galatnya tidak berubah (422 `errors.berkas`, selain itu 500).
-            $urai = $this->uraiBerkas($muat['path']);
-
-            $db->transBegin();
-            $mulai    = true;
             $analisis = $this->analisis($urai, $filter, $cakupan, fn (array $nip): array => $this->kunciSudahAda($nip, true));
             $hitung   = ['disisip' => 0, 'diperbarui' => 0, 'dilewati' => 0, 'gagal' => 0];
             $keluaran = [];
@@ -232,7 +238,7 @@ final class ImporSlipService
 
             return [...$hitung, 'baris' => $keluaran];
         } catch (KonflikImporSlip $e) {
-            $this->rollbackBila($db, $mulai);
+            $this->rollback($db);
 
             throw new ApiException(
                 "Data slip NIP {$e->nip} periode {$e->periode->label()} sudah ditambahkan proses lain. Tidak ada data yang disimpan; ulangi unggah dan pratinjau.",
@@ -241,11 +247,11 @@ final class ImporSlipService
                 kode: KodeGalatSlip::KONFLIK_DATA,
             );
         } catch (ApiException $e) {
-            $this->rollbackBila($db, $mulai);
+            $this->rollback($db);
 
             throw $e;
         } catch (Throwable $e) {
-            $this->rollbackBila($db, $mulai);
+            $this->rollback($db);
             log_message('error', 'Commit impor slip gagal: {kelas} {pesan}', ['kelas' => $e::class, 'pesan' => $e->getMessage()]);
 
             throw new ApiException(self::PESAN_GAGAL_COMMIT, 500);
@@ -395,6 +401,18 @@ final class ImporSlipService
 
     /**
      * Kunci `(nip, bulan, tahun)` yang sudah ada untuk NIP di berkas; `$kunci = true` → baris dikunci `FOR UPDATE`.
+     *
+     * Predikat sengaja hanya `nip IN (…)` (semua periode NIP di berkas ikut terkunci). Mempersempitnya ke
+     * `nip IN (…) AND tahun IN (…) AND bulan IN (…)` sudah dicoba dan DIBATALKAN (CR-167), berdasarkan EXPLAIN + jumlah
+     * kunci di MySQL 8.0 REPEATABLE READ atas 120.000 baris sintetis (5.000 NIP × 24 bulan):
+     * - periode yang sudah terisi penuh: range `uk_nip_bulan_tahun`, kunci turun (5.000 NIP: ±245.000 → 10.000 row lock);
+     * - periode yang BELUM ada barisnya (kasus rutin impor bulan baru): optimizer memilih `idx_bulan_tahun`, sehingga
+     *   yang terkunci adalah celah periode itu untuk SEMUA NIP, bukan hanya NIP di berkas;
+     * - periode terisi sebagian oleh NIP lain: `idx_bulan_tahun` lagi, baris NIP di luar berkas ikut terkunci.
+     * Jadi himpunan kunci bisa lebih luas daripada sekarang. Satu-satunya bentuk yang aman adalah
+     * `FORCE INDEX (uk_nip_bulan_tahun)`, yang ditolak: mengikat kode ke nama indeks (indeks berganti → galat 1176 → 500)
+     * dan belum teruji di MariaDB 10.4, sedangkan impor slip operasi admin bulanan dengan commit singkat. Jangan dicoba
+     * ulang tanpa data ukur baru. Perilaku kunci sekarang dikunci `ImporSlipKunciParitasTest`.
      *
      * @param list<string> $nip
      *
@@ -560,17 +578,6 @@ final class ImporSlipService
         $mb   = $byte % (1024 * 1024) === 0 ? (string) intdiv($byte, 1024 * 1024) : number_format($byte / (1024 * 1024), 1, ',', '');
 
         return "Ukuran berkas maksimal {$mb} MB.";
-    }
-
-    /**
-     * Rollback hanya bila transaksi commit impor sudah dibuka: galat saat parse terjadi sebelum `transBegin`, dan rollback di
-     * titik itu akan membatalkan transaksi milik pemanggil (bila ada).
-     */
-    private function rollbackBila(BaseConnection $db, bool $mulai): void
-    {
-        if ($mulai) {
-            $this->rollback($db);
-        }
     }
 
     private function rollback(BaseConnection $db): void
