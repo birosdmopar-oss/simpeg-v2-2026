@@ -46,9 +46,7 @@ final class PopulasiRekap
             ->orderBy('nip', 'ASC')
             ->get()->getResultArray();
 
-        $hasil = $this->lengkapi($pegawai, 1, $akhir, $awal);
-
-        return array_values(array_filter($hasil, static fn (array $p): bool => $lingkup->mencakup($p)));
+        return $this->lengkapi($pegawai, 1, $akhir, $awal, $lingkup);
     }
 
     /**
@@ -69,25 +67,28 @@ final class PopulasiRekap
     }
 
     /**
+     * Lingkup (bila ada) diterapkan pada jabatan berlaku SEBELUM pangkat dimuat (CR-165), jadi `riwayat_kp`
+     * hanya dibaca untuk NIP yang lolos lingkup. Hasil sama dengan menyaring sesudah semuanya dimuat: `mencakup()` hanya
+     * membaca `id_unit`/`id_satker` jabatan.
+     *
      * @param list<array<string, mixed>> $pegawai
      *
      * @return list<array{nip: string, nama: string, jabatan: string, id_unit: int|null, id_satker: int|null, unit: string, satker: string, dibuat: string}>
      */
-    private function lengkapi(array $pegawai, int $jenisJabatan, string $batasJabatan, string $batasPangkat): array
+    private function lengkapi(array $pegawai, int $jenisJabatan, string $batasJabatan, string $batasPangkat, ?LingkupLaporan $lingkup = null): array
     {
         $hasil = [];
 
         foreach (array_chunk($pegawai, self::BATCH_NIP) as $batch) {
             $nip     = array_map(static fn (array $p): string => (string) $p['nip'], $batch);
             $jabatan = $this->terbaru('riwayat_mutasi_jabatan', 'id_riwayat_mutasi_jabatan', 'nip, jabatan, id_unit, id_satker, unit, satker, kelas_jabatan', $nip, $batasJabatan, ['jenis_jabatan' => $jenisJabatan]);
-            $pangkat = $this->terbaru('riwayat_kp', 'id_riwayat_kp', 'nip, gol_ruang, tmtsk', $nip, $batasPangkat, []);
+            $lolos   = [];
 
             foreach ($batch as $p) {
                 $n = (string) $p['nip'];
                 $j = $jabatan[$n] ?? [];
-                $k = $pangkat[$n] ?? [];
 
-                $hasil[] = [
+                $baris = [
                     'nip'       => $n,
                     'nama'      => StrukturService::namaGelar($p['glr_awal'] ?? null, (string) ($p['nama'] ?? ''), $p['glr_akhir'] ?? null),
                     'jabatan'   => (string) ($j['jabatan'] ?? ''),
@@ -97,8 +98,20 @@ final class PopulasiRekap
                     'satker'    => (string) ($j['satker'] ?? ''),
                     'dibuat'    => (string) ($p['created_at'] ?? ''),
                     '_kelas'    => (int) ($j['kelas_jabatan'] ?? 0),
-                    '_gol'      => (string) ($k['gol_ruang'] ?? ''),
-                    '_tmt'      => (string) ($k['tmtsk'] ?? '9999-12-31'),
+                ];
+
+                if ($lingkup === null || $lingkup->mencakup($baris)) {
+                    $lolos[] = $baris;
+                }
+            }
+
+            $pangkat = $this->terbaru('riwayat_kp', 'id_riwayat_kp', 'nip, gol_ruang, tmtsk', array_column($lolos, 'nip'), $batasPangkat, []);
+
+            foreach ($lolos as $baris) {
+                $k       = $pangkat[$baris['nip']] ?? [];
+                $hasil[] = $baris + [
+                    '_gol' => (string) ($k['gol_ruang'] ?? ''),
+                    '_tmt' => (string) ($k['tmtsk'] ?? '9999-12-31'),
                 ];
             }
         }
@@ -112,13 +125,17 @@ final class PopulasiRekap
     /**
      * Baris riwayat status 1 terbaru (`tmtsk DESC`, id DESC) per NIP dengan `tmtsk ≤ $batas`.
      *
-     * @param list<string>          $nip
-     * @param array<string, mixed>  $syarat
+     * @param list<string>         $nip
+     * @param array<string, mixed> $syarat
      *
      * @return array<string, array<string, mixed>>
      */
     private function terbaru(string $tabel, string $pk, string $kolom, array $nip, string $batas, array $syarat): array
     {
+        if ($nip === []) {
+            return [];
+        }
+
         $baris = $this->db->table($tabel)->select($kolom)->whereIn('nip', $nip)->where('status', 1)->where('tmtsk <=', $batas)->where($syarat)
             ->orderBy('nip', 'ASC')->orderBy('tmtsk', 'DESC')->orderBy($pk, 'DESC')->get()->getResultArray();
         $hasil = [];
