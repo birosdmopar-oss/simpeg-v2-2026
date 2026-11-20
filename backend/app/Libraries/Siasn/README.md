@@ -26,8 +26,14 @@ php spark siasn:tarik --jenis=<data-utama|golongan|pendidikan|pmk|skp|ak|ref-uno
 
 **Kode keluar:** `0` berhasil, termasuk bila sebagian NIP gagal di sisi SIASN (dicatat, AC-03.1); `1` konfigurasi BKN
 belum lengkap, akun sistem integrasi belum siap (`php spark integrasi:siapkan-akun-sistem`), `integrations.siasn.driver`
-bukan `bkn`, jenis yang sama sedang berjalan, atau galat DB/lainnya (dicetak kelas & kode saja); `7` masukan salah.
-Keluaran hanya jumlah, tanpa NIP/nama.
+bukan `bkn`, jenis yang sama sedang berjalan, galat DB/lainnya (dicetak kelas & kode saja), atau batch **DIPUTUS**
+(CR-162, alur per batch langkah 4); `7` masukan salah. Keluaran hanya jumlah, tanpa NIP/nama.
+
+Batch yang diputus mencetak baris ringkasan biasa, lalu
+`Tarik SIASN <jenis> DIPUTUS: N NIP tidak dicoba (gagal transport M); dicoba lagi pada jalan berikutnya.` dan keluar `1`
+(`EXIT_ERROR`), supaya terlihat di log cron. Data NIP yang sudah dicoba tetap ditulis. Bukan tanda konfigurasi rusak: NIP
+sisanya dipilih lagi otomatis; bila terus berulang, cek `php spark integrasi:uji-koneksi siasn`. `--dry-run` memakai pemutus
+yang sama, jadi uji kering yang diputus juga keluar `1` (tanpa tulis apa pun, flag tidak berubah).
 
 **Konfigurasi:** `integrations.siasn.driver = bkn` dan blok `integrations.bkn.*` (`baseUrlApi` sampai `/apisiasn/1.0`,
 token gateway + SSO) hanya di `.env` server. Driver lain (mis. `mock`) ditolak `siasn:tarik` karena datanya contoh.
@@ -39,9 +45,19 @@ token gateway + SSO) hanya di `.env` server. Driver lain (mis. `mock`) ditolak `
 3. Daftar status disinkronkan (padanan `sync_dsp`: pegawai `status = 1`, kecuali NIP `-`/`1`; INSERT IGNORE, satu
    transaksi), NIP dipilih: riwayat → flag 0 / stempel > 6 jam / kosong; data utama → `du = 0` dan `du_lu` sebelum hari
    ini (tanggal bisnis WIB), atau `du = 2` macet > 6 jam. Ditandai proses (`2`).
-4. API per NIP di luar transaksi (BP-4).
-5. Rencana → satu transaksi (sisip → ubah → hapus). Exception apa pun sesudah langkah 3 → flag kembali `0`, dilempar ulang.
-6. Flag selesai + satu ringkasan `integrasi_log` (`tarik_<jenis>`, jumlah saja); batch kosong tidak dicatat.
+4. API per NIP di luar transaksi (BP-4). Gagal per NIP tidak menghentikan batch (AC-03.1), kecuali **pemutus** (CR-162):
+   - **gagal transport** = status hasil `timeout`, `koneksi`, atau `token` (`TarikSiasn::GAGAL_TRANSPORT`): SIASN tidak
+     terjangkau, bukan jawaban SIASN untuk NIP itu;
+   - sesudah **3** gagal transport berturut-turut (`BATAS_GAGAL_BERUNTUN`), sisa batch tidak dicoba; hitungan kembali ke 0
+     setiap ada NIP yang hasilnya bukan gagal transport. Pemutus hanya berlaku bila masih ada NIP tersisa;
+   - **anggaran waktu 600 detik** per batch (`ANGGARAN_DETIK`, di bawah jadwal 15 menit): sesudah lewat, NIP berikutnya
+     tidak dimulai. NIP yang sedang diproses tidak dipotong, dan minimal satu NIP selalu dicoba.
+5. Rencana (dari NIP yang sudah dicoba) → satu transaksi (sisip → ubah → hapus). Exception apa pun sesudah langkah 3 → flag
+   **semua** NIP batch kembali `0`, dilempar ulang.
+6. NIP yang **sudah dicoba**, apa pun hasilnya (termasuk gagal transport), ditandai selesai seperti legacy; yang gagal
+   dicoba lagi sesudah usang (6 jam / 1 hari). NIP yang **belum sempat dicoba** karena batch diputus dikembalikan ke flag
+   `0`, sehingga dipilih lagi pada jalan berikutnya. Lalu satu ringkasan `integrasi_log` (`tarik_<jenis>`, jumlah saja);
+   batch kosong tidak dicatat.
 
 ## Pengaman aksi destruktif (F6-14 + putusan reviewer B6 M1)
 
@@ -52,7 +68,17 @@ hanya bila batch itu punya sisip/ubah SKP (ikut legacy `Rw_skp.php:201`). AK tid
 ## Ringkasan (`integrasi_log.pesan`)
 
 `nip`, `sukses`, `gagal`, `sisip`, `ubah`, `pasang`, `lepas`, `hapus`, `ganda` (golongan ganda → `double_riwayat_kp`),
-`ditolak` (nilai tidak sah per kolom), dan INFO:
+`ditolak` (nilai tidak sah per kolom), INFO (tabel di bawah), serta (CR-162):
+
+- `gagal_transport` = bagian dari `gagal` yang karena SIASN tidak terjangkau (`timeout`/`koneksi`/`token`);
+- `tidak_dicoba` = NIP yang dikembalikan ke flag 0 karena batch diputus. `gagal` hanya menghitung NIP yang dicoba lalu
+  gagal (`gagal = nip − sukses − tidak_dicoba`).
+
+Status ringkasan: semua NIP sukses → sukses tanpa kode; selain itu gagal dengan kode `diputus` (batch diputus, exit 1) atau
+`sebagian_gagal` (sebagian NIP gagal tanpa putus, exit 0). Karena berstatus gagal, keduanya ikut dilaporkan
+`php spark integrasi:status` (cron pemantauan `README-deploy.md` §1e). Exception di tengah batch → kode `galat_db`/`galat`.
+
+INFO:
 
 | INFO | Arti |
 |---|---|

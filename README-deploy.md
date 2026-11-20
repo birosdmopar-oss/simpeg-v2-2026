@@ -402,9 +402,21 @@ barisnya memakai `flock -n` seperti cron lain; `flock` yang sibuk keluar 1 tanpa
 `--limit` bawaan 20 baris/NIP per jalan (tarik maks 500); naikkan hanya bila antrean menumpuk.
 
 **Kode keluar & pemantauan.** `0` = berhasil (termasuk sebagian NIP/baris gagal di sisi BKN, tercatat); `1` = konfigurasi
-belum lengkap, akun sistem belum siap, driver bukan `bkn`, jenis yang sama sedang berjalan, token/otorisasi BKN ditolak
-(batch dihentikan tanpa menulis baris), atau galat DB; `7` = opsi salah. Keluaran dan `integrasi_log` hanya jumlah, tanpa
-NIP/nama/token. `php spark integrasi:status` keluar 1 bila ada kegagalan dalam jendela atau periode Tukin berjalan belum punya
+belum lengkap, akun sistem belum siap, driver bukan `bkn`, jenis yang sama sedang berjalan, galat DB, token/otorisasi BKN
+ditolak pada `siasn:dorong` / `siasn:unggah-arsip` (batch dihentikan tanpa menulis baris) atau pada `siasn:tarik
+--jenis=ref-unor` (jawaban gagal, tanpa tulis), atau batch `siasn:tarik` (jenis selain `ref-unor`) **DIPUTUS**; `7` = opsi
+salah. Keluaran dan `integrasi_log` hanya jumlah, tanpa NIP/nama/token.
+
+Batch `siasn:tarik` **DIPUTUS** (CR-162) = SIASN tidak terjangkau 3× beruntun (timeout, koneksi, atau token BKN gagal
+diperoleh) atau anggaran 600 detik per batch habis. Di `siasn:tarik` token yang gagal dicatat per NIP (status `token`) dan
+ikut dihitung pemutus, jadi batch tidak berhenti di NIP pertama. Log cron memuat baris
+`Tarik SIASN <jenis> DIPUTUS: N NIP tidak dicoba (gagal transport M); dicoba lagi pada jalan berikutnya.` sesudah baris
+ringkasan. Data NIP yang sudah dicoba tetap ditulis; NIP sisanya kembali ke antrean dan otomatis dicoba lagi pada jalan
+berikutnya, jadi **tidak perlu tindakan manual** bila hanya sesekali. Bila muncul terus di beberapa jalan berturut-turut, cek
+konektivitas/token BKN dengan `php spark integrasi:uji-koneksi siasn`. Ringkasan `integrasi_log` batch itu berstatus gagal
+dengan kode `diputus` (sebagian NIP gagal tanpa putus = kode `sebagian_gagal`, exit 0), sehingga ikut dilaporkan
+`integrasi:status` (cron pemantauan di atas). Rincian: `backend/app/Libraries/Siasn/README.md`.
+`php spark integrasi:status` keluar 1 bila ada kegagalan dalam jendela atau periode Tukin berjalan belum punya
 SKP periodik e-Kinerja (F6-15). Job `bkn-tarik` yang gagal permanen ada di `php spark queue:failed`.
 
 **Risiko duplikat di BKN (wajib dibaca operator).** POST ke SIASN (dorong riwayat, unggah dokumen) tidak pernah di-retry
