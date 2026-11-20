@@ -38,7 +38,7 @@ final class ImporSlipParitasTest extends DatabaseTestCase
     use PegawaiFixtureTrait;
 
     /**
-     * perilaku sekarang (dikunci CR-164): `message` amplop tidak seragam — galat dari ValidasiBerkas::periksaImpor memakai
+     * perilaku sekarang (dikunci CR-164): `message` amplop tidak seragam — galat dari ValidasiBerkas::periksaImpor (ValidasiBerkas.php:101) memakai
      * pesan umum "Validasi gagal." sedangkan `ValidationException::forField` lain memakai pesan field-nya sendiri.
      */
     private const PESAN_UTAMA = [

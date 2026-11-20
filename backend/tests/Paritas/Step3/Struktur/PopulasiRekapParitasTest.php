@@ -40,13 +40,22 @@ final class PopulasiRekapParitasTest extends DatabaseTestCase
         $s2  = $this->buatSatker();
         $s3  = $this->buatSatker();
         $this->rmj($nip, $s1, '2025-01-01', 'Jabatan Lama');
-        $this->rmj($nip, $s2, self::AKHIR, 'Jabatan Akhir Bulan');
+        $this->rmj($nip, $s2, '2026-03-01', 'Jabatan Pemenang');
+        // R2: baris LEBIH BARU dari pemenang (masih ≤ akhir bulan) yang harus tersaring SEBELUM memilih terbaru.
+        $this->rmj($nip, $s3, '2026-04-10', 'Jabatan Status 2', ['status' => 2]);
+        $this->rmj($nip, $s3, '2026-04-12', 'Jabatan Status 10', ['status' => 10]);
+        $this->rmj($nip, $s3, '2026-04-20', 'Jabatan IL', ['jenis_jabatan' => 2]);
         $this->rmj($nip, $s3, '2026-05-01', 'Jabatan Bulan Depan');
-        $this->rmj($nip, $s3, '2026-04-15', 'Jabatan Status 2', ['status' => 2]);
 
-        $baris = $this->dhUntuk([$nip]);
+        $akhir = $this->pegawai();
+        $this->rmj($akhir, $s1, '2025-01-01', 'Lama');
+        $this->rmj($akhir, $s2, self::AKHIR, 'Tepat Akhir Bulan');
 
-        $this->assertSame(['Jabatan Akhir Bulan', $s2], [$baris[0]['jabatan'], $baris[0]['id_satker']], 'tmtsk = akhir bulan ikut; sesudahnya & status 2 tidak');
+        $baris = $this->dhUntuk([$nip, $akhir]);
+        $per   = array_column($baris, null, 'nip');
+
+        $this->assertSame(['Jabatan Pemenang', $s2], [$per[$nip]['jabatan'], $per[$nip]['id_satker']], 'status 2/10, jenis lain, sesudah akhir → tersaring');
+        $this->assertSame('Tepat Akhir Bulan', $per[$akhir]['jabatan'], 'tmtsk = akhir bulan ikut');
     }
 
     public function testDhTmtskKembarIdTerbesarMenang(): void
@@ -60,21 +69,57 @@ final class PopulasiRekapParitasTest extends DatabaseTestCase
         $this->assertSame('Kembar Kedua', $this->dhUntuk([$nip])[0]['jabatan'], 'tmtsk kembar → id_riwayat_mutasi_jabatan DESC');
     }
 
-    public function testDhPangkatBerlapisDibatasiAwalBulanDanKembarIdTerbesar(): void
+    /**
+     * Pangkat tidak keluar di hasil dh(); teramati lewat urutan (gol turun, TMT pangkat naik) antar pegawai sekelas.
+     */
+    public function testDhPangkatBerlapisStatusLebihBaruTersaring(): void
     {
-        // Pangkat tidak keluar di hasil; dikunci lewat metode private terbaru() (dipanggil lengkapi() dengan batas awal).
-        $nip = $this->pegawai();
-        $this->kp($nip, 'III/a', '2020-01-01');
-        $this->kp($nip, 'III/b', self::AWAL);
-        $this->kp($nip, 'III/c', '2026-04-15');
-        $this->kp($nip, 'IV/a', '2026-03-01', 2);
+        $s           = $this->buatSatker();
+        [$x, $y, $z] = [$this->pegawai(), $this->pegawai(), $this->pegawai()];
 
-        $this->assertSame(['III/b', self::AWAL], $this->pangkat($nip, self::AWAL), 'tmtsk = awal ikut, sesudah awal tidak, status 2 diabaikan');
+        foreach ([$x, $y, $z] as $n) {
+            $this->rmj($n, $s, '2020-01-01', 'Sama', ['kelas_jabatan' => 9]);
+        }
+        $this->kp($x, 'III/a', '2020-01-01');
+        $this->kp($x, 'III/b', '2026-03-01');     // pemenang
+        $this->kp($x, 'IV/e', '2026-03-15', 2);   // lebih baru, status 2
+        $this->kp($x, 'IV/d', '2026-03-20', 10);  // lebih baru, status 10
+        $this->kp($x, 'IV/c', '2026-04-15');      // sesudah awal bulan
+        $this->kp($y, 'III/b', '2026-02-01');
+        $this->kp($z, 'III/b', '2026-03-02');
 
-        $kembar = $this->pegawai();
-        $this->kp($kembar, 'II/c', '2025-01-01');
-        $this->kp($kembar, 'II/b', '2025-01-01');
-        $this->assertSame(['II/b', '2025-01-01'], $this->pangkat($kembar, self::AWAL), 'tmtsk kembar → id_riwayat_kp DESC (baris terakhir disisip)');
+        // X = III/b @01-03 → di antara Y (01-02) dan Z (02-03). Bocor status/batas → X pertama; baris lama → X terakhir.
+        $this->assertSame([$y, $x, $z], array_column($this->dhUntuk([$z, $x, $y]), 'nip'));
+    }
+
+    public function testDhPangkatTmtskSamaDenganAwalBulanIkut(): void
+    {
+        $s       = $this->buatSatker();
+        [$a, $c] = [$this->pegawai(), $this->pegawai()];
+        $this->rmj($a, $s, '2020-01-01', 'Sama', ['kelas_jabatan' => 9]);
+        $this->rmj($c, $s, '2020-01-01', 'Sama', ['kelas_jabatan' => 9]);
+        $this->kp($a, 'III/a', '2020-01-01');
+        $this->kp($a, 'IV/a', self::AWAL);
+        $this->kp($c, 'III/d', '2020-01-01');
+
+        $this->assertSame([$a, $c], array_column($this->dhUntuk([$c, $a]), 'nip'), 'A = IV/a (tmtsk = awal ikut)');
+    }
+
+    public function testDhPangkatTmtskKembarIdTerbesarMenang(): void
+    {
+        $s           = $this->buatSatker();
+        [$w, $k, $v] = [$this->pegawai(), $this->pegawai(), $this->pegawai()];
+
+        foreach ([$w, $k, $v] as $n) {
+            $this->rmj($n, $s, '2020-01-01', 'Sama', ['kelas_jabatan' => 9]);
+        }
+        $this->kp($k, 'II/c', '2025-01-01');
+        $this->kp($k, 'II/b', '2025-01-01'); // id lebih besar → menang
+        $this->kp($w, 'II/c', '2026-01-01');
+        $this->kp($v, 'II/b', '2025-06-01');
+
+        // K = II/b @2025-01-01 → sesudah W (gol lebih tinggi), sebelum V (TMT lebih awal). Bila II/c menang → K pertama.
+        $this->assertSame([$w, $k, $v], array_column($this->dhUntuk([$v, $k, $w]), 'nip'));
     }
 
     public function testDhUrutanKelasGolTmtSatkerNip(): void
@@ -135,7 +180,7 @@ final class PopulasiRekapParitasTest extends DatabaseTestCase
         $this->kp($ii, 'II/e', '2020-01-01');
 
         // perilaku sekarang (dikunci CR-164): gol_ruang dibandingkan sebagai TEKS (<=>), bukan peringkat pangkat
-        // (PopulasiRekap.php:111-112) — 'IV/a' > 'II/e' benar secara kebetulan karena 'V' > 'I'; 'IV' < 'V' dst. tidak diuji.
+        // (PopulasiRekap.php:106-107) — 'IV/a' > 'II/e' benar secara kebetulan karena 'V' > 'I'; 'IV' < 'V' dst. tidak diuji.
         $this->assertSame([$iv, $ii], array_column($this->dhUntuk([$ii, $iv]), 'nip'));
     }
 
@@ -184,18 +229,25 @@ final class PopulasiRekapParitasTest extends DatabaseTestCase
         $s2 = $this->buatSatker();
         $il = $this->pegawai([], ['jenis_jabatan' => 2]);
         $this->rmj($il, $s1, '2025-01-01', 'IL Lama', ['jenis_jabatan' => 2]);
-        $this->rmj($il, $s2, self::AWAL, 'IL Awal', ['jenis_jabatan' => 2]);
-        $this->rmj($il, $s2, '2026-04-02', 'IL Sesudah Awal', ['jenis_jabatan' => 2]);
-        $this->rmj($il, $s1, '2026-03-01', 'Jenis 1', ['jenis_jabatan' => 1]);
+        $this->rmj($il, $s2, '2026-02-01', 'IL Pemenang', ['jenis_jabatan' => 2]);
+        // R2: baris LEBIH BARU dari pemenang (≤ awal) yang harus tersaring sebelum memilih terbaru.
+        $this->rmj($il, $s1, '2026-03-01', 'IL Status 2', ['jenis_jabatan' => 2, 'status' => 2]);
+        $this->rmj($il, $s1, '2026-03-10', 'IL Status 10', ['jenis_jabatan' => 2, 'status' => 10]);
+        $this->rmj($il, $s1, '2026-03-20', 'Jenis 1', ['jenis_jabatan' => 1]);
+        $this->rmj($il, $s1, '2026-04-02', 'IL Sesudah Awal', ['jenis_jabatan' => 2]);
         $bukanIl  = $this->pegawai();
         $baruIl   = $this->pegawai(['created_at' => '2026-04-01 17:00:00'], ['jenis_jabatan' => 2]); // 02-04 WIB
         $keluarIl = $this->pegawai(['status' => 2, 'tmt_status' => '2026-04-02'], ['jenis_jabatan' => 2]);
+        $this->rmj($keluarIl, $s1, '2025-01-01', 'Lama', ['jenis_jabatan' => 2]);
+        $this->rmj($keluarIl, $s2, self::AWAL, 'Tepat Awal', ['jenis_jabatan' => 2]);
 
         $hasil = array_values(array_filter((new PopulasiRekap($this->db))->il(self::AWAL), static fn (array $r): bool => in_array($r['nip'], [$il, $bukanIl, $baruIl, $keluarIl], true)));
 
         $this->assertEqualsCanonicalizing([$il, $keluarIl], array_column($hasil, 'nip'));
         $baris = array_values(array_filter($hasil, static fn (array $r): bool => $r['nip'] === $il))[0];
-        $this->assertSame(['IL Awal', $s2], [$baris['jabatan'], $baris['id_satker']], 'IL: tmtsk ≤ awal bulan, jenis_jabatan 2 saja');
+        $this->assertSame(['IL Pemenang', $s2], [$baris['jabatan'], $baris['id_satker']], 'IL: status 1, jenis_jabatan 2, tmtsk ≤ awal bulan');
+        $keluar = array_values(array_filter($hasil, static fn (array $r): bool => $r['nip'] === $keluarIl))[0];
+        $this->assertSame('Tepat Awal', $keluar['jabatan'], 'tmtsk = awal bulan ikut');
     }
 
     // ---- bantuan ----
@@ -233,16 +285,5 @@ final class PopulasiRekapParitasTest extends DatabaseTestCase
         $hasil = (new PopulasiRekap($this->db))->dh(self::AWAL, self::AKHIR, $lingkup ?? new LingkupLaporan(LingkupLaporan::KEMENTERIAN, null, 'Kem'), [1]);
 
         return array_values(array_filter($hasil, static fn (array $r): bool => in_array($r['nip'], $nip, true)));
-    }
-
-    /**
-     * @return array{0: string, 1: string}
-     */
-    private function pangkat(string $nip, string $batas): array
-    {
-        $m   = new \ReflectionMethod(PopulasiRekap::class, 'terbaru');
-        $row = $m->invoke(new PopulasiRekap($this->db), 'riwayat_kp', 'id_riwayat_kp', 'nip, gol_ruang, tmtsk', [$nip], $batas, [])[$nip] ?? [];
-
-        return [(string) ($row['gol_ruang'] ?? ''), (string) ($row['tmtsk'] ?? '')];
     }
 }

@@ -7,6 +7,7 @@ namespace Tests\Support\Paritas\Kepegawaian;
 use Closure;
 use CodeIgniter\Cache\CacheInterface;
 use CodeIgniter\Test\Mock\MockCache;
+use RuntimeException;
 
 /**
  * Cache uji (CR-164): pembungkus MockCache yang mencatat setiap `save()` (key + TTL) dan setiap pola
@@ -19,6 +20,9 @@ final class CacheTtlSpy implements CacheInterface
 
     /** @var list<string> */
     public array $polaHapus = [];
+
+    /** Operasi yang dibuat melempar RuntimeException ('get' atau 'save'); null = normal. */
+    public ?string $lempar = null;
 
     private function __construct(private readonly MockCache $inti)
     {
@@ -37,12 +41,20 @@ final class CacheTtlSpy implements CacheInterface
 
     public function get(string $key): mixed
     {
+        if ($this->lempar === 'get') {
+            throw new RuntimeException('cache uji: get gagal');
+        }
+
         return $this->inti->get($key);
     }
 
     public function save(string $key, mixed $value, int $ttl = 60): bool
     {
         $this->simpan[] = ['key' => $key, 'ttl' => $ttl];
+
+        if ($this->lempar === 'save') {
+            throw new RuntimeException('cache uji: save gagal');
+        }
 
         return $this->inti->save($key, $value, $ttl);
     }

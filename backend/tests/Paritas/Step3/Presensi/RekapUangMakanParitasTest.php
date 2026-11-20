@@ -77,7 +77,7 @@ final class RekapUangMakanParitasTest extends DatabaseTestCase
         $this->assertSame(count($data['items']), $data['total'], 'total = jumlah baris');
         $this->assertSame(count(array_unique($pasangan)), $data['total'], 'total = jumlah pasangan (nip, tgl_absen) unik');
 
-        // perilaku sekarang (dikunci CR-164): urut populasi PopulasiRekap::lengkapi (kelas jabatan turun, golongan turun, TMT
+        // perilaku sekarang (dikunci CR-164): urut populasi PopulasiRekap.php:106 (kelas jabatan turun, golongan turun, TMT
         // naik, id_satker naik, NIP naik) — bukan NIP murni: b1 (NIP terkecil, satker B) di belakang — lalu tanggal naik; IL
         // tidak ikut di rekap DH.
         $this->assertSame([
@@ -96,9 +96,30 @@ final class RekapUangMakanParitasTest extends DatabaseTestCase
         $this->assertSame([6, 2, 4], [$akhir['total'], $akhir['page'], $akhir['per_page']]);
         $this->assertSame([[$this->nip['b1'], '2026-09-01'], [$this->nip['b1'], '2026-09-07']], array_map(static fn (array $b): array => [$b['nip'], $b['tgl_absen']], $akhir['items']), 'halaman terakhir parsial');
 
-        // perilaku sekarang (dikunci CR-164): halaman di luar rentang → 200 dengan items kosong, total & page apa adanya.
+        // perilaku sekarang (dikunci CR-164): RekapUangMakanService::daftar (array_slice) — halaman di luar rentang → 200 dengan items kosong, total & page apa adanya.
         $luar = $svc->daftar($this->adminRekap(), [...self::BULAN, 'per_page' => '4', 'page' => '3']);
         $this->assertSame([[], 6, 3, 4], [$luar['items'], $luar['total'], $luar['page'], $luar['per_page']]);
+    }
+
+    /**
+     * R4: halaman yang memotong baris satu pegawai (urutan penuh: a1×3, a2×1, b1×2).
+     */
+    public function testPaginasiMemotongBarisSatuPegawai(): void
+    {
+        $hal = fn (int $per, int $page): array => $this->halaman($per, $page);
+
+        $this->assertSame([6, [[$this->nip['a1'], '2026-09-03'], [$this->nip['a2'], '2026-09-04']]], $hal(2, 2), 'per_page 2 page 2: sisa a1 + a2');
+        $this->assertSame([6, [[$this->nip['b1'], '2026-09-07']]], $hal(5, 2), 'per_page 5 page 2: baris kedua b1 saja');
+        $this->assertSame([6, [[$this->nip['a1'], '2026-09-03']]], $hal(1, 3), 'per_page 1 halaman tengah: baris ketiga a1');
+        $this->assertSame([6, [[$this->nip['b1'], '2026-09-01']]], $hal(1, 5), 'per_page 1 page 5: baris pertama b1');
+
+        $gabung = [];
+
+        foreach ([1, 2, 3] as $p) {
+            $gabung = [...$gabung, ...$hal(2, $p)[1]];
+        }
+
+        $this->assertSame($hal(100, 1)[1], $gabung, 'gabungan halaman per_page 2 = daftar penuh, tanpa baris hilang/ganda');
     }
 
     public function testJsonSamaDenganXlsxRoleKementerian(): void
@@ -120,6 +141,16 @@ final class RekapUangMakanParitasTest extends DatabaseTestCase
         $this->assertJsonSamaXlsx($this->adminRekap(), [], true, 'rekap_uang_makan_il_2026-09.xlsx', 2);
         $items = $this->serviceUangMakan()->daftar($this->adminRekap(), [...self::BULAN, 'per_page' => '100'], true)['items'];
         $this->assertSame([[$this->nip['il'], '2026-09-02'], [$this->nip['il'], '2026-09-08']], array_map(static fn (array $b): array => [$b['nip'], $b['tgl_absen']], $items));
+    }
+
+    /**
+     * @return array{0: int, 1: list<array{0: string, 1: string}>}
+     */
+    private function halaman(int $perPage, int $page): array
+    {
+        $d = $this->serviceUangMakan()->daftar($this->adminRekap(), [...self::BULAN, 'per_page' => (string) $perPage, 'page' => (string) $page]);
+
+        return [$d['total'], array_map(static fn (array $b): array => [$b['nip'], $b['tgl_absen']], $d['items'])];
     }
 
     /**

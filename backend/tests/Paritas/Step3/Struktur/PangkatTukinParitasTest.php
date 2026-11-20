@@ -4,16 +4,21 @@ declare(strict_types=1);
 
 namespace Tests\Paritas\Step3\Struktur;
 
+use App\Libraries\Kepegawaian\Riwayat\Definisi\Jabatan;
+use App\Libraries\Presensi\Tukin\DataPegawaiTukin;
 use App\Libraries\Presensi\Tukin\PeriodeTukin;
 use App\Libraries\Presensi\TukinData\SumberDataPegawaiTukin;
-use ReflectionMethod;
 use Tests\Support\DatabaseTestCase;
 use Tests\Support\Kepegawaian\PegawaiFixtureTrait;
 
 /**
- * CR-164 pagar paritas step 3 — test KARAKTERISASI pangkat Tukin: {@see SumberDataPegawaiTukin} `pangkatDari()` (jalur
- * massal, baris sudah dimuat) dan `pangkat()` (jalur satu NIP, kueri sendiri). Keduanya private → lewat reflection.
- * Dua batas: awal periode, lalu akhir periode hanya bila pegawai dibuat sesudah akhir periode (WIB atas `created_at` UTC).
+ * CR-164 pagar paritas step 3 — test KARAKTERISASI pangkat & mutasi PPPK Tukin lewat API publik
+ * {@see SumberDataPegawaiTukin::untukBanyak()} (dan {@see SumberDataPegawaiTukin::untuk()} sebagai pembanding jalur tunggal).
+ *
+ * Pangkat terpilih teramati dari `tmtMasuk`: gol berawalan "CPNS" (panjang > 5) → `tmtMasuk` = tmtsk baris terpilih;
+ * gol lain (PNS) → null. PPPK: baris `riwayat_mutasi_jabatan` terpilih menggantikan gol/TMT; `tmtMasuk` = tmtsk bila
+ * > hari kerja pertama periode (01-04-2026, tanpa hari libur), gol_pppk "CPNS…" → tmtsk apa adanya.
+ * Dua batas pangkat: awal periode, lalu akhir periode hanya bila pegawai dibuat sesudah akhir periode (WIB atas UTC).
  *
  * @internal
  */
@@ -30,93 +35,151 @@ final class PangkatTukinParitasTest extends DatabaseTestCase
     /** 01-05 00:00 WIB — sesudah akhir periode. */
     private const DIBUAT_SESUDAH = '2026-04-30 17:00:00';
 
-    public function testPangkatDariBatasAwalPeriodeSaja(): void
+    protected function setUp(): void
     {
-        $baris = [
-            $this->b('III/c', '2026-04-15'),
-            $this->b('III/b', self::AWAL),
-            $this->b('III/a', '2020-01-01'),
-        ];
+        parent::setUp();
 
-        $this->assertSame(['III/b', self::AWAL], $this->dari($baris, self::DIBUAT_DALAM), 'tmtsk = awal ikut; di antara awal–akhir tidak');
-        $this->assertSame(['III/b', self::AWAL], $this->dari($baris, ''), 'created_at kosong → hanya batas awal');
+        foreach ([1 => 'PNS Uji', Jabatan::JENIS_PEGAWAI_PPPK => 'PPPK Uji'] as $id => $nama) {
+            if ($this->db->table('jenis_pegawai')->where('id_jenis_pegawai', $id)->countAllResults() === 0) {
+                $this->db->table('jenis_pegawai')->insert(['id_jenis_pegawai' => $id, 'jenis_pegawai' => $nama, 'status' => 1]);
+            }
+        }
     }
 
-    public function testPangkatDariPegawaiDibuatSesudahAkhirPeriode(): void
+    public function testPangkatBerlapisBatasAwalPeriodeDanStatusLebihBaruDiabaikan(): void
     {
-        $hanyaTengah = [$this->b('II/a', '2026-04-15')];
+        $nip = $this->pns(self::DIBUAT_DALAM);
+        $this->kp($nip, 'CPNS III/a', '2020-01-01');
+        $this->kp($nip, 'CPNS III/b', self::AWAL);      // pemenang: tmtsk = awal ikut
+        $this->kp($nip, 'CPNS III/c', '2026-04-15');    // di antara awal–akhir → tidak
+        $this->kp($nip, 'CPNS IV/a', '2026-03-15', 2);  // status 2 → diabaikan
+        $this->kp($nip, 'CPNS IV/b', '2026-03-20', 10); // status 10 → diabaikan
 
-        $this->assertSame(['', ''], $this->dari($hanyaTengah, self::DIBUAT_DALAM), 'dibuat dalam periode → batas akhir tidak dipakai');
-        $this->assertSame(['II/a', '2026-04-15'], $this->dari($hanyaTengah, self::DIBUAT_SESUDAH), 'dibuat sesudah akhir → jatuh ke batas akhir');
+        $this->assertSame(self::AWAL, $this->tmtMasuk($nip));
 
-        // Batas awal tetap didahulukan bila ada baris ≤ awal, meski ada baris lebih baru ≤ akhir.
-        $berlapis = [$this->b('II/b', '2026-04-15'), $this->b('II/a', '2025-01-01')];
-        $this->assertSame(['II/a', '2025-01-01'], $this->dari($berlapis, self::DIBUAT_SESUDAH));
+        // Status 2/10 LEBIH BARU dari pemenang (di bawah batas) tidak boleh menggeser pemenang.
+        $lain = $this->pns(self::DIBUAT_DALAM);
+        $this->kp($lain, 'CPNS II/a', '2025-01-01');
+        $this->kp($lain, 'III/a', '2026-02-01', 2);
+        $this->kp($lain, 'III/b', '2026-03-01', 10);
+        $this->assertSame('2025-01-01', $this->tmtMasuk($lain));
+    }
 
+    public function testPegawaiDibuatSesudahAkhirPeriodeJatuhKeBatasAkhir(): void
+    {
+        $dalam   = $this->pns(self::DIBUAT_DALAM);
+        $sesudah = $this->pns(self::DIBUAT_SESUDAH);
+        $tumpuk  = $this->pns(self::DIBUAT_SESUDAH);
+        $depan   = $this->pns(self::DIBUAT_SESUDAH);
+
+        foreach ([$dalam, $sesudah] as $n) {
+            $this->kp($n, 'CPNS II/a', '2026-04-15');
+        }
+        // Batas awal tetap didahulukan: ada baris ≤ awal (PNS) → baris CPNS 15-04 tidak dicoba.
+        $this->kp($tumpuk, 'II/a', '2025-01-01');
+        $this->kp($tumpuk, 'CPNS II/b', '2026-04-15');
         // Baris sesudah akhir periode tidak pernah dipilih.
-        $this->assertSame(['', ''], $this->dari([$this->b('IV/a', '2026-05-01')], self::DIBUAT_SESUDAH));
+        $this->kp($depan, 'CPNS IV/a', '2026-05-01');
+
+        $hasil = $this->banyak([$dalam, $sesudah, $tumpuk, $depan]);
+
+        $this->assertSame([null, '2026-04-15', null, null], [$hasil[$dalam]->tmtMasuk, $hasil[$sesudah]->tmtMasuk, $hasil[$tumpuk]->tmtMasuk, $hasil[$depan]->tmtMasuk]);
+        $this->assertSame([false, false, false, false], [$hasil[$dalam]->lewatiLoopHarian, $hasil[$sesudah]->lewatiLoopHarian, $hasil[$tumpuk]->lewatiLoopHarian, $hasil[$depan]->lewatiLoopHarian]);
     }
 
-    public function testPangkatDariUrutanMasukanMenentukanTmtskKembar(): void
+    public function testPangkatTmtskKembarIdTerbesarMenang(): void
     {
-        // pangkatDari mengambil baris PERTAMA yang lolos batas; urutan id DESC dijamin oleh kueri pemanggil
-        // (SumberDataPegawaiTukin.php:115). Dengan masukan apa adanya, baris pertama yang menang.
-        $this->assertSame(['III/d', '2025-01-01'], $this->dari([$this->b('III/d', '2025-01-01'), $this->b('III/c', '2025-01-01')], ''));
-        $this->assertSame(['III/c', '2025-01-01'], $this->dari([$this->b('III/c', '2025-01-01'), $this->b('III/d', '2025-01-01')], ''));
+        $a = $this->pns(self::DIBUAT_DALAM);
+        $this->kp($a, 'III/a', '2025-01-01');
+        $this->kp($a, 'CPNS III/a', '2025-01-01'); // id lebih besar → menang
+
+        $b = $this->pns(self::DIBUAT_DALAM);
+        $this->kp($b, 'CPNS III/a', '2025-01-01');
+        $this->kp($b, 'III/a', '2025-01-01'); // id lebih besar → menang
+
+        $hasil = $this->banyak([$a, $b]);
+
+        $this->assertSame(['2025-01-01', null], [$hasil[$a]->tmtMasuk, $hasil[$b]->tmtMasuk]);
     }
 
-    public function testPangkatDariGolKosongTidakDilewati(): void
+    public function testGolTidakDipangkasSebelumCekCpns(): void
     {
-        // perilaku sekarang (dikunci CR-164): baris terbaru dengan gol_ruang kosong/null tetap dipakai apa adanya
-        // (SumberDataPegawaiTukin.php:350-353), berbeda dengan StrukturService yang melewati gol kosong sesudah trim.
-        $this->assertSame(['', '2026-03-01'], $this->dari([['gol_ruang' => null, 'tmtsk' => '2026-03-01'], $this->b('III/a', '2020-01-01')], ''));
-        $this->assertSame([' ', '2026-03-01'], $this->dari([$this->b(' ', '2026-03-01'), $this->b('III/a', '2020-01-01')], ''), 'tanpa trim');
+        $nip = $this->pns(self::DIBUAT_DALAM);
+        $this->kp($nip, 'CPNS II/a', '2020-01-01');
+        $this->kp($nip, ' CPNS II/b', '2025-01-01');
+
+        // perilaku sekarang (dikunci CR-164): gol_ruang dipakai tanpa trim (SumberDataPegawaiTukin.php:350 dan :247),
+        // jadi " CPNS…" tidak dikenali CPNS; berbeda dengan StrukturService yang memangkas gol.
+        $this->assertNull($this->tmtMasuk($nip));
     }
 
-    public function testPangkatDbBerlapisKembarDanStatus(): void
+    public function testMutasiPppkSatuBatchBerlapisKembarDanSaringan(): void
     {
-        $nip = $this->buatPegawai();
-        $this->kp($nip, 'III/a', '2020-01-01');
-        $this->kp($nip, 'III/b', '2025-06-01');
-        $this->kp($nip, 'III/c', '2025-06-01'); // kembar, id lebih besar
-        $this->kp($nip, 'IV/a', '2026-01-01', 2); // status 2 diabaikan
-        $this->kp($nip, 'IV/b', '2026-04-10');
+        $berlapis = $this->pppk();
+        $this->mutasi($berlapis, 'IX', '2025-01-01');
+        $this->mutasi($berlapis, 'X', '2026-04-10');                            // pemenang
+        $this->mutasi($berlapis, 'XI', '2026-05-02');                           // > akhir periode → diabaikan
+        $this->mutasi($berlapis, 'XII', '2026-04-20', ['status' => 2]);         // lebih baru, status 2 → diabaikan
+        $this->mutasi($berlapis, 'XIII', '2026-04-25', ['jenis_jabatan' => 2]); // lebih baru, jenis lain → diabaikan
 
-        $this->assertSame(['III/c', '2025-06-01'], $this->pangkatDb($nip, self::DIBUAT_DALAM), 'kembar → id_riwayat_kp DESC');
-        $this->assertSame(['III/c', '2025-06-01'], $this->pangkatDb($nip, self::DIBUAT_SESUDAH), 'ada baris ≤ awal → batas akhir tidak dicoba');
+        $kembarA = $this->pppk();
+        $this->mutasi($kembarA, 'IX', self::AWAL);
+        $this->mutasi($kembarA, 'CPNS IX', self::AWAL); // id lebih besar → menang → tmtMasuk = tmtsk
 
-        $baru = $this->buatPegawai();
-        $this->kp($baru, 'II/c', '2026-04-10');
-        $this->assertSame(['', ''], $this->pangkatDb($baru, self::DIBUAT_DALAM));
-        $this->assertSame(['II/c', '2026-04-10'], $this->pangkatDb($baru, self::DIBUAT_SESUDAH));
+        $kembarB = $this->pppk();
+        $this->mutasi($kembarB, 'CPNS IX', self::AWAL);
+        $this->mutasi($kembarB, 'IX', self::AWAL); // id lebih besar → menang → tmtsk tidak > hari kerja pertama → null
+
+        $tanpa = $this->pppk();
+        $this->kp($tanpa, 'IX', '2026-04-08'); // tanpa mutasi; KP tmtsk > awal → tidak terpilih
+
+        $hasil = $this->banyak([$berlapis, $kembarA, $kembarB, $tanpa]);
+
+        $this->assertSame(['2026-04-10', false], [$hasil[$berlapis]->tmtMasuk, $hasil[$berlapis]->lewatiLoopHarian]);
+        $this->assertSame(self::AWAL, $hasil[$kembarA]->tmtMasuk);
+        $this->assertNull($hasil[$kembarB]->tmtMasuk);
+        // PPPK tanpa TMT sama sekali → seluruh loop harian dilewati.
+        $this->assertSame([null, true], [$hasil[$tanpa]->tmtMasuk, $hasil[$tanpa]->lewatiLoopHarian]);
     }
 
-    public function testPangkatDbSamaDenganPangkatDariBarisKueriMassal(): void
+    public function testJalurTunggalSamaDenganJalurMassal(): void
     {
-        $nip = $this->buatPegawai();
-        $this->kp($nip, 'II/a', '2026-04-20');
-        $this->kp($nip, 'II/b', '2026-04-20');
-        $this->kp($nip, 'II/c', '2026-05-02');
-
-        // Prafilter massal = tmtsk ≤ max(awal, akhir), urut tmtsk DESC, id DESC (SumberDataPegawaiTukin.php:110-115).
-        $baris = $this->db->table('riwayat_kp')->select(['nip', 'gol_ruang', 'tmtsk'])->where('nip', $nip)->where('status', 1)
-            ->where('tmtsk <=', self::AKHIR)->orderBy('tmtsk', 'DESC')->orderBy('id_riwayat_kp', 'DESC')->get()->getResultArray();
+        $nip = [];
 
         foreach ([self::DIBUAT_DALAM, self::DIBUAT_SESUDAH] as $dibuat) {
-            $this->assertSame($this->pangkatDb($nip, $dibuat), $this->dari($baris, $dibuat), $dibuat);
+            $n = $this->pns($dibuat);
+            $this->kp($n, 'III/a', '2026-04-20');
+            $this->kp($n, 'CPNS III/a', '2026-04-20');
+            $this->kp($n, 'CPNS III/b', '2026-05-02');
+            $nip[] = $n;
         }
 
-        $this->assertSame(['II/b', '2026-04-20'], $this->dari($baris, self::DIBUAT_SESUDAH));
+        $p = $this->pppk();
+        $this->mutasi($p, 'IX', '2026-04-10');
+        $this->mutasi($p, 'X', '2026-04-10');
+        $nip[] = $p;
+
+        $massal = $this->banyak($nip);
+        $sumber = new SumberDataPegawaiTukin($this->db);
+
+        foreach ($nip as $n) {
+            $tunggal = $sumber->untuk($n, new PeriodeTukin(self::AWAL, self::AKHIR), null);
+            $this->assertSame([$tunggal->tmtMasuk, $tunggal->lewatiLoopHarian], [$massal[$n]->tmtMasuk, $massal[$n]->lewatiLoopHarian], $n);
+        }
+
+        $this->assertSame([null, '2026-04-20', '2026-04-10'], [$massal[$nip[0]]->tmtMasuk, $massal[$nip[1]]->tmtMasuk, $massal[$nip[2]]->tmtMasuk]);
     }
 
     // ---- bantuan ----
 
-    /**
-     * @return array{gol_ruang: string, tmtsk: string}
-     */
-    private function b(string $gol, string $tmt): array
+    private function pns(string $dibuat): string
     {
-        return ['gol_ruang' => $gol, 'tmtsk' => $tmt];
+        return $this->buatPegawai(['id_jenis_pegawai' => 1, 'created_at' => $dibuat]);
+    }
+
+    private function pppk(): string
+    {
+        return $this->buatPegawai(['id_jenis_pegawai' => Jabatan::JENIS_PEGAWAI_PPPK, 'created_at' => self::DIBUAT_DALAM]);
     }
 
     private function kp(string $nip, string $gol, string $tmt, int $status = 1): void
@@ -125,22 +188,32 @@ final class PangkatTukinParitasTest extends DatabaseTestCase
     }
 
     /**
-     * @param list<array<string, mixed>> $baris
-     *
-     * @return array{0: string, 1: string}
+     * @param array<string, mixed> $ekstra
      */
-    private function dari(array $baris, string $createdAt): array
+    private function mutasi(string $nip, string $gol, string $tmt, array $ekstra = []): void
     {
-        /** @var array{0: string, 1: string} */
-        return (new ReflectionMethod(SumberDataPegawaiTukin::class, 'pangkatDari'))->invoke(null, $baris, new PeriodeTukin(self::AWAL, self::AKHIR), $createdAt);
+        $this->buatRiwayatMutasiJabatan($nip, $ekstra + ['gol_pppk' => $gol, 'tmtsk' => $tmt]);
     }
 
     /**
-     * @return array{0: string, 1: string}
+     * @param list<string> $nip
+     *
+     * @return array<string, DataPegawaiTukin>
      */
-    private function pangkatDb(string $nip, string $createdAt): array
+    private function banyak(array $nip): array
     {
-        /** @var array{0: string, 1: string} */
-        return (new ReflectionMethod(SumberDataPegawaiTukin::class, 'pangkat'))->invoke(new SumberDataPegawaiTukin($this->db), $nip, new PeriodeTukin(self::AWAL, self::AKHIR), $createdAt);
+        $hasil = [];
+
+        foreach ((new SumberDataPegawaiTukin($this->db))->untukBanyak($nip, new PeriodeTukin(self::AWAL, self::AKHIR), null) as $n => $d) {
+            $this->assertInstanceOf(DataPegawaiTukin::class, $d, (string) $n);
+            $hasil[(string) $n] = $d;
+        }
+
+        return $hasil;
+    }
+
+    private function tmtMasuk(string $nip): ?string
+    {
+        return $this->banyak([$nip])[$nip]->tmtMasuk;
     }
 }

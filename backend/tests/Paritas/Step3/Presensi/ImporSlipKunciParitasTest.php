@@ -20,7 +20,7 @@ use Throwable;
 
 /**
  * CR-164 butir 8 (pagar paritas step 3, test karakterisasi): kunci baris commit impor slip vs koneksi DB kedua. Commit
- * memegang `SELECT … WHERE nip IN (…) FOR UPDATE` (ImporSlipService::kunciSudahAda, ImporSlipService.php:389-390) selama
+ * memegang `SELECT … WHERE nip IN (…) FOR UPDATE` (ImporSlipService::kunciSudahAda, ImporSlipService.php:390) selama
  * transaksi; koneksi kedua (sesi `innodb_lock_wait_timeout = 1`) menjalankan UPDATE bentuk "buka slip"
  * (SlipGajiService.php:134: `WHERE id = ? AND viewed_at IS NULL`) dari seam `kaitSebelumTulis`, saat kunci commit masih
  * dipegang. Koneksi kedua butuh data ter-commit → `db-isolasi-penuh`; data & koneksi dibersihkan di finally/tearDown.
@@ -115,6 +115,56 @@ final class ImporSlipKunciParitasTest extends DatabaseTestCase
     }
 
     /**
+     * S1 (CR-167): berkas berisi NIP yang sama untuk Agustus + September; UPDATE buka slip pada tuple KEDUA di berkas
+     * (September) tetap menunggu. Harus tetap lolos sesudah CR-167 karena tuple itu memang ditulis commit.
+     */
+    public function testBukaSlipTupleKeduaDiBerkasIkutMenunggu(): void
+    {
+        [$nip, $admin, $token] = $this->siapkan([8, 9]);
+        $this->slip($nip, 8);
+        $idSeptember = $this->slip($nip, 9);
+
+        $hasil = $this->commitDenganBukaDariKoneksiLain($admin, $token, $idSeptember);
+
+        $this->assertSame(self::ER_LOCK_WAIT_TIMEOUT, $hasil['kode_lain']);
+        $this->assertSame([0, 2], [$hasil['commit']['disisip'], $hasil['commit']['diperbarui']]);
+        $this->assertNull($this->db->table('gaji_pegawai')->where('id', $idSeptember)->get()->getRowArray()['viewed_at']);
+    }
+
+    /**
+     * S2 (CR-167): koneksi lain meng-INSERT tuple baru (nip, periode yang ada di berkas) selama commit.
+     */
+    public function testInsertTupleBerkasDariKoneksiLainSelamaCommit(): void
+    {
+        [$nip, $admin, $token] = $this->siapkan([8, 9]);
+        $this->slip($nip, 8);
+        $this->lain = Database::connect('tests', false);
+        $this->lain->query('SET SESSION innodb_lock_wait_timeout = 1');
+        $lain = $this->lain;
+        $kode = null;
+        $kait = static function () use ($lain, $nip, &$kode): void {
+            if ($kode !== null) {
+                return;
+            }
+
+            try {
+                $ok   = $lain->table('gaji_pegawai')->insert(['nip' => $nip, 'bulan' => 9, 'tahun' => 2026, 'created_at' => '2026-10-27 02:00:00']);
+                $kode = $ok === false ? (int) ($lain->error()['code'] ?? -1) : 0;
+            } catch (Throwable $e) {
+                $kode = (int) $e->getCode();
+            }
+        };
+
+        $commit = (new ImporSlipService(null, null, null, null, $kait))->commit($this->auth($admin), $token, true);
+
+        // perilaku sekarang (dikunci CR-164): FOR UPDATE `WHERE nip IN (…)` (ImporSlipService.php:390) memegang kunci celah
+        // indeks NIP → INSERT tuple baru dari koneksi lain menunggu lalu 1205; commit menyisip September tanpa konflik.
+        $this->assertSame(self::ER_LOCK_WAIT_TIMEOUT, $kode);
+        $this->assertSame([1, 1], [$commit['disisip'], $commit['diperbarui']]);
+        $this->assertSame(2, $this->db->table('gaji_pegawai')->where('nip', $nip)->countAllResults());
+    }
+
+    /**
      * Arah sebaliknya: koneksi lain memegang kunci baris slip; commit impor menunggu lalu 1205 → rollback + 500 generik.
      */
     public function testCommitMenungguKunciKoneksiLainJadi500GagalCommit(): void
@@ -144,15 +194,20 @@ final class ImporSlipKunciParitasTest extends DatabaseTestCase
     }
 
     /**
+     * @param list<int> $bulan periode (2026) di berkas
+     *
      * @return array{0: string, 1: array<string, mixed>, 2: string}
      */
-    private function siapkan(): array
+    private function siapkan(array $bulan = [9]): array
     {
         $nip                    = $this->buatPegawai(['nama' => 'Citra Tiga']);
         $this->nipDibuat[]      = $nip;
         $admin                  = $this->adminSlip();
         $this->penggunaDibuat[] = (int) $admin['id_pengguna'];
-        $token                  = $this->dataOk($this->unggahSlip($admin, $this->berkasSlip([$this->barisGpp($nip, 9, 2026, 'Citra Tiga')], [$this->barisTk($nip, 9, 2026, 'Citra Tiga')])))['token_pratinjau'];
+        $token                  = $this->dataOk($this->unggahSlip($admin, $this->berkasSlip(
+            array_map(fn (int $b): array => $this->barisGpp($nip, $b, 2026, 'Citra Tiga'), $bulan),
+            array_map(fn (int $b): array => $this->barisTk($nip, $b, 2026, 'Citra Tiga'), $bulan),
+        )))['token_pratinjau'];
         Services::resetSingle('response');
 
         return [$nip, $admin, (string) $token];

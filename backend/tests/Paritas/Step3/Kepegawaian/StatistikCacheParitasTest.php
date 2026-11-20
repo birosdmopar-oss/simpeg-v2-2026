@@ -114,7 +114,7 @@ final class StatistikCacheParitasTest extends DatabaseTestCase
         $this->assertSame('none', StatistikCache::segmenScope($this->auth(Role::ADMIN_SATKER)));
         $this->assertSame('none', StatistikCache::segmenScope($this->auth(Role::PEGAWAI, ['id_satker' => '7'])));
         $this->assertSame('none', StatistikCache::segmenScope(new AuthContext()));
-        // perilaku sekarang (dikunci CR-164): satker '0' dianggap angka kanonik → segmen 's0' (StatistikCache.php:96-97).
+        // perilaku sekarang (dikunci CR-164): satker '0' dianggap angka kanonik → segmen 's0' (StatistikCache.php:54-56, :99).
         $this->assertSame('s0', StatistikCache::segmenScope($this->auth(Role::ADMIN_SATKER, ['id_satker' => '0'])));
     }
 
@@ -174,6 +174,58 @@ final class StatistikCacheParitasTest extends DatabaseTestCase
         StatistikCache::invalidasiDariEvent();
         $this->assertSame(['dashboard_stat_*'], $this->spy->polaHapus);
         $this->assertFalse($this->svc()->statistik($super, StatistikService::USIA, [])['cache']['hit']);
+    }
+
+    public function testCacheGagalDiGetDihitungLangsungTanpa500(): void
+    {
+        $super             = $this->auth(Role::SUPER_ADMIN);
+        $acuan             = (new StatistikService($this->db, new PegawaiScope(), new CacheService(CacheTtlSpy::baru(), '')))->statistik($super, StatistikService::UNIT_KERJA, []);
+        $this->spy->lempar = 'get';
+
+        $hasil = $this->svc()->statistik($super, StatistikService::UNIT_KERJA, []);
+
+        $this->assertSame(['hit' => false, 'ttl' => 900], $hasil['cache']);
+        $this->assertSame($acuan['baris'], $hasil['baris'], 'dihitung langsung');
+        $this->assertSame([], $this->simpanStatistik(), 'has() melempar sebelum remember() → tidak ada simpan');
+        $this->assertLogContains('warning', '[dashboard] cache statistik dashboard_stat_unit-kerja_kementerian_0_all gagal: cache uji: get gagal');
+    }
+
+    public function testCacheGagalDiSaveDihitungUlang(): void
+    {
+        $super             = $this->auth(Role::SUPER_ADMIN);
+        $acuan             = (new StatistikService($this->db, new PegawaiScope(), new CacheService(CacheTtlSpy::baru(), '')))->statistik($super, StatistikService::UNIT_KERJA, []);
+        $this->spy->lempar = 'save';
+
+        $hasil = $this->svc()->statistik($super, StatistikService::UNIT_KERJA, []);
+
+        $this->assertSame(['hit' => false, 'ttl' => 900], $hasil['cache']);
+        $this->assertSame($acuan['baris'], $hasil['baris']);
+        // perilaku sekarang (dikunci CR-164): remember() sudah menghitung sebelum save() melempar; hasil itu dibuang dan
+        // dihitung ULANG di luar try (StatistikService.php:158-161) — percobaan simpan tercatat sekali.
+        $this->assertSame([['key' => 'dashboard_stat_unit-kerja_kementerian_0_all', 'ttl' => 900]], $this->simpanStatistik());
+        $this->assertLogContains('warning', 'cache uji: save gagal');
+
+        $this->spy->lempar = null;
+        $this->assertFalse($this->svc()->statistik($super, StatistikService::UNIT_KERJA, [])['cache']['hit'], 'tidak ada yang tersimpan');
+    }
+
+    public function testNilaiCacheBukanArrayDihitungUlangTanpaMenimpa(): void
+    {
+        $super = $this->auth(Role::SUPER_ADMIN);
+        $kunci = 'dashboard_stat_unit-kerja_kementerian_0_all';
+        $acuan = (new StatistikService($this->db, new PegawaiScope(), new CacheService(CacheTtlSpy::baru(), '')))->statistik($super, StatistikService::UNIT_KERJA, []);
+        $this->cacheUji->set($kunci, 'rusak', 900);
+        $this->spy->simpan = [];
+
+        $hasil = $this->svc()->statistik($super, StatistikService::UNIT_KERJA, []);
+
+        $this->assertSame(['hit' => false, 'ttl' => 900], $hasil['cache'], 'has() true tetapi nilai bukan array → hit dipaksa false');
+        $this->assertSame($acuan['baris'], $hasil['baris']);
+        // perilaku sekarang (dikunci CR-164): nilai rusak TIDAK ditimpa (StatistikService.php:158-161), jadi setiap
+        // permintaan menghitung ulang sampai TTL habis atau invalidasi.
+        $this->assertSame('rusak', $this->cacheUji->get($kunci));
+        $this->assertSame([], $this->simpanStatistik());
+        $this->assertFalse($this->svc()->statistik($super, StatistikService::UNIT_KERJA, [])['cache']['hit']);
     }
 
     /**

@@ -107,8 +107,9 @@ final class BerandaPendidikanAkParitasTest extends DatabaseTestCase
 
         $d4 = $this->pns();
         $this->snapshot($d4, 'D.IV');
-        $this->riwayat($d4, ['SD', 'SLTP', 'SLTA', 'D.IV']);
-        $this->assertSame(100, $this->persenPendidikan($d4), 'snapshot D.IV < bawaan S.1 → tetap aturan S.1');
+        // Riwayat S.1 tanpa D.IV: aturan S.1 → 100, aturan D.IV → 75 (kolom D.IV kosong); hasil membedakan keduanya.
+        $this->riwayat($d4, ['SD', 'SLTP', 'SLTA', 'S.1']);
+        $this->assertSame(100, $this->persenPendidikan($d4), 'snapshot D.IV < bawaan S.1 → tetap aturan S.1 (bukan aturan D.IV)');
 
         $asing = $this->pns();
         $this->snapshot($asing, 'S.3 Profesi');
@@ -126,23 +127,7 @@ final class BerandaPendidikanAkParitasTest extends DatabaseTestCase
 
     public function testAkBawahanJfUrutOrderNaikStabilPerNip(): void
     {
-        foreach ([1 => 'Struktural', 2 => 'Fungsional'] as $id => $nama) {
-            if ($this->db->table('group_jabatan')->where('id_group_jabatan', $id)->countAllResults() === 0) {
-                $this->db->table('group_jabatan')->insert(['id_group_jabatan' => $id, 'group_jabatan' => $nama, 'status' => 1]);
-            }
-        }
-
-        if ($this->db->table('sub_group_jabatan')->where('id_sub_group_jabatan', 4)->countAllResults() === 0) {
-            $this->db->table('sub_group_jabatan')->insert(['id_sub_group_jabatan' => 4, 'id_group_jabatan' => 1, 'sub_group_jabatan' => 'E.IV', 'status' => 1]);
-        }
-
-        $this->db->table('jenjang_jf')->insert(['kategori_jf' => 'Ahli', 'jenjang_jf' => 'Ahli Pertama', 'extra_nama_jab' => '', 'order' => 1, 'status' => 1]);
-        $idJenjang = (int) $this->db->insertID();
-
-        $satker = $this->buatSatker();
-        $atasan = $this->buatPegawaiDiSatker($satker, ['nama' => 'Atasan']);
-        $this->db->table('pegawai_mutasi_jabatan')->where('nip', $atasan)->update(['id_group_jabatan' => 1, 'id_sub_group_jabatan' => 4]);
-        $jab = (int) $this->db->table('pegawai_mutasi_jabatan')->where('nip', $atasan)->get()->getRow('id_jabatan');
+        [$satker, $atasan, $jab, $idJenjang] = $this->siapkanAtasanEs4();
 
         // NIP eksplisit agar urutan dasar (peg.nip ASC) jelas.
         $nol1   = $this->jf($satker, $jab, '199001012020011101', 'JF Nol Satu', null, 0);
@@ -163,11 +148,97 @@ final class BerandaPendidikanAkParitasTest extends DatabaseTestCase
             array_map(static fn (array $r): array => [$r['order'], $r['ak_now'], $r['ak_kp'], $r['kurang']], $hasil['ak']),
         );
         // perilaku sekarang (dikunci CR-164): JF tanpa jenjang (target 0) tetapi ber-AK mendapat order negatif sehingga
-        // tampil PALING ATAS, mendahului JF yang masih kurang AK (BawahanPegawai.php:87, :101).
+        // tampil PALING ATAS, mendahului JF yang masih kurang AK (BawahanPegawai.php:82, :95).
         $this->assertSame('III/a', $hasil['ak'][1]['gol_ruang']);
     }
 
+    public function testAkBawahanSumPerNipJabatanSekarangDanFieldBaris(): void
+    {
+        [$satker, $atasan, $jab, $idJenjang] = $this->siapkanAtasanEs4();
+        $namaSatker                          = (string) $this->db->table('satker')->where('id_satker', $satker)->get()->getRow('satker');
+
+        $a = $this->jf($satker, $jab, '199001012020011201', 'Andi', $idJenjang, 0);
+        $b = $this->jf($satker, $jab, '199001012020011202', 'Budi', $idJenjang, 0);
+        $c = $this->jf($satker, $jab, '199001012020011203', 'Citra', null, 0);
+        $this->db->table('pegawai')->where('nip', $a)->update(['glr_awal' => 'Dr.', 'glr_akhir' => 'S.Kom.']);
+        $this->db->table('pegawai')->where('nip', $b)->update(['glr_akhir' => 'M.Si.']);
+        $jabA = $this->idJabatan($a);
+        $jabB = $this->idJabatan($b);
+        $jabC = $this->idJabatan($c);
+
+        // A: beberapa baris di jabatan sekarang → SUM 10 + 15 (konversi) + 7 (integrasi saja, is_konversi '0') = 32;
+        // baris tanpa konversi/integrasi (99) tidak dihitung.
+        $this->siasn($a, $jabA, 10, '1', null);
+        $this->siasn($a, $jabA, 15, '1', '0');
+        $this->siasn($a, $jabA, 7, '0', '1');
+        $this->siasn($a, $jabA, 99, '0', '0');
+        // A pernah di jabatan yang id-nya = jabatan B sekarang → tidak ikut untuk A (bukan jabatan sekarang) dan tidak
+        // untuk B (saringan nip).
+        $this->siasn($a, $jabB, 40, '1', null);
+        $this->siasn($b, $jabB, 5, null, '1');
+        // C: jumlah negatif → dipotong 0 (AkPermenpanrb.php:60, max(0.0, …)).
+        $this->siasn($c, $jabC, -10, '1', null);
+        $this->siasn($c, $jabC, 3, '1', null);
+
+        $hasil = (new BawahanPegawai($this->db, self::HARI_INI))->untuk($atasan);
+
+        $this->assertSame([$a, $b, $c], array_column($hasil['ak'], 'nip'), 'order ASC: A 18, B 45, C 1000');
+        $this->assertSame(
+            [[18.0, 32.0, 50.0, -18.0], [45.0, 5.0, 50.0, -45.0], [1000.0, 0.0, 0.0, 0.0]],
+            array_map(static fn (array $r): array => [$r['order'], $r['ak_now'], $r['ak_kp'], $r['kurang']], $hasil['ak']),
+        );
+        $jabatan = fn (string $nip): string => (string) $this->db->table('pegawai_mutasi_jabatan')->where('nip', $nip)->get()->getRow('jabatan');
+        $this->assertSame([
+            ['Dr. Andi, S.Kom.', $jabatan($a), $namaSatker, 'III/a'],
+            ['Budi, M.Si.', $jabatan($b), $namaSatker, 'III/a'],
+            ['Citra', $jabatan($c), $namaSatker, ''],
+        ], array_map(static fn (array $r): array => [$r['nama'], $r['jabatan'], $r['satker'], $r['gol_ruang']], $hasil['ak']));
+        $this->assertNotSame('', $jabatan($a));
+    }
+
     // ---- bantu --------------------------------------------------------------------------------------------------------
+
+    /**
+     * Master group/sub group, jenjang JF Ahli Pertama, satker, dan atasan Eselon IV.
+     *
+     * @return array{0: int, 1: string, 2: int, 3: int} satker, NIP atasan, id_jabatan atasan, id_jenjang_jf
+     */
+    private function siapkanAtasanEs4(): array
+    {
+        foreach ([1 => 'Struktural', 2 => 'Fungsional'] as $id => $nama) {
+            if ($this->db->table('group_jabatan')->where('id_group_jabatan', $id)->countAllResults() === 0) {
+                $this->db->table('group_jabatan')->insert(['id_group_jabatan' => $id, 'group_jabatan' => $nama, 'status' => 1]);
+            }
+        }
+
+        if ($this->db->table('sub_group_jabatan')->where('id_sub_group_jabatan', 4)->countAllResults() === 0) {
+            $this->db->table('sub_group_jabatan')->insert(['id_sub_group_jabatan' => 4, 'id_group_jabatan' => 1, 'sub_group_jabatan' => 'E.IV', 'status' => 1]);
+        }
+
+        $this->db->table('jenjang_jf')->insert(['kategori_jf' => 'Ahli', 'jenjang_jf' => 'Ahli Pertama', 'extra_nama_jab' => '', 'order' => 1, 'status' => 1]);
+        $idJenjang = (int) $this->db->insertID();
+
+        $satker = $this->buatSatker();
+        $atasan = $this->buatPegawaiDiSatker($satker, ['nama' => 'Atasan']);
+        $this->db->table('pegawai_mutasi_jabatan')->where('nip', $atasan)->update(['id_group_jabatan' => 1, 'id_sub_group_jabatan' => 4]);
+        $jab = (int) $this->db->table('pegawai_mutasi_jabatan')->where('nip', $atasan)->get()->getRow('id_jabatan');
+
+
+        return [$satker, $atasan, $jab, $idJenjang];
+    }
+
+    private function siasn(string $nip, int $idJabatan, float $kredit, ?string $konversi, ?string $integrasi): void
+    {
+        $this->db->table('riwayat_ak_siasn')->insert([
+            'nip'               => $nip, 'id_jabatan' => $idJabatan, 'id_rw_siasn' => 'rw-' . bin2hex(random_bytes(6)),
+            'kredit_baru_total' => $kredit, 'is_konversi' => $konversi, 'is_integrasi' => $integrasi, 'status' => 1,
+        ]);
+    }
+
+    private function idJabatan(string $nip): int
+    {
+        return (int) $this->db->table('pegawai_mutasi_jabatan')->where('nip', $nip)->get()->getRow('id_jabatan');
+    }
 
     private function jf(int $satker, int $jabAtasan, string $nip, string $nama, ?int $idJenjang, float $ak): string
     {

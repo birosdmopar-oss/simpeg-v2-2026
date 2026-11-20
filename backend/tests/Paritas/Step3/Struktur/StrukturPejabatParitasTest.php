@@ -27,6 +27,8 @@ final class StrukturPejabatParitasTest extends DatabaseTestCase
     private const HARI_INI = '2026-10-13';
 
     private int $idPeriode;
+    private int $unitSek;
+    private int $satSek;
 
     /**
      * @var array<string, int>
@@ -42,8 +44,10 @@ final class StrukturPejabatParitasTest extends DatabaseTestCase
         $this->pastikan('jenis_status', ['id_jenis_status' => 1, 'jenis_status' => 'Aktif Bekerja', 'status_pegawai' => 1]);
         $this->pastikan('sub_group_jabatan', ['id_sub_group_jabatan' => 1, 'id_group_jabatan' => 1, 'sub_group_jabatan' => 'Eselon I', 'need_satker' => 1, 'status' => 1]);
 
-        $unit   = $this->buatUnit(['unit' => 'Sekretariat Uji']);
-        $satker = $this->buatSatker($unit, ['satker' => 'Biro Uji']);
+        $unit          = $this->buatUnit(['unit' => 'Sekretariat Uji']);
+        $satker        = $this->buatSatker($unit, ['satker' => 'Biro Uji']);
+        $this->unitSek = $unit;
+        $this->satSek  = $satker;
         $this->db->table('periode_struktur_jabatan')->insert(['periode_struktur_jabatan' => 'Periode Uji', 'status' => 1]);
         $this->idPeriode = (int) $this->db->insertID();
 
@@ -84,7 +88,7 @@ final class StrukturPejabatParitasTest extends DatabaseTestCase
         $this->rmj($nip, 'sekretaris', '2024-01-01', ['id_group_jabatan' => 3]);
 
         // perilaku sekarang (dikunci CR-164): baris terbaru NIP itu bukan group 1/5 (kunci '') tetap "memakai" NIP
-        // (StrukturService.php:486-490), jadi baris struktural lama tidak dipertimbangkan → jabatan lowong.
+        // (StrukturService.php:486-494), jadi baris struktural lama tidak dipertimbangkan → jabatan lowong.
         $this->assertSame('', $this->data()['sekretaris']['pejabat']);
     }
 
@@ -174,6 +178,48 @@ final class StrukturPejabatParitasTest extends DatabaseTestCase
         $this->assertSame("Tanpa Gol, {$tanpa}", $this->data()['deputi'][0]['pejabat'], 'semua kosong → tanpa bagian gol');
     }
 
+    /**
+     * R1 (StrukturService.php:220-237): list_es2 per es1 = level 3, atasan = es1 itu, satker di unit es1; satker 104
+     * dibuang hanya di bawah sekretaris; urut `urutan` lalu id_struktur_jabatan.
+     */
+    public function testListEs2PerEs1IsiDanUrutan(): void
+    {
+        $unitDep = $this->buatUnit(['unit' => 'Deputi Uji']);
+        $satDep  = $this->buatSatker($unitDep, ['satker' => 'Direktorat Uji']);
+        $satSek2 = $this->buatSatker($this->unitSek, ['satker' => 'Biro Dua Uji']);
+        $this->pastikan('satker', ['id_satker' => StrukturService::SATKER_INSPEKTORAT, 'id_unit' => $this->unitSek, 'satker' => 'Inspektorat Uji', 'status' => 1]);
+        $sat104 = StrukturService::SATKER_INSPEKTORAT;
+        $this->db->table('sub_group_jabatan')->insert(['id_group_jabatan' => 1, 'sub_group_jabatan' => 'Eselon II Uji', 'need_satker' => 1, 'status' => 1]);
+        $es2Sub = (int) $this->db->insertID();
+
+        // Deputi A (unit Deputi) — jab 'deputi' dari setUp ada di unit Sekretariat; pindahkan ke satker unit Deputi.
+        $this->db->table('jabatan')->where('id_jabatan', $this->jab['deputi'])->update(['id_satker' => $satDep]);
+        // Deputi B di unit Sekretariat (agar satker 104 sah di bawahnya).
+        $this->jabatanStruktur('deputi_b', 'Deputi B Uji', $satSek2, 1, 2, null, 2);
+
+        // Di bawah sekretaris: urutan 2 disisip dulu, lalu urutan 1; satker 104 dibuang; satker unit lain dibuang.
+        $this->jabatanStruktur('sek_u2', 'Kepala Biro Urutan Dua', $this->satSek, $es2Sub, 3, 'sekretaris', 2);
+        $this->jabatanStruktur('sek_u1', 'Kepala Biro Urutan Satu', $satSek2, $es2Sub, 3, 'sekretaris', 1);
+        $this->jabatanStruktur('sek_104', 'Inspektur Di Sekretaris', $sat104, $es2Sub, 3, 'sekretaris', 1);
+        $this->jabatanStruktur('sek_lain', 'Direktur Unit Lain', $satDep, $es2Sub, 3, 'sekretaris', 1);
+        // Di bawah deputi A: urutan terbalik; satu dengan atasan cocok tapi satker di unit Sekretariat → dibuang.
+        $this->jabatanStruktur('depa_u2', 'Direktur A Dua', $satDep, $es2Sub, 3, 'deputi', 2);
+        $this->jabatanStruktur('depa_u1', 'Direktur A Satu', $satDep, $es2Sub, 3, 'deputi', 1);
+        $this->jabatanStruktur('depa_lain', 'Direktur A Unit Lain', $this->satSek, $es2Sub, 3, 'deputi', 1);
+        // Di bawah deputi B: satker 104 TETAP ikut (saringan 104 hanya untuk sekretaris).
+        $this->jabatanStruktur('depb_104', 'Inspektur Di Deputi B', $sat104, $es2Sub, 3, 'deputi_b', 1);
+        $this->jabatanStruktur('depb_u0', 'Kepala Biro B Nol', $satSek2, $es2Sub, 3, 'deputi_b', 0);
+
+        $d = $this->data();
+
+        $this->assertSame(['Kepala Biro Urutan Satu', 'Kepala Biro Urutan Dua'], array_column($d['sekretaris']['list_es2'], 'jabatan'));
+        $this->assertSame(['Biro Dua Uji', 'Biro Uji'], array_column($d['sekretaris']['list_es2'], 'satker'));
+        $this->assertSame(['Deputi Uji', 'Deputi B Uji'], array_column($d['deputi'], 'jabatan'));
+        $this->assertSame(['Direktur A Satu', 'Direktur A Dua'], array_column($d['deputi'][0]['list_es2'], 'jabatan'));
+        $this->assertSame(['Kepala Biro B Nol', 'Inspektur Di Deputi B'], array_column($d['deputi'][1]['list_es2'], 'jabatan'));
+        $this->assertSame(['Biro Dua Uji', 'Inspektorat Uji'], array_column($d['deputi'][1]['list_es2'], 'satker'));
+    }
+
     // ---- bantuan ----
 
     /**
@@ -222,5 +268,15 @@ final class StrukturPejabatParitasTest extends DatabaseTestCase
         if ($this->db->table($tabel)->where($pk, $baris[$pk])->countAllResults() === 0) {
             $this->db->table($tabel)->insert($baris);
         }
+    }
+
+    private function jabatanStruktur(string $kunci, string $nama, int $satker, int $sub, int $level, ?string $atasan, int $urutan): void
+    {
+        $this->db->table('jabatan')->insert(['id_group_jabatan' => 1, 'id_sub_group_jabatan' => $sub, 'id_satker' => $satker, 'jabatan' => $nama, 'status' => 1]);
+        $this->jab[$kunci] = (int) $this->db->insertID();
+        $this->db->table('struktur_jabatan')->insert([
+            'id_periode_struktur_jabatan' => $this->idPeriode, 'id_jabatan' => $this->jab[$kunci], 'id_jabatan_atasan' => $atasan === null ? null : $this->jab[$atasan],
+            'periode_struktur_jabatan'    => 'Periode Uji', 'jabatan' => $nama, 'level_struktur' => $level, 'urutan' => $urutan, 'status' => 1,
+        ]);
     }
 }
