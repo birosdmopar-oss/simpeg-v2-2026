@@ -17,9 +17,15 @@ use RuntimeException;
  * - Kolom FK G-02 (`id_unit`, `id_satker`, `id_jabatan`, …) dibiarkan NULL; nama jabatan/unit hanya teks.
  * - Riwayat urut `tmtsk` naik per NIP; sebagian baris berstatus 0/3/10 (bukan aktif) dan sebagian NIP punya dua baris
  *   aktif ber-`tmtsk` sama (kembar, untuk menguji tie-breaker `pk DESC`).
- * - LKH: hari kerja (Senin–Jumat) mundur dari `tanggalAkhir`; status 1/0/3/2/10 dengan sebaran tetap; `nip_atasan` =
- *   pegawai pertama kelompok `bawahanPerAtasan`.
- * - Penulisan per batch (`insertBatch`), tanpa transaksi sendiri: pemanggil yang menentukan (bingkai uji atau commit).
+ * - `riwayat_mutasi_jabatan.jenis_jabatan`: 1 nomenklatur 80%, 2 instansi lain 10%, 3 PLT 10% (kueri utama memfilter
+ *   `jenis_jabatan = 1` / `!= 3`, mis. StrukturService, PopulasiRekap, LaporanTukinService).
+ * - LKH: hari kerja (Senin–Jumat) mundur dari `tanggalAkhir`; status `LkhService` 1 disetujui / 0 menunggu / 3 revisi /
+ *   2 ditolak / 10 dihapus dengan sebaran tetap; `nip_atasan` = pegawai pertama kelompok `bawahanPerAtasan`.
+ * - Penulisan per batch (`insertBatch`), tanpa transaksi sendiri: pemanggil yang menentukan. Di `DatabaseTestCase`
+ *   (bingkai uji) isinya ikut di-ROLLBACK sesudah test. Untuk EXPLAIN/uji volume di DB scratch (#18.3), pemanggil harus
+ *   commit: koneksi sendiri ke DB scratch (`Config\Database::connect([...])`, tanpa bingkai `DatabaseTestCase`) lalu
+ *   `semai(ProfilSintetis::riset(...))`. Pemanggil seperti itu dijalankan di luar repo (skrip riset, tidak di-commit),
+ *   dan DB scratch tidak boleh lagi dipakai test `DatabaseTestCase` sesudahnya (refresh skema menghapus isinya).
  *
  * @internal
  */
@@ -29,7 +35,7 @@ final class GeneratorRiwayat
 
     private const GOLONGAN = ['II/a', 'II/b', 'II/c', 'II/d', 'III/a', 'III/b', 'III/c', 'III/d', 'IV/a', 'IV/b', 'IV/c', 'IV/d', 'IV/e'];
 
-    /** Sebaran status LKH (persen kumulatif): 1 disetujui, 0 menunggu, 3 ditolak, 2 dibatalkan, 10 dihapus. */
+    /** Sebaran status LKH (persen kumulatif, konstanta `LkhService`): 1 disetujui, 0 menunggu, 3 revisi, 2 ditolak, 10 dihapus. */
     private const STATUS_LKH = [[84, 1], [92, 0], [96, 3], [98, 2], [100, 10]];
 
     /** @var array<string, int> */
@@ -116,7 +122,7 @@ final class GeneratorRiwayat
             $status = $k === $n ? 1 : $this->statusRiwayat();
             $baris  = [
                 'nip'           => $nip,
-                'jenis_jabatan' => $jenis <= 10 ? 1 : ($jenis <= 30 ? 2 : 3),
+                'jenis_jabatan' => $jenis <= 80 ? 1 : ($jenis <= 90 ? 2 : 3),
                 'tmtsk'         => min($tmt->format('Y-m-d'), $akhir->format('Y-m-d')),
                 'jabatan'       => 'Jabatan Sintetis ' . (($i * 7 + $k) % 400),
                 'kelas_jabatan' => $this->acak(1, 17),

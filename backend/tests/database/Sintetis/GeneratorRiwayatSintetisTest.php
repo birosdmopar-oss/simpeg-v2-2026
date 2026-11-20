@@ -13,7 +13,8 @@ use Tests\Support\Sintetis\ProfilSintetis;
  * Generator data sintetis riwayat dalam (CR-168, izin #18.3): jumlah baris = laporan generator, semua NIP berawalan
  * `9999`, deterministik per benih, memuat kasus tmtsk kembar / pegawai keluar / riwayat dalam, LKH hanya hari kerja
  * tanpa (nip, tanggal) ganda. Profil `kecil` bawaan; `SINTETIS_PROFIL=riset` menyemai profil riset (±1,6 juta LKH) dan
- * mencetak durasi. Di-skip kecuali env `RUN_VOLUME_TEST=1`.
+ * mencetak durasi. Di-skip kecuali env `RUN_VOLUME_TEST=1`. Isi semai ikut di-ROLLBACK bingkai `DatabaseTestCase`; DB scratch
+ * untuk EXPLAIN #18.3 disemai oleh pemanggil yang commit (lihat docblock `GeneratorRiwayat`).
  *
  * @internal
  */
@@ -52,6 +53,12 @@ final class GeneratorRiwayatSintetisTest extends DatabaseTestCase
             $this->assertSame(0, $this->tanpaAktif($t), "tiap NIP punya baris aktif {$t}");
         }
 
+        // R1: mayoritas NIP punya jabatan nomenklatur aktif (jenis 1), dan kasus kembar terlihat oleh kueri jenis 1.
+        $rmj    = $this->db->prefixTable('riwayat_mutasi_jabatan');
+        $jenis1 = (int) $this->db->query("SELECT COUNT(DISTINCT nip) AS n FROM {$rmj} WHERE status = 1 AND jenis_jabatan = 1")->getRow()->n;
+        $this->assertGreaterThanOrEqual((int) ceil($profil->jumlahPegawai * 0.7), $jenis1, 'NIP dengan baris jenis_jabatan 1');
+        $this->assertGreaterThan(0, $this->kembar('riwayat_mutasi_jabatan', 'jenis_jabatan = 1'), 'tmtsk kembar jenis 1');
+
         $per = $this->perNip('riwayat_mutasi_jabatan');
         $this->assertGreaterThanOrEqual($profil->mutasi[0] * $profil->faktorDalam, $per[GeneratorRiwayat::nip(1)], 'riwayat dalam');
 
@@ -84,11 +91,11 @@ final class GeneratorRiwayatSintetisTest extends DatabaseTestCase
     }
 
     /** Jumlah NIP yang punya ≥ 2 baris aktif dengan tmtsk terbaru yang sama. */
-    private function kembar(string $tabel): int
+    private function kembar(string $tabel, string $saring = '1 = 1'): int
     {
         $t = $this->db->prefixTable($tabel);
 
-        return (int) $this->db->query("SELECT COUNT(*) AS n FROM (SELECT r.nip FROM {$t} r JOIN (SELECT nip, MAX(tmtsk) m FROM {$t} WHERE status = 1 GROUP BY nip) x ON x.nip = r.nip AND x.m = r.tmtsk WHERE r.status = 1 GROUP BY r.nip HAVING COUNT(*) > 1) k")->getRow()->n;
+        return (int) $this->db->query("SELECT COUNT(*) AS n FROM (SELECT r.nip FROM {$t} r JOIN (SELECT nip, MAX(tmtsk) m FROM {$t} WHERE status = 1 AND {$saring} GROUP BY nip) x ON x.nip = r.nip AND x.m = r.tmtsk WHERE r.status = 1 AND {$saring} GROUP BY r.nip HAVING COUNT(*) > 1) k")->getRow()->n;
     }
 
     private function tanpaAktif(string $tabel): int
