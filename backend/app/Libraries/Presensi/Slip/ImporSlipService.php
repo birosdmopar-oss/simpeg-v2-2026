@@ -111,7 +111,7 @@ final class ImporSlipService
         try {
             $muat = $this->penyimpan->muat($simpan['token'], (int) $auth->idPengguna(), $sekarang)
                 ?? throw new RuntimeException('Pratinjau yang baru disimpan tidak dapat dimuat.');
-            $analisis = $this->analisis($muat['path'], $periodeFilter, $cakupan, $this->kunciSudahAda(...));
+            $analisis = $this->analisis($this->uraiBerkas($muat['path']), $periodeFilter, $cakupan, $this->kunciSudahAda(...));
             $this->auditNamaTidakCocok($auth, $analisis, $simpan['token']);
         } catch (Throwable $e) {
             $this->penyimpan->hapus($simpan['token']);
@@ -177,10 +177,22 @@ final class ImporSlipService
         $waktu  = gmdate('Y-m-d H:i:s', $sekarang);
         $id     = $auth->idPengguna();
 
+        // Berkas dibaca dan diuraikan SEBELUM transaksi dibuka (CR-167). Pemetaan galatnya sama dengan saat parse masih di
+        // dalam transaksi: ApiException (422 `errors.berkas`) diteruskan, galat lain dicatat lalu 500 "gagal commit".
+        try {
+            $urai = $this->uraiBerkas($muat['path']);
+        } catch (ApiException $e) {
+            throw $e;
+        } catch (Throwable $e) {
+            log_message('error', 'Commit impor slip gagal: {kelas} {pesan}', ['kelas' => $e::class, 'pesan' => $e->getMessage()]);
+
+            throw new ApiException(self::PESAN_GAGAL_COMMIT, 500);
+        }
+
         $db->transBegin();
 
         try {
-            $analisis = $this->analisis($muat['path'], $filter, $cakupan, fn (array $nip): array => $this->kunciSudahAda($nip, true));
+            $analisis = $this->analisis($urai, $filter, $cakupan, fn (array $nip): array => $this->kunciSudahAda($nip, true));
             $hitung   = ['disisip' => 0, 'diperbarui' => 0, 'dilewati' => 0, 'gagal' => 0];
             $keluaran = [];
             $periode  = [];
@@ -288,13 +300,11 @@ final class ImporSlipService
     }
 
     /**
-     * Baca berkas + uraikan sheet + susun pratinjau dengan data DB.
+     * Baca berkas + uraikan sheet, TANPA menyentuh DB.
      *
-     * @param Closure(list<string>): array<string, true> $kunciSudahAda
-     *
-     * @return array{susun: array<string, mixed>, nama: array<string, string>, info: array<string, mixed>, periodeBaris: array<string, PeriodeSlip>}
+     * @return array{sheet: array{GPP: list<BarisSheet>, TK: list<BarisSheet>}, info: array{baris_tanpa_nip: array<string, list<int>>, kolom_diabaikan: array<string, list<string>>}}
      */
-    private function analisis(string $path, ?PeriodeSlip $filter, ?string $cakupan, Closure $kunciSudahAda): array
+    private function uraiBerkas(string $path): array
     {
         try {
             $baca = (new PembacaExcelSlip($this->config->maksBarisImporPerSheet))->baca($path);
@@ -316,6 +326,22 @@ final class ImporSlipService
             $info['baris_tanpa_nip'][$nama] = $nilai['baris_tanpa_nip'];
             $info['kolom_diabaikan'][$nama] = $nilai['kolom_diabaikan'];
         }
+
+        return ['sheet' => $sheet, 'info' => $info];
+    }
+
+    /**
+     * Susun pratinjau dari hasil {@see uraiBerkas()} dengan data DB (pegawai, kunci yang sudah ada).
+     *
+     * @param array{sheet: array{GPP: list<BarisSheet>, TK: list<BarisSheet>}, info: array<string, mixed>} $urai
+     * @param Closure(list<string>): array<string, true>                                                   $kunciSudahAda
+     *
+     * @return array{susun: array<string, mixed>, nama: array<string, string>, info: array<string, mixed>, periodeBaris: array<string, PeriodeSlip>}
+     */
+    private function analisis(array $urai, ?PeriodeSlip $filter, ?string $cakupan, Closure $kunciSudahAda): array
+    {
+        $sheet = $urai['sheet'];
+        $info  = $urai['info'];
 
         $semua                = [...$sheet[KolomGaji::SHEET_GPP], ...$sheet[KolomGaji::SHEET_TK]];
         $nip                  = array_values(array_unique(array_filter(array_map(static fn (BarisSheet $b): ?string => $b->nip, $semua), static fn (?string $n): bool => $n !== null)));
@@ -375,6 +401,18 @@ final class ImporSlipService
 
     /**
      * Kunci `(nip, bulan, tahun)` yang sudah ada untuk NIP di berkas; `$kunci = true` → baris dikunci `FOR UPDATE`.
+     *
+     * Predikat sengaja hanya `nip IN (…)` (semua periode NIP di berkas ikut terkunci). Mempersempitnya ke
+     * `nip IN (…) AND tahun IN (…) AND bulan IN (…)` sudah dicoba dan DIBATALKAN (CR-167), berdasarkan EXPLAIN + jumlah
+     * kunci di MySQL 8.0 REPEATABLE READ atas 120.000 baris sintetis (5.000 NIP × 24 bulan):
+     * - periode yang sudah terisi penuh: range `uk_nip_bulan_tahun`, kunci turun (5.000 NIP: ±245.000 → 10.000 row lock);
+     * - periode yang BELUM ada barisnya (kasus rutin impor bulan baru): optimizer memilih `idx_bulan_tahun`, sehingga
+     *   yang terkunci adalah celah periode itu untuk SEMUA NIP, bukan hanya NIP di berkas;
+     * - periode terisi sebagian oleh NIP lain: `idx_bulan_tahun` lagi, baris NIP di luar berkas ikut terkunci.
+     * Jadi himpunan kunci bisa lebih luas daripada sekarang. Satu-satunya bentuk yang aman adalah
+     * `FORCE INDEX (uk_nip_bulan_tahun)`, yang ditolak: mengikat kode ke nama indeks (indeks berganti → galat 1176 → 500)
+     * dan belum teruji di MariaDB 10.4, sedangkan impor slip operasi admin bulanan dengan commit singkat. Jangan dicoba
+     * ulang tanpa data ukur baru. Perilaku kunci sekarang dikunci `ImporSlipKunciParitasTest`.
      *
      * @param list<string> $nip
      *
