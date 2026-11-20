@@ -78,6 +78,87 @@ final class AkPermenpanrb
     }
 
     /**
+     * {@see hitung()} untuk banyak NIP sekaligus (CR-166): dua kueri per 500 NIP, bukan dua kueri per NIP. Hasil per NIP sama
+     * persis dengan `hitung($nip)`.
+     *
+     * Asumsi skema: `pegawai_mutasi_jabatan.nip` dan `pegawai_kp.nip` adalah PRIMARY KEY (satu baris per NIP), jadi join
+     * tidak menggandakan baris. NIP yang tidak ditemukan di hasil gabungan dihitung lewat `hitung()` supaya tetap identik.
+     *
+     * @param list<string> $nips
+     *
+     * @return array<array{nip: string, nama: string, jabatan: string, satker: string, pangkat: string, gol_ruang: string,
+     *     jenjang: string, current_ak: float, ak_for_kp: float, ak_kurang: float, ak_maxed: bool}> kunci = NIP masukan
+     *     (PHP menjadikan NIP numerik kunci int; pakai akses `$hasil[$nip]`, jangan mengandalkan tipe kunci)
+     */
+    public function hitungBanyak(array $nips): array
+    {
+        $db    = $this->db ?? db_connect();
+        $hasil = [];
+
+        foreach (array_chunk(array_values(array_unique($nips)), 500) as $potong) {
+            $pegawai = [];
+            $baris   = $db->table('pegawai peg')
+                ->select('peg.nip, peg.glr_awal, peg.nama, peg.glr_akhir, pmj.id_jabatan, pmj.jabatan, pmj.satker, '
+                    . 'jjf.jenjang_jf, pkp.pangkat, pkp.gol_ruang')
+                ->join('pegawai_mutasi_jabatan pmj', 'pmj.nip = peg.nip', 'left')
+                ->join('jabatan jab', 'jab.id_jabatan = pmj.id_jabatan', 'left')
+                ->join('jenjang_jf jjf', 'jjf.id_jenjang_jf = jab.id_jenjang_jf', 'left')
+                ->join('pegawai_kp pkp', 'pkp.nip = peg.nip', 'left')
+                ->whereIn('peg.nip', $potong)
+                ->get()->getResultArray();
+
+            foreach ($baris as $r) {
+                $pegawai[(string) $r['nip']] = $r;
+            }
+
+            // SUM per (nip, id_jabatan); yang dipakai hanya kelompok jabatan pegawai saat ini.
+            $jumlah = [];
+            $baris  = $db->table('riwayat_ak_siasn')->select('nip, id_jabatan')->selectSum('kredit_baru_total', 'total')
+                ->whereIn('nip', $potong)
+                ->groupStart()->where('is_konversi', '1')->orWhere('is_integrasi', '1')->groupEnd()
+                ->groupBy('nip, id_jabatan')
+                ->get()->getResultArray();
+
+            foreach ($baris as $r) {
+                $jumlah[(string) $r['nip']][(string) $r['id_jabatan']] = (float) ($r['total'] ?? 0);
+            }
+
+            foreach ($potong as $nip) {
+                $nip = (string) $nip;
+                $peg = $pegawai[$nip] ?? null;
+
+                if ($peg === null) {
+                    $hasil[$nip] = $this->hitung($nip);
+
+                    continue;
+                }
+
+                $idJabatan = $peg['id_jabatan'] ?? null;
+                $jenjang   = trim((string) ($peg['jenjang_jf'] ?? ''));
+                $golRuang  = trim((string) ($peg['gol_ruang'] ?? ''));
+                $saatIni   = $idJabatan !== null && $idJabatan !== '' ? max(0.0, $jumlah[$nip][(string) $idJabatan] ?? 0.0) : 0.0;
+                $target    = $this->akUntukKp($jenjang, $golRuang);
+
+                $hasil[$nip] = [
+                    'nip'        => (string) $peg['nip'],
+                    'nama'       => isset($peg['nama']) ? StrukturService::namaGelar($peg['glr_awal'] ?? null, (string) $peg['nama'], $peg['glr_akhir'] ?? null) : '',
+                    'jabatan'    => (string) ($peg['jabatan'] ?? ''),
+                    'satker'     => (string) ($peg['satker'] ?? ''),
+                    'pangkat'    => (string) ($peg['pangkat'] ?? ''),
+                    'gol_ruang'  => $golRuang,
+                    'jenjang'    => $jenjang,
+                    'current_ak' => $saatIni,
+                    'ak_for_kp'  => $target,
+                    'ak_kurang'  => $target > $saatIni ? $target - $saatIni : 0.0,
+                    'ak_maxed'   => ! ($target > $saatIni),
+                ];
+            }
+        }
+
+        return $hasil;
+    }
+
+    /**
      * AK kumulatif untuk KP: konstanta jenjang × golongan; golongan di atas batas jenjang → nilai terbesar jenjang.
      */
     public function akUntukKp(string $jenjang, string $golRuang): float
