@@ -58,11 +58,40 @@ final class RekapUangMakanService
      */
     public function daftar(AuthContext $auth, array $query, bool $il = false): array
     {
-        [$p, $lingkup, $baris] = $this->baris($auth, $query, $il);
+        [$p, $lingkup, $nip, $hari] = $this->hariDibayar($auth, $query, $il);
+
+        // Total dari jumlah hari per pegawai; baris `{nip, tgl_absen}` hanya dibentuk untuk halaman yang diminta (CR-165;
+        // dulu semua baris dibentuk lalu dipotong). Urutan tetap: populasi, lalu tanggal.
+        $lewati = ($p->page - 1) * $p->perPage;
+        $total  = 0;
+        $items  = [];
+
+        foreach ($nip as $n) {
+            $tanggal = $hari[$n] ?? [];
+            $jumlah  = count($tanggal);
+            $total += $jumlah;
+            $sisa = $p->perPage - count($items);
+
+            if ($sisa <= 0) {
+                continue;
+            }
+
+            if ($lewati >= $jumlah) {
+                $lewati -= $jumlah;
+
+                continue;
+            }
+
+            foreach (array_slice($tanggal, $lewati, $sisa) as $t) {
+                $items[] = ['nip' => $n, 'tgl_absen' => $t];
+            }
+
+            $lewati = 0;
+        }
 
         return [
-            'items'    => array_slice($baris, ($p->page - 1) * $p->perPage, $p->perPage),
-            'total'    => count($baris),
+            'items'    => $items,
+            'total'    => $total,
             'page'     => $p->page,
             'per_page' => $p->perPage,
             'bulan'    => $p->kunci(),
@@ -79,7 +108,16 @@ final class RekapUangMakanService
      */
     public function xlsx(AuthContext $auth, array $query, bool $il = false): array
     {
-        [$p, $lingkup, $baris] = $this->baris($auth, $query, $il);
+        [$p, $lingkup, $nip, $hari] = $this->hariDibayar($auth, $query, $il);
+        $baris                      = [];
+
+        foreach ($nip as $n) {
+            foreach ($hari[$n] ?? [] as $t) {
+                $baris[] = ['nip' => $n, 'tgl_absen' => $t];
+            }
+        }
+
+        unset($hari, $nip);
 
         return [
             'isi'  => EksporRekapXlsx::uangMakan($baris),
@@ -89,11 +127,13 @@ final class RekapUangMakanService
     }
 
     /**
+     * Populasi (urut) dan tanggal dibayar per NIP.
+     *
      * @param array<string, mixed> $query
      *
-     * @return array{0: ParameterRekap, 1: LingkupLaporan, 2: list<array{nip: string, tgl_absen: string}>}
+     * @return array{0: ParameterRekap, 1: LingkupLaporan, 2: list<string>, 3: array<array-key, list<string>>}
      */
-    private function baris(AuthContext $auth, array $query, bool $il): array
+    private function hariDibayar(AuthContext $auth, array $query, bool $il): array
     {
         $p = ParameterRekap::dari($query, TanggalBisnis::hariIni(($this->jam)()), $this->db, ! $il);
 
@@ -105,16 +145,9 @@ final class RekapUangMakanService
             $populasi = (new PopulasiRekap($this->db))->dh($p->awal, $p->akhir, $lingkup, $p->jenisPegawai);
         }
 
-        $nip   = array_map(static fn (array $peg): string => (string) $peg['nip'], $populasi);
-        $hari  = (new UangMakanSlipPresensi($this->db, null, $this->hariLibur, $this->jam))->hariDibayarBanyak($nip, $p->tahun, $p->bulan);
-        $baris = [];
+        $nip  = array_map(static fn (array $peg): string => (string) $peg['nip'], $populasi);
+        $hari = (new UangMakanSlipPresensi($this->db, null, $this->hariLibur, $this->jam))->hariDibayarBanyak($nip, $p->tahun, $p->bulan);
 
-        foreach ($nip as $n) {
-            foreach ($hari[$n] ?? [] as $t) {
-                $baris[] = ['nip' => $n, 'tgl_absen' => $t];
-            }
-        }
-
-        return [$p, $lingkup, $baris];
+        return [$p, $lingkup, $nip, $hari];
     }
 }
