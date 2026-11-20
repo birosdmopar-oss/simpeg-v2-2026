@@ -111,7 +111,9 @@ final class AkPermenpanrb
                 $pegawai[(string) $r['nip']] = $r;
             }
 
-            // SUM per (nip, id_jabatan); yang dipakai hanya kelompok jabatan pegawai saat ini.
+            // SUM per (nip, id_jabatan); yang dipakai hanya kelompok jabatan pegawai saat ini. Kunci NIP di-`rtrim` dan
+            // dijumlahkan: collation kolom PAD SPACE, jadi `hitung()` (`WHERE nip = ?`) ikut menghitung baris yang NIP-nya
+            // berspasi di ujung; di sini baris seperti itu harus jatuh ke NIP yang sama.
             $jumlah = [];
             $baris  = $db->table('riwayat_ak_siasn')->select('nip, id_jabatan')->selectSum('kredit_baru_total', 'total')
                 ->whereIn('nip', $potong)
@@ -120,7 +122,9 @@ final class AkPermenpanrb
                 ->get()->getResultArray();
 
             foreach ($baris as $r) {
-                $jumlah[(string) $r['nip']][(string) $r['id_jabatan']] = (float) ($r['total'] ?? 0);
+                $kunciNip                         = rtrim((string) $r['nip'], ' ');
+                $kunciJabatan                     = (string) $r['id_jabatan'];
+                $jumlah[$kunciNip][$kunciJabatan] = ($jumlah[$kunciNip][$kunciJabatan] ?? 0.0) + (float) ($r['total'] ?? 0);
             }
 
             foreach ($potong as $nip) {
@@ -136,7 +140,7 @@ final class AkPermenpanrb
                 $idJabatan = $peg['id_jabatan'] ?? null;
                 $jenjang   = trim((string) ($peg['jenjang_jf'] ?? ''));
                 $golRuang  = trim((string) ($peg['gol_ruang'] ?? ''));
-                $saatIni   = $idJabatan !== null && $idJabatan !== '' ? max(0.0, $jumlah[$nip][(string) $idJabatan] ?? 0.0) : 0.0;
+                $saatIni   = $idJabatan !== null && $idJabatan !== '' ? max(0.0, $jumlah[rtrim($nip, ' ')][(string) $idJabatan] ?? 0.0) : 0.0;
                 $target    = $this->akUntukKp($jenjang, $golRuang);
 
                 $hasil[$nip] = [

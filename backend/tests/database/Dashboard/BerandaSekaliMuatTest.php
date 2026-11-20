@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Database\Dashboard;
 
 use App\Constants\Role;
+use App\Interfaces\Kepegawaian\PegawaiScopeInterface;
 use App\Libraries\Auth\AuthContext;
 use App\Libraries\CacheService;
 use App\Libraries\Dashboard\Beranda\BawahanPegawai;
@@ -14,8 +15,11 @@ use App\Libraries\Dashboard\Statistik\StatistikService;
 use App\Libraries\Kepegawaian\AngkaKredit\AkPermenpanrb;
 use App\Libraries\Kepegawaian\Scope\PegawaiScope;
 use Closure;
+use CodeIgniter\Database\BaseBuilder;
 use CodeIgniter\Test\FeatureTestTrait;
+use CodeIgniter\Test\TestLogger;
 use Config\Services;
+use RuntimeException;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Dashboard\StatistikUjiTrait;
 use Tests\Support\DatabaseTestCase;
@@ -87,6 +91,82 @@ final class BerandaSekaliMuatTest extends DatabaseTestCase
         $this->assertSame(0.0, $hasil[$tanpaJabatan]['current_ak']);
         $this->assertSame('', $hasil['000000000000000000']['nip'], 'NIP tidak dikenal: bentuk kosong yang sama dengan hitung()');
         $this->assertSame([], $ak->hitungBanyak([]));
+    }
+
+    /**
+     * Collation `nip` PAD SPACE: baris AK impor yang NIP-nya berspasi di ujung dihitung `hitung()` (`WHERE nip = ?`), jadi
+     * jalur banyak NIP harus menghitungnya juga.
+     */
+    public function testNipBerspasiDiUjungSamaDiJalurTunggalDanBanyak(): void
+    {
+        [$satker, , $jab, $idJenjang] = $this->siapkanAtasanEs4();
+        // Semua baris AK pegawai ini ber-NIP dengan spasi di ujung (tidak ada baris ber-NIP bersih), jadi wakil kelompok
+        // `GROUP BY nip` pasti NIP ber-spasi.
+        $nip  = $this->jf($satker, $jab, '199001012020012301', 'JF Spasi', $idJenjang, 0);
+        $lain = $this->jf($satker, $jab, '199001012020012302', 'JF Lain', $idJenjang, 4);
+        $this->siasn($nip . ' ', $this->idJabatan($nip), 5.5, '1', null);
+        $this->siasn($nip . '  ', $this->idJabatan($nip), 2, null, '1');
+
+        $ak    = new AkPermenpanrb($this->db);
+        $hasil = $ak->hitungBanyak([$nip, $lain]);
+
+        $this->assertSame(7.5, $ak->hitung($nip)['current_ak'], 'jalur tunggal menghitung baris ber-spasi');
+        $this->assertSame($ak->hitung($nip), $hasil[$nip]);
+        $this->assertSame($ak->hitung($lain), $hasil[$lain]);
+        $this->assertSame(4.0, $hasil[$lain]['current_ak']);
+    }
+
+    /**
+     * Galat dari perhitungan statistik diteruskan apa adanya: dihitung SEKALI (dulu tertangkap di dalam `remember()`,
+     * dicatat sebagai "cache statistik … gagal", lalu dihitung lagi) dan tanpa warning cache.
+     */
+    public function testGalatHitungStatistikDiteruskanSekaliTanpaWarningCache(): void
+    {
+        $spy            = CacheTtlSpy::baru();
+        $this->cacheUji = new CacheService($spy, '');
+        Services::injectMock('cacheService', $this->cacheUji);
+        Services::injectMock('pegawaiScope', new PegawaiScope());
+        $this->siapkanMasterStatistik();
+        $this->pegawaiStatistik('A1', ['jenis' => 1]);
+
+        $scope = new class () implements PegawaiScopeInterface {
+            public int $dipanggil = 0;
+
+            public function bolehLihat(AuthContext $auth, string $nip): bool
+            {
+                return true;
+            }
+
+            public function bolehUbah(AuthContext $auth, string $nip): bool
+            {
+                return true;
+            }
+
+            public function bolehProses(AuthContext $auth, string $nip): bool
+            {
+                return true;
+            }
+
+            public function terapkanKeQuery(BaseBuilder $builder, AuthContext $auth, string $kolomNip = 'nip'): void
+            {
+                $this->dipanggil++;
+
+                throw new RuntimeException('hitung uji gagal');
+            }
+        };
+        $auth = new AuthContext();
+        $auth->setClaims(['sub' => '900001', 'role' => Role::SUPER_ADMIN]);
+
+        try {
+            (new StatistikService($this->db, $scope, $this->cacheUji))->statistik($auth, StatistikService::UNIT_KERJA, []);
+            $this->fail('galat hitung harus diteruskan');
+        } catch (RuntimeException $e) {
+            $this->assertSame('hitung uji gagal', $e->getMessage());
+        }
+
+        $this->assertSame(1, $scope->dipanggil, 'perhitungan dijalankan tepat satu kali');
+        $this->assertFalse(TestLogger::didLog('warning', 'cache statistik', false), 'tanpa warning "cache statistik … gagal"');
+        $this->assertSame([], array_values(array_filter($spy->simpan, static fn (array $s): bool => str_starts_with($s['key'], StatistikCache::PREFIKS))), 'tidak ada yang disimpan');
     }
 
     public function testJumlahKueriBawahanTidakMengikutiJumlahJf(): void
