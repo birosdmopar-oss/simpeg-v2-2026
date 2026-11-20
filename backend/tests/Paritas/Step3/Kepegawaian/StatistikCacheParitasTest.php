@@ -13,7 +13,9 @@ use App\Libraries\Kepegawaian\Riwayat\RiwayatEngine;
 use App\Libraries\Kepegawaian\Scope\PegawaiScope;
 use App\Models\Kepegawaian\PegawaiModel;
 use CodeIgniter\Events\Events;
+use CodeIgniter\Test\FeatureTestTrait;
 use Config\Services;
+use Tests\Support\AuthTestTrait;
 use Tests\Support\Dashboard\StatistikUjiTrait;
 use Tests\Support\DatabaseTestCase;
 use Tests\Support\Kepegawaian\PegawaiFixtureTrait;
@@ -30,6 +32,9 @@ use Tests\Support\Paritas\Kepegawaian\CacheTtlSpy;
  */
 final class StatistikCacheParitasTest extends DatabaseTestCase
 {
+    // StatistikUjiTrait memakai helper AuthTestTrait + FeatureTestTrait.
+    use AuthTestTrait;
+    use FeatureTestTrait;
     use PegawaiFixtureTrait;
     use StatistikUjiTrait;
 
