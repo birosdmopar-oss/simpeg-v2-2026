@@ -19,6 +19,7 @@ use CodeIgniter\Database\BaseBuilder;
 use CodeIgniter\Test\FeatureTestTrait;
 use CodeIgniter\Test\TestLogger;
 use Config\Services;
+use ReflectionProperty;
 use RuntimeException;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Dashboard\StatistikUjiTrait;
@@ -157,6 +158,9 @@ final class BerandaSekaliMuatTest extends DatabaseTestCase
         $auth = new AuthContext();
         $auth->setClaims(['sub' => '900001', 'role' => Role::SUPER_ADMIN]);
 
+        // Log TestLogger statis dan terkumpul lintas test dalam satu proses: yang diperiksa hanya yang ditulis sesudah titik ini.
+        $logSebelum = count($this->logUji());
+
         try {
             (new StatistikService($this->db, $scope, $this->cacheUji))->statistik($auth, StatistikService::UNIT_KERJA, []);
             $this->fail('galat hitung harus diteruskan');
@@ -165,7 +169,11 @@ final class BerandaSekaliMuatTest extends DatabaseTestCase
         }
 
         $this->assertSame(1, $scope->dipanggil, 'perhitungan dijalankan tepat satu kali');
-        $this->assertFalse(TestLogger::didLog('warning', 'cache statistik', false), 'tanpa warning "cache statistik … gagal"');
+        $logBaru = array_slice($this->logUji(), $logSebelum);
+        $this->assertSame([], array_values(array_filter(
+            $logBaru,
+            static fn (array $l): bool => strtolower((string) $l['level']) === 'warning' && str_contains((string) $l['message'], 'cache statistik'),
+        )), 'tanpa warning "cache statistik … gagal" selama permintaan ini');
         $this->assertSame([], array_values(array_filter($spy->simpan, static fn (array $s): bool => str_starts_with($s['key'], StatistikCache::PREFIKS))), 'tidak ada yang disimpan');
     }
 
@@ -277,6 +285,14 @@ final class BerandaSekaliMuatTest extends DatabaseTestCase
     }
 
     // ---- bantu --------------------------------------------------------------------------------------------------------
+
+    /**
+     * @return list<array{level: string, message: string, file: string}>
+     */
+    private function logUji(): array
+    {
+        return (new ReflectionProperty(TestLogger::class, 'op_logs'))->getValue();
+    }
 
     /**
      * Teks kueri data (tanpa metadata) selama `$aksi`.
