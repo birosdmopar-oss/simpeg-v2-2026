@@ -119,7 +119,8 @@ final class PangkatTukinParitasTest extends DatabaseTestCase
         $this->mutasi($berlapis, 'IX', '2025-01-01');
         $this->mutasi($berlapis, 'X', '2026-04-10');                            // pemenang
         $this->mutasi($berlapis, 'XI', '2026-05-02');                           // > akhir periode → diabaikan
-        $this->mutasi($berlapis, 'XII', '2026-04-20', ['status' => 2]);         // lebih baru, status 2 → diabaikan
+        $this->mutasi($berlapis, 'XII', '2026-04-20', ['status' => 2]);
+        $this->mutasi($berlapis, 'XIV', '2026-04-22', ['status' => 10]); // C2: lebih baru, status 10 → diabaikan         // lebih baru, status 2 → diabaikan
         $this->mutasi($berlapis, 'XIII', '2026-04-25', ['jenis_jabatan' => 2]); // lebih baru, jenis lain → diabaikan
 
         $kembarA = $this->pppk();
@@ -133,7 +134,14 @@ final class PangkatTukinParitasTest extends DatabaseTestCase
         $tanpa = $this->pppk();
         $this->kp($tanpa, 'IX', '2026-04-08'); // tanpa mutasi; KP tmtsk > awal → tidak terpilih
 
-        $hasil = $this->banyak([$berlapis, $kembarA, $kembarB, $tanpa]);
+        // R7: PPPK yang semua mutasinya tersaring → jatuh ke KP sah ≤ awal periode.
+        $kpSaja = $this->pppk();
+        $this->mutasi($kpSaja, 'IX', '2026-05-05');
+        $this->mutasi($kpSaja, 'X', '2026-03-05', ['status' => 2]);
+        $this->kp($kpSaja, 'CPNS IX', '2026-03-01');
+
+        $hasil = $this->banyak([$berlapis, $kembarA, $kembarB, $tanpa, $kpSaja]);
+        $this->assertSame(['2026-03-01', false], [$hasil[$kpSaja]->tmtMasuk, $hasil[$kpSaja]->lewatiLoopHarian]);
 
         $this->assertSame(['2026-04-10', false], [$hasil[$berlapis]->tmtMasuk, $hasil[$berlapis]->lewatiLoopHarian]);
         $this->assertSame(self::AWAL, $hasil[$kembarA]->tmtMasuk);

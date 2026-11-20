@@ -206,6 +206,12 @@ final class StrukturPejabatParitasTest extends DatabaseTestCase
         $this->jabatanStruktur('depa_u2', 'Direktur A Dua', $satDep, $es2Sub, 3, 'deputi', 2);
         $this->jabatanStruktur('depa_u1', 'Direktur A Satu', $satDep, $es2Sub, 3, 'deputi', 1);
         $this->jabatanStruktur('depa_lain', 'Direktur A Unit Lain', $this->satSek, $es2Sub, 3, 'deputi', 1);
+        // C1: dua es2 sah urutan sama (3) → id_struktur_jabatan naik yang menentukan.
+        $this->jabatanStruktur('depa_u3a', 'Direktur A Tiga Pertama', $satDep, $es2Sub, 3, 'deputi', 3);
+        $this->jabatanStruktur('depa_u3b', 'Direktur A Tiga Kedua', $satDep, $es2Sub, 3, 'deputi', 3);
+        // R10: level 4 dengan atasan es1 di unit sama → bukan es2.
+        $this->jabatanStruktur('depa_l4', 'Kepala Subdit Level Empat', $satDep, $es2Sub, 4, 'deputi', 1);
+        $this->jabatanStruktur('sek_l4', 'Kepala Bagian Level Empat', $this->satSek, $es2Sub, 4, 'sekretaris', 1);
         // Di bawah deputi B: satker 104 TETAP ikut (saringan 104 hanya untuk sekretaris).
         $this->jabatanStruktur('depb_104', 'Inspektur Di Deputi B', $sat104, $es2Sub, 3, 'deputi_b', 1);
         $this->jabatanStruktur('depb_u0', 'Kepala Biro B Nol', $satSek2, $es2Sub, 3, 'deputi_b', 0);
@@ -215,7 +221,7 @@ final class StrukturPejabatParitasTest extends DatabaseTestCase
         $this->assertSame(['Kepala Biro Urutan Satu', 'Kepala Biro Urutan Dua'], array_column($d['sekretaris']['list_es2'], 'jabatan'));
         $this->assertSame(['Biro Dua Uji', 'Biro Uji'], array_column($d['sekretaris']['list_es2'], 'satker'));
         $this->assertSame(['Deputi Uji', 'Deputi B Uji'], array_column($d['deputi'], 'jabatan'));
-        $this->assertSame(['Direktur A Satu', 'Direktur A Dua'], array_column($d['deputi'][0]['list_es2'], 'jabatan'));
+        $this->assertSame(['Direktur A Satu', 'Direktur A Dua', 'Direktur A Tiga Pertama', 'Direktur A Tiga Kedua'], array_column($d['deputi'][0]['list_es2'], 'jabatan'));
         $this->assertSame(['Kepala Biro B Nol', 'Inspektur Di Deputi B'], array_column($d['deputi'][1]['list_es2'], 'jabatan'));
         $this->assertSame(['Biro Dua Uji', 'Inspektorat Uji'], array_column($d['deputi'][1]['list_es2'], 'satker'));
     }

@@ -172,6 +172,9 @@ final class BerandaPendidikanAkParitasTest extends DatabaseTestCase
         $this->siasn($a, $jabA, 15, '1', '0');
         $this->siasn($a, $jabA, 7, '0', '1');
         $this->siasn($a, $jabA, 99, '0', '0');
+        // Baris berstatus 2 (Ditolak) tetap ikut SUM: AkPermenpanrb sengaja tanpa saringan status (docblock :18-19) → A = 36.
+        $this->siasn($a, $jabA, 4, '1', null);
+        $this->db->table('riwayat_ak_siasn')->where('nip', $a)->where('kredit_baru_total', 4)->update(['status' => 2]);
         // A pernah di jabatan yang id-nya = jabatan B sekarang → tidak ikut untuk A (bukan jabatan sekarang) dan tidak
         // untuk B (saringan nip).
         $this->siasn($a, $jabB, 40, '1', null);
@@ -182,9 +185,9 @@ final class BerandaPendidikanAkParitasTest extends DatabaseTestCase
 
         $hasil = (new BawahanPegawai($this->db, self::HARI_INI))->untuk($atasan);
 
-        $this->assertSame([$a, $b, $c], array_column($hasil['ak'], 'nip'), 'order ASC: A 18, B 45, C 1000');
+        $this->assertSame([$a, $b, $c], array_column($hasil['ak'], 'nip'), 'order ASC: A 14, B 45, C 1000');
         $this->assertSame(
-            [[18.0, 32.0, 50.0, -18.0], [45.0, 5.0, 50.0, -45.0], [1000.0, 0.0, 0.0, 0.0]],
+            [[14.0, 36.0, 50.0, -14.0], [45.0, 5.0, 50.0, -45.0], [1000.0, 0.0, 0.0, 0.0]],
             array_map(static fn (array $r): array => [$r['order'], $r['ak_now'], $r['ak_kp'], $r['kurang']], $hasil['ak']),
         );
         $jabatan = fn (string $nip): string => (string) $this->db->table('pegawai_mutasi_jabatan')->where('nip', $nip)->get()->getRow('jabatan');

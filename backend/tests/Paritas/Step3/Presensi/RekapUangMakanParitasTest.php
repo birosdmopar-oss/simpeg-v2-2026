@@ -6,6 +6,9 @@ namespace Tests\Paritas\Step3\Presensi;
 
 use App\Constants\Role;
 use App\Libraries\Auth\AuthContext;
+use App\Libraries\Presensi\Laporan\CakupanLaporan;
+use App\Libraries\Presensi\Laporan\ParameterRekap;
+use App\Libraries\Presensi\Laporan\PopulasiRekap;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use Tests\Support\DatabaseTestCase;
 use Tests\Support\Kepegawaian\PegawaiFixtureTrait;
@@ -106,7 +109,14 @@ final class RekapUangMakanParitasTest extends DatabaseTestCase
      */
     public function testPaginasiMemotongBarisSatuPegawai(): void
     {
+        // R9: pegawai DH satker A tanpa hari dibayar; urutan populasi di antara a2 dan b1 (satker A, NIP > a2).
+        $kosong = $this->pegawaiRekap($this->satkerA, ['nip' => '199901012026011905']);
+        $p      = ParameterRekap::dari(self::BULAN, '2026-10-27', $this->db, true);
+        $lingk  = (new CakupanLaporan($this->db))->lingkup($this->adminRekap(), $p->unitSatker);
+        $this->assertSame([$this->nip['a1'], $this->nip['a2'], $kosong, $this->nip['b1']], array_column((new PopulasiRekap($this->db))->dh($p->awal, $p->akhir, $lingk, $p->jenisPegawai), 'nip'), 'pegawai tanpa hari dibayar masuk populasi, di tengah');
+
         $hal = fn (int $per, int $page): array => $this->halaman($per, $page);
+        $this->assertNotContains($kosong, array_column($hal(100, 1)[1], 0), 'pegawai tanpa hari dibayar tidak menghasilkan baris');
 
         $this->assertSame([6, [[$this->nip['a1'], '2026-09-03'], [$this->nip['a2'], '2026-09-04']]], $hal(2, 2), 'per_page 2 page 2: sisa a1 + a2');
         $this->assertSame([6, [[$this->nip['b1'], '2026-09-07']]], $hal(5, 2), 'per_page 5 page 2: baris kedua b1 saja');
