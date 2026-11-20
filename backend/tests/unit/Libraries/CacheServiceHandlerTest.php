@@ -17,6 +17,7 @@ use CodeIgniter\Exceptions\BadMethodCallException;
 use CodeIgniter\Test\CIUnitTestCase;
 use CodeIgniter\Test\TestLogger;
 use Config\Cache as CacheConfig;
+use ReflectionMethod;
 use ReflectionProperty;
 use RuntimeException;
 
@@ -106,7 +107,9 @@ final class CacheServiceHandlerTest extends CIUnitTestCase
         foreach ([MemcachedHandler::class, WincacheHandler::class] as $kelas) {
             // Tanpa initialize(): deleteMatching() kedua handler melempar BadMethodCallException tanpa koneksi.
             $this->assertSame(0, (new CacheService(new $kelas($this->config()), self::PREFIX))->invalidateMatching('dashboard_stat_*'), $kelas);
-            $this->assertLogged('critical', 'Cache: invalidasi pola gagal di handler ' . $kelas . ' (' . BadMethodCallException::class . '); data cache basi sampai TTL.');
+            // Berkas:baris asal = baris throw di handler vendor (nomor baris tidak dikunci supaya tidak rapuh terhadap update CI4).
+            $berkas = (string) (new ReflectionMethod($kelas, 'deleteMatching'))->getFileName();
+            $this->assertTrue(TestLogger::didLog('critical', 'Cache: invalidasi pola gagal di handler ' . $kelas . ' (' . BadMethodCallException::class . ' di ' . $berkas . ':', false), $kelas);
         }
     }
 
@@ -118,9 +121,10 @@ final class CacheServiceHandlerTest extends CIUnitTestCase
                 throw new RuntimeException('gagal membaca ' . $pattern);
             }
         };
+        $barisThrow = __LINE__ - 3; // baris `throw` di atas
 
         $this->assertSame(0, (new CacheService($handler, self::PREFIX))->invalidateMatching('rahasia_*'));
-        $this->assertLogged('critical', 'Cache: invalidasi pola gagal di handler ' . $handler::class . ' (RuntimeException); data cache basi sampai TTL.');
+        $this->assertLogged('critical', 'Cache: invalidasi pola gagal di handler ' . $handler::class . ' (RuntimeException di ' . __FILE__ . ':' . $barisThrow . '); data cache basi sampai TTL.');
         $this->assertFalse(TestLogger::didLog('critical', 'rahasia_', false), 'Pola/key tidak boleh masuk log');
     }
 
