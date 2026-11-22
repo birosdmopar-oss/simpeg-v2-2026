@@ -28,6 +28,10 @@ use ZipArchive;
  * - `iterasi_kolom` = jumlah langkah perulangan `Reader\Xlsx\ColumnAndRowAttributes::readColumnAttributes` untuk semua
  *                     `<col>`: 1 bila `max` = 16384, selain itu `max − min + 1`. `min`/`max` yang tidak sah (`max` < `min`
  *                     membuat perulangan pemuat tidak pernah berhenti) dihitung tak hingga;
+ * - `tabel`         = jumlah `<tablePart>`: pemuat mengurai ulang relasi sheet untuk setiap `<tablePart>`;
+ * - `salinan`       = byte teks yang disalin pemuat per sel: untuk sel `t="s"`, panjang shared string yang dirujuknya
+ *                     (indeks `<v>` → `<si>` ke-n, dari semua entri ber-`<si>`); untuk rumus `<f t="shared">`, panjang teks
+ *                     rumus induk × jumlah sel turunannya;
  * - `byte`          = jumlah ukuran sesudah dekompresi semua entri (`statIndex`), dijaga lagi dengan byte yang benar-benar
  *                     terbaca.
  *
@@ -39,14 +43,20 @@ use ZipArchive;
  * - entri yang memuat `<!DOCTYPE` tidak diurai lebih lanjut dan tidak membuat berkas ditolak: pemuat menolak part
  *   seperti itu bila benar-benar dimuat (gambar SVG di `xl/media` tidak pernah dimuat sebagai sheet);
  * - entri ber-BOM UTF-16/UTF-32 diurai apa adanya (libxml mengenali BOM, sama seperti hasil konversi pemuat);
- * - entri XML (byte bermakna pertamanya `<`, atau ber-BOM UTF-16/32) yang GAGAL diurai membuat berkas DITOLAK: parser SAX
- *   berhenti pada galat yang masih diteruskan SimpleXML (mis. prefiks namespace tak dideklarasikan), jadi sisa entri
- *   tidak terhitung. Entri bukan XML (gambar, biner) dilewati: libxml milik pemuat juga menolaknya di byte pertama.
+ * - entri XML (byte bermakna pertamanya `<`, atau ber-BOM UTF-16/32) yang GAGAL diurai TIDAK membuat berkas ditolak
+ *   (VML tulisan Excel memuat `<br>` tanpa penutup; pemuat mengabaikannya), tetapi sisanya dihitung KASAR sebagai batas
+ *   atas, karena parser SAX berhenti pada galat yang masih diteruskan SimpleXML (mis. prefiks namespace tak
+ *   dideklarasikan): setiap `<` = satu elemen, setiap `=` = satu atribut, setiap `<c` = satu sel, dan `<col`, `<tablePart`,
+ *   `<si`, atau rumus `shared` di entri seperti itu dihitung tak hingga. Entri bukan XML (gambar, biner) dilewati: libxml
+ *   milik pemuat juga menolaknya di byte pertama.
  */
 final class PemindaiXlsx
 {
     /** Lebar lembar `.xlsx`; `<col max="16384">` membuat pemuat berhenti sesudah satu langkah. */
     private const KOLOM_LEMBAR = 16384;
+
+    /** Panjang teks sel terpanjang di Excel; pemuat memotong shared string ke sini (karakter; × 4 byte UTF-8). */
+    private const BYTE_TEKS_SEL = 32767 * 4;
 
     private const POTONG = 65536;
 
@@ -58,39 +68,58 @@ final class PemindaiXlsx
     private int $sel          = 0;
     private int $bobot        = 0;
     private int $iterasiKolom = 0;
+    private int $tabel        = 0;
+    private int $salinanRumus = 0;
+
+    /**
+     * Panjang byte `<si>` ke-n yang tidak kosong (maksimum dari semua entri ber-`<si>`).
+     *
+     * @var array<int, int>
+     */
+    private array $panjangSi = [];
+
+    /**
+     * Indeks shared string => jumlah sel `t="s"` yang merujuknya.
+     *
+     * @var array<int, int>
+     */
+    private array $rujukSi = [];
+
+    /** Sel `t="s"` di entri yang dihitung kasar: indeksnya tidak diketahui, dianggap merujuk `<si>` terpanjang. */
+    private int $rujukKasar = 0;
 
     // Keadaan parser per entri.
     private int $dalam       = 0;
     private bool $dalamData  = false;
     private bool $dalamBaris = false;
+    private bool $selString  = false;
+    private ?string $teks    = null;
+    private int $urutSi      = 0;
+    private bool $dalamSi    = false;
+    private int $byteSi      = 0;
+    private ?string $rumusSi = null;
+    private int $byteRumus   = 0;
 
     /**
-     * @var array<string, true>
+     * Rumus shared entri ini: `si` => [panjang teks induk, jumlah sel turunan].
+     *
+     * @var array<string, array{0: int, 1: int}>
      */
-    private array $namaData = [];
+    private array $rumus = [];
 
     /**
-     * @var array<string, true>
+     * Nama elemen berkualifikasi namespace => jenis.
+     *
+     * @var array<string, string>
      */
-    private array $namaBaris = [];
-
-    /**
-     * @var array<string, true>
-     */
-    private array $namaSel = [];
-
-    /**
-     * @var array<string, true>
-     */
-    private array $namaKolom = [];
+    private array $nama = [];
 
     private function __construct(private readonly int $maksBobot)
     {
         foreach (self::NS as $ns) {
-            $this->namaData[$ns . "\x1F" . 'sheetData'] = true;
-            $this->namaBaris[$ns . "\x1F" . 'row']      = true;
-            $this->namaSel[$ns . "\x1F" . 'c']          = true;
-            $this->namaKolom[$ns . "\x1F" . 'col']      = true;
+            foreach (['sheetData', 'row', 'c', 'v', 'f', 'col', 'tablePart', 'si'] as $lokal) {
+                $this->nama[$ns . "\x1F" . $lokal] = $lokal;
+            }
         }
     }
 
@@ -98,7 +127,7 @@ final class PemindaiXlsx
      * Pemindaian berhenti lebih awal begitu `byte` melewati `$maksByte` atau `bobot` melewati `$maksBobot`; nilai yang
      * dikembalikan saat itu sudah melewati batasnya.
      *
-     * @return array{sel: int, bobot: int, iterasi_kolom: int, byte: int}
+     * @return array{sel: int, bobot: int, iterasi_kolom: int, tabel: int, salinan: int, byte: int}
      *
      * @throws RuntimeException berkas bukan ZIP yang terbaca, atau memuat entri yang hitungannya tidak bisa dipercaya
      */
@@ -135,7 +164,14 @@ final class PemindaiXlsx
                 $byte = max($byte, $terbaca);
             }
 
-            return ['sel' => $pindai->sel, 'bobot' => $pindai->bobot, 'iterasi_kolom' => $pindai->iterasiKolom, 'byte' => $byte];
+            return [
+                'sel'           => $pindai->sel,
+                'bobot'         => $pindai->bobot,
+                'iterasi_kolom' => $pindai->iterasiKolom,
+                'tabel'         => $pindai->tabel,
+                'salinan'       => $pindai->salinan(),
+                'byte'          => $byte,
+            ];
         } finally {
             $zip->close();
         }
@@ -155,15 +191,23 @@ final class PemindaiXlsx
         $parser = xml_parser_create_ns(null, "\x1F");
         xml_parser_set_option($parser, XML_OPTION_CASE_FOLDING, false);
         xml_set_element_handler($parser, $this->buka(...), $this->tutup(...));
+        xml_set_character_data_handler($parser, $this->isi(...));
 
         $this->dalam      = 0;
         $this->dalamData  = false;
         $this->dalamBaris = false;
+        $this->selString  = false;
+        $this->teks       = null;
+        $this->urutSi     = 0;
+        $this->dalamSi    = false;
+        $this->rumusSi    = null;
+        $this->rumus      = [];
 
         $terbaca  = 0;
         $ekor     = '';
         $jenis    = 'lain';   // 'xml' | 'bom' | 'lain' (bukan XML: tidak diurai)
         $urai     = true;
+        $kasar    = false;    // urai gagal: sisa entri dihitung kasar
         $encoding = null;     // null = belum ketemu deklarasi, true = UTF-8, false = selain UTF-8
         $doctype  = false;
 
@@ -185,11 +229,13 @@ final class PemindaiXlsx
                     return $terbaca;
                 }
 
-                $teks = $ekor . (str_contains($potong, "\0") ? str_replace("\0", '', $potong) : $potong);
+                $bersih = str_contains($potong, "\0") ? str_replace("\0", '', $potong) : $potong;
+                $teks   = $ekor . $bersih;
 
                 if (! $doctype && str_contains($teks, '<!DOCTYPE')) {
                     $doctype = true;
                     $urai    = false;
+                    $kasar   = false;
                 }
 
                 // Entri ber-BOM: pemuat memakai BOM, bukan deklarasi, untuk menentukan encoding.
@@ -200,14 +246,17 @@ final class PemindaiXlsx
 
                 $ekor = self::ekor($teks);
 
-                if ($urai && $jenis !== 'lain') {
-                    if (xml_parse($parser, $potong, false) !== 1) {
-                        throw new RuntimeException('Entri XML di arsip xlsx tidak dapat diurai sampai selesai.');
-                    }
+                if ($urai && $jenis !== 'lain' && xml_parse($parser, $potong, false) !== 1) {
+                    $urai  = false;
+                    $kasar = true;
+                }
 
-                    if ($this->bobot > $this->maksBobot) {
-                        return $terbaca;
-                    }
+                if ($kasar) {
+                    $this->hitungKasar($teks);
+                }
+
+                if ($this->bobot > $this->maksBobot) {
+                    return $terbaca;
                 }
             }
 
@@ -217,6 +266,10 @@ final class PemindaiXlsx
 
             if ($encoding === false && ! $doctype) {
                 throw new RuntimeException('Entri xlsx berdeklarasi encoding selain UTF-8.');
+            }
+
+            foreach ($this->rumus as [$panjang, $turunan]) {
+                $this->salinanRumus = self::tambah($this->salinanRumus, self::kali($panjang, $turunan));
             }
         } finally {
             fclose($aliran);
@@ -232,26 +285,75 @@ final class PemindaiXlsx
     {
         $this->dalam++;
         $this->bobot += 1 + 2 * count($atribut);
+        $jenis = $this->nama[$nama] ?? null;
 
-        if (isset($this->namaKolom[$nama])) {
+        if ($jenis === 'col') {
             $this->hitungKolom((int) ($atribut['min'] ?? 0), (int) ($atribut['max'] ?? 0));
+        } elseif ($jenis === 'tablePart') {
+            $this->tabel++;
+        } elseif ($jenis === 'si' && $this->dalam === 2) {
+            $this->dalamSi = true;
+            $this->byteSi  = 0;
         }
 
         if ($this->dalam === 2) {
-            $this->dalamData = isset($this->namaData[$nama]);
+            $this->dalamData = $jenis === 'sheetData';
         } elseif ($this->dalam === 3) {
-            $this->dalamBaris = $this->dalamData && isset($this->namaBaris[$nama]);
-        } elseif ($this->dalam === 4 && $this->dalamBaris && isset($this->namaSel[$nama])) {
+            $this->dalamBaris = $this->dalamData && $jenis === 'row';
+        } elseif ($this->dalam === 4 && $this->dalamBaris && $jenis === 'c') {
             $this->sel++;
+            $this->selString = ($atribut['t'] ?? '') === 's';
+        } elseif ($this->dalam === 5 && $this->dalamBaris) {
+            if ($jenis === 'v' && $this->selString) {
+                $this->teks = '';
+            } elseif ($jenis === 'f' && strtolower($atribut['t'] ?? '') === 'shared') {
+                $this->rumusSi   = $atribut['si'] ?? '';
+                $this->byteRumus = 0;
+            }
+        }
+    }
+
+    private function isi(XMLParser $parser, string $data): void
+    {
+        if ($this->dalamSi) {
+            $this->byteSi += strlen($data);
+        } elseif ($this->teks !== null) {
+            // Indeks shared string: beberapa digit saja; dipotong supaya teks liar tidak menumpuk.
+            $this->teks = substr($this->teks . $data, 0, 20);
+        } elseif ($this->rumusSi !== null) {
+            $this->byteRumus += strlen($data);
         }
     }
 
     private function tutup(XMLParser $parser, string $nama): void
     {
-        if ($this->dalam === 3) {
+        if ($this->dalam === 5) {
+            if ($this->teks !== null) {
+                $indeks                 = (int) $this->teks;
+                $this->rujukSi[$indeks] = ($this->rujukSi[$indeks] ?? 0) + 1;
+                $this->teks             = null;
+            } elseif ($this->rumusSi !== null) {
+                // Rumus ber-teks = induk; tanpa teks = turunan yang menyalin teks induknya.
+                $r                           = $this->rumus[$this->rumusSi] ?? [0, 0];
+                $this->rumus[$this->rumusSi] = $this->byteRumus > 0 ? [max($r[0], $this->byteRumus), $r[1] + 1] : [$r[0], $r[1] + 1];
+                $this->rumusSi               = null;
+            }
+        } elseif ($this->dalam === 4) {
+            $this->selString = false;
+        } elseif ($this->dalam === 3) {
             $this->dalamBaris = false;
         } elseif ($this->dalam === 2) {
             $this->dalamData = false;
+
+            if ($this->dalamSi) {
+                // `<si>` kosong tidak dicatat (panjang 0 = bawaan), supaya jutaan `<si/>` tidak menumpuk di sini.
+                if ($this->byteSi > 0) {
+                    $this->panjangSi[$this->urutSi] = max($this->panjangSi[$this->urutSi] ?? 0, min($this->byteSi, self::BYTE_TEKS_SEL));
+                }
+
+                $this->urutSi++;
+                $this->dalamSi = false;
+            }
         }
 
         $this->dalam--;
@@ -267,7 +369,44 @@ final class PemindaiXlsx
             $langkah = PHP_INT_MAX;
         }
 
-        $this->iterasiKolom = $langkah > PHP_INT_MAX - $this->iterasiKolom ? PHP_INT_MAX : $this->iterasiKolom + $langkah;
+        $this->iterasiKolom = self::tambah($this->iterasiKolom, $langkah);
+    }
+
+    /**
+     * Batas atas kasar untuk potongan entri XML yang tidak bisa diurai parser SAX (lihat docblock kelas). `$teks` sudah
+     * tanpa byte nol dan diawali ekor potongan sebelumnya (64 byte terhitung dua kali: tetap batas atas).
+     */
+    private function hitungKasar(string $teks): void
+    {
+        $this->bobot += substr_count($teks, '<') + 2 * substr_count($teks, '=');
+        $this->sel += substr_count($teks, '<c');
+        $this->rujukKasar += substr_count($teks, 't="s"') + substr_count($teks, "t='s'");
+
+        if (preg_match('/<(?:\w+:)?(?:col|tablePart|si)[\s\/>]|shared/', $teks) === 1) {
+            $this->iterasiKolom = PHP_INT_MAX;
+        }
+    }
+
+    private function salinan(): int
+    {
+        $jumlah     = $this->salinanRumus;
+        $terpanjang = $this->panjangSi === [] ? 0 : max($this->panjangSi);
+
+        foreach ($this->rujukSi as $indeks => $kali) {
+            $jumlah = self::tambah($jumlah, self::kali($this->panjangSi[$indeks] ?? 0, $kali));
+        }
+
+        return self::tambah($jumlah, self::kali($terpanjang, $this->rujukKasar));
+    }
+
+    private static function tambah(int $a, int $b): int
+    {
+        return $b > PHP_INT_MAX - $a ? PHP_INT_MAX : $a + $b;
+    }
+
+    private static function kali(int $a, int $b): int
+    {
+        return $a !== 0 && $b > intdiv(PHP_INT_MAX, $a) ? PHP_INT_MAX : $a * $b;
     }
 
     /**

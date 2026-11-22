@@ -36,7 +36,7 @@ use Throwable;
  *    berkas (referensi panjang, matriks lebar) dan `<row>` berformat tanpa sel tetap diterima seperti sebelum CR-177.
  * 2. SESUDAH dimuat, batas baris data dan kolom sheet GPP dan TK ("Jumlah baris melebihi batas …", "Jumlah kolom melebihi
  *    batas …"), diperiksa sebelum array baris × kolom disusun: satu sel di kolom XFD tidak lagi berarti 16.384 kolom ×
- *    semua baris. Baris diperiksa untuk kedua sheet dulu, baru kolom, jadi pesan tidak bergantung urutan tab.
+ *    semua baris. GPP dimuat dan diperiksa dulu, lalu TK (dua muatan terpisah), jadi pesan tidak bergantung urutan tab.
  *
  * Read filter (`IReadFilter`) SENGAJA TIDAK dipasang pada pemuat, jangan ditambahkan: begitu ada read filter kustom,
  * reader Xlsx memanggilnya untuk setiap kolom `<cols>` × setiap `<row>` (`Reader/Xlsx/ColumnAndRowAttributes`, juga saat
@@ -48,7 +48,7 @@ use Throwable;
 final class PembacaExcelSlip
 {
     public const PESAN_TIDAK_TERBACA = 'Berkas tidak dapat dibaca. Pastikan berkas Excel (.xlsx/.xls) yang valid.';
-    public const PESAN_STRUKTUR      = 'Struktur berkas terlalu besar untuk diproses. Simpan ulang berkas hanya dengan sheet GPP dan TK.';
+    public const PESAN_STRUKTUR      = 'Struktur berkas terlalu besar untuk diproses. Simpan ulang berkas hanya dengan sheet GPP dan TK, tanpa rumus (tempel sebagai nilai).';
 
     /**
      * Reader yang boleh dipakai; tanpa daftar ini `createReaderForFile` mencoba semua reader (Csv, Html, Ods, …).
@@ -104,6 +104,12 @@ final class PembacaExcelSlip
             throw self::tidakTerbaca($e);
         }
 
+        // Excel tidak mengizinkan nama sheet kembar (tanpa membedakan huruf besar-kecil). Berkas buatan dengan nama kembar
+        // membuat pemuat memuat part yang sama berkali-kali, padahal pemindai menghitungnya sekali.
+        if (count(array_unique(array_map(static fn (string $n): string => mb_strtolower($n), $namaSheet))) !== count($namaSheet)) {
+            throw self::tidakTerbaca(new BerkasImporDitolak('Nama sheet kembar.'));
+        }
+
         $cari = KolomGaji::cariSheetWajib($namaSheet);
 
         if (! $cari->valid) {
@@ -118,40 +124,39 @@ final class PembacaExcelSlip
             $this->praCekXls($path, array_values($nama));
         }
 
-        try {
-            $reader->setLoadSheetsOnly(array_values($nama));
-            $buku = $reader->load($path);
-        } catch (Throwable $e) {
-            throw self::tidakTerbaca($e);
-        }
+        // GPP dan TK dimuat dalam dua muatan terpisah: puncak memori = satu part (pemuat membangun pohon XML part sheet dua
+        // kali, di luar `memory_limit`), juga bila kedua nama menunjuk part yang sama. GPP diperiksa dulu, lalu TK.
+        $hasil = [];
 
-        try {
-            $lembar = [];
-            $ukuran = [];
+        foreach ($nama as $sheet => $namaAsli) {
+            try {
+                $reader->setLoadSheetsOnly([$namaAsli]);
+                $buku = $reader->load($path);
+            } catch (Throwable $e) {
+                throw self::tidakTerbaca($e);
+            }
 
-            foreach ($nama as $sheet => $namaAsli) {
-                $l = $buku->getSheetByName($namaAsli);
+            try {
+                $lembar = $buku->getSheetByName($namaAsli);
 
-                if ($l === null) {
+                if ($lembar === null) {
                     throw new BerkasImporDitolak(self::PESAN_TIDAK_TERBACA);
                 }
 
-                $lembar[$sheet] = $l;
-                $ukuran[$sheet] = [$l->getHighestDataRow(), Coordinate::columnIndexFromString($l->getHighestDataColumn())];
-            }
+                $barisTerakhir = $lembar->getHighestDataRow();
+                $kolomTerakhir = Coordinate::columnIndexFromString($lembar->getHighestDataColumn());
 
-            $this->periksaUkuran(array_values($ukuran));
-            $hasil = [];
-
-            foreach ($lembar as $sheet => $l) {
-                $hasil[$sheet] = self::barisMentah($l, $ukuran[$sheet][0], $ukuran[$sheet][1]);
+                // Sebelum array baris × kolom disusun.
+                $this->periksaUkuran([[$barisTerakhir, $kolomTerakhir]]);
+                $hasil[$sheet] = self::barisMentah($lembar, $barisTerakhir, $kolomTerakhir);
+            } catch (BerkasImporDitolak $e) {
+                throw $e;
+            } catch (Throwable $e) {
+                throw self::tidakTerbaca($e);
+            } finally {
+                $buku->disconnectWorksheets();
+                unset($buku, $lembar);
             }
-        } catch (BerkasImporDitolak $e) {
-            throw $e;
-        } catch (Throwable $e) {
-            throw self::tidakTerbaca($e);
-        } finally {
-            $buku->disconnectWorksheets();
         }
 
         return HasilSlip::berhasil($hasil);
@@ -159,7 +164,8 @@ final class PembacaExcelSlip
 
     /**
      * Anggaran seluruh berkas `.xlsx` (lihat {@see PemindaiXlsx} dan docblock konstanta `Config\Presensi`). Urutan: ukuran
-     * isi, jumlah sel, lalu bobot elemen dan iterasi `<col>` (satu pesan: keduanya soal struktur, bukan isi sel).
+     * isi, jumlah sel, lalu struktur (satu pesan): bobot elemen, iterasi `<col>`, jumlah `<tablePart>`, dan byte teks yang
+     * disalin pemuat per sel (shared string dan rumus shared; batasnya sama dengan batas ukuran isi).
      *
      * @throws BerkasImporDitolak
      */
@@ -177,7 +183,8 @@ final class PembacaExcelSlip
 
         $this->periksaSel($ukuran['sel']);
 
-        if ($ukuran['bobot'] > $this->maksBobot || $ukuran['iterasi_kolom'] > $this->maksIterasiKolom) {
+        if ($ukuran['bobot'] > $this->maksBobot || $ukuran['iterasi_kolom'] > $this->maksIterasiKolom
+            || $ukuran['tabel'] > Presensi::MAKS_TABEL_IMPOR || $ukuran['salinan'] > $this->maksByteIsi) {
             throw new BerkasImporDitolak(self::PESAN_STRUKTUR);
         }
     }
@@ -214,7 +221,7 @@ final class PembacaExcelSlip
     }
 
     /**
-     * Baris dulu untuk semua sheet, baru kolom: hasilnya tidak bergantung urutan tab.
+     * Baris dulu untuk semua sheet yang diberikan, baru kolom.
      *
      * @param list<array{0: int, 1: int}> $ukuran [baris terakhir, kolom terakhir] per sheet
      *

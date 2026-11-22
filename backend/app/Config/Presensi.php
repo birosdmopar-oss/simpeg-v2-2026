@@ -30,8 +30,9 @@ class Presensi extends BaseConfig
     // `Libraries/Presensi` (BB-1..BB-11). Acuan ukur (PHP 8.4, PhpSpreadsheet 5.10): template resmi terisi penuh = 10.000
     // baris GPP 26 kolom + TK 10 kolom = 360.036 sel, berkas 1,5 MB, isi 12,4 MB, 780.461 elemen XML + 440.502 atribut.
     // Membacanya: ±8 detik, puncak memori PHP +214 MB (kena `memory_limit`), dan puncak RSS proses ±612 MB, karena pohon
-    // XML libxml yang dibangun PhpSpreadsheet berada DI LUAR `memory_limit`. Jadi server impor wajib `memory_limit` ≥ 256M
-    // dan RAM bebas ±1 GB per impor yang berjalan bersamaan.
+    // XML libxml yang dibangun PhpSpreadsheet berada DI LUAR `memory_limit`. Kasus sah terberat yang masih lolos anggaran
+    // (390.039 sel teks pendek `t="s"`): PHP +258 MB (fatal pada 256M), RSS ±925 MB. Jadi server impor wajib
+    // `memory_limit` ≥ 512M dan RAM bebas ±1 GB per impor yang berjalan bersamaan (README-deploy §1).
 
     /**
      * Batas kolom sheet GPP/TK, diperiksa sesudah muat. Template resmi 26 kolom (GPP: nip, bulan, tahun, nama + 22
@@ -60,7 +61,7 @@ class Presensi extends BaseConfig
      * Batas bobot struktur XML `.xlsx` = batas sel × nilai ini; bobot = jumlah semua elemen + 2 × jumlah semua atribut di
      * semua entri (atribut ±2× lebih mahal dari elemen di libxml). Template penuh tulisan PhpSpreadsheet berbobot 4,6
      * per sel; tulisan Excel (sel ber-atribut gaya) ±7 per sel. 8 → bawaan 3.200.320. Terukur di batas ini (berkas yang
-     * isinya hanya elemen pengisi): puncak RSS ±840 MB, yaitu ±1,4× template penuh. Tanpa batas ini 32 MB isi masih
+     * isinya hanya elemen pengisi): puncak RSS ±840 MB; sel teks pendek sebanyak batas sel: ±925 MB (±1,5× template penuh). Tanpa batas ini 32 MB isi masih
      * mengizinkan ±8 juta elemen (RSS ±2 GB).
      */
     public const BOBOT_PER_SEL_IMPOR = 8;
@@ -73,8 +74,15 @@ class Presensi extends BaseConfig
     public const MAKS_ITERASI_KOLOM_IMPOR = 200_000;
 
     /**
-     * Batas jumlah ukuran semua entri `.xlsx` sesudah dekompresi. Template penuh = 12,4 MB; dengan 30 kolom tambahan
-     * 22,1 MB. 32 MB memberi ruang ±2,5× untuk berkas tulisan Excel (XML lebih boros), dan menutup berkas yang mengembang
+     * Batas jumlah `<tablePart>` (tabel Excel) `.xlsx`: PhpSpreadsheet mengurai ulang relasi sheet untuk setiap
+     * `<tablePart>` (berkas 14 KB berisi 1.000 tablePart: 157 detik). Berkas gaji sah: nol sampai beberapa.
+     */
+    public const MAKS_TABEL_IMPOR = 50;
+
+    /**
+     * Batas jumlah ukuran semua entri `.xlsx` sesudah dekompresi. Dipakai juga sebagai batas byte teks yang disalin
+     * pemuat per sel (shared string yang dirujuk sel + teks rumus shared × sel turunannya). Template penuh = 12,4 MB;
+     * dengan 30 kolom tambahan 22,1 MB. 32 MB memberi ruang ±2,5× untuk berkas tulisan Excel (XML lebih boros), dan menutup berkas yang mengembang
      * saat dibuka (zip bomb, XML berisi pengisi teks, sharedStrings raksasa): pemuat menampung setiap part utuh sebagai
      * string sebelum diurai.
      */

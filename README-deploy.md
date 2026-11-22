@@ -69,6 +69,8 @@ Keluaran `==> [cek-versi-runtime] … aman` = lolos; `!!  … DITOLAK` (exit 1) 
 
 PHP untuk unduhan PDF dokumen F-09 (MAKE-037, ADR-034): `memory_limit` ≥ 256M dan batas waktu request ≥ 30 detik (`max_execution_time` PHP-FPM serta timeout proxy web server, mis. `fastcgi_read_timeout`). PDF 1.700 baris terukur ±238 MB dan ±10 detik di mesin dev.
 
+PHP untuk impor Slip Gaji (CR-177): `memory_limit` ≥ **512M**, batas waktu request ≥ 60 detik, dan RAM bebas ±1 GB per impor yang berjalan bersamaan. Template resmi terisi penuh (10.000 baris, 360.036 sel) terukur ±8 detik, puncak memori PHP +214 MB, dan puncak RSS proses ±612 MB; berkas sah terberat yang masih diterima (390 ribu sel teks pendek) PHP +258 MB (fatal pada 256M) dan RSS ±925 MB. RSS jauh di atas `memory_limit` karena pohon XML yang dibangun PhpSpreadsheet (libxml) tidak dihitung `memory_limit`. Berkas di luar anggaran ditolak 422 sebelum dimuat; rincian: `backend/app/Libraries/Presensi/README.md` BB-1..BB-11.
+
 Database: koneksi aplikasi berjalan strict (`strictOn = true`) dan tabel memakai `utf8mb4_unicode_ci`. Sebelum deploy yang memuat DBV-010 (migration `2026-09-25-1300xx`), ikuti runbook `backend/docs/db-review/A-01-auth-schema.md` Bagian 9.8: cek versi/`sql_mode`/collation server (MySQL 8 vs MariaDB 10.4, D-11), `ALTER DATABASE` oleh DBA, bersihkan data QA, deploy di luar jam kerja (semua pengguna login ulang sekali). Migration-nya sendiri dijalankan manual (§3a), bukan oleh hook.
 
 ```bash
@@ -896,7 +898,7 @@ WHERE t.status = 0 AND t.id_question_category IS NOT NULL
 | `opcache.interned_strings_buffer` | `16`–`32` (MB) | |
 | `realpath_cache_size` | `4096K` | Banyak berkas vendor + symlink `current`. |
 | `realpath_cache_ttl` | `600` | Aman karena path release tidak berubah sesudah dibuat; switch symlink ditangani `$realpath_root` + reload (butir 3). |
-| `memory_limit` | ≥ `256M` | Sudah wajib (§1, unduhan PDF F-09; ekspor Halo Simpeg §1n). |
+| `memory_limit` | ≥ `512M` | Wajib (§1): impor Slip Gaji butuh 512M (CR-177); unduhan PDF F-09 dan ekspor Halo Simpeg §1n cukup 256M. |
 
 Menghitung berkas PHP release aktif (baca saja):
 
@@ -912,7 +914,7 @@ pm.max_children = RAM yang disediakan untuk FPM ÷ RSS rata-rata satu worker
 
 - RSS rata-rata diukur di server sesudah beban nyata, mis. `ps -o rss= -C php-fpm8.4 | awk '{s+=$1; n++} END {print s/n/1024 " MB"}'`.
 - Sisakan RAM untuk OS, Nginx, cron/worker `php spark`, dan MySQL bila satu server.
-- Batas atas per request tetap `memory_limit` (≥ 256M); `pm.max_children × memory_limit` boleh melebihi RAM hanya bila TL menerima
+- Batas atas per request tetap `memory_limit` (≥ 512M; impor Slip Gaji juga memakai RSS sampai ±1 GB di luar hitungan itu, §1); `pm.max_children × memory_limit` boleh melebihi RAM hanya bila TL menerima
   risiko puncak serentak (kebanyakan request jauh di bawah `memory_limit`).
 - Usulan awal `pm.max_requests = 500` (mendaur ulang worker, mencegah memori bocor menumpuk).
 
