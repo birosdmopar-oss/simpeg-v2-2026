@@ -6,7 +6,9 @@ namespace Tests\MasterData;
 
 use App\Constants\Role;
 use App\Database\Migrations\AddFkPegawaiDiPenggunaFaqRate;
+use App\Exceptions\ForbiddenException;
 use App\Libraries\Kepegawaian\NipCascadeService;
+use App\Libraries\MasterData\FaqService;
 use CodeIgniter\Database\Query;
 use CodeIgniter\Events\Events;
 use CodeIgniter\Test\FeatureTestTrait;
@@ -19,8 +21,9 @@ use Tests\Support\Kepegawaian\PegawaiFixtureTrait;
 
 /**
  * CR-171 (G2): sesudah koreksi NIP (B-06) access token lama masih membawa NIP lama di claim. `POST faq/{id}/rate` dengan token itu
- * ditolak 403 (seperti penolakan identitas penilai lain), tanpa rating yatim ber-NIP lama dan tanpa rating ganda (rating lama
- * sudah ikut pindah ke NIP baru). Token baru (NIP baru) tetap dilayani normal.
+ * ditolak tanpa rating yatim ber-NIP lama dan tanpa rating ganda (rating lama sudah ikut pindah ke NIP baru). Sejak CR-175 penolakan
+ * itu datang dari JwtAuthFilter (401 generik); cek 403 sesi basi FaqService tetap ada sebagai lapis kedua dan jaring 1452 (R2,
+ * balapan sesudah filter) tetap 403. Token baru (NIP baru) tetap dilayani normal.
  *
  * @internal
  */
@@ -58,9 +61,10 @@ final class FaqRateSesiBasiTest extends DatabaseTestCase
         (new NipCascadeService())->koreksi($super, $lama, self::NIP_BARU);
         $this->assertSame(1, $this->db->table('faq_rate')->where('id_faq_article', 1)->where('nip', self::NIP_BARU)->countAllResults(), 'rating ikut pindah ke NIP baru');
 
+        // CR-175: JwtAuthFilter menolak sesi NIP basi lebih dulu (401 generik), sebelum cek 403 sesi basi FaqService.
         $res = $this->rate($tokenLama, 1);
-        $res->assertStatus(403);
-        $this->assertSame('Sesi tidak lagi sesuai data pegawai. Silakan login ulang.', $this->json($res)['message']);
+        $res->assertStatus(401);
+        $this->assertSame(['status' => 'error', 'message' => 'Unauthorized'], $this->json($res));
 
         $this->assertSame(0, $this->db->table('faq_rate')->where('nip', $lama)->countAllResults(), 'tanpa rating yatim ber-NIP lama');
         $this->assertSame(1, $this->db->table('faq_rate')->where('id_faq_article', 1)->countAllResults(), 'tanpa rating ganda');
@@ -88,8 +92,31 @@ final class FaqRateSesiBasiTest extends DatabaseTestCase
         $this->assertNotSame($idX, $idY);
 
         $res = $this->rate($tokenX, 1);
-        $res->assertStatus(403);
+        $res->assertStatus(401); // CR-175: ditolak filter
         $this->assertSame(0, $this->db->table('faq_rate')->where('nip', $lama)->countAllResults(), 'tanpa rating atas nama pegawai Y');
+    }
+
+    /**
+     * CR-175 R1 review: cabang 403 sesi basi CR-171 (`akunPemegangNip` → `sesiBasi`) kini didahului 401 JwtAuthFilter di HTTP,
+     * jadi diuji langsung di tingkat service (lapis kedua untuk balapan sesudah filter lolos): NIP lama + akun X sesudah
+     * koreksi NIP → ForbiddenException, tanpa baris.
+     */
+    public function testServiceSesiBasiSesudahKoreksiNip403TanpaBaris(): void
+    {
+        $lama  = $this->buatPegawai();
+        $idX   = $this->buatAkunUntuk($lama, Role::PEGAWAI);
+        $super = $this->authUntukAkun($this->buatAkunUntuk($this->buatPegawai(), Role::SUPER_ADMIN));
+        (new NipCascadeService())->koreksi($super, $lama, self::NIP_BARU);
+
+        try {
+            (new FaqService())->rate('1', $lama, $idX, Role::PEGAWAI, 1, null);
+            $this->fail('Seharusnya ForbiddenException sesi basi');
+        } catch (ForbiddenException $e) {
+            $this->assertSame('Sesi tidak lagi sesuai data pegawai. Silakan login ulang.', $e->getMessage());
+        }
+
+        $this->assertSame(0, $this->db->table('faq_rate')->where('nip', $lama)->countAllResults());
+        $this->assertSame(0, $this->db->table('faq_rate')->where('nip', self::NIP_BARU)->countAllResults());
     }
 
     /**

@@ -96,7 +96,7 @@ FAIL di log skrip (`t_scope` 6, `t_bio` 3, `t_appr` 2, `t_siklus` 1, `t_lamp` 4,
 | Hapus → soft delete pegawai | **PASS sesuai keputusan user 13-10-2026** (hapus FISIK ikut legacy, README Controllers B-05) | `DELETE pegawai/{nip}` → 200 `{deleted: true, soft_delete: false, item}`; baris `pegawai` hilang; galeri `pegawai_foto` ikut terhapus + berkas foto dibuang dari disk; audit `pegawai delete`, `pegawai_foto delete`, `pengguna update`. NIP tidak ada → 404 |
 | Hapus → akun terkait dinonaktifkan | PASS (akun dilepas) | Akun: `nip` NULL + `status` 0; semua refresh token dicabut (0 aktif); login ditolak |
 | Data turunan → 422 | PASS | Hapus pegawai ber-pmj (unit 30) dan pegawai ber-riwayat/pengajuan → 422 `errors.nip` "Pegawai tidak dapat dihapus karena masih memiliki data terkait…", data & akun utuh |
-| Status 1→2 menonaktifkan akun PNS saja | PASS | Role 1 ubah status 1→2 (+ jenis status 3) pegawai akun `user_level` 2 → akun status 0, refresh token dicabut; akun `user_level` 7 → tetap aktif; 2→1 tidak mengaktifkan ulang; daftar `status=2` memuatnya. Access token lama tetap berlaku sampai `exp` (A-F7, ADR-004) |
+| Status 1→2 menonaktifkan akun PNS saja | PASS | Role 1 ubah status 1→2 (+ jenis status 3) pegawai akun `user_level` 2 → akun status 0, refresh token dicabut; akun `user_level` 7 → tetap aktif; 2→1 tidak mengaktifkan ulang; daftar `status=2` memuatnya. Access token lama tetap berlaku sampai `exp` (A-F7, ADR-004; diubah sebagian oleh CR-175: koreksi NIP / hapus pegawai → access token lama 401 (filter membaca DB untuk token ber-NIP); akun nonaktif tetap berlaku sampai `exp` (QA-21).) |
 | Regression test A-09 dijalankan ulang | PASS | PHPUnit `AccountProvisionerTest`, `EmailUnikTest`, `ValidasiNipPegawaiTest` + `SiklusPegawaiTest` (10 test, termasuk "Tambah pegawai foto dan akun A-09") OK |
 | Modal konfirmasi hapus (UI) | — | Bagian D |
 | Catatan | A-F3 | Seed `MasterDataSeeder` memberi id `jenis_pegawai` 2 = PPPK, sementara pemetaan akun [K] memakai id legacy 2 = PTT, 6 = PPPK |
@@ -160,7 +160,7 @@ FAIL di log skrip (`t_scope` 6, `t_bio` 3, `t_appr` 2, `t_siklus` 1, `t_lamp` 4,
 | A-F4 | Info | `riwayat_skp_periodik.nip` (dan `riwayat_skp.nip_penilai`/`nip_atasan_penilai`) tidak ikut koreksi NIP | 048 |
 | A-F5 | Info | Kegagalan cascade → 500 dengan pesan DB mentah di development (production disamarkan) | 048 |
 | A-F6 | Info | `GET pegawai` mengabaikan parameter tak dikenal; `GET pegawai/export` tanpa `format` = XLSX | 062 |
-| A-F7 | Info | Access token lama tetap berlaku sampai `exp` setelah akun dinonaktifkan/dilepas/koreksi NIP | 047, 048 |
+| A-F7 | Info | Access token lama tetap berlaku sampai `exp` setelah akun dinonaktifkan/dilepas/koreksi NIP. Diubah sebagian oleh CR-175: koreksi NIP / hapus pegawai → access token lama 401 (filter membaca DB untuk token ber-NIP); akun nonaktif tetap berlaku sampai `exp` (QA-21). | 047, 048 |
 | A-F8 | Info | `display_name` lampiran mempertahankan karakter seperti `<script>` (hanya folder & karakter kontrol dibuang) | 060 |
 | A-F9 | Info | Kolom tanpa FK: `pegawai_diklat`/`riwayat_diklat.id_sub_group_jabatan`, `riwayat_skp_periodik.nip` | 043, 044 |
 | A-F10 | Info | Cetak DRH terbuka untuk role 6/7 (NIP sendiri) dan 8, berbeda dengan Matriks (1–5) | 062 |
@@ -202,6 +202,7 @@ FAIL di log skrip (`t_scope` 6, `t_bio` 3, `t_appr` 2, `t_siklus` 1, `t_lamp` 4,
 ### A-F7 — Access token setelah akun dinonaktifkan (Info)
 
 - Setelah status pegawai 1→2 (akun PNS nonaktif), pegawai dihapus (akun dilepas), atau koreksi NIP, refresh token dicabut, tetapi access token yang sudah terbit tetap 200 sampai `exp` (maks 1 jam). Ini sesuai desain ADR-004 dan sudah dicatat di QAFUNC-002.
+- Diubah sebagian oleh CR-175: koreksi NIP / hapus pegawai → access token lama 401 (filter membaca DB untuk token ber-NIP); akun nonaktif tetap berlaku sampai `exp` (QA-21).
 
 ### A-F8 — `display_name` lampiran (Info)
 

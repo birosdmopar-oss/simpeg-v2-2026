@@ -27,7 +27,9 @@ use Throwable;
  * untuk akun tanpa NIP), 'id_unit', 'id_satker', 'must_change_password' (MAKE-020; hanya ada bila true). Setiap token
  * membawa 'ver' = CLAIMS_VERSION.
  * Catatan: claims nip/id_unit/id_satker disalin dari row refresh token saat refresh, sehingga bisa stale
- * selama window 7 hari kalau pegawai dimutasi (lihat catatan 00-INDEX.md).
+ * selama window 7 hari kalau pegawai dimutasi. Khusus `nip` (CR-175): JwtAuthFilter dan AuthService::refresh menolak
+ * claim yang tidak lagi dipegang akun `sub` (koreksi NIP / hapus pegawai) → 401; lihat Controllers/Api/Auth/README.md
+ * bagian "Sesi NIP basi".
  *
  * Format claims v2 (DBV-010/CR-013): identitas akun = id_pengguna, bukan NIP (akun role 1/3/4/5/8 boleh tanpa NIP).
  * Token format lama (`sub` = NIP, tanpa 'ver') ditolak: access token -> 401, refresh token -> dihapus + 401 "tidak

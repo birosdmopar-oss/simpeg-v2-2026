@@ -103,6 +103,19 @@ class PenggunaModel extends BaseAuditableModel
     }
 
     /**
+     * CR-175: akun `id_pengguna` masih memegang NIP klaim sesi (access token / refresh token). Sesudah koreksi NIP (B-06)
+     * atau hapus pegawai (`pengguna.nip` → NULL) klaim lama tidak lagi cocok → sesi basi. Sengaja TANPA syarat
+     * `deleted_at` dan status akun (perluasan ke akun dihapus/nonaktif/ganti role menunggu QA-21). Satu kueri per
+     * panggilan lewat query builder baru, bukan state model (tanpa filter soft delete).
+     *
+     * @phpstan-impure
+     */
+    public function masihMemegangNip(int $idPengguna, string $nip): bool
+    {
+        return $this->db->table($this->table)->where('id_pengguna', $idPengguna)->where('nip', $nip)->countAllResults() > 0;
+    }
+
+    /**
      * Email sudah dipakai akun lain yang belum dihapus, aktif maupun nonaktif (syarat DBV-010 D-6: email unik selama
      * menjadi kanal reset password; UNIQUE di DB menunggu audit data legacy). Dibandingkan MySQL dengan collation kolom
      * `utf8mb4_unicode_ci` (huruf besar/kecil dianggap sama) — sengaja tidak di-lower-case di PHP. Akun terhapus tidak
