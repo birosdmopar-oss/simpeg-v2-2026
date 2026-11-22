@@ -36,7 +36,9 @@ use Throwable;
  *    berkas (referensi panjang, matriks lebar) dan `<row>` berformat tanpa sel tetap diterima seperti sebelum CR-177.
  * 2. SESUDAH dimuat, batas baris data dan kolom sheet GPP dan TK ("Jumlah baris melebihi batas …", "Jumlah kolom melebihi
  *    batas …"), diperiksa sebelum array baris × kolom disusun: satu sel di kolom XFD tidak lagi berarti 16.384 kolom ×
- *    semua baris. GPP dimuat dan diperiksa dulu, lalu TK (dua muatan terpisah), jadi pesan tidak bergantung urutan tab.
+ *    semua baris. GPP diperiksa dulu, lalu TK, jadi pesan tidak bergantung urutan tab. Keduanya dimuat dalam SATU
+ *    muatan supaya rumus lintas sheet tetap terhitung; berkas yang kedua sheet-nya berisi part yang sama ditolak
+ *    {@see PemuatXlsxSlip}.
  *
  * Read filter (`IReadFilter`) SENGAJA TIDAK dipasang pada pemuat, jangan ditambahkan: begitu ada read filter kustom,
  * reader Xlsx memanggilnya untuk setiap kolom `<cols>` × setiap `<row>` (`Reader/Xlsx/ColumnAndRowAttributes`, juga saat
@@ -48,7 +50,7 @@ use Throwable;
 final class PembacaExcelSlip
 {
     public const PESAN_TIDAK_TERBACA = 'Berkas tidak dapat dibaca. Pastikan berkas Excel (.xlsx/.xls) yang valid.';
-    public const PESAN_STRUKTUR      = 'Struktur berkas terlalu besar untuk diproses. Simpan ulang berkas hanya dengan sheet GPP dan TK, tanpa rumus (tempel sebagai nilai).';
+    public const PESAN_STRUKTUR      = 'Struktur berkas terlalu besar untuk diproses. Simpan ulang berkas hanya dengan sheet GPP dan TK, tanpa rumus (tempel sebagai nilai) atau teks sangat panjang.';
 
     /**
      * Reader yang boleh dipakai; tanpa daftar ini `createReaderForFile` mencoba semua reader (Csv, Html, Ods, …).
@@ -85,12 +87,17 @@ final class PembacaExcelSlip
     {
         try {
             $reader = IOFactory::createReaderForFile($path, self::READER);
+            $xlsx   = $reader instanceof Xlsx;
+
+            // Pemuat xlsx yang menolak dua sheet berisi part yang sama (lihat PemuatXlsxSlip).
+            if ($xlsx) {
+                $reader = new PemuatXlsxSlip();
+            }
+
             $reader->setReadDataOnly(true);
         } catch (Throwable $e) {
             throw self::tidakTerbaca($e);
         }
-
-        $xlsx = $reader instanceof Xlsx;
 
         // xlsx dipindai sebelum apa pun dibaca reader (termasuk daftar nama sheet, yang menampung `workbook.xml` utuh).
         if ($xlsx) {
@@ -124,19 +131,20 @@ final class PembacaExcelSlip
             $this->praCekXls($path, array_values($nama));
         }
 
-        // GPP dan TK dimuat dalam dua muatan terpisah: puncak memori = satu part (pemuat membangun pohon XML part sheet dua
-        // kali, di luar `memory_limit`), juga bila kedua nama menunjuk part yang sama. GPP diperiksa dulu, lalu TK.
-        $hasil = [];
+        // GPP dan TK dimuat dalam SATU muatan: rumus lintas sheet (TK → GPP, GPP → TK, nama terdefinisi) hanya terhitung
+        // bila kedua sheet ada di workbook yang sama. Dimuat terpisah, hasilnya "#REF!".
+        try {
+            $reader->setLoadSheetsOnly(array_values($nama));
+            $buku = $reader->load($path);
+        } catch (Throwable $e) {
+            throw self::tidakTerbaca($e);
+        }
 
-        foreach ($nama as $sheet => $namaAsli) {
-            try {
-                $reader->setLoadSheetsOnly([$namaAsli]);
-                $buku = $reader->load($path);
-            } catch (Throwable $e) {
-                throw self::tidakTerbaca($e);
-            }
+        try {
+            $hasil = [];
 
-            try {
+            // GPP diperiksa dulu, lalu TK; masing-masing sebelum array baris × kolomnya disusun.
+            foreach ($nama as $sheet => $namaAsli) {
                 $lembar = $buku->getSheetByName($namaAsli);
 
                 if ($lembar === null) {
@@ -146,17 +154,15 @@ final class PembacaExcelSlip
                 $barisTerakhir = $lembar->getHighestDataRow();
                 $kolomTerakhir = Coordinate::columnIndexFromString($lembar->getHighestDataColumn());
 
-                // Sebelum array baris × kolom disusun.
                 $this->periksaUkuran([[$barisTerakhir, $kolomTerakhir]]);
                 $hasil[$sheet] = self::barisMentah($lembar, $barisTerakhir, $kolomTerakhir);
-            } catch (BerkasImporDitolak $e) {
-                throw $e;
-            } catch (Throwable $e) {
-                throw self::tidakTerbaca($e);
-            } finally {
-                $buku->disconnectWorksheets();
-                unset($buku, $lembar);
             }
+        } catch (BerkasImporDitolak $e) {
+            throw $e;
+        } catch (Throwable $e) {
+            throw self::tidakTerbaca($e);
+        } finally {
+            $buku->disconnectWorksheets();
         }
 
         return HasilSlip::berhasil($hasil);

@@ -212,9 +212,10 @@ MAKE-052 merged + MAKE-054.
   reader dikunci ke Xlsx/Xls; `.xlsx` dipindai dulu oleh `PemindaiXlsx` (semua entri ZIP, aliran, tanpa mengikuti relasi)
   terhadap anggaran seluruh berkas: isi ≤ 32 MB, sel ≤ (batas baris + 1) × 40, bobot elemen XML ≤ batas sel × 8, langkah
   `<col>` ≤ 200.000, `<tablePart>` ≤ 50, salinan teks (shared string + rumus shared) ≤ 32 MB (konstanta
-  `Config\Presensi`, pesan 422 masing-masing); `.xls` lewat `listWorksheetInfo`; GPP dan TK dimuat dalam dua muatan
-  terpisah, batas baris dan kolom (256, baru) diperiksa sesudah muat sebelum array disusun; tanpa read filter. Perubahan
-  perilaku [V2]: berkas HTML/CSV berkedok Excel, entri ber-encoding selain UTF-8, dan nama sheet kembar → "Berkas tidak
+  `Config\Presensi`; pesan 422 sendiri untuk isi dan sel, satu pesan "struktur" untuk empat lainnya); `.xls` lewat
+  `listWorksheetInfo`; GPP dan TK tetap dimuat dalam satu muatan (rumus lintas sheet terhitung), batas baris dan kolom
+  (256, baru) diperiksa sesudah muat sebelum array disusun; tanpa read filter. Perubahan perilaku [V2]: berkas HTML/CSV
+  berkedok Excel, entri ber-encoding selain UTF-8, nama sheet kembar, dan GPP/TK berisi part yang sama → "Berkas tidak
   dapat dibaca". Kebutuhan server: `memory_limit` ≥ 512M dan RAM bebas ±1 GB per impor (template penuh: PHP +214 MB, RSS
   612 MB; 390 ribu sel teks pendek: PHP +258 MB, RSS 925 MB). Rincian dan angka ukur: README `Libraries/Presensi`
   BB-1..BB-11. Test:

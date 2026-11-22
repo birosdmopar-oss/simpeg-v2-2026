@@ -46,8 +46,8 @@ use ZipArchive;
  * - entri XML (byte bermakna pertamanya `<`, atau ber-BOM UTF-16/32) yang GAGAL diurai TIDAK membuat berkas ditolak
  *   (VML tulisan Excel memuat `<br>` tanpa penutup; pemuat mengabaikannya), tetapi sisanya dihitung KASAR sebagai batas
  *   atas, karena parser SAX berhenti pada galat yang masih diteruskan SimpleXML (mis. prefiks namespace tak
- *   dideklarasikan): setiap `<` = satu elemen, setiap `=` = satu atribut, setiap `<c` = satu sel, dan `<col`, `<tablePart`,
- *   `<si`, atau rumus `shared` di entri seperti itu dihitung tak hingga. Entri bukan XML (gambar, biner) dilewati: libxml
+ *   dideklarasikan): setiap `<` = satu elemen, setiap `=` = satu atribut, setiap `<c>` (dengan atau tanpa prefiks) = satu sel,
+ *   dan `<col`, `<tablePart`, `<si`, atau `t="shared"` di entri seperti itu dihitung tak hingga. Entri bukan XML (gambar, biner) dilewati: libxml
  *   milik pemuat juga menolaknya di byte pertama.
  */
 final class PemindaiXlsx
@@ -318,8 +318,9 @@ final class PemindaiXlsx
         if ($this->dalamSi) {
             $this->byteSi += strlen($data);
         } elseif ($this->teks !== null) {
-            // Indeks shared string: beberapa digit saja; dipotong supaya teks liar tidak menumpuk.
-            $this->teks = substr($this->teks . $data, 0, 20);
+            // Indeks shared string: pemuat memakai `(int)` seluruh teks, jadi spasi dan nol di depan dibuang dulu. Yang
+            // disimpan paling banyak 21 karakter (lebih dari 20 = bukan indeks wajar, lihat tutup()).
+            $this->teks = substr(ltrim($this->teks . $data, " \t\r\n0"), 0, 21);
         } elseif ($this->rumusSi !== null) {
             $this->byteRumus += strlen($data);
         }
@@ -329,9 +330,15 @@ final class PemindaiXlsx
     {
         if ($this->dalam === 5) {
             if ($this->teks !== null) {
-                $indeks                 = (int) $this->teks;
-                $this->rujukSi[$indeks] = ($this->rujukSi[$indeks] ?? 0) + 1;
-                $this->teks             = null;
+                if (strlen($this->teks) > 20) {
+                    // Terlalu panjang untuk dipercaya: dianggap merujuk `<si>` terpanjang.
+                    $this->rujukKasar++;
+                } else {
+                    $indeks                 = (int) $this->teks;
+                    $this->rujukSi[$indeks] = ($this->rujukSi[$indeks] ?? 0) + 1;
+                }
+
+                $this->teks = null;
             } elseif ($this->rumusSi !== null) {
                 // Rumus ber-teks = induk; tanpa teks = turunan yang menyalin teks induknya.
                 $r                           = $this->rumus[$this->rumusSi] ?? [0, 0];
@@ -379,10 +386,10 @@ final class PemindaiXlsx
     private function hitungKasar(string $teks): void
     {
         $this->bobot += substr_count($teks, '<') + 2 * substr_count($teks, '=');
-        $this->sel += substr_count($teks, '<c');
+        $this->sel += (int) preg_match_all('/<(?:\w+:)?c[\s\/>]/', $teks);
         $this->rujukKasar += substr_count($teks, 't="s"') + substr_count($teks, "t='s'");
 
-        if (preg_match('/<(?:\w+:)?(?:col|tablePart|si)[\s\/>]|shared/', $teks) === 1) {
+        if (preg_match('/<(?:\w+:)?(?:col|tablePart|si)[\s\/>]|t\s*=\s*["\']shared/', $teks) === 1) {
             $this->iterasiKolom = PHP_INT_MAX;
         }
     }

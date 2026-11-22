@@ -9,7 +9,9 @@ use App\Libraries\Presensi\Slip\PembacaExcelSlip;
 use App\Libraries\Presensi\SlipGaji\KolomGaji;
 use CodeIgniter\Test\CIUnitTestCase;
 use Config\Presensi;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\NamedRange;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
@@ -32,10 +34,10 @@ final class PembacaExcelSlipBatasBacaTest extends CIUnitTestCase
     private const NIP            = '199001012020011001';
     private const PESAN_KOLOM    = 'Jumlah kolom melebihi batas 256 per sheet.';
     private const PESAN_SEL      = 'Jumlah sel melebihi batas 400.040 per berkas. Hapus sheet atau kolom yang tidak dipakai, lalu unggah ulang.';
-    private const PESAN_STRUKTUR = PembacaExcelSlip::PESAN_STRUKTUR;
+    private const PESAN_STRUKTUR = 'Struktur berkas terlalu besar untuk diproses. Simpan ulang berkas hanya dengan sheet GPP dan TK, tanpa rumus (tempel sebagai nilai) atau teks sangat panjang.';
     private const BATAS_MEMORI   = 64 * 1024 * 1024;
 
-    /** 120.000 sel × 2 sheet: dua part sekaligus terukur +131 MB, satu part + hasil +69 MB. */
+    /** 120.000 sel × 2 sheet: dua part dimuat sekaligus terukur +131 MB; ditolak di part kedua jauh di bawah itu. */
     private const BATAS_SATU_PART = 105 * 1024 * 1024;
 
     /**
@@ -163,7 +165,7 @@ final class PembacaExcelSlipBatasBacaTest extends CIUnitTestCase
     }
 
     /**
-     * GPP dimuat dan diperiksa dulu, lalu TK: pesan tidak bergantung urutan tab (GPP lebar, TK lewat baris → pesan kolom).
+     * GPP diperiksa dulu, lalu TK: pesan tidak bergantung urutan tab (GPP lebar, TK lewat baris → pesan kolom).
      *
      * @param list<string> $urutan
      */
@@ -193,10 +195,10 @@ final class PembacaExcelSlipBatasBacaTest extends CIUnitTestCase
     }
 
     /**
-     * GPP dan TK dimuat dalam dua muatan terpisah, jadi puncak memori = satu part. Berkas yang kedua sheet-nya menunjuk
-     * part yang SAMA (dihitung pemindai sekali) tidak lagi berada di memori dua kali sekaligus.
+     * GPP dan TK menunjuk part yang SAMA (dihitung pemindai sekali, dimuat pemuat dua kali): ditolak saat part itu
+     * diminta untuk sheet kedua, sebelum salinan keduanya dibangun.
      */
-    public function testGppDanTkSatuPartTidakDimuatBersamaan(): void
+    public function testGppDanTkMenunjukPartYangSamaDitolak(): void
     {
         $sel = '';
 
@@ -217,14 +219,106 @@ final class PembacaExcelSlipBatasBacaTest extends CIUnitTestCase
         unset($entri);
 
         memory_reset_peak_usage();
-        $awal  = memory_get_peak_usage();
-        $sheet = $this->assertDiterima($path);
-        $naik  = memory_get_peak_usage() - $awal;
+        $awal = memory_get_peak_usage();
 
-        $this->assertCount(4000, $sheet['GPP']);
-        $this->assertSame($sheet['GPP'], $sheet['TK']);
-        unset($sheet);
-        $this->assertLessThan(self::BATAS_SATU_PART, $naik, 'kenaikan puncak memori = satu part + hasil, bukan dua part');
+        try {
+            (new PembacaExcelSlip(10000))->baca($path);
+            $this->fail('berkas harus ditolak');
+        } catch (BerkasImporDitolak $e) {
+            $this->assertSame(PembacaExcelSlip::PESAN_TIDAK_TERBACA, $e->getMessage());
+        }
+
+        $this->assertLessThan(self::BATAS_SATU_PART, memory_get_peak_usage() - $awal, 'satu part di memori, bukan dua');
+    }
+
+    /**
+     * Varian: nama entri berbeda huruf besar-kecil (pemuat mencari entri tanpa membedakannya) dan dua entri berisi sama.
+     *
+     * @param array<string, string> $ubah
+     */
+    #[DataProvider('partSamaLewatNamaLain')]
+    public function testGppDanTkBerisiPartYangSamaLewatNamaLainDitolak(array $ubah): void
+    {
+        $entri = XlsxMentah::entri(['GPP' => self::sheetGpp(), 'TK' => self::sheetGpp()]);
+
+        foreach ($ubah as $cari => $ganti) {
+            $entri['xl/_rels/workbook.xml.rels'] = str_replace($cari, $ganti, $entri['xl/_rels/workbook.xml.rels']);
+        }
+
+        $this->assertDitolak(PembacaExcelSlip::PESAN_TIDAK_TERBACA, $this->xlsxEntri($entri));
+    }
+
+    /**
+     * @return iterable<string, array{0: array<string, string>}>
+     */
+    public static function partSamaLewatNamaLain(): iterable
+    {
+        yield 'dua entri berisi sama' => [[]];
+        yield 'Target beda huruf besar-kecil' => [['Target="worksheets/sheet2.xml"' => 'Target="worksheets/SHEET1.xml"']];
+        yield 'Target absolut' => [['Target="worksheets/sheet2.xml"' => 'Target="/xl/worksheets/sheet1.xml"']];
+    }
+
+    /**
+     * GPP dan TK dimuat dalam SATU muatan: rumus lintas sheet (TK → GPP, GPP → TK, nama terdefinisi) dihitung seperti
+     * biasa. Bila dimuat terpisah, sheet yang dirujuk tidak ada dan hasilnya "#REF!".
+     *
+     * @param list<string> $urutan
+     */
+    #[DataProvider('formatDanUrutan')]
+    public function testRumusLintasSheetGppDanTkTetapDihitung(string $format, array $urutan): void
+    {
+        $buku = new Spreadsheet();
+        $buku->removeSheetByIndex(0);
+        $isi = [
+            KolomGaji::SHEET_GPP => [self::headerGpp(), self::dataGpp()],
+            KolomGaji::SHEET_TK  => [self::headerTk(), self::dataTk()],
+        ];
+
+        foreach ($urutan as $nama) {
+            $buku->createSheet()->setTitle($nama)->fromArray($isi[$nama], null, 'A1', true);
+        }
+
+        $gpp = $buku->getSheetByName(KolomGaji::SHEET_GPP);
+        $tk  = $buku->getSheetByName(KolomGaji::SHEET_TK);
+        $this->assertNotNull($gpp);
+        $this->assertNotNull($tk);
+
+        $gpp->setCellValueExplicit('A2', self::NIP, DataType::TYPE_STRING);
+        $tk->setCellValueExplicit('A2', self::NIP, DataType::TYPE_STRING);
+        $gpp->setCellValue('E2', 1000);
+        $tk->setCellValue('E2', 5);
+        $tk->setCellValue('D2', '=GPP!E2*2');       // TK → GPP
+        $gpp->setCellValue('F2', '=TK!E2+1');       // GPP → TK
+        $tk->setCellValue('G2', '=SUM(GPP!E2:E2,TK!E2)');
+
+        if ($format === 'Xlsx') {
+            $buku->addNamedRange(new NamedRange('POKOK', $gpp, '$E$2'));
+            $tk->setCellValue('F2', '=POKOK+3');    // nama terdefinisi lintas sheet
+        }
+
+        $path = $this->temp($format === 'Xls' ? '.xls' : '.xlsx');
+        IOFactory::createWriter($buku, $format)->save($path);
+        $buku->disconnectWorksheets();
+
+        $sheet = $this->assertDiterima($path);
+
+        $this->assertEquals(2000, $sheet['TK'][2][3], 'TK!D2 = GPP!E2*2');
+        $this->assertEquals(6, $sheet['GPP'][2][5], 'GPP!F2 = TK!E2+1');
+        $this->assertEquals(1005, $sheet['TK'][2][6], 'TK!G2 = SUM lintas sheet');
+
+        if ($format === 'Xlsx') {
+            $this->assertEquals(1003, $sheet['TK'][2][5], 'TK!F2 = POKOK+3');
+        }
+    }
+
+    /**
+     * @return iterable<string, array{0: string, 1: list<string>}>
+     */
+    public static function formatDanUrutan(): iterable
+    {
+        yield 'xlsx, GPP di kiri' => ['Xlsx', ['GPP', 'TK']];
+        yield 'xlsx, TK di kiri' => ['Xlsx', ['TK', 'GPP']];
+        yield 'xls' => ['Xls', ['GPP', 'TK']];
     }
 
     // ------------------------------------------------------------------------------------------------------------------
@@ -597,6 +691,31 @@ final class PembacaExcelSlipBatasBacaTest extends CIUnitTestCase
         $this->assertDitolak(self::PESAN_STRUKTUR, $this->xlsxEntri($entri));
     }
 
+    /**
+     * Hitung kasar ikut menghitung sel berprefiks namespace (`<x:c>`): sheet rusak yang memakai prefiks untuk namespace
+     * utama tetap ditolak karena jumlah sel, bukan lolos sebagai "tanpa sel".
+     */
+    public function testHitungKasarMenghitungSelBerprefiks(): void
+    {
+        $entri                      = XlsxMentah::entri(['GPP' => self::sheetGpp(), 'TK' => self::sheetTk()]);
+        $entri['xl/lain/data1.xml'] = '<x:worksheet xmlns:x="' . XlsxMentah::UTAMA . '"><foo:bar/><x:sheetData><x:row>' . str_repeat('<x:c/>', 100) . '</x:row></x:sheetData></x:worksheet>';
+        $jumlah                     = 2 * count(self::headerGpp()) + 2 * count(self::headerTk());
+        $path                       = $this->xlsxEntri($entri);
+
+        $this->assertDitolak(self::pesanSel($jumlah + 50), $path, new PembacaExcelSlip(10000, 256, $jumlah + 50));
+        $this->assertDiterima($path, new PembacaExcelSlip(10000, 256, $jumlah + 200));
+    }
+
+    /**
+     * Indeks shared string yang ditulis panjang (nol di depan) tetap dikenali: pemuat memakai `(int)` seluruh teksnya.
+     */
+    public function testIndeksSharedStringBernolDiDepanTetapDihitung(): void
+    {
+        $path = $this->xlsxSharedString(str_repeat('<row><c t="s"><v>' . str_repeat('0', 40) . '1</v></c></row>', 5000), ['pendek', str_repeat('a', 10_000)]);
+
+        $this->assertDitolak(self::PESAN_STRUKTUR, $path);
+    }
+
     // ------------------------------------------------------------------------------------------------------------------
     // Entri yang diperlakukan khusus oleh pemuat (encoding, DOCTYPE, galat urai)
     // ------------------------------------------------------------------------------------------------------------------
@@ -629,6 +748,7 @@ final class PembacaExcelSlipBatasBacaTest extends CIUnitTestCase
         // Tulisan Excel 365 untuk kontrol form/komentar berteks dua baris: <br> tanpa penutup. Pemuat mengabaikan VML rusak.
         yield 'VML dengan <br> tanpa penutup' => [['xl/drawings/vmlDrawing1.vml' => '<xml xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">'
             . '<v:shape id="_x0000_s1025"><v:textbox><div style="text-align:left">baris1<br>baris2</div></v:textbox><x:ClientData ObjectType="Note"><x:Row>0</x:Row><x:Column>0</x:Column></x:ClientData></v:shape></xml>']];
+        yield 'VML rusak dengan kata shared di teks kontrol' => [['xl/drawings/vmlDrawing2.vml' => '<xml xmlns:v="urn:schemas-microsoft-com:vml"><v:shape><v:textbox><div>folder shared<br>baris2</div></v:textbox></v:shape></xml>']];
         yield 'SVG dengan prefiks namespace tak dideklarasikan' => [['xl/media/image2.svg' => '<svg xmlns="http://www.w3.org/2000/svg"><sodipodi:namedview/><g><path d="M0 0"/></g></svg>']];
         yield 'gambar biner' => [['xl/media/image1.png' => "\x89PNG\r\n\x1a\n" . str_repeat("\x00\xFF<c>", 500)]];
         yield 'entri kosong' => [['xl/lain/kosong.xml' => '']];

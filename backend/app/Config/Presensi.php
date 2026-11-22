@@ -61,7 +61,7 @@ class Presensi extends BaseConfig
      * Batas bobot struktur XML `.xlsx` = batas sel × nilai ini; bobot = jumlah semua elemen + 2 × jumlah semua atribut di
      * semua entri (atribut ±2× lebih mahal dari elemen di libxml). Template penuh tulisan PhpSpreadsheet berbobot 4,6
      * per sel; tulisan Excel (sel ber-atribut gaya) ±7 per sel. 8 → bawaan 3.200.320. Terukur di batas ini (berkas yang
-     * isinya hanya elemen pengisi): puncak RSS ±840 MB; sel teks pendek sebanyak batas sel: ±925 MB (±1,5× template penuh). Tanpa batas ini 32 MB isi masih
+     * isinya hanya elemen pengisi): puncak RSS ±840 MB; 390.039 sel teks pendek `t="s"`: ±925 MB (±1,5× template penuh). Tanpa batas ini 32 MB isi masih
      * mengizinkan ±8 juta elemen (RSS ±2 GB).
      */
     public const BOBOT_PER_SEL_IMPOR = 8;
