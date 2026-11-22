@@ -149,7 +149,9 @@ Normalisasi `kolomKode` adalah perilaku yang sudah ada (CR-089): karakter tak te
 **Diputus WS-2 (DB Validator) 22-11-2026 @`58e0497a`, APPROVE tanpa blok** (teks lengkap di PR #44):
 Q1 setuju (berkas tidak diedit lagi sesudah dipindah ke `Migrations/`); Q2 setuju; Q3 (a); Q4 (a) sampai DQ-4 diputus,
 bila FK `disiplin_ticket.nip` dipakai maka (b) menjadi CR lanjutan; Q5 cukup dicatat. Catatan non-blok: KOSMETIK-1 (baris
-panjang), INFO-2 (tab/NBSP di runbook, lihat §1.3 dan §2.4).
+panjang), INFO-1 (saat gladi, cek `COLLATION_NAME` 7 kolom anak + `pegawai.nip` = `utf8mb4_unicode_ci`), INFO-2
+(tab/NBSP di runbook, lihat §1.3 dan §2.4), INFO-3 (angka koreksi `kosong→NULL` approver `riwayat_cuti` dicatat di
+laporan gladi). Cek ulang DB @`3874d28e`: tetap APPROVE.
 
 | Q | Pertanyaan | Usulan coder |
 |---|---|---|
@@ -184,7 +186,7 @@ DB scratch MySQL 8 di 3307, `db-isolasi-penuh`.
 
 ## 6. Syarat merge (⛔)
 
-1. Approve DB Validator (WS-2) — ✅ @`58e0497a`.
+1. Approve DB Validator (WS-2) — ✅ @`58e0497a`, diulang @`3874d28e`.
 2. CI hijau MySQL 8.0 + MariaDB 10.4 pada head PR.
 3. Gate penuh `./check.sh` lolos atas aba-aba reviewer CR.
 4. Izin merge dari Horii; merge oleh reviewer CR.
