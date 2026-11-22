@@ -130,7 +130,33 @@ class AuthService
         // MAKE-028: kedaluwarsa password dihitung ulang dari DB di setiap refresh (waktu berjalan tanpa peristiwa yang
         // mencabut sesi), sehingga sesi lama pun terkena begitu `expired_at` terlewati. CR-057: dua arah — claim juga
         // dilepas bila DB tidak lagi mewajibkan (expired_at diperpanjang, penanda 0).
-        return $this->jwt->refresh($refreshToken, fn (array $claims): array => $this->withPasswordExpiry($claims));
+        // CR-175: klaim `nip` yang tidak lagi dipegang akun (koreksi NIP / hapus pegawai tanpa pencabutan sesi) → baris
+        // dihapus seperti logout lalu "tidak dikenal", simetris dengan JwtAuthFilter (access token basi → 401).
+        return $this->jwt->refresh($refreshToken, function (array $claims) use ($refreshToken): array {
+            if (! $this->nipKlaimMasihSesuai($claims)) {
+                $this->jwt->deleteRefreshToken($refreshToken);
+
+                throw AuthException::unknownToken();
+            }
+
+            return $this->withPasswordExpiry($claims);
+        });
+    }
+
+    /**
+     * @param array<string, mixed> $claims
+     */
+    private function nipKlaimMasihSesuai(array $claims): bool
+    {
+        $nip = $claims['nip'] ?? null;
+
+        if ($nip === null || $nip === '') {
+            return true;
+        }
+
+        $id = JwtService::subjectToId($claims['sub'] ?? null);
+
+        return $id !== null && $this->pengguna->masihMemegangNip($id, (string) $nip);
     }
 
     /**

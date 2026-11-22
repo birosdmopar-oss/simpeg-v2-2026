@@ -50,6 +50,7 @@ use Throwable;
  *    kolom DBV-020): pemilik wajib mengganti password saat login berikutnya.
  *  - Sesi [V2]: refresh token menyimpan claims (termasuk `nip`) saat terbit, jadi seluruh sesi akun pegawai itu dicabut
  *    (`JwtService::revokeAllForUser`, baris token dihapus) di transaksi yang sama; pemilik login ulang dengan NIP baru.
+ *    Access token lama (claim NIP lama) ditolak 401 oleh JwtAuthFilter sejak CR-175 (akun tidak lagi memegang NIP itu).
  *    Kolom jejak `token.nip` (A-01 D-7) karena itu tidak diarahkan ulang.
  *  - Kolom JSON array NIP (`JenisRujukanNip::JsonArrayNip`: `dm_user_lokasi_presensi.target_peg`/`excl_peg`, pengganti
  *    `user_lokasi_presensi` yang tidak dibuat di v2) — elemen NIP lama diganti, begitu pula awalan "NIP - " di

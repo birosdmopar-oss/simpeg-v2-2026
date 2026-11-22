@@ -250,7 +250,7 @@ Body `{ "rate": 1 | 2, "reason"?: string }` → **201** `data: { rated: true, ra
 |---|---|
 | 201 | tersimpan: `nip` = NIP aktor (JWT `sub`), `created_by` = `id_pengguna` aktor, `created_at` = waktu UTC aplikasi; audit `audit_logs` event `create`, entity `faq_rate`, entity_id `"{id}:{nip}"` (fail-open) |
 | 404 | artikel tidak tampil (rantai tidak aktif / tidak ada / id non-kanonik) |
-| 403 | sesi basi (CR-171): akun pemilik token (JWT `sub`) tidak lagi memegang NIP claim — mis. sesudah koreksi NIP (B-06) atau hapus pegawai — → "Sesi tidak lagi sesuai data pegawai. Silakan login ulang.", tanpa baris tertulis. Dicek sesudah 404 artikel, sebelum 422 "sudah dinilai". FK 1452 (FK ditahan DBV-019 `fk_nip_faqrate_to_peg`, aktif sesudah dipasang) dengan pegawai sudah tidak ada → 403 yang sama |
+| 403 | sesi basi (CR-171): akun pemilik token (JWT `sub`) tidak lagi memegang NIP claim — mis. sesudah koreksi NIP (B-06) atau hapus pegawai — → "Sesi tidak lagi sesuai data pegawai. Silakan login ulang.", tanpa baris tertulis. Sejak CR-175 sesi seperti itu umumnya sudah ditolak lebih dulu oleh `JwtAuthFilter` → **401** generik (`Unauthorized`); 403 ini tinggal lapis kedua untuk balapan (koreksi NIP/hapus pegawai ter-commit sesudah filter lolos). Dicek sesudah 404 artikel, sebelum 422 "sudah dinilai". FK 1452 (FK ditahan DBV-019 `fk_nip_faqrate_to_peg`, aktif sesudah dipasang) dengan pegawai sudah tidak ada → 403 yang sama |
 | 422 | `rate`/`reason` tidak valid; sudah pernah menilai → `errors.rate: ["Artikel ini sudah Anda nilai."]` (termasuk balapan dua permintaan: pelanggaran PK diterjemahkan ke 422 yang sama) |
 | 403 | role selain 2/6/7 |
 

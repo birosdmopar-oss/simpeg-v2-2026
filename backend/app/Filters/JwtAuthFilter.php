@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filters;
 
 use App\Exceptions\AuthException;
+use App\Models\Auth\PenggunaModel;
 use CodeIgniter\Filters\FilterInterface;
 use CodeIgniter\HTTP\IncomingRequest;
 use CodeIgniter\HTTP\RequestInterface;
@@ -19,6 +20,9 @@ use Config\Jwt as JwtConfig;
  * MAKE-020 (ISSUE-044) [V2]: sesi akun yang wajib ganti password (claim `must_change_password`) hanya boleh memakai
  * route yang memasang argumen `jwt:ganti_password` (auth/me, auth/change-password, auth/logout; auth/refresh tanpa
  * filter jwt). Route lain → 403 `code` = `password_change_required`. Fail-closed: route baru otomatis ikut ditolak.
+ *
+ * CR-175: sesi dengan NIP basi (klaim `nip` tidak lagi dipegang akun `sub`, mis. sesudah koreksi NIP atau hapus pegawai)
+ * → 401 generik, dicek sebelum `must_change_password`. Satu kueri tambahan hanya untuk token ber-NIP.
  */
 class JwtAuthFilter implements FilterInterface
 {
@@ -46,6 +50,12 @@ class JwtAuthFilter implements FilterInterface
 
         service('authContext')->setClaims($claims);
 
+        if (! $this->nipMasihSesuai()) {
+            service('authContext')->clear();
+
+            return $this->unauthorized();
+        }
+
         if (service('authContext')->mustChangePassword() && ! in_array(self::ARG_GANTI_PASSWORD, (array) ($arguments ?? []), true)) {
             return service('response')
                 ->setStatusCode(403)
@@ -65,6 +75,25 @@ class JwtAuthFilter implements FilterInterface
     public function after(RequestInterface $request, ResponseInterface $response, $arguments = null): ?ResponseInterface
     {
         return null;
+    }
+
+    /**
+     * CR-175: klaim `nip` tidak null → akun `sub` wajib masih memegang NIP itu (sesudah koreksi NIP / hapus pegawai,
+     * access token lama membawa NIP lama sampai `exp`). Token tanpa NIP tidak menambah kueri. Dicek sebelum
+     * `must_change_password` agar sesi basi selalu 401, bukan 403.
+     */
+    private function nipMasihSesuai(): bool
+    {
+        $auth = service('authContext');
+        $nip  = $auth->nip();
+
+        if ($nip === null) {
+            return true;
+        }
+
+        $id = $auth->idPengguna();
+
+        return $id !== null && model(PenggunaModel::class)->masihMemegangNip($id, $nip);
     }
 
     private function extractToken(RequestInterface $request): ?string

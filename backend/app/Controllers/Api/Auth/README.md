@@ -15,6 +15,14 @@ Token: access token JWT 1 jam + refresh token 7 hari (rotating, single-use), ked
 (`access_token` path `/`, `refresh_token` path `/api/v1/auth`). Klien non-browser boleh memakai header
 `Authorization: Bearer <access_token>` dan body `refresh_token`.
 
+Sesi NIP basi (CR-175): access token dan refresh token membawa claim `nip`. Bila akun `sub` tidak lagi memegang NIP itu
+(sesudah koreksi NIP B-06, atau hapus pegawai yang melepas `pengguna.nip` ke NULL), setiap endpoint ber-filter `jwt` →
+**401** `{ status:"error", message:"Unauthorized" }` (generik, sama dengan token tidak valid), dicek sebelum 403
+`password_change_required`. `POST /auth/refresh` dengan claim seperti itu → 401 "tidak dikenal", baris token dihapus dan
+cookie refresh dihapus; klien lalu login ulang (dengan NIP baru). `POST /auth/logout` dengan access token basi → 401 dari
+filter, sama seperti access token kedaluwarsa. Satu kueri tambahan per request hanya untuk token ber-NIP; token akun tanpa
+NIP tidak menambah kueri. Akun dihapus/nonaktif/ganti role belum ikut dicek di sini (QA-21).
+
 Identitas akun (DBV-010/CR-013 ✅, di main `6bb29b5`): akun role 1/3/4/5/8 boleh tanpa NIP (K2), jadi identitas akun = `id_pengguna`.
 - Claims JWT: `sub` = id_pengguna (string bilangan bulat), `nip` = NIP akun (null untuk akun tanpa NIP), `ver` = 2,
   `role`, `id_unit`, `id_satker`. Token tanpa `ver` = 2 (format lama, `sub` = NIP) → 401.
@@ -103,7 +111,8 @@ Penegakan:
 - Login membaca penanda dari DB dan memasukkannya ke claim `must_change_password` (hanya ada bila true). Refresh
   menyalin claim itu. Setiap perubahan penanda mencabut seluruh sesi akun (reset admin, koreksi NIP, ganti/reset
   password), jadi sesi berikutnya selalu memakai nilai terbaru. Access token yang sudah terbit tetap berlaku sampai
-  kedaluwarsa, seperti perubahan role.
+  kedaluwarsa, seperti perubahan role — kecuali sesudah koreksi NIP: access token lama membawa NIP lama dan langsung
+  ditolak 401 (CR-175, lihat "Sesi NIP basi" di atas).
 - Selama claim aktif, `JwtAuthFilter` hanya meloloskan route berargumen `jwt:ganti_password`: `GET /auth/me`,
   `POST /auth/change-password`, `POST /auth/logout` (`POST /auth/refresh` tanpa filter jwt). Endpoint lain →
   **403** `{ status:"error", code:"password_change_required", message:"Password wajib diganti sebelum melanjutkan." }`.

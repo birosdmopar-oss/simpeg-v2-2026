@@ -300,6 +300,9 @@ Perlakuan khusus:
   AccountProvisioner). Penanda "wajib ganti password" belum ada di skema v2 (kebutuhan skema, laporan MAKE-010).
 - **Sesi [V2]**: refresh token menyimpan claims termasuk `nip` saat terbit, jadi seluruh sesi akun itu dicabut
   (`JwtService::revokeAllForUser`) di transaksi yang sama. `token.nip` (jejak A-01 D-7) tidak diarahkan ulang.
+  Access token lama (claim NIP lama, berlaku sampai `exp`) ditolak **401** oleh `JwtAuthFilter` sejak CR-175 (akun tidak
+  lagi memegang NIP claim); begitu pula sesudah hapus pegawai (`pengguna.nip` → NULL). Request yang lolos filter sesaat
+  sebelum koreksi di-commit masih bisa menulis/500 dengan NIP lama (sisa risiko, lihat `Libraries/Auth/README.md`).
 - **JSON array NIP** (`JsonArrayNip`, MAKE-011, keputusan user 13-10-2026): elemen = NIP lama di
   `dm_user_lokasi_presensi.target_peg`/`excl_peg` diganti NIP baru, dan awalan "NIP lama - " di `*_desc`; baris dikunci
   `FOR UPDATE`, NIP yang hanya mirip (awalan sama) tidak tersentuh. `user_lokasi_presensi` (tabel legacy) tidak dibuat di

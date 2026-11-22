@@ -64,7 +64,10 @@ final class RbacFilterTest extends DatabaseTestCase
 
     public function testValidTokenViaHttpOnlyCookieReturns200(): void
     {
-        $token = service('jwt')->issueAccessToken(['sub' => '7', 'nip' => '198501012010011001', 'role' => Role::PEGAWAI]);
+        // CR-175: claim `nip` wajib masih dipegang akun `sub` di DB (sesi NIP basi → 401), jadi akunnya dibuat nyata.
+        $this->db->table('pengguna')->insert(['nip' => '198501012010011001', 'username' => 'rbac.cookie', 'name' => 'Pegawai Rbac', 'user_level' => Role::PEGAWAI, 'status' => 1]);
+        $id    = (int) $this->db->insertID();
+        $token = service('jwt')->issueAccessToken(['sub' => (string) $id, 'nip' => '198501012010011001', 'role' => Role::PEGAWAI]);
 
         // Simulasi browser mengirim cookie httpOnly (CI4 membaca cookie lewat service superglobals).
         service('superglobals')->setCookie(config(JwtConfig::class)->accessCookie, $token);
@@ -73,7 +76,7 @@ final class RbacFilterTest extends DatabaseTestCase
 
         $result->assertStatus(200);
         $json = json_decode((string) $result->getJSON(), true, 512, JSON_THROW_ON_ERROR);
-        $this->assertSame(7, $json['data']['id_pengguna']);
+        $this->assertSame($id, $json['data']['id_pengguna']);
         $this->assertSame('198501012010011001', $json['data']['nip']);
         $this->assertSame(Role::PEGAWAI, $json['data']['role']);
     }
