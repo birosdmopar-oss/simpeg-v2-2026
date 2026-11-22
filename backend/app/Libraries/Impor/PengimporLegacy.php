@@ -22,7 +22,8 @@ use Throwable;
  * 6. `status` (bila `statusDomain` tidak null) dan kolom `domain`: di luar domain → berkas keputusan, kalau tidak gagal;
  *    NULL di kolom nullable dibiarkan.
  * 7. `kolomKode`: karakter tak terlihat dibuang lalu trim PHP (kode wilayah DBV-011 §2.2 #7; NIP CR-089, dicatat di
- *    laporan). Teks melebihi panjang kolom tujuan → gagal.
+ *    laporan); hasil `''` di kolom `kosongKeNull` → NULL (dicatat, CR-172/DBV-034; yatim tidak di-NULL-kan). Teks
+ *    melebihi panjang kolom tujuan → gagal.
  * 8. Rujukan FK dicek per batch terhadap tabel induk di tujuan (audit DBV-019 = 0): yatim → NULL bila kolomnya
  *    `yatimKeNull` (dicatat), barisnya dibuang bila kolomnya `yatimBuang` (dicatat, MAKE-097), selain itu gagal dengan
  *    jumlah nilai yatim. Dry-run tidak memeriksa rujukan.
@@ -913,6 +914,16 @@ final class PengimporLegacy
                 }
 
                 $nilai = $kode;
+
+                if ($nilai === '' && in_array($kolom, $def->kosongKeNull, true)) {
+                    if (! $tipe['nullable']) {
+                        throw new ImporGagal("Definisi {$def->tabel}: kosongKeNull {$kolom} di kolom NOT NULL.");
+                    }
+
+                    $this->laporan->koreksi($def->kunci(), "{$kolom} kosong→NULL (DBV-034)");
+
+                    return null;
+                }
             }
 
             if ($tipe['panjang'] !== null && mb_strlen($nilai) > $tipe['panjang']) {

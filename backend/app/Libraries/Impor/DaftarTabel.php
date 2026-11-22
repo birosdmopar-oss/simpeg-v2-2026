@@ -290,7 +290,9 @@ final class DaftarTabel
                     'status_al' => [0, 1, 2, 4], 'status_pyb' => [0, 1, 2, 3, 4], 'status_regen' => [0, 1], 'rated' => [0, 1, 2],
                     'skip_al'   => [0, 1], 'skip_pyb' => [0, 1],
                 ],
-                kolomKode: ['nip'],
+                // CR-172/DBV-034: kolom approver akan ber-FK (AddFkNipLayananFase4 ditahan) → trim + `''`→NULL.
+                kolomKode: ['nip', 'nip_atasan_langsung', 'nip_yang_menyetujui'],
+                kosongKeNull: ['nip_atasan_langsung', 'nip_yang_menyetujui'],
             ),
             new DefinisiTabel(
                 'riwayat_tb',
@@ -490,7 +492,7 @@ final class DaftarTabel
             new DefinisiTabel('question_category', 'id_question_category', $r, statusDomain: [0, 1]),
             ...self::tierMasterHalo(),
             new DefinisiTabel('petugas_layanan', 'id_petugas_layanan', $r . ' (DQ-12/DQ-27)', statusDomain: [0, 1, 10], kolomKode: ['nip']),
-            new DefinisiTabel('pa_layanan', 'id_pa_layanan', $r),
+            new DefinisiTabel('pa_layanan', 'id_pa_layanan', $r . ' (DQ-17, CR-172/DBV-034)', kolomKode: ['nip'], kosongKeNull: ['nip']),
             new DefinisiTabel('riwayat_cuti_notif_kt', 'id_riwayat_cuti', $r, statusDomain: [0, 1, 2], kolomKode: ['nip_kt'], kunciUrut: ['id_riwayat_cuti', 'nip_kt']),
             new DefinisiTabel(
                 'riwayat_ib',

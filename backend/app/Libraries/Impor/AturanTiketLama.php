@@ -216,12 +216,22 @@ final class AturanTiketLama
             $id         = (string) $r['id_inbox'];
             $tiket[$id] = true;
 
+            // CR-172/DBV-034: NIP kosong selalu ikut tertulis di kode (juga bila tiket sudah ambigu karena pengirim/subjek),
+            // supaya putusan "__impor" atas tiket ber-NIP `''` terlihat di daftar eskalasi/berkas keputusan.
+            $alasan = [];
+
             if ((int) $r['sender'] <= 0) {
-                $ambigu[$id] = self::A_PENGIRIM;
+                $alasan[] = self::A_PENGIRIM;
             } elseif (trim(stripslashes((string) $r['subject'])) === '') {
-                $ambigu[$id] = self::A_SUBJEK;
-            } elseif ((string) Transformasi::kode($r['nip'] === null ? null : (string) $r['nip']) === '') {
-                $ambigu[$id] = self::A_NIP;
+                $alasan[] = self::A_SUBJEK;
+            }
+
+            if ((string) Transformasi::kode($r['nip'] === null ? null : (string) $r['nip']) === '') {
+                $alasan[] = self::A_NIP;
+            }
+
+            if ($alasan !== []) {
+                $ambigu[$id] = implode(' + ', $alasan);
             }
 
             foreach (['status' => self::STATUS_TIKET] + self::DOMAIN_TIKET as $kolom => $domain) {
