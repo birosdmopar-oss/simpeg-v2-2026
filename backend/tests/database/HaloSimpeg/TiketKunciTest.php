@@ -5,7 +5,11 @@ declare(strict_types=1);
 namespace Tests\Database\HaloSimpeg;
 
 use App\Constants\Role;
+use App\Database\Migrations\AddFkNipLayananFase4;
+use App\Libraries\HaloSimpeg\TiketService;
 use CodeIgniter\Database\Exceptions\DatabaseException;
+use CodeIgniter\Database\Query;
+use CodeIgniter\Events\Events;
 use CodeIgniter\Test\FeatureTestTrait;
 use Config\Database;
 use Config\Services;
@@ -137,6 +141,54 @@ final class TiketKunciTest extends DatabaseTestCase
         } finally {
             $this->db->query("DROP TRIGGER IF EXISTS {$trg}");
         }
+    }
+
+    /**
+     * CR-171 (G1): FK ditahan DBV-022 `fk_nip_disiplin_ticket_to_pegawai` dipasang sementara; pegawai pelapor dihapus koneksi
+     * KEDUA tepat sesudah cek kategori di dalam transaksi (sesudah cek pegawai awal) → INSERT tiket kena 1452 → 422 pesan
+     * pegawai (bukan "Kategori tidak tersedia."), tanpa baris tertulis.
+     */
+    public function testGalatFk1452PelaporHilangDiterjemahkan422Pegawai(): void
+    {
+        $this->pasangThrottlerHs();
+        $k       = $this->buatKategoriHs('Kepegawaian');
+        $nip     = $this->buatPegawai(['nama' => 'Pelapor Hilang']);
+        $pemilik = $this->buatAkunUntuk($nip, Role::PEGAWAI);
+        $fk      = $this->fkLayananDitahan();
+        $lain    = Database::connect('tests', false);
+        $sekali  = false;
+        $balap   = static function (Query $q) use ($lain, $nip, &$sekali): void {
+            if (! $sekali && str_contains($q->getQuery(), 'LOCK IN SHARE MODE')) {
+                $sekali = true;
+                // Hapus fisik tanpa menunggu anak lain (pmj/pengguna) — yang diuji hanya FK tiket → pegawai.
+                $lain->query('SET FOREIGN_KEY_CHECKS = 0');
+                $lain->table('pegawai')->where('nip', $nip)->delete();
+                $lain->query('SET FOREIGN_KEY_CHECKS = 1');
+            }
+        };
+
+        try {
+            $fk->up();
+            Events::on('DBQuery', $balap);
+            $res = $this->sebagai($pemilik)->post(self::URL . 'tiket', ['id_question_category' => $k, 'subject' => 'S', 'msg' => 'M']);
+        } finally {
+            Events::removeListener('DBQuery', $balap);
+            $lain->close();
+            $fk->down();
+        }
+
+        $this->assertTrue($sekali, 'balapan terjadi');
+        $res->assertStatus(422);
+        $this->assertSame(TiketService::PESAN_PEGAWAI, $this->json($res)['message']);
+        $this->assertArrayNotHasKey('id_question_category', $this->json($res)['errors'] ?? []);
+        $this->assertSame([0, 0], [$this->db->table('disiplin_ticket')->countAllResults(), $this->db->table('disiplin_ticket_msg')->countAllResults()]);
+    }
+
+    private function fkLayananDitahan(): AddFkNipLayananFase4
+    {
+        require_once APPPATH . 'Database/MigrationsDitahan/AddFkNipLayananFase4.php';
+
+        return new AddFkNipLayananFase4();
     }
 
     private function kode(callable $aksi): ?int
