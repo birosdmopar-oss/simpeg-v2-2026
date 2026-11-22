@@ -112,6 +112,22 @@ class SuratCutiService implements PenerbitSuratCutiInterface
         return $this->lampiran()->ambil($nip, (int) $daftar[0]['id_attachment']);
     }
 
+    /**
+     * CR-180a (K12 opsi d): cuti legacy hasil impor yang sudah ber-TTE di legacy. `L_cuti::process_esign` (allow_esign = 1)
+     * mengisi `file_sc_signed_bef` (PDF pra-TTE, sama dengan `esign_hist.file_pdf_to_sign`) DAN `file_surat_cuti` (PDF
+     * ber-TTE); v2 tidak pernah mengisi kedua kolom itu (berkas v2 di `document_attachment`, D13). Sampai pemetaan cutover
+     * ke kode 45 (CR-180b) jalan, pasangan ini menutup TTE ulang (TTE ganda). Murni, tanpa kueri.
+     *
+     * `file_surat_cuti` saja BUKAN penanda: legacy juga mengisinya dengan surat tanpa TTE (allow_esign ≠ 1, insert,
+     * regenerate_sc) — perlakuannya menunggu QA-30.
+     *
+     * @param array<string, mixed> $cuti baris `riwayat_cuti`
+     */
+    public static function tteLegacy(array $cuti): bool
+    {
+        return trim((string) ($cuti['file_sc_signed_bef'] ?? '')) !== '' && trim((string) ($cuti['file_surat_cuti'] ?? '')) !== '';
+    }
+
     public function adaTte(string $nip, int $idCuti): bool
     {
         return $this->lampiran()->daftar($nip, CutiService::ID_SURAT_TTE, $idCuti) !== [];

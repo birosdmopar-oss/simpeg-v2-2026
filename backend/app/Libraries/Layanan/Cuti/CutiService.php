@@ -624,6 +624,9 @@ class CutiService
         $hapus = $role === Role::SUPER_ADMIN
             || (in_array($role, [Role::PEGAWAI, Role::PPPK], true) && $milik && in_array($status, [StatusCuti::PENGAJUAN, StatusCuti::DITOLAK], true));
 
+        // CR-180a: TTE legacy (kolom impor) setara surat kode 45 untuk aksi TTE; unduh tetap menunggu pemetaan (CR-180b).
+        $adaSuratTte = $adaSuratTte || SuratCutiService::tteLegacy($cuti);
+
         $tunggu   = StatusCuti::menunggu($status);
         $nipAl    = $this->tekstuPlain($cuti['nip_atasan_langsung'] ?? null);
         $nipPyb   = $this->tekstuPlain($cuti['nip_yang_menyetujui'] ?? null);
@@ -704,7 +707,7 @@ class CutiService
             }
 
             if ($superAdmin && in_array($status, StatusCuti::EFEK_FINAL, true) && ! ($adaFile[(int) $r['id_riwayat_cuti']]['tte'] ?? false)
-                && $auth->nip() !== EsignCutiService::penandaTangan($r)) {
+                && ! SuratCutiService::tteLegacy($r) && $auth->nip() !== EsignCutiService::penandaTangan($r)) {
                 $final[] = $r;
             }
         }

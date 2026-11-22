@@ -328,7 +328,8 @@ class EsignCutiService
             throw ValidationException::forField('status', self::PESAN_STATUS);
         }
 
-        if ($this->surat->adaTte($nip, $id)) {
+        // CR-180a: TTE legacy (kolom impor `file_sc_signed_bef` + `file_surat_cuti`) juga "sudah ditandatangani".
+        if (SuratCutiService::tteLegacy($cuti) || $this->surat->adaTte($nip, $id)) {
             throw ValidationException::forField('status', self::PESAN_SUDAH_TTE);
         }
     }
