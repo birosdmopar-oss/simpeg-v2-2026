@@ -200,6 +200,12 @@ class FaqService
 
         $articleId = (int) $this->visibleArticle($id)['id_faq_article'];
 
+        // CR-171 (G2): NIP claim token bisa basi — sesudah koreksi NIP (B-06) `pengguna.nip` pindah ke NIP baru, sesudah hapus
+        // pegawai di-NULL-kan, sedangkan access token lama tetap membawa NIP lama sampai kedaluwarsa. Tanpa cek ini token lama
+        // menulis rating yatim, rating ganda (rating lama sudah ikut pindah ke NIP baru), dan `created_by` NULL. Ditolak 403
+        // seperti penolakan identitas penilai di atas.
+        $idAktor = $this->actorId($nip) ?? throw self::sesiBasi();
+
         if ($this->rates()->findRating($articleId, $nip) !== null) {
             throw self::alreadyRated();
         }
@@ -207,7 +213,8 @@ class FaqService
         $reason = $rate === FaqRateModel::RATE_NOT_HELPFUL ? $this->normalizeReason($reason) : null;
 
         // MAKE-015: `nip` selalu dari claim sesi akun (bukan input), dan NIP akun sudah divalidasi terdaftar di `pegawai`
-        // saat akun dibuat/ditautkan, jadi FK masuk DBV-019 `fk_nip_faqrate_to_peg` tidak butuh cek terpisah di sini.
+        // saat akun dibuat/ditautkan. Balapan (pegawai dihapus/dikoreksi di sela cek dan INSERT) ditolak FK masuk DBV-019
+        // `fk_nip_faqrate_to_peg` (1452) → 403 yang sama (CR-171).
 
         try {
             $this->rates()->record([
@@ -216,12 +223,16 @@ class FaqService
                 'rate'           => $rate,
                 'reason'         => $reason,
                 'created_at'     => Time::now()->toDateTimeString(),
-                'created_by'     => $this->actorId($nip),
+                'created_by'     => $idAktor,
             ]);
         } catch (DatabaseException $e) {
             // Balapan dua permintaan: PK (id_faq_article, nip) menolak yang kedua.
             if ($e->getCode() === 1062) {
                 throw self::alreadyRated();
+            }
+
+            if ($e->getCode() === 1452 && $this->db->table('pegawai')->where('nip', $nip)->countAllResults() === 0) {
+                throw self::sesiBasi();
             }
 
             throw $e;
@@ -388,6 +399,11 @@ class FaqService
     private static function alreadyRated(): ValidationException
     {
         return ValidationException::forField('rate', 'Artikel ini sudah Anda nilai.');
+    }
+
+    private static function sesiBasi(): ForbiddenException
+    {
+        return new ForbiddenException('Sesi tidak lagi sesuai data pegawai. Silakan login ulang.');
     }
 
     /**

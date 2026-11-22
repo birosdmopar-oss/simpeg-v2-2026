@@ -16,6 +16,7 @@ use App\Libraries\Kepegawaian\Nip\TabelAnakNip;
 use App\Libraries\Kepegawaian\NipCascadeService;
 use CodeIgniter\Database\Exceptions\DatabaseException;
 use CodeIgniter\Test\FeatureTestTrait;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\AuthSeeder;
 use Tests\Support\DatabaseTestCase;
@@ -345,6 +346,41 @@ final class NipCascadeTest extends DatabaseTestCase
 
         $this->expectException(NotFoundException::class);
         $service->koreksi($super, '999999999999999999', '199901012020011001');
+    }
+
+    /**
+     * CR-171 (G4): baris anak yatim yang SUDAH memakai NIP baru bentrok dengan kunci unik tabel itu saat UPDATE NIP lama → baru
+     * (PK `faq_rate (id_faq_article, nip)`, `uq_petugas_layanan_jenis_nip`) → 422 errors.nip_baru lewat endpoint (bukan 500),
+     * transaksi di-rollback penuh (pegawai lama utuh, NIP baru tidak terdaftar, baris anak tidak berpindah).
+     *
+     * @return array<string, array{0: string}>
+     */
+    public static function bentrokUnikProvider(): array
+    {
+        return ['PK faq_rate' => ['faq_rate'], 'uq petugas_layanan' => ['petugas_layanan']];
+    }
+
+    #[DataProvider('bentrokUnikProvider')]
+    public function testBentrokUnikTabelAnak422DanRollback(string $tabel): void
+    {
+        $lama           = $this->buatPegawai();
+        [, , $superRow] = $this->aktorBaris(Role::SUPER_ADMIN);
+        $kunci          = $tabel === 'faq_rate'
+            ? ['id_faq_article' => $this->buatArtikelFaq(), 'rate' => 1]
+            : ['id_jenis_layanan' => $this->sisip('jenis_layanan', [])];
+        $this->sisip($tabel, $kunci + ['nip' => $lama]);
+        $this->sisip($tabel, $kunci + ['nip' => self::NIP_BARU]); // yatim ber-NIP baru (tanpa FK masuk, sisa data lama)
+
+        $res = $this->asUser($superRow)->withBodyFormat('json')->post("api/v1/pegawai/{$lama}/koreksi-nip", ['nip_baru' => self::NIP_BARU]);
+
+        $res->assertStatus(422);
+        $this->assertStringContainsString("{$tabel}.nip", $this->json($res)['errors']['nip_baru'][0]);
+        $this->assertSame(1, $this->db->table('pegawai')->where('nip', $lama)->countAllResults(), 'pegawai lama utuh');
+        $this->assertSame(0, $this->db->table('pegawai')->where('nip', self::NIP_BARU)->countAllResults(), 'NIP baru tidak terdaftar');
+        $this->assertSame([1, 1], [
+            $this->db->table($tabel)->where('nip', $lama)->countAllResults(),
+            $this->db->table($tabel)->where('nip', self::NIP_BARU)->countAllResults(),
+        ], 'baris anak tidak berpindah');
     }
 
     public function testRegistryCocokDenganSkema(): void

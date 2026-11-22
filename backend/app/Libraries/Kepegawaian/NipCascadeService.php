@@ -229,7 +229,19 @@ final class NipCascadeService implements NipCascadeInterface
                 ? $db->table($rujukan->tabel)->where('nip', $lama)->get()->getResultArray()
                 : [];
 
-            $this->wajibBerhasil($db, $db->table($rujukan->tabel)->where($rujukan->kolomDiV2(), $lama)->update([$rujukan->kolomDiV2() => $baru]), $kunci);
+            try {
+                $this->wajibBerhasil($db, $db->table($rujukan->tabel)->where($rujukan->kolomDiV2(), $lama)->update([$rujukan->kolomDiV2() => $baru]), $kunci);
+            } catch (DatabaseException $e) {
+                // CR-171 (G4): baris anak yang SUDAH memakai NIP baru (sisa data lama/yatim) bentrok dengan kunci unik tabel itu
+                // (mis. PK `faq_rate (id_faq_article, nip)`, `uq_petugas_layanan_jenis_nip`) → 422, bukan 500; transaksi tetap
+                // di-rollback oleh koreksi(). Diterjemahkan di sini (bukan pra-cek) supaya berlaku untuk kunci unik apa pun di
+                // tabel registry, termasuk yang ditambah kemudian.
+                if ((int) $e->getCode() === 1062) {
+                    throw ValidationException::forField('nip_baru', "NIP baru sudah dipakai di data {$kunci} yang bentrok dengan data pegawai ini; bereskan data tersebut sebelum koreksi NIP.");
+                }
+
+                throw $e;
+            }
             $tabel[$kunci] = $db->affectedRows();
 
             foreach ($lamaSimapi as $baris) {

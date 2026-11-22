@@ -20,6 +20,7 @@ use App\Models\Layanan\RiwayatCutiModel;
 use Closure;
 use CodeIgniter\Database\BaseBuilder;
 use CodeIgniter\Database\BaseConnection;
+use CodeIgniter\Database\Exceptions\DatabaseException;
 use CodeIgniter\HTTP\Files\UploadedFile;
 use DateTimeImmutable;
 use DateTimeZone;
@@ -47,6 +48,9 @@ class CutiService
     public const ID_SURAT_BELUM_TTE = 44;
 
     public const ID_SURAT_TTE = 45;
+
+    /** Galat MySQL FK tanpa induk (CR-171). */
+    private const ER_FK_TANPA_INDUK = 1452;
 
     private const ROLE_AJUKAN = [Role::SUPER_ADMIN, Role::PEGAWAI, Role::PPPK];
 
@@ -744,7 +748,8 @@ class CutiService
 
         $this->sebelumTransaksi();
 
-        $this->dalamTransaksi(function () use ($auth, $nip, $data, $ketua, $berkas, $lama, $status, $hari, $tahunAcuan, $profil, &$idBaru, &$idNotif): void {
+        // CR-171 (G3): 1452 dari INSERT/UPDATE diterjemahkan SESUDAH rollback (validasi approver tetap di luar transaksi, tanpa kunci baru).
+        $this->dalamTransaksiJaringApprover($data, function () use ($auth, $nip, $data, $ketua, $berkas, $lama, $status, $hari, $tahunAcuan, $profil, &$idBaru, &$idNotif): void {
             $this->kunciPegawai($nip);
 
             // Ulangi pemeriksaan yang bergantung keadaan di bawah lock (balapan dengan persetujuan/hapus/pengajuan lain).
@@ -779,13 +784,13 @@ class CutiService
                 $idBaru = (int) $this->model()->insert($data);
 
                 if ($idBaru === 0) {
-                    throw new \RuntimeException('Pengajuan cuti gagal disimpan.');
+                    throw $this->galatTulis('Pengajuan cuti gagal disimpan.');
                 }
             } else {
                 $idBaru = (int) $lama['id_riwayat_cuti'];
 
                 if (! $this->model()->update($idBaru, $data)) {
-                    throw new \RuntimeException('Pengajuan cuti gagal diperbarui.');
+                    throw $this->galatTulis('Pengajuan cuti gagal diperbarui.');
                 }
             }
 
@@ -1339,6 +1344,55 @@ class CutiService
             $this->db->resetTransStatus();
 
             throw $e;
+        }
+    }
+
+    /**
+     * CR-171 (G3): INSERT/UPDATE `riwayat_cuti` gagal. Di dalam transaksi CI4 tidak melempar galat query (transException mati),
+     * jadi kode galat dibaca dari koneksi: 1452 (FK ditahan DBV-022 `riwayat_cuti` → `pegawai`; approver dihapus/dikoreksi NIP
+     * di sela validasi dan tulis) dilempar sebagai DatabaseException agar diterjemahkan sesudah rollback; galat lain tetap
+     * RuntimeException seperti sebelumnya.
+     */
+    private function galatTulis(string $pesan): \RuntimeException
+    {
+        if ((int) $this->db->error()['code'] === self::ER_FK_TANPA_INDUK) {
+            return new DatabaseException($pesan, self::ER_FK_TANPA_INDUK);
+        }
+
+        return new \RuntimeException($pesan);
+    }
+
+    /**
+     * CR-171 (G3): {@see dalamTransaksi()} atas $kerja; 1452 (dilempar sesudah rollback) → 422 di field approver yang NIP-nya
+     * sudah tidak ada di `pegawai` (pesan sama dengan validasi()). Bila tidak ada approver yang hilang, induk lain penyebabnya →
+     * galat asli (500).
+     *
+     * @param array<string, mixed> $data
+     */
+    private function dalamTransaksiJaringApprover(array $data, Closure $kerja): void
+    {
+        try {
+            $this->dalamTransaksi($kerja);
+        } catch (DatabaseException $e) {
+            if ($e->getCode() !== self::ER_FK_TANPA_INDUK) {
+                throw $e;
+            }
+
+            $errors = [];
+
+            foreach (['nip_atasan_langsung', 'nip_yang_menyetujui'] as $f) {
+                $v = $data[$f] ?? null;
+
+                if (is_string($v) && $v !== '' && $this->db->table('pegawai')->where('nip', $v)->countAllResults() === 0) {
+                    $errors[$f] = 'Pegawai tidak ditemukan.';
+                }
+            }
+
+            if ($errors === []) {
+                throw $e;
+            }
+
+            throw new ValidationException('Validasi gagal.', $this->keDaftar($errors));
         }
     }
 

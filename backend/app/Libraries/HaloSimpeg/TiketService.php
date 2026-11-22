@@ -332,7 +332,7 @@ final class TiketService extends MasterHaloSimpeg
                 ]);
 
                 return $id;
-            }, static fn (DatabaseException $e): ?ApiException => $e->getCode() === 1452 ? self::galatKategoriTidakTersedia() : null);
+            }, fn (DatabaseException $e): ?ApiException => $e->getCode() === 1452 ? $this->galatIndukHilang((string) $pegawai['nip']) : null);
         } finally {
             $penjaga->selesaikan();
         }
@@ -796,6 +796,21 @@ final class TiketService extends MasterHaloSimpeg
     private static function galatKategoriTidakTersedia(): ValidationException
     {
         return ValidationException::forField('id_question_category', 'Kategori tidak tersedia.');
+    }
+
+    /**
+     * CR-171 (G1): `disiplin_ticket` punya dua FK ke induk — kategori (`fk_id_question_category_i_qc`) dan, sesudah FK ditahan
+     * DBV-022 dipasang, pelapor (`fk_nip_disiplin_ticket_to_pegawai`). Dipanggil SESUDAH rollback: bila pegawai pelapor sudah
+     * tidak ada (dihapus/dikoreksi NIP di sela cek awal dan INSERT) → 422 pesan pegawai, sama dengan cek awal; selain itu
+     * induk yang hilang adalah kategori → 422 kategori (perilaku sebelumnya).
+     */
+    private function galatIndukHilang(string $nip): ValidationException
+    {
+        if ($this->db->table('pegawai')->where('nip', $nip)->countAllResults() === 0) {
+            return new ValidationException(self::PESAN_PEGAWAI);
+        }
+
+        return self::galatKategoriTidakTersedia();
     }
 
     private function wajibThrottle(string $kunci, int $kapasitas, int $detik, string $pesan): void
