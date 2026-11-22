@@ -51,6 +51,9 @@ final class DefinisiTabel
      *                                                         `<kolom> yatim dibuang (K-M12)` (master Halo Simpeg T12b: `id_user` tanpa
      *                                                         `pengguna`, `officer_category` tanpa petugas/kategori; F8-21, DBV-028 Q9).
      *                                                         Dry-run tidak memeriksa rujukan, sama seperti aturan FK lain.
+     * @param list<string>                  $kosongKeNull      [CR-172, DBV-034] kolom `kolomKode` NULL-able yang hasil normalisasinya `''` → NULL +
+     *                                                         dicatat `<kolom> kosong→NULL (DBV-034)`. Hanya format: nilai yatim TIDAK
+     *                                                         di-NULL-kan (tetap ditolak pra-cek FK ditahan). Kolom NOT NULL → impor gagal bila ada nilai kosong.
      */
     public function __construct(
         public readonly string $tabel,
@@ -82,7 +85,12 @@ final class DefinisiTabel
         public readonly bool $hanyaSeed = false,
         public readonly bool $pkSintetis = false,
         public readonly array $yatimBuang = [],
+        public readonly array $kosongKeNull = [],
     ) {
+        if (array_diff($kosongKeNull, $kolomKode) !== []) {
+            throw new ImporGagal("Definisi {$tabel}: kosongKeNull hanya untuk kolom kolomKode.");
+        }
+
         if ($pkSintetis && ($kunciUrut === [] || $bolehSeed || $kolomTunda !== [] || $isiUrutan !== null)) {
             throw new ImporGagal("Definisi {$tabel}: pkSintetis wajib kunciUrut dan tidak bisa digabung bolehSeed/kolomTunda/isiUrutan.");
         }

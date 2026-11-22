@@ -28,9 +28,9 @@ use Throwable;
  * Semua ON DELETE RESTRICT ON UPDATE RESTRICT (K1; ganti NIP lewat B-06). KEY penopang FK sudah dibuat di CREATE
  * (`nip_atasan_langsung`, `nip_yang_menyetujui`, `nip`), sehingga ALTER hanya ADD CONSTRAINT.
  *
- * up() fail-closed: sebelum ALTER apa pun, NIP yatim per kolom dihitung (NULL dan string kosong diabaikan — string
- * kosong harus di-NULL-kan saat impor, audit Bagian 1 `nip_al_kosong`); bila ada, migration berhenti dengan pesan jumlah
- * per kolom. FK yang sudah ada dilewati; bila ALTER berikutnya gagal, FK yang dipasang PADA RUN ITU dilepas lagi sebelum
+ * up() fail-closed: sebelum ALTER apa pun, NIP yatim dan NIP kosong/spasi-saja per kolom dihitung terpisah (NULL
+ * diabaikan; `''` di kolom NULL-able di-NULL-kan saat impor, audit Bagian 1 `nip_al_kosong`, CR-172/DBV-034); bila ada,
+ * migration berhenti dengan pesan jumlah per kolom. FK yang sudah ada dilewati; bila ALTER berikutnya gagal, FK yang dipasang PADA RUN ITU dilepas lagi sebelum
  * error dilempar ulang. down() hanya melepas FK yang ada (KEY tetap, seperti sebelum up()).
  */
 class AddFkNipLayananFase4 extends Migration
@@ -91,6 +91,10 @@ class AddFkNipLayananFase4 extends Migration
     /**
      * Pra-cek yatim (fail-closed). ADD FOREIGN KEY sendiri juga menolak yatim (1452), tetapi tanpa jumlah per kolom;
      * pesan ini memberi operator angka yang bisa ditindaklanjuti sebelum impor diulang.
+     *
+     * CR-172/DBV-034: nilai `''`/spasi-saja (TRIM = '') dihitung TERPISAH dari yatim. ALTER menolaknya (tidak ada
+     * `pegawai.nip` kosong), jadi tidak boleh lolos pra-cek. Saran per kolom mengikuti IS_NULLABLE: kolom NULL-able →
+     * NULL-kan (normalisasi impor `kosongKeNull`); kolom NOT NULL → perbaiki NIP atau buang barisnya (tidak bisa NULL).
      */
     private function assertNoOrphans(): void
     {
@@ -98,24 +102,46 @@ class AddFkNipLayananFase4 extends Migration
 
         foreach (self::FOREIGN_KEYS as [$table, $column, $label]) {
             $row = $this->first(
-                "SELECT COUNT(*) AS n FROM {$this->t($table)} c
-                 WHERE c.`{$column}` IS NOT NULL AND c.`{$column}` <> ''
-                   AND NOT EXISTS (SELECT 1 FROM {$this->t('pegawai')} p WHERE p.`nip` = c.`{$column}`)",
+                "SELECT
+                    SUM(TRIM(c.`{$column}`) = '') AS kosong,
+                    SUM(TRIM(c.`{$column}`) <> ''
+                        AND NOT EXISTS (SELECT 1 FROM {$this->t('pegawai')} p WHERE p.`nip` = c.`{$column}`)) AS yatim
+                 FROM {$this->t($table)} c
+                 WHERE c.`{$column}` IS NOT NULL",
             );
-            $orphans = (int) ($row['n'] ?? 0);
+            $orphans = (int) ($row['yatim'] ?? 0);
+            $blanks  = (int) ($row['kosong'] ?? 0);
 
             if ($orphans > 0) {
                 $problems[] = "{$table}.{$column}: {$orphans} {$label} dengan NIP yang tidak ada di pegawai";
+            }
+
+            if ($blanks > 0) {
+                $problems[] = "{$table}.{$column}: {$blanks} {$label} dengan NIP kosong/spasi-saja ("
+                    . ($this->nullable($table, $column) ? 'kolom NULL-able: NULL-kan' : 'kolom NOT NULL: perbaiki NIP atau buang barisnya, tidak bisa di-NULL-kan')
+                    . ')';
             }
         }
 
         if ($problems !== []) {
             throw new RuntimeException(
                 'DBV-022: FK NIP layanan ke pegawai.nip tidak dipasang — ' . implode('; ', $problems)
-                . '. Impor pegawai dulu atau perbaiki/NULL-kan baris tersebut (audit sql/DBV-022-audit-layanan.sql), '
+                . '. Impor pegawai dulu atau perbaiki baris tersebut (NULL-kan hanya di kolom NULL-able; audit '
+                . 'sql/DBV-022-audit-layanan.sql), '
                 . 'lalu jalankan ulang migrate.',
             );
         }
+    }
+
+    private function nullable(string $table, string $column): bool
+    {
+        $row = $this->first(
+            "SELECT IS_NULLABLE AS n FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '{$this->connection()->prefixTable($table)}'
+               AND COLUMN_NAME = '{$column}'",
+        );
+
+        return ($row['n'] ?? 'NO') === 'YES';
     }
 
     private function foreignKeyExists(string $table, string $name): bool
