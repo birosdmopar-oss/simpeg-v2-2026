@@ -44,19 +44,26 @@ const sedangUnduh = ref(false)
 const perPageOpsi = PER_PAGE_LAPORAN.map((n) => ({ value: String(n), label: String(n) }))
 const judulBulan = computed(() => labelBulan(filter.bulan))
 
+// Penjaga urutan respons (CR-179 R3, pola RekapTukinPage): hanya permintaan terbaru yang boleh menulis hasil/galat dan
+// mematikan `memuat`, supaya respons tab/filter lama yang datang belakangan tidak menimpa tampilan terbaru.
+let token = 0
+
 async function muat(): Promise<void> {
+  const saya = ++token
   memuat.value = true
   failure.value = null
   try {
-    daftar.value = await rekapUangMakanService.daftar(
+    const hasil = await rekapUangMakanService.daftar(
       { bulan: param.value.bulan, unit_satker: param.value.unit_satker, jenis_pegawai: param.value.jenis_pegawai, page: filter.page, per_page: filter.perPage },
       il.value,
     )
+    if (saya === token) daftar.value = hasil
   } catch (err) {
+    if (saya !== token) return
     daftar.value = null
     failure.value = describeApiError(err).message
   } finally {
-    memuat.value = false
+    if (saya === token) memuat.value = false
   }
 }
 

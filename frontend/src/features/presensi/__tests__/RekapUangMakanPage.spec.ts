@@ -108,21 +108,60 @@ describe('tab Instansi Lain', () => {
 
     svc.daftar.mockClear()
     await pilihTab(wrapper, 'Pegawai')
-    expect(svc.daftar.mock.calls.at(-1)?.[0].page).toBe(1)
-    expect(svc.daftar.mock.calls.at(-1)?.[1]).toBe(false)
+    expect(svc.daftar).toHaveBeenCalledTimes(1)
+    expect(svc.daftar.mock.calls[0]?.[0].page).toBe(1)
+    expect(svc.daftar.mock.calls[0]?.[1]).toBe(false)
   })
 
-  it('CR-179: penerapan dari URL tetap memakai halaman dari URL', async () => {
+  it('CR-179: ganti tab ke halaman 1, lalu query URL berikutnya tetap dipakai (penjaga regresi dariUrl)', async () => {
     const { wrapper, router } = await mountPage(Role.SUPER_ADMIN, '/presensi/uang-makan?page=2', 60)
     expect(svc.daftar.mock.calls[0]?.[0].page).toBe(2)
     await pilihTab(wrapper, 'Instansi Lain')
+    expect(svc.daftar.mock.calls.at(-1)?.[0].page).toBe(1)
 
-    // Back/forward ke rute yang sama dengan ?page=3: halaman dari URL dipakai, tab tidak mereset ke 1.
+    // Back/forward ke rute yang sama dengan ?page=3 saat tab IL aktif: halaman dari URL yang dipakai.
     await router.push('/presensi/uang-makan?page=3')
     await flushPromises()
     expect(svc.daftar.mock.calls.at(-1)?.[0].page).toBe(3)
     expect(svc.daftar.mock.calls.at(-1)?.[1]).toBe(true)
     expect(wrapper.find('[data-testid="rekap-uang-makan-il-catatan"]').exists()).toBe(true)
+  })
+
+  it('CR-179 R3: respons tab lama yang datang belakangan tidak menimpa tab baru', async () => {
+    const { wrapper, router } = await mountPage(Role.SUPER_ADMIN, '/presensi/uang-makan', 60)
+    const lingkup = {}
+    let selesaiPegawai!: (v: Awaited<ReturnType<typeof svc.daftar>>) => void
+    let selesaiIl!: (v: Awaited<ReturnType<typeof svc.daftar>>) => void
+    svc.daftar
+      .mockImplementationOnce(() => new Promise((r) => (selesaiPegawai = r)))
+      .mockImplementationOnce(() => new Promise((r) => (selesaiIl = r)))
+
+    // Permintaan Pegawai (halaman 2 dari URL) masih berjalan, lalu pindah ke tab IL.
+    await router.push('/presensi/uang-makan?page=2')
+    await flushPromises()
+    await pilihTab(wrapper, 'Instansi Lain')
+
+    selesaiIl({ items: [{ nip: '111', tgl_absen: '2026-09-02' }], total: 1, page: 1, per_page: 25, bulan: '2026-09', lingkup })
+    await flushPromises()
+    selesaiPegawai({ items: [{ nip: '222', tgl_absen: '2026-09-03' }], total: 1, page: 1, per_page: 25, bulan: '2026-09', lingkup })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="rekap-uang-makan-baris-111"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="rekap-uang-makan-baris-222"]').exists()).toBe(false)
+  })
+
+  it('CR-179 R3: memuat tetap tampil sampai permintaan terbaru selesai', async () => {
+    const { wrapper, router } = await mountPage(Role.SUPER_ADMIN, '/presensi/uang-makan', 60)
+    let selesaiPegawai!: (v: Awaited<ReturnType<typeof svc.daftar>>) => void
+    svc.daftar.mockImplementationOnce(() => new Promise((r) => (selesaiPegawai = r))).mockImplementationOnce(() => new Promise(() => {}))
+
+    await router.push('/presensi/uang-makan?page=2')
+    await flushPromises()
+    await pilihTab(wrapper, 'Instansi Lain')
+    selesaiPegawai({ items: [], total: 0, page: 1, per_page: 25, bulan: '2026-09', lingkup: {} })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Memuat...')
   })
 })
 
