@@ -175,7 +175,7 @@ final class ImporSlipParitasTest extends DatabaseTestCase
             (new ImporSlipService(null, null, null, null, $kait))->commit($this->auth($admin), $token, true);
             $this->fail('harus 500');
         } catch (ApiException $e) {
-            // perilaku sekarang (dikunci CR-164): ImporSlipService.php:241-245 — semua Throwable non-Api → 500 tanpa kode & errors.
+            // perilaku sekarang (dikunci CR-164): ImporSlipService.php:253-258 — semua Throwable non-Api → 500 tanpa kode & errors.
             $this->assertSame([500, ImporSlipService::PESAN_GAGAL_COMMIT, null, null], [$e->getStatusCode(), $e->getMessage(), $e->getKode(), $e->getErrors()]);
         }
 

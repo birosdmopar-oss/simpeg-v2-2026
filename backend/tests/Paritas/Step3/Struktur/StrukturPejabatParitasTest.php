@@ -15,8 +15,8 @@ use Tests\Support\Kepegawaian\RiwayatUjiTrait;
  * golongan "gol_ruang pertama yang tidak kosong sesudah trim". Hari ini dikunci 2026-10-13 WIB.
  *
  * Catatan: tmtsk KEMBAR pada riwayat jabatan satu NIP TIDAK dikunci — muatPejabat() hanya `ORDER BY nip, tmtsk DESC`
- * tanpa pemutus seri (StrukturService.php:477), jadi baris yang menang tidak tentu. Begitu pula golongan dengan tmtsk
- * kembar (StrukturService.php:537).
+ * tanpa pemutus seri (StrukturService.php:500), jadi baris yang menang tidak tentu. Begitu pula golongan dengan tmtsk
+ * kembar (StrukturService.php:561).
  *
  * @internal
  */
@@ -88,7 +88,7 @@ final class StrukturPejabatParitasTest extends DatabaseTestCase
         $this->rmj($nip, 'sekretaris', '2024-01-01', ['id_group_jabatan' => 3]);
 
         // perilaku sekarang (dikunci CR-164): baris terbaru NIP itu bukan group 1/5 (kunci '') tetap "memakai" NIP
-        // (StrukturService.php:486-494), jadi baris struktural lama tidak dipertimbangkan → jabatan lowong.
+        // (StrukturService.php:507-523), jadi baris struktural lama tidak dipertimbangkan → jabatan lowong.
         $this->assertSame('', $this->data()['sekretaris']['pejabat']);
     }
 
@@ -100,7 +100,7 @@ final class StrukturPejabatParitasTest extends DatabaseTestCase
         $this->rmj($kecil, 'sekretaris', '2025-01-01');
 
         $this->assertLessThan(0, strcmp($kecil, $besar));
-        // perilaku sekarang (dikunci CR-164): kunci sama → NIP terakhir urut NIP menang, bukan TMT terbaru (StrukturService.php:498).
+        // perilaku sekarang (dikunci CR-164): kunci sama → NIP terakhir urut NIP menang, bukan TMT terbaru (StrukturService.php:500/:521).
         $this->assertSame("Kedua, {$besar}", $this->data()['sekretaris']['pejabat']);
     }
 
@@ -168,7 +168,7 @@ final class StrukturPejabatParitasTest extends DatabaseTestCase
         $this->kp($nip, '  III/d  ', '2024-01-01');
         $this->kp($nip, 'III/c', '2022-01-01');
 
-        // perilaku sekarang (dikunci CR-164): gol terbaru yang kosong dilewati ke baris lebih lama (StrukturService.php:540-543),
+        // perilaku sekarang (dikunci CR-164): gol terbaru yang kosong dilewati ke baris lebih lama (StrukturService.php:563-566),
         // dan nilai dipangkas spasinya.
         $this->assertSame("Gol, III/d, {$nip}", $this->data()['sekretaris']['pejabat']);
 
