@@ -13,6 +13,7 @@ use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\NamedRange;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Worksheet\Table;
 use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
 use Tests\Support\Presensi\XlsxMentah;
@@ -256,6 +257,51 @@ final class PembacaExcelSlipBatasBacaTest extends CIUnitTestCase
         yield 'dua entri berisi sama' => [[]];
         yield 'Target beda huruf besar-kecil' => [['Target="worksheets/sheet2.xml"' => 'Target="worksheets/SHEET1.xml"']];
         yield 'Target absolut' => [['Target="worksheets/sheet2.xml"' => 'Target="/xl/worksheets/sheet1.xml"']];
+    }
+
+    /**
+     * Berkas sah: relasi sheet (bukan part sheet) yang teksnya memuat kata "sheetData" (URL hyperlink) diambil pemuat lebih
+     * dari dua kali (sheet bertabel), atau isinya identik untuk GPP dan TK (begitulah PhpSpreadsheet menulisnya). Itu bukan
+     * "dua sheet berisi part yang sama": yang dikenali sebagai part sheet hanya isi ber-ELEMEN `<sheetData>`.
+     */
+    #[DataProvider('hyperlinkBerkataSheetData')]
+    public function testHyperlinkBerkataSheetDataTetapDiterima(bool $bertabel, bool $diKeduaSheet): void
+    {
+        $buku = new Spreadsheet();
+        $gpp  = $buku->getActiveSheet()->setTitle(KolomGaji::SHEET_GPP);
+        $gpp->fromArray([self::headerGpp(), self::dataGpp()], null, 'A1', true);
+        $gpp->setCellValueExplicit('A2', self::NIP, DataType::TYPE_STRING);
+        $tk = $buku->createSheet()->setTitle(KolomGaji::SHEET_TK);
+        $tk->fromArray([self::headerTk(), self::dataTk()], null, 'A1', true);
+        $tk->setCellValueExplicit('A2', self::NIP, DataType::TYPE_STRING);
+
+        $gpp->getCell('D2')->getHyperlink()->setUrl('https://contoh.test/unduh?bagian=sheetData&versi=1');
+
+        if ($diKeduaSheet) {
+            $tk->getCell('D2')->getHyperlink()->setUrl('https://contoh.test/unduh?bagian=sheetData&versi=1');
+        }
+
+        if ($bertabel) {
+            $gpp->addTable(new Table('A1:' . XlsxMentah::kolom(count(self::headerGpp())) . '2', 'TabelGpp'));
+        }
+
+        $path = $this->temp('.xlsx');
+        IOFactory::createWriter($buku, 'Xlsx')->save($path);
+        $buku->disconnectWorksheets();
+
+        $sheet = $this->assertDiterima($path);
+        $this->assertSame(self::NIP, $sheet['GPP'][2][0]);
+        $this->assertSame(self::NIP, $sheet['TK'][2][0]);
+    }
+
+    /**
+     * @return iterable<string, array{0: bool, 1: bool}>
+     */
+    public static function hyperlinkBerkataSheetData(): iterable
+    {
+        yield 'sheet bertabel' => [true, false];
+        yield 'hyperlink sama di GPP dan TK' => [false, true];
+        yield 'bertabel dan hyperlink sama di kedua sheet' => [true, true];
     }
 
     /**
