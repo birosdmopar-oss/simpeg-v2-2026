@@ -197,7 +197,8 @@ final class ImporQna
         $ekstra = '';
 
         // Ukuran sheet diperiksa SEBELUM memuat (listWorksheetInfo membaca dimensi secara streaming): xlsx kecil dengan satu sel
-        // di baris 1.048.576 tidak boleh dimuat penuh ke memori (pola PembacaExcelSlip).
+        // di baris 1.048.576 tidak boleh dimuat penuh ke memori. Pola ini berasal dari sini; PembacaExcelSlip baru
+        // mengikutinya sejak CR-177 (pra-cek baris dan kolom, tanpa read filter).
         try {
             if (! $reader->canRead($path)) {
                 throw ValidationException::forField('berkas', 'Berkas harus berformat .xlsx.');

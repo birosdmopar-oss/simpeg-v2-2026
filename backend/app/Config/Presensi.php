@@ -25,6 +25,15 @@ class Presensi extends BaseConfig
     /** Batas baris data per sheet impor (Q5A-05 default). */
     public int $maksBarisImporPerSheet = 10000;
 
+    /**
+     * Batas kolom per sheet impor Slip Gaji (CR-177). Template resmi hanya 26 kolom (GPP: nip, bulan, tahun, nama + 22
+     * nominal) dan 9–10 kolom (TK); kolom tak dikenal dari ekspor aplikasi gaji diabaikan penguraian, jadi tetap diberi
+     * ruang. 256 = lebar penuh `.xls`, sehingga berkas `.xls` tidak pernah ditolak karena kolom, dan pembaca paling banyak
+     * menyusun (batas baris + 1) × 256 sel per sheet, bukan × 16.384 (lebar `.xlsx`). Konstanta, bukan setelan `.env`:
+     * ini pengaman memori, bukan aturan bisnis.
+     */
+    public const MAKS_KOLOM_IMPOR = 256;
+
     /** Masa berlaku pratinjau impor dalam detik (Q5A-05 default 30 menit). */
     public int $ttlPratinjauDetik = 1800;
 

@@ -21,7 +21,7 @@ token → 401.
 
 | Status | Kondisi |
 |---|---|
-| 422 `errors.berkas` | "Berkas wajib diunggah." / "Format berkas harus .xlsx atau .xls." (ekstensi atau jenis isi lain, tanpa ekstensi) / "Isi berkas tidak sesuai dengan ekstensinya." / "Ukuran berkas maksimal 5 MB." / sheet `GPP`/`TK` tidak ada, kosong, header tidak sah / "Jumlah baris melebihi batas 10.000 per sheet." / "Berkas tidak dapat dibaca. …" (tanpa pesan exception mentah) |
+| 422 `errors.berkas` | "Berkas wajib diunggah." / "Format berkas harus .xlsx atau .xls." (ekstensi atau jenis isi lain, tanpa ekstensi) / "Isi berkas tidak sesuai dengan ekstensinya." / "Ukuran berkas maksimal 5 MB." / sheet `GPP`/`TK` tidak ada, kosong, header tidak sah / "Jumlah baris melebihi batas 10.000 per sheet." / "Jumlah kolom melebihi batas 256 per sheet." (CR-177) / "Berkas tidak dapat dibaca. …" (tanpa pesan exception mentah) |
 | 422 `errors.filter_bulan` + `code` | `filter_periode_tidak_lengkap`, `periode_tidak_valid`, `periode_tidak_ada_di_berkas` |
 | 422 `errors.timpa` | `timpa` bukan boolean |
 | 404 `code: pratinjau_tidak_ditemukan` | token tidak sah/tidak ada, bukan milik pemanggil, kedaluwarsa (TTL), atau isi berkas di disk berubah — pesan sama "Pratinjau tidak ditemukan atau sudah kedaluwarsa. Unggah ulang berkas." |

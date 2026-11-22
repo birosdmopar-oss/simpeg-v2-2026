@@ -177,6 +177,23 @@ diubah sebatas §7.3.8 (`RingkasanSlip`). Nilai uang makan slip disambung D-09 (
 — **wajib sebelum go-live** (F5-1); sejak 5B M2 (MAKE-040) bawaan `Config\Presensi::$sumberUangMakan` =
 `Slip\UangMakanSlipPresensi` (lihat bagian "Uang makan slip 5B").
 
+Batas baca berkas impor (`Slip/PembacaExcelSlip`, CR-177) — pengaman supaya berkas yang tidak wajar ditolak 422
+`errors.berkas`, bukan 500 karena memori atau waktu habis:
+
+| # | Butir | Keputusan |
+|---|---|---|
+| BB-1 | Reader | Dikunci ke `Xlsx`/`Xls`. Berkas yang hanya dikenali reader lain (HTML, CSV, …) → "Berkas tidak dapat dibaca. …" (dulu dibaca reader itu lalu ditolak "sheet tidak ada") |
+| BB-2 | Pra-cek sebelum muat | Ukuran sheet GPP dan TK dibaca lewat `listWorksheetInfo` (dipindai berurutan, tanpa membangun sel) dengan reader tersendiri. Baris data > `presensi.maksBarisImporPerSheet` → "Jumlah baris melebihi batas … per sheet." (pesan lama); kolom > batas kolom → "Jumlah kolom melebihi batas 256 per sheet." (pesan baru). Urutan: baris dulu, lalu kolom; GPP dulu, lalu TK |
+| BB-3 | Batas kolom | `Config\Presensi::MAKS_KOLOM_IMPOR = 256` (konstanta, bukan `.env`). Template resmi 26 kolom (GPP) dan 9–10 kolom (TK); kolom tak dikenal diabaikan penguraian, jadi tetap diberi ruang. 256 = lebar penuh `.xls`, sehingga `.xls` tidak pernah ditolak karena kolom |
+| BB-4 | Sel kosong | Pra-cek memakai `setReadEmptyCells` bawaan (true): sel kosong yang hanya bergaya ikut dihitung, **sama seperti sebelumnya** (pemuat memang membuat sel untuk sel kosong bergaya), jadi template dengan sel kosong lewat batas baris tetap ditolak. **[V2] beda kecil:** pada `.xlsx`, `<row>` tanpa sel (mis. hanya tinggi baris) lewat batas kini ikut dihitung dan ditolak dengan pesan batas baris |
+| BB-5 | Cek pasca-muat | Batas baris dan kolom diperiksa lagi sesudah muat, sebelum array baris × kolom disusun (lapis kedua, mis. `<row>` tidak berurutan di XML) |
+| BB-6 | Read filter | **Tidak dipasang.** Begitu ada read filter, reader Xlsx memanggilnya untuk setiap kolom `<cols>` × setiap baris (`Xlsx/ColumnAndRowAttributes`), sehingga berkas 51 KB dengan `<cols>` lebar dan 10.001 baris dimuat 28,4 detik (tanpa filter 0,2 detik); `<cols>` sampai 1025 seperti tulisan LibreOffice: 2,0 detik (tanpa filter 0,2 detik). Dijaga test `testDefinisiKolomLebarDiterimaDalamWaktuWajar`. Sesudah pra-cek lolos, yang dimuat paling banyak (batas baris + 1) × 256 sel per sheet |
+| BB-7 | Di luar cakupan | Batas ukuran sesudah dekompresi (zip bomb) dan berkas padat yang masih di dalam batas baris/kolom |
+
+Angka ukur (berkas uji XML mentah, `PembacaExcelSlipBatasBacaTest`): sel di XFD1 + 10.000 baris data → dulu fatal memori
+(±163 juta iterasi sel), kini ditolak dengan kenaikan puncak memori ±3 MB; 200.000 baris data → dulu dimuat penuh (+231 MB)
+baru ditolak, kini ditolak sebelum dimuat (+22 MB).
+
 PDF slip (`Slip/PdfSlipGaji`, view `pdf/slip_gaji`, port `print/cetak.php` @771f8b4, bagian TK @0cf7e67) — keputusan reviewer CR 20-10:
 
 | # | Butir | Keputusan |
