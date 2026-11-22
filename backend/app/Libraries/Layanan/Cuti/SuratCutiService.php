@@ -121,6 +121,11 @@ class SuratCutiService implements PenerbitSuratCutiInterface
      * `file_surat_cuti` saja BUKAN penanda: legacy juga mengisinya dengan surat tanpa TTE (allow_esign ≠ 1, insert,
      * regenerate_sc) — perlakuannya menunggu QA-30.
      *
+     * Kasus tepi: `regenerate_sc` legacy (manual role 1) bisa menimpa `file_surat_cuti` baris ber-TTE dengan surat tanpa TTE,
+     * sementara `file_sc_signed_bef` tetap — baris itu tetap terkunci (arah aman: tidak membuka TTE ganda).
+     * Sengaja varian "dua kolom saja, tanpa `esign_hist`": syarat `esign_hist` (status 1) untuk klasifikasi kode 45 diputus
+     * di pemetaan cutover CR-180b (kartu QA-29), bukan di pagar ini.
+     *
      * @param array<string, mixed> $cuti baris `riwayat_cuti`
      */
     public static function tteLegacy(array $cuti): bool

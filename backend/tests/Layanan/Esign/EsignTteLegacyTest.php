@@ -72,6 +72,35 @@ final class EsignTteLegacyTest extends DatabaseTestCase
         $this->assertSame(self::LEGACY_TTE['file_surat_cuti'], $this->cutiService()->ambil($id)['file_surat_cuti'], 'kolom legacy utuh');
     }
 
+    /**
+     * R1 review: `GET cuti/{id}/esign/status` (statusSertifikat) memakai pemeriksaan yang sama → 422 sebelum `checkUser`.
+     */
+    public function testLegacyBerTteStatusSertifikat422TanpaCheckUser(): void
+    {
+        ['id' => $id, 'a' => $a] = $this->cutiFinal();
+        $this->tandaiLegacy($id, self::LEGACY_TTE);
+
+        $gateway = new class () extends MockEsignAdapter {
+            public int $cekUser = 0;
+
+            public function checkUser(#[\SensitiveParameter] string $nip): array
+            {
+                $this->cekUser++;
+
+                return parent::checkUser($nip);
+            }
+        };
+
+        try {
+            $this->esignService([], $gateway)->statusSertifikat($a['pyb']['auth'], $id);
+            $this->fail('Seharusnya 422 sudah ditandatangani');
+        } catch (ValidationException $e) {
+            $this->assertSame([EsignCutiService::PESAN_SUDAH_TTE], $e->getErrors()['status']);
+        }
+
+        $this->assertSame(0, $gateway->cekUser, 'checkUser gateway tidak dipanggil');
+    }
+
     public function testLegacyBerTteAtasNamaSuperAdminTersembunyiDanDitolak(): void
     {
         ['id' => $id, 'admin' => $admin] = $this->finalAtasNama();
@@ -93,24 +122,33 @@ final class EsignTteLegacyTest extends DatabaseTestCase
     }
 
     /**
-     * Daftar admin (Super Admin, item ⋮ "… atas nama", MAKE-075): penanda legacy dibaca dari baris `rc.*` yang sudah dimuat —
-     * tanpa kueri tambahan (justru lookup `finalAtasNamaBanyak` untuk baris itu tidak perlu lagi).
+     * Daftar admin (Super Admin, item ⋮ "… atas nama", MAKE-075): penanda legacy dibaca dari baris `rc.*` yang sudah dimuat.
+     * R2 review: dua baris legacy atas nama + pemanasan; sesudah ditandai tidak ada SQL ke `audit_logs` sama sekali — baik
+     * lookup halaman (`finalAtasNamaBanyak`) maupun per baris (`finalAtasNama` di `aksi`, yang tidak dievaluasi karena
+     * `! $adaSuratTte` lebih dulu). Bila urutan itu dipindah, test ini merah (N+1).
      */
     public function testDaftarAdminTanpaKueriTambahanUntukPenandaLegacy(): void
     {
-        ['id' => $id, 'admin' => $admin] = $this->finalAtasNama();
-        $svc                             = $this->cutiService();
-        $auth                            = $admin['auth'];
-        $daftar                          = static fn (): array => $svc->daftar($auth, ['mode' => CutiService::MODE_ADMIN, 'per_page' => '100']);
+        ['id' => $id1, 'admin' => $admin] = $this->finalAtasNama();
+        ['id' => $id2]                    = $this->finalAtasNama();
+        $svc                              = $this->cutiService();
+        $auth                             = $admin['auth'];
+        $daftar                           = static fn (): array => $svc->daftar($auth, ['mode' => CutiService::MODE_ADMIN, 'per_page' => '100']);
 
+        $daftar(); // pemanasan (cache metadata koneksi)
         [$awal, $sebelum] = $this->rekam($daftar);
-        $this->assertTrue($this->itemDari($awal, $id)['aksi']['esign_atas_nama'], 'prasyarat');
+        $this->assertTrue($this->itemDari($awal, $id1)['aksi']['esign_atas_nama'], 'prasyarat');
+        $this->assertTrue($this->itemDari($awal, $id2)['aksi']['esign_atas_nama'], 'prasyarat');
+        $this->assertSame(1, $this->jumlahAuditLogs($sebelum), 'prasyarat: satu lookup atas nama per halaman');
 
-        $this->tandaiLegacy($id, self::LEGACY_TTE);
+        $this->tandaiLegacy($id1, self::LEGACY_TTE);
+        $this->tandaiLegacy($id2, self::LEGACY_TTE);
         [$hasil, $sesudah] = $this->rekam($daftar);
 
-        $this->assertLessThanOrEqual($sebelum, $sesudah, 'tanpa kueri tambahan');
-        $this->assertFalse($this->itemDari($hasil, $id)['aksi']['esign_atas_nama']);
+        $this->assertSame(0, $this->jumlahAuditLogs($sesudah), 'tanpa lookup audit_logs untuk baris TTE legacy (tanpa N+1)');
+        $this->assertSame(count($sebelum) - 1, count($sesudah), 'tanpa kueri tambahan (lookup halaman hilang)');
+        $this->assertFalse($this->itemDari($hasil, $id1)['aksi']['esign_atas_nama']);
+        $this->assertFalse($this->itemDari($hasil, $id2)['aksi']['esign_atas_nama']);
     }
 
     /**
@@ -211,13 +249,21 @@ final class EsignTteLegacyTest extends DatabaseTestCase
     }
 
     /**
-     * @return array{0: mixed, 1: int}
+     * @param list<string> $sql
+     */
+    private function jumlahAuditLogs(array $sql): int
+    {
+        return count(array_filter($sql, static fn (string $q): bool => str_contains($q, 'audit_logs')));
+    }
+
+    /**
+     * @return array{0: mixed, 1: list<string>} [hasil, SQL yang dijalankan]
      */
     private function rekam(callable $f): array
     {
-        $jumlah = 0;
+        $jumlah = [];
         $hitung = static function (Query $q) use (&$jumlah): void {
-            $jumlah++;
+            $jumlah[] = $q->getQuery();
         };
 
         Events::on('DBQuery', $hitung);
