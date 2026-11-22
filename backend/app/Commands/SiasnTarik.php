@@ -24,9 +24,11 @@ use Throwable;
  * NIP yang belum diproses (flag/stempel `siasn_status_pegawai`); jadwal ada di runbook (crontab legacy, PN-5). `--nip`
  * menarik satu NIP tanpa syarat usang. Tanpa UI admin (legacy tidak punya).
  *
- * Kode keluar: 0 berhasil (termasuk sebagian NIP gagal di sisi SIASN — dicatat, AC-03.1), 1 konfigurasi/akun sistem belum
- * siap, driver SIASN bukan `bkn`, jenis yang sama sedang berjalan, atau galat DB/lainnya (`EXIT_ERROR`; galat DB hanya
- * dicetak kelas & kodenya), 7 masukan salah (`EXIT_USER_INPUT`). Keluaran hanya jumlah, tanpa NIP/nama.
+ * Kode keluar: 0 berhasil (termasuk sebagian NIP gagal di sisi SIASN selama batch tidak diputus — dicatat, AC-03.1),
+ * 1 konfigurasi/akun sistem belum siap, driver SIASN bukan `bkn`, jenis yang sama sedang berjalan, galat DB/lainnya (galat
+ * DB hanya dicetak kelas & kodenya), batch DIPUTUS pemutus CR-162 (juga saat `--dry-run`), atau `--jenis=ref-unor` gagal
+ * (tanpa tulis) (`EXIT_ERROR`), 7 masukan salah (`EXIT_USER_INPUT`). Keluaran hanya jumlah, tanpa NIP/nama. Rincian:
+ * `app/Libraries/Siasn/README.md`.
  */
 class SiasnTarik extends BaseCommand
 {

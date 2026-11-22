@@ -70,8 +70,8 @@ final class StatistikCacheParitasTest extends DatabaseTestCase
         $this->assertSame(['hit' => true, 'ttl' => 900], $kedua['cache']);
         $this->assertSame([['key' => 'dashboard_stat_unit-kerja_kementerian_0_all', 'ttl' => 900]], $this->simpanStatistik(), 'satu kali simpan, TTL 900');
 
-        // perilaku sekarang (dikunci CR-164): isi cache TIDAK memuat kunci `cache` — ditempel sesudah remember()
-        // (StatistikService.php:163), jadi nilai tersimpan = hasil hitung murni.
+        // perilaku sekarang (dikunci CR-164): isi cache TIDAK memuat kunci `cache` — ditempel sesudah set()
+        // (StatistikService.php:171), jadi nilai tersimpan = hasil hitung murni.
         $this->assertArrayNotHasKey('cache', (array) $this->cacheUji->get('dashboard_stat_unit-kerja_kementerian_0_all'));
         $this->assertSame(3600, CacheService::DEFAULT_TTL, 'TTL bawaan CacheService::set tetap 3600 (statistik memakai 900)');
     }
@@ -186,11 +186,11 @@ final class StatistikCacheParitasTest extends DatabaseTestCase
 
         $this->assertSame(['hit' => false, 'ttl' => 900], $hasil['cache']);
         $this->assertSame($acuan['baris'], $hasil['baris'], 'dihitung langsung');
-        $this->assertSame([], $this->simpanStatistik(), 'has() melempar sebelum remember() → tidak ada simpan');
+        $this->assertSame([], $this->simpanStatistik(), 'get() melempar → bolehSimpan tetap false → tidak ada simpan');
         $this->assertLogContains('warning', '[dashboard] cache statistik dashboard_stat_unit-kerja_kementerian_0_all gagal: cache uji: get gagal');
     }
 
-    public function testCacheGagalDiSaveDihitungUlang(): void
+    public function testCacheGagalDiSaveHasilHitungTetapDikembalikan(): void
     {
         $super             = $this->auth(Role::SUPER_ADMIN);
         $acuan             = (new StatistikService($this->db, new PegawaiScope(), new CacheService(CacheTtlSpy::baru(), '')))->statistik($super, StatistikService::UNIT_KERJA, []);
@@ -200,8 +200,9 @@ final class StatistikCacheParitasTest extends DatabaseTestCase
 
         $this->assertSame(['hit' => false, 'ttl' => 900], $hasil['cache']);
         $this->assertSame($acuan['baris'], $hasil['baris']);
-        // perilaku sekarang (dikunci CR-164): remember() sudah menghitung sebelum save() melempar; hasil itu dibuang dan
-        // dihitung ULANG di luar try (StatistikService.php:158-161) — percobaan simpan tercatat sekali.
+        // perilaku sekarang (dikunci CR-164; sejak CR-166 tanpa hitung ulang): hitung() berjalan sekali di luar try, lalu
+        // set() melempar di try tersendiri (StatistikService.php:163-169) — hasil hitung yang sama tetap dikembalikan dan
+        // percobaan simpan tercatat sekali.
         $this->assertSame([['key' => 'dashboard_stat_unit-kerja_kementerian_0_all', 'ttl' => 900]], $this->simpanStatistik());
         $this->assertLogContains('warning', 'cache uji: save gagal');
 
@@ -219,10 +220,10 @@ final class StatistikCacheParitasTest extends DatabaseTestCase
 
         $hasil = $this->svc()->statistik($super, StatistikService::UNIT_KERJA, []);
 
-        $this->assertSame(['hit' => false, 'ttl' => 900], $hasil['cache'], 'has() true tetapi nilai bukan array → hit dipaksa false');
+        $this->assertSame(['hit' => false, 'ttl' => 900], $hasil['cache'], 'get() mengembalikan nilai bukan array → hit false (is_array)');
         $this->assertSame($acuan['baris'], $hasil['baris']);
-        // perilaku sekarang (dikunci CR-164): nilai rusak TIDAK ditimpa (StatistikService.php:158-161), jadi setiap
-        // permintaan menghitung ulang sampai TTL habis atau invalidasi.
+        // perilaku sekarang (dikunci CR-164): nilai rusak TIDAK ditimpa — bolehSimpan hanya true bila get() mengembalikan
+        // null (StatistikService.php:155, :163), jadi setiap permintaan menghitung ulang sampai TTL habis atau invalidasi.
         $this->assertSame('rusak', $this->cacheUji->get($kunci));
         $this->assertSame([], $this->simpanStatistik());
         $this->assertFalse($this->svc()->statistik($super, StatistikService::UNIT_KERJA, [])['cache']['hit']);
