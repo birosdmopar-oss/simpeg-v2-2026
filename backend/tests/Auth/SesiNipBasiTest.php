@@ -80,28 +80,49 @@ final class SesiNipBasiTest extends DatabaseTestCase
 
         $pp = $this->pegawaiPresensi();
         $this->aturan([$this->lokasi('-6.2005', '106.8166667', 200)], ['0'], [1]);
-        $token = $this->tokenUntuk($this->buatAkunUntuk($pp['nip'], Role::PEGAWAI));
+        $id    = $this->buatAkunUntuk($pp['nip'], Role::PEGAWAI);
+        $token = $this->tokenUntuk($id);
         $this->koreksi($pp['nip']);
 
         $res = $this->withBearer($token)->withBodyFormat('json')->post('api/v1/presensi/masuk', ['latitude' => '-6.2005', 'longitude' => '106.8166667', 'akurasi' => 12.5]);
 
         $this->assertUnauthorized($res);
         $this->assertSame(0, $this->db->table('dh_online')->where('nip', $pp['nip'])->countAllResults(), 'tanpa baris presensi ber-NIP lama');
+
+        // Kontrol positif: sesi baru (NIP baru, ganti password wajib sudah beres) dengan payload sama → 201 + 1 baris. Sebelum
+        // CR-175, 0 baris ber-NIP lama ditahan FK `fk_nip_dh_to_pegawai` (1452 → jalur 500), bukan oleh perbaikan ini.
+        $this->db->table('pengguna')->where('id_pengguna', $id)->update(['must_change_password' => 0]);
+        $this->withBearer($this->tokenUntuk($id))->withBodyFormat('json')->post('api/v1/presensi/masuk', ['latitude' => '-6.2005', 'longitude' => '106.8166667', 'akurasi' => 12.5])->assertStatus(201);
+        $this->assertSame(1, $this->db->table('dh_online')->where('nip', self::NIP_BARU)->countAllResults());
     }
 
     /**
-     * NIP lama dipakai ulang untuk pegawai + akun Y: token X (NIP lama di klaim) tidak boleh membaca/menulis atas nama Y di
-     * LKH, proses cuti (Y approver), dan ubah biodata (gerbang tulis PegawaiScope).
+     * NIP lama dipakai ulang untuk pegawai + akun Y: token X (NIP lama di klaim) tidak boleh menulis atas nama Y. Tiap jalur
+     * tulis diuji terpisah: token X lebih dulu (401, tanpa baris), lalu kontrol positif payload yang sama dengan token sah Y
+     * (sukses, baris tertulis) — membuktikan payload memang mencapai jalur tulis (sebelum CR-175 token X ikut sukses).
      */
-    public function testNipLamaDipakaiUlangTokenLamaTidakMenyentuhDataPemegangBaru(): void
+    public function testNipLamaDipakaiUlangTokenLamaTidakMenulisLkhAtasNamaPemegangBaru(): void
     {
-        $this->siapkanMasterBiodata();
-        [$lama, $tokenX, $idX] = $this->pegawaiDenganToken();
-        $this->koreksi($lama);
+        $satker = $this->buatSatker();
+        $jabAt  = $this->buatJabatan($satker)['id_jabatan'];
+        $this->buatPegawai(['nama' => 'Atasan Uji', 'id_jenis_status' => 1], ['id_satker' => $satker, 'id_jabatan' => $jabAt]);
+        [$lama, $tokenX, $tokenY] = $this->nipDipakaiUlang(['id_jenis_status' => 1], ['id_satker' => $satker, 'id_atasan_es_4' => $jabAt]);
 
-        $this->buatPegawai($this->biodataLengkap(['nip' => $lama, 'nama' => 'Pegawai Y']));
-        $idY = $this->buatAkunUntuk($lama, Role::PEGAWAI, ['username' => 'akun.y.' . substr($lama, -4)]);
-        $this->assertNotSame($idX, $idY);
+        $isian = ['tgl_laporan' => '2026-11-10', 'kegiatan' => [
+            ['kegiatan' => 'Menyusun laporan', 'output' => 'Draf', 'jumlah_diselesaikan' => '1', 'jam_mulai' => '08:00', 'jam_selesai' => '10:00'],
+        ]];
+
+        $this->assertUnauthorized($this->withBearer($tokenX)->withBodyFormat('json')->post('api/v1/lkh', $isian));
+        $this->assertSame(0, $this->db->table('riwayat_lckh')->where('nip', $lama)->countAllResults(), 'tanpa LKH atas nama Y');
+        $this->assertUnauthorized($this->withBearer($tokenX)->get('api/v1/lkh'));
+
+        $this->withBearer($tokenY)->withBodyFormat('json')->post('api/v1/lkh', $isian)->assertStatus(201);
+        $this->assertSame(1, $this->db->table('riwayat_lckh')->where('nip', $lama)->countAllResults(), 'kontrol positif: payload mencapai jalur tulis');
+    }
+
+    public function testNipLamaDipakaiUlangTokenLamaTidakMemprosesCutiYangApproverNyaPemegangBaru(): void
+    {
+        [$lama, $tokenX, $tokenY] = $this->nipDipakaiUlang();
 
         $pemohon = $this->buatPegawai(['nama' => 'Pemohon Uji']);
         $this->db->table('riwayat_cuti')->insert([
@@ -112,16 +133,25 @@ final class SesiNipBasiTest extends DatabaseTestCase
         $idCuti = (int) $this->db->insertID();
         $sidik  = $this->db->table('riwayat_cuti')->where('id_riwayat_cuti', $idCuti)->get()->getRowArray();
 
-        $this->assertUnauthorized($this->withBearer($tokenX)->get('api/v1/lkh'));
-        $this->assertUnauthorized($this->withBearer($tokenX)->withBodyFormat('json')->post('api/v1/lkh', ['tgl_laporan' => '2026-11-10', 'kegiatan' => [
-            ['kegiatan' => 'Menyusun laporan', 'output' => 'Draf', 'jumlah_diselesaikan' => '1', 'jam_mulai' => '08:00', 'jam_selesai' => '10:00'],
-        ]]));
         $this->assertUnauthorized($this->withBearer($tokenX)->withBodyFormat('json')->post("api/v1/cuti/{$idCuti}/process", ['aksi' => 'setujui']));
-        $this->assertUnauthorized($this->withBearer($tokenX)->withBodyFormat('json')->put("api/v1/pegawai/{$lama}/biodata", $this->isianBiodata()));
-
-        $this->assertSame(0, $this->db->table('riwayat_lckh')->where('nip', $lama)->countAllResults(), 'tanpa LKH atas nama Y');
         $this->assertSame($sidik, $this->db->table('riwayat_cuti')->where('id_riwayat_cuti', $idCuti)->get()->getRowArray(), 'cuti tidak diproses atas nama Y');
+
+        $this->withBearer($tokenY)->withBodyFormat('json')->post("api/v1/cuti/{$idCuti}/process", ['aksi' => 'setujui'])->assertStatus(200);
+        $this->assertSame('1', (string) $this->db->table('riwayat_cuti')->where('id_riwayat_cuti', $idCuti)->get()->getRow('status_al'), 'kontrol positif: diproses oleh Y');
+    }
+
+    public function testNipLamaDipakaiUlangTokenLamaTidakMengajukanBiodataAtasNamaPemegangBaru(): void
+    {
+        $this->siapkanMasterBiodata();
+        [$lama, $tokenX, $tokenY] = $this->nipDipakaiUlang($this->biodataLengkap([]));
+
+        $this->assertUnauthorized($this->withBearer($tokenX)->withBodyFormat('json')->put("api/v1/pegawai/{$lama}/biodata", $this->isianBiodata()));
         $this->assertSame(0, $this->db->table('pegawai_hist')->where('nip', $lama)->countAllResults(), 'tanpa pengajuan biodata atas nama Y');
+
+        $res = $this->withBearer($tokenY)->withBodyFormat('json')->put("api/v1/pegawai/{$lama}/biodata", $this->isianBiodata());
+        $res->assertStatus(200);
+        $this->assertSame('pengajuan', $this->json($res)['data']['jalur']);
+        $this->assertSame(1, $this->db->table('pegawai_hist')->where('nip', $lama)->countAllResults(), 'kontrol positif: pengajuan tertulis');
     }
 
     public function testHapusPegawaiTokenLamaDitolak(): void
@@ -157,7 +187,7 @@ final class SesiNipBasiTest extends DatabaseTestCase
 
     public function testPasswordChangeRequiredTetap403DanSesiBasiDidahulukan401(): void
     {
-        [$nip, , $id] = $this->pegawaiDenganToken();
+        [, , $id] = $this->pegawaiDenganToken();
         $this->db->table('pengguna')->where('id_pengguna', $id)->update(['must_change_password' => 1]);
         $token = $this->tokenUntuk($id);
 
@@ -168,7 +198,6 @@ final class SesiNipBasiTest extends DatabaseTestCase
         // NIP klaim tidak lagi dipegang akun → 401, bukan 403 ganti password.
         $this->db->table('pengguna')->where('id_pengguna', $id)->update(['nip' => null]);
         $this->assertUnauthorized($this->withBearer($token)->get('api/v1/lkh'));
-        $this->assertNotSame('', $nip);
     }
 
     /**
@@ -260,6 +289,26 @@ final class SesiNipBasiTest extends DatabaseTestCase
         $id  = $this->buatAkunUntuk($nip, Role::PEGAWAI);
 
         return [$nip, $this->tokenUntuk($id), $id];
+    }
+
+    /**
+     * Pegawai X + token, koreksi NIP X → NIP_BARU, lalu NIP lama dipakai pegawai + akun Y (role 2).
+     *
+     * @param array<string, mixed> $pegawaiY
+     * @param array<string, mixed> $pmjY
+     *
+     * @return array{0: string, 1: string, 2: string} [NIP lama, token X (basi), token Y]
+     */
+    private function nipDipakaiUlang(array $pegawaiY = [], array $pmjY = []): array
+    {
+        [$lama, $tokenX, $idX] = $this->pegawaiDenganToken();
+        $this->koreksi($lama);
+
+        $this->buatPegawai(['nip' => $lama, 'nama' => 'Pegawai Y'] + $pegawaiY, $pmjY);
+        $idY = $this->buatAkunUntuk($lama, Role::PEGAWAI, ['username' => 'akun.y.' . substr($lama, -4)]);
+        $this->assertNotSame($idX, $idY);
+
+        return [$lama, $tokenX, $this->tokenUntuk($idY)];
     }
 
     private function tokenUntuk(int $idPengguna): string
