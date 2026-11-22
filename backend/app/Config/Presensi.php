@@ -34,6 +34,23 @@ class Presensi extends BaseConfig
      */
     public const MAKS_KOLOM_IMPOR = 256;
 
+    /**
+     * Batas jumlah sel per berkas impor Slip Gaji `.xlsx`, dihitung dari semua sheet (CR-177). Acuan ukur (PHP 8.4,
+     * PhpSpreadsheet 5.10): template resmi terisi penuh = 10.000 baris GPP 26 kolom + TK 10 kolom = 360.036 sel, dibaca
+     * dengan kenaikan puncak memori ±180 MB dalam ±9 detik (±0,5 KB per sel); dengan 30 kolom tambahan di GPP (660.066
+     * sel) ±338 MB. Batas diletakkan sedikit di atas template penuh (margin ±11%), jadi puncak memori pembacaan ±200 MB:
+     * `memory_limit` server WAJIB ≥ 256M. Tanpa batas ini batas baris × kolom saja masih mengizinkan ±5 juta sel.
+     */
+    public const MAKS_SEL_IMPOR = 400_000;
+
+    /**
+     * Batas jumlah ukuran semua entri `.xlsx` sesudah dekompresi (CR-177). Template resmi terisi penuh di atas = 12,4 MB
+     * (berkasnya 1,4 MB); dengan 30 kolom tambahan 22,1 MB. 32 MB memberi ruang ±2,5× untuk berkas yang ditulis Excel
+     * (XML lebih boros), dan menutup berkas yang mengembang saat dibuka (zip bomb, XML berisi pengisi, sharedStrings
+     * raksasa): pemuat menampung setiap part utuh sebagai string sebelum diurai.
+     */
+    public const MAKS_BYTE_ISI_IMPOR = 32 * 1024 * 1024;
+
     /** Masa berlaku pratinjau impor dalam detik (Q5A-05 default 30 menit). */
     public int $ttlPratinjauDetik = 1800;
 

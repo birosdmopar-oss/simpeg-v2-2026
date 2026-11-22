@@ -9,6 +9,7 @@ use App\Libraries\Presensi\SlipGaji\KolomGaji;
 use Config\Presensi;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Reader\Xlsx;
 use PhpOffice\PhpSpreadsheet\RichText\RichText;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use Throwable;
@@ -20,14 +21,15 @@ use Throwable;
  * - `IOFactory::createReaderForFile` dikunci ke reader `Xlsx`/`Xls` (berkas yang hanya dikenali reader lain, mis. HTML
  *   atau CSV, ditolak sebagai tidak terbaca), `setReadDataOnly(true)`, hanya sheet `GPP` dan `TK`
  *   (`KolomGaji::cariSheetWajib`, keduanya wajib, I-1).
- * - Ukuran kedua sheet diperiksa SEBELUM berkas dimuat (CR-177, {@see self::praCek()}): berkas kecil yang "lebar" atau
- *   padat ratusan ribu baris ditolak tanpa dimuat ke memori. Sesudah lolos, yang dimuat paling banyak
- *   (batas baris + 1) × batas kolom sel per sheet.
+ * - Ukuran berkas diperiksa SEBELUM dimuat (CR-177, {@see self::praCek()}): `.xlsx` lewat {@see PemindaiXlsx} (semua
+ *   entri ZIP, aliran), `.xls` lewat `listWorksheetInfo`. Berkas kecil yang "lebar", padat ratusan ribu baris, atau
+ *   mengembang besar saat dibuka ditolak tanpa dimuat ke memori.
  * - Nilai sel **mentah** tanpa format tampilan; sel rumus = hasil hitung (`getCalculatedValue`); rich text → teks polos.
  * - Keluaran per sheet = `[nomor baris berkas => list nilai sel]` mulai baris 1 (header) — masukan
  *   `PratinjauImpor::uraiSheet($baris, $sheet)`.
- * - Baris data (di luar header) per sheet > batas → {@see BerkasImporDitolak} "Jumlah baris melebihi batas …"; kolom
- *   per sheet > batas (`Config\Presensi::MAKS_KOLOM_IMPOR`) → "Jumlah kolom melebihi batas …".
+ * - Batas → {@see BerkasImporDitolak}: baris data per sheet ("Jumlah baris melebihi batas …"), kolom per sheet
+ *   (`Config\Presensi::MAKS_KOLOM_IMPOR`), jumlah sel per berkas (`MAKS_SEL_IMPOR`), dan ukuran isi sesudah dibuka
+ *   (`MAKS_BYTE_ISI_IMPOR`). Urutan pemeriksaan: ukuran isi, baris, kolom, jumlah sel.
  * - Berkas rusak/tidak terbaca → {@see BerkasImporDitolak} pesan generik (P5-39); rincian exception hanya ke log
  *   aplikasi, tanpa isi sel.
  */
@@ -40,8 +42,12 @@ final class PembacaExcelSlip
      */
     private const READER = ['Xlsx', 'Xls'];
 
-    public function __construct(private readonly int $maksBarisPerSheet, private readonly int $maksKolomPerSheet = Presensi::MAKS_KOLOM_IMPOR)
-    {
+    public function __construct(
+        private readonly int $maksBarisPerSheet,
+        private readonly int $maksKolomPerSheet = Presensi::MAKS_KOLOM_IMPOR,
+        private readonly int $maksSel = Presensi::MAKS_SEL_IMPOR,
+        private readonly int $maksByteIsi = Presensi::MAKS_BYTE_ISI_IMPOR,
+    ) {
     }
 
     /**
@@ -55,7 +61,14 @@ final class PembacaExcelSlip
         try {
             $reader = IOFactory::createReaderForFile($path, self::READER);
             $reader->setReadDataOnly(true);
+        } catch (Throwable $e) {
+            throw self::tidakTerbaca($e);
+        }
 
+        // xlsx dipindai sebelum apa pun dibaca reader (termasuk daftar nama sheet, yang menampung `workbook.xml` utuh).
+        $ukuran = $reader instanceof Xlsx ? $this->pindaiXlsx($path) : null;
+
+        try {
             /** @var list<string> $namaSheet */
             $namaSheet = array_values($reader->listWorksheetNames($path));
         } catch (Throwable $e) {
@@ -72,7 +85,12 @@ final class PembacaExcelSlip
         $indeks = $cari->nilai;
         $nama   = [KolomGaji::SHEET_GPP => $namaSheet[$indeks[KolomGaji::SHEET_GPP]], KolomGaji::SHEET_TK => $namaSheet[$indeks[KolomGaji::SHEET_TK]]];
 
-        $this->praCek($path, array_values($nama));
+        if ($ukuran !== null) {
+            $this->periksaUkuran([[$ukuran['baris'], $ukuran['kolom']]]);
+            $this->periksaSel($ukuran['sel']);
+        } else {
+            $this->praCekXls($path, array_values($nama));
+        }
 
         try {
             $reader->setLoadSheetsOnly(array_values($nama));
@@ -82,16 +100,26 @@ final class PembacaExcelSlip
         }
 
         try {
-            $hasil = [];
+            $lembar = [];
+            $ukuran = [];
 
             foreach ($nama as $sheet => $namaAsli) {
-                $lembar = $buku->getSheetByName($namaAsli);
+                $l = $buku->getSheetByName($namaAsli);
 
-                if ($lembar === null) {
+                if ($l === null) {
                     throw new BerkasImporDitolak(self::PESAN_TIDAK_TERBACA);
                 }
 
-                $hasil[$sheet] = $this->barisMentah($lembar);
+                $lembar[$sheet] = $l;
+                $ukuran[$sheet] = [$l->getHighestDataRow(), Coordinate::columnIndexFromString($l->getHighestDataColumn())];
+            }
+
+            // Lapis kedua sesudah pra-cek: diperiksa sebelum array baris × kolom disusun.
+            $this->periksaUkuran(array_values($ukuran));
+            $hasil = [];
+
+            foreach ($lembar as $sheet => $l) {
+                $hasil[$sheet] = self::barisMentah($l, $ukuran[$sheet][0], $ukuran[$sheet][1]);
             }
         } catch (BerkasImporDitolak $e) {
             throw $e;
@@ -105,37 +133,86 @@ final class PembacaExcelSlip
     }
 
     /**
-     * Ukuran sheet GPP dan TK dibaca lewat `listWorksheetInfo` (xlsx: XML sheet dipindai berurutan tanpa membangun sel;
-     * xls: rekaman sel dipindai) dengan reader TERSENDIRI, supaya setelan reader pemuat tidak berubah.
+     * Pra-cek `.xlsx` lewat {@see PemindaiXlsx}: SEMUA entri ZIP dipindai sebagai aliran, tanpa mengikuti relasi, jadi
+     * batas baris dan kolom berlaku untuk setiap sheet di berkas (bukan hanya GPP dan TK) dan hitungannya tidak bisa
+     * berbeda dari part yang akhirnya dimuat. `listWorksheetInfo` reader Xlsx TIDAK dipakai (alasan di docblock pemindai).
      *
-     * `setReadEmptyCells` sengaja dibiarkan bawaan (true): sel kosong yang hanya bergaya ikut dihitung, sama seperti saat
-     * dimuat (pemuat membuat sel untuk `<c r="…" s="…"/>`), jadi berkas yang dulu ditolak karena itu tetap ditolak. Bedanya
-     * dengan hitungan pasca-muat hanya satu: pada xlsx, `<row>` TANPA sel (mis. hanya tinggi baris) ikut dihitung sebagai
-     * baris.
+     * Hitungan baris = batas atas dari yang dibuat pemuat: sel kosong yang hanya bergaya ikut dihitung, sama seperti saat
+     * dimuat (pemuat membuat sel untuk `<c r="…" s="…"/>`), jadi berkas yang dulu ditolak karena itu tetap ditolak.
+     * Bedanya dengan hitungan pasca-muat: `<row>` TANPA sel (mis. hanya tinggi baris) ikut dihitung sebagai baris.
      *
      * Read filter (`IReadFilter`) SENGAJA TIDAK dipasang pada pemuat, jangan ditambahkan: begitu ada read filter kustom,
      * reader Xlsx memanggilnya untuk setiap kolom `<cols>` × setiap `<row>` (`Reader/Xlsx/ColumnAndRowAttributes`, juga saat
      * `setReadDataOnly(true)`). Diukur pada PhpSpreadsheet 5.10 dengan berkas 51 KB berisi 10.001 baris satu sel:
      * `<cols min="1" max="16383">` → muat 0,2 detik tanpa filter, 28,4 detik dengan filter (163,9 juta panggilan);
      * `<cols>` sampai 1025 (bentuk yang biasa ditulis LibreOffice) → 0,2 detik menjadi 2,0 detik. Filter menukar celah
-     * memori dengan celah waktu. Tanpa filter pun muatan sudah terbatas: sesudah pra-cek lolos, sel yang dibuat paling
-     * banyak (batas baris + 1) × batas kolom per sheet (dijaga `PembacaExcelSlipBatasBacaTest`).
+     * memori dengan celah waktu. Tanpa filter pun muatan sudah terbatas oleh batas jumlah sel dan ukuran isi
+     * (dijaga `PembacaExcelSlipBatasBacaTest`).
+     *
+     * @return array{baris: int, kolom: int, sel: int, byte: int}
+     *
+     * @throws BerkasImporDitolak
+     */
+    private function pindaiXlsx(string $path): array
+    {
+        try {
+            $ukuran = PemindaiXlsx::pindai($path, $this->maksByteIsi);
+        } catch (Throwable $e) {
+            throw self::tidakTerbaca($e);
+        }
+
+        if ($ukuran['byte'] > $this->maksByteIsi) {
+            throw new BerkasImporDitolak('Isi berkas terlalu besar sesudah dibuka (maksimal ' . number_format($this->maksByteIsi / 1048576, 0, ',', '.') . ' MB).');
+        }
+
+        return $ukuran;
+    }
+
+    /**
+     * Pra-cek `.xls`: `listWorksheetInfo` reader Xls memindai rekaman sel yang sama dengan yang dipakai pemuat, jadi
+     * hitungannya sepadan. Jumlah sel `.xls` sudah terbatas oleh ukuran unggah (tanpa kompresi, ≥ 6 byte per sel).
      *
      * @param list<string> $nama nama asli sheet GPP dan TK di berkas
      *
      * @throws BerkasImporDitolak
      */
-    private function praCek(string $path, array $nama): void
+    private function praCekXls(string $path, array $nama): void
     {
         try {
-            $info = IOFactory::createReaderForFile($path, self::READER)->listWorksheetInfo($path);
+            $info = array_column(IOFactory::createReaderForFile($path, self::READER)->listWorksheetInfo($path), null, 'worksheetName');
         } catch (Throwable $e) {
             throw self::tidakTerbaca($e);
         }
 
-        foreach ($info as $i) {
-            if (in_array($i['worksheetName'], $nama, true)) {
-                $this->periksaUkuran((int) $i['totalRows'], (int) $i['totalColumns']);
+        $ukuran = [];
+
+        foreach ($nama as $n) {
+            if (isset($info[$n])) {
+                $ukuran[] = [(int) $info[$n]['totalRows'], (int) $info[$n]['totalColumns']];
+            }
+        }
+
+        $this->periksaUkuran($ukuran);
+    }
+
+    /**
+     * Baris dulu untuk semua sheet, baru kolom: hasilnya tidak bergantung urutan tab maupun urutan entri di berkas.
+     *
+     * @param list<array{0: int, 1: int}> $ukuran [baris terakhir, kolom terakhir] per sheet
+     *
+     * @throws BerkasImporDitolak
+     */
+    private function periksaUkuran(array $ukuran): void
+    {
+        foreach ($ukuran as [$barisTerakhir]) {
+            if ($barisTerakhir - 1 > $this->maksBarisPerSheet) {
+                throw new BerkasImporDitolak('Jumlah baris melebihi batas ' . number_format($this->maksBarisPerSheet, 0, ',', '.') . ' per sheet.');
+            }
+        }
+
+        foreach ($ukuran as [, $kolomTerakhir]) {
+            if ($kolomTerakhir > $this->maksKolomPerSheet) {
+                throw new BerkasImporDitolak('Jumlah kolom melebihi batas ' . number_format($this->maksKolomPerSheet, 0, ',', '.') . ' per sheet.');
             }
         }
     }
@@ -143,28 +220,18 @@ final class PembacaExcelSlip
     /**
      * @throws BerkasImporDitolak
      */
-    private function periksaUkuran(int $barisTerakhir, int $kolomTerakhir): void
+    private function periksaSel(int $sel): void
     {
-        if ($barisTerakhir - 1 > $this->maksBarisPerSheet) {
-            throw new BerkasImporDitolak('Jumlah baris melebihi batas ' . number_format($this->maksBarisPerSheet, 0, ',', '.') . ' per sheet.');
-        }
-
-        if ($kolomTerakhir > $this->maksKolomPerSheet) {
-            throw new BerkasImporDitolak('Jumlah kolom melebihi batas ' . number_format($this->maksKolomPerSheet, 0, ',', '.') . ' per sheet.');
+        if ($sel > $this->maksSel) {
+            throw new BerkasImporDitolak('Jumlah sel melebihi batas ' . number_format($this->maksSel, 0, ',', '.') . ' per berkas.');
         }
     }
 
     /**
      * @return array<int, list<mixed>>
      */
-    private function barisMentah(Worksheet $lembar): array
+    private static function barisMentah(Worksheet $lembar, int $barisTerakhir, int $kolomTerakhir): array
     {
-        $barisTerakhir = $lembar->getHighestDataRow();
-        $kolomTerakhir = Coordinate::columnIndexFromString($lembar->getHighestDataColumn());
-
-        // Lapis kedua sesudah pra-cek (mis. `<row>` tidak berurutan di XML): diperiksa sebelum array baris × kolom disusun.
-        $this->periksaUkuran($barisTerakhir, $kolomTerakhir);
-
         $baris = [];
 
         for ($r = 1; $r <= $barisTerakhir; $r++) {

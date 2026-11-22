@@ -208,10 +208,13 @@ MAKE-052 merged + MAKE-054.
 - **Test (AC-D10.1–10):** `tests/Presensi/Slip/ImporSlip{Pratinjau,Commit,MismatchNama,Duplikat,KonflikUnique,Akses,Berkas}Test.php`
   + `tests/unit/Presensi/Slip/{PembacaExcelSlip,PenyimpanPratinjau}Test.php`; berkas Excel sintetis dibangkitkan test
   (`tests/_support/Presensi/ImporSlipUjiTrait.php`). Konflik 1062 lewat seam `kaitSebelumTulis` (PRD §7.2.6).
-- **CR-177 (22-11-2026):** `PembacaExcelSlip` memeriksa ukuran sheet GPP/TK sebelum memuat berkas (`listWorksheetInfo`),
-  reader dikunci ke Xlsx/Xls, dan ada batas kolom baru `Config\Presensi::MAKS_KOLOM_IMPOR = 256` → 422 "Jumlah kolom
-  melebihi batas 256 per sheet." Berkas kecil yang lebar (sel di XFD) atau padat ratusan ribu baris tidak lagi 500 karena
-  memori habis. Tanpa read filter (alasan dan rincian: README `Libraries/Presensi` BB-1..BB-7). Test:
+- **CR-177 (22-11-2026):** impor slip tidak lagi 500 karena memori habis saat membaca berkas. `PembacaExcelSlip`: reader
+  dikunci ke Xlsx/Xls; `.xlsx` dipindai dulu oleh `PemindaiXlsx` (semua entri ZIP, aliran, tanpa mengikuti relasi), `.xls`
+  lewat `listWorksheetInfo`; batas baru `Config\Presensi::MAKS_KOLOM_IMPOR = 256`, `MAKS_SEL_IMPOR = 400.000`,
+  `MAKS_BYTE_ISI_IMPOR = 32 MB` dengan pesan 422 masing-masing; cek baris/kolom diulang sesudah muat; tanpa read filter.
+  Perubahan perilaku [V2]: batas baris/kolom berlaku untuk setiap sheet `.xlsx`; `<row>` tanpa sel lewat batas ikut
+  dihitung; berkas HTML/CSV berkedok Excel dan entri non-UTF-8/ber-DOCTYPE → "Berkas tidak dapat dibaca". `memory_limit`
+  server wajib ≥ 256M (template penuh ±180 MB). Rincian dan angka ukur: README `Libraries/Presensi` BB-1..BB-10. Test:
   `tests/unit/Presensi/Slip/PembacaExcelSlipBatasBacaTest.php`, `tests/Presensi/Slip/ImporSlipBatasBacaTest.php`.
 - **Catatan perilaku:** berkas tanpa ekstensi ditolak "Isi berkas tidak sesuai dengan ekstensinya." dan isi ber-jenis lain
   (mis. PDF bernama `.xlsx`) "Format berkas harus .xlsx atau .xls." — sama dengan aturan `ValidasiBerkas` jalur lampiran
