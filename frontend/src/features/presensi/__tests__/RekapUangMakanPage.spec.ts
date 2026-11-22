@@ -4,6 +4,8 @@
  */
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { defineComponent, h } from 'vue'
+import { RouterView } from 'vue-router'
 
 vi.mock('@/features/master-data/services/master.service', () => ({ masterService: { options: vi.fn().mockResolvedValue([]) } }))
 vi.mock('../services/rekapKehadiran.service', async (importOriginal) => {
@@ -21,16 +23,25 @@ import RekapUangMakanPage from '../views/RekapUangMakanPage.vue'
 
 const svc = vi.mocked(rekapUangMakanService)
 
-async function mountPage(role: number) {
+async function mountPage(role: number, url = '/presensi/uang-makan', total = 1) {
   loginAs(role as never)
-  svc.daftar.mockResolvedValue({ items: [{ nip: '198001012005011001', tgl_absen: '2026-10-05' }], total: 1, page: 1, per_page: 25, bulan: '2026-10', lingkup: {} })
+  svc.daftar.mockResolvedValue({ items: [{ nip: '198001012005011001', tgl_absen: '2026-10-05' }], total, page: 1, per_page: 25, bulan: '2026-10', lingkup: {} })
   const router = createShellRouter()
   router.addRoute({ path: '/presensi/uang-makan', name: 'presensi-uang-makan', component: RekapUangMakanPage })
-  await router.push('/presensi/uang-makan')
+  await router.push(url)
   await router.isReady()
-  const wrapper = mount(RekapUangMakanPage, { global: { plugins: [router] }, attachTo: document.body })
+  // Dipasang di bawah RouterView seperti di aplikasi, supaya onBeforeRouteUpdate (penerapan query URL) aktif.
+  const wrapper = mount(defineComponent({ render: () => h(RouterView) }), { global: { plugins: [router] }, attachTo: document.body })
   await flushPromises()
-  return { wrapper }
+  return { wrapper, router }
+}
+
+async function pilihTab(wrapper: Awaited<ReturnType<typeof mountPage>>['wrapper'], label: string): Promise<void> {
+  await wrapper
+    .findAll('[role="tab"]')
+    .find((t) => t.text().includes(label))
+    ?.trigger('click')
+  await flushPromises()
 }
 
 afterEach(() => {
@@ -77,6 +88,40 @@ describe('tab Instansi Lain', () => {
 
     const terakhir = svc.daftar.mock.calls.at(-1)
     expect(terakhir?.[1]).toBe(true)
+    expect(wrapper.find('[data-testid="rekap-uang-makan-il-catatan"]').exists()).toBe(true)
+  })
+
+  it('CR-179: dari halaman 2 tab Pegawai, ganti ke Instansi Lain (dan kembali) meminta halaman 1', async () => {
+    const { wrapper, router } = await mountPage(Role.SUPER_ADMIN, '/presensi/uang-makan?page=2', 60)
+    expect(svc.daftar.mock.calls.at(-1)?.[0].page).toBe(2)
+
+    svc.daftar.mockClear()
+    await pilihTab(wrapper, 'Instansi Lain')
+    expect(svc.daftar).toHaveBeenCalledTimes(1)
+    expect(svc.daftar.mock.calls[0]?.[0].page).toBe(1)
+    expect(svc.daftar.mock.calls[0]?.[1]).toBe(true)
+    expect(router.currentRoute.value.query.page).toBeUndefined()
+
+    await router.push('/presensi/uang-makan?page=2')
+    await flushPromises()
+    expect(svc.daftar.mock.calls.at(-1)?.[0].page).toBe(2)
+
+    svc.daftar.mockClear()
+    await pilihTab(wrapper, 'Pegawai')
+    expect(svc.daftar.mock.calls.at(-1)?.[0].page).toBe(1)
+    expect(svc.daftar.mock.calls.at(-1)?.[1]).toBe(false)
+  })
+
+  it('CR-179: penerapan dari URL tetap memakai halaman dari URL', async () => {
+    const { wrapper, router } = await mountPage(Role.SUPER_ADMIN, '/presensi/uang-makan?page=2', 60)
+    expect(svc.daftar.mock.calls[0]?.[0].page).toBe(2)
+    await pilihTab(wrapper, 'Instansi Lain')
+
+    // Back/forward ke rute yang sama dengan ?page=3: halaman dari URL dipakai, tab tidak mereset ke 1.
+    await router.push('/presensi/uang-makan?page=3')
+    await flushPromises()
+    expect(svc.daftar.mock.calls.at(-1)?.[0].page).toBe(3)
+    expect(svc.daftar.mock.calls.at(-1)?.[1]).toBe(true)
     expect(wrapper.find('[data-testid="rekap-uang-makan-il-catatan"]').exists()).toBe(true)
   })
 })

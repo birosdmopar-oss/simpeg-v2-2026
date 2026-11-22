@@ -30,6 +30,10 @@ const { filter, param, unitOpsi, satkerOpsi, jenisPegawaiOpsi, muatOpsi } = useF
 const tab = ref<'pegawai' | 'il'>('pegawai')
 const tabItems = computed(() => (bisaIl.value ? [{ value: 'pegawai', label: 'Pegawai' }, { value: 'il', label: 'Instansi Lain' }] : [{ value: 'pegawai', label: 'Pegawai' }]))
 const il = computed(() => tab.value === 'il' && bisaIl.value)
+// CR-179: tab adalah filter lokal (tidak di URL), jadi pergantiannya mengembalikan ke halaman 1 seperti filter lain di
+// useFilterLaporan. Sinkron agar pemuat (watch di bawah) hanya meminta sekali dengan page=1, bukan page lama ke rekap lain.
+// Penerapan query URL (onBeforeRouteUpdate) tidak mengubah tab, sehingga halaman dari URL tetap dipakai.
+watch(tab, () => (filter.page = 1), { flush: 'sync' })
 
 const daftar = ref<DaftarRekap<BarisUangMakan> | null>(null)
 const memuat = ref(false)
