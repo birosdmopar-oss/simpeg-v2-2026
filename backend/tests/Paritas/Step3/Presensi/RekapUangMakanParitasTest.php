@@ -80,7 +80,7 @@ final class RekapUangMakanParitasTest extends DatabaseTestCase
         $this->assertSame(count($data['items']), $data['total'], 'total = jumlah baris');
         $this->assertSame(count(array_unique($pasangan)), $data['total'], 'total = jumlah pasangan (nip, tgl_absen) unik');
 
-        // perilaku sekarang (dikunci CR-164): urut populasi PopulasiRekap.php:106 (kelas jabatan turun, golongan turun, TMT
+        // perilaku sekarang (dikunci CR-164): urut populasi PopulasiRekap.php:128-129 (kelas jabatan turun, golongan turun, TMT
         // naik, id_satker naik, NIP naik) — bukan NIP murni: b1 (NIP terkecil, satker B) di belakang — lalu tanggal naik; IL
         // tidak ikut di rekap DH.
         $this->assertSame([

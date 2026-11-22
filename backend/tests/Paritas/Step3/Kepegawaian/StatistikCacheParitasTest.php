@@ -120,19 +120,29 @@ final class StatistikCacheParitasTest extends DatabaseTestCase
         $this->assertSame('none', StatistikCache::segmenScope($this->auth(Role::ADMIN_SATKER, ['id_satker' => '0'])));
         $this->assertSame('none', StatistikCache::segmenScope($this->auth(Role::ADMIN_SATKER, ['id_satker' => '0', 'id_unit' => '3'])), "satker '0' ada → tidak jatuh ke unit");
         $this->assertSame('none', StatistikCache::segmenScope($this->auth(Role::ADMIN_SATKER, ['id_unit' => '0'])));
+        // CR-178 R3: regex `$` tanpa modifier D menerima "12\n" → dulu segmen 's12'; kini ditolak seperti PegawaiScope.
+        $this->assertSame('none', StatistikCache::segmenScope($this->auth(Role::ADMIN_SATKER, ['id_satker' => "12\n"])));
+        $this->assertSame('none', StatistikCache::segmenScope($this->auth(Role::ADMIN_SATKER, ['id_unit' => "3\n"])));
     }
 
     public function testLingkupAkunSatkerAtauUnitNolDitolak403(): void
     {
-        // CR-178: sebelumnya '0' lolos regex → satker/unit 0 → 404; kini sama dengan PegawaiScope → 403.
-        foreach ([['id_satker' => '0'], ['id_unit' => '0']] as $claims) {
-            try {
-                $this->svc()->statistik($this->auth(Role::ADMIN_SATKER, $claims), StatistikService::JENIS_KELAMIN, []);
-                $this->fail('lingkup 0 seharusnya ditolak: ' . json_encode($claims));
-            } catch (ForbiddenException $e) {
-                $this->assertSame('Lingkup akun tidak valid.', $e->getMessage());
+        // CR-178: sebelumnya '0' lolos regex → statistik() satker/unit 0 → 404, dan lingkupTersedia() → 200 dengan daftar
+        // unit kosong; kini keduanya 403 "Lingkup akun tidak valid." sama dengan PegawaiScope. "12\n" (R3) juga ditolak.
+        foreach ([['id_satker' => '0'], ['id_unit' => '0'], ['id_satker' => "12\n"], ['id_unit' => "3\n"]] as $claims) {
+            $auth = $this->auth(Role::ADMIN_SATKER, $claims);
+
+            foreach (['statistik' => fn () => $this->svc()->statistik($auth, StatistikService::JENIS_KELAMIN, []), 'lingkupTersedia' => fn () => $this->svc()->lingkupTersedia($auth)] as $nama => $panggil) {
+                try {
+                    $panggil();
+                    $this->fail("{$nama} seharusnya ditolak: " . json_encode($claims));
+                } catch (ForbiddenException $e) {
+                    $this->assertSame('Lingkup akun tidak valid.', $e->getMessage(), $nama);
+                }
             }
         }
+
+        $this->assertSame([], $this->simpanStatistik(), 'tidak ada kunci statistik tersimpan sesudah 403');
     }
 
     public function testInvalidasiDariPegawaiModelMenghapusSemuaKunciStatistikSaja(): void

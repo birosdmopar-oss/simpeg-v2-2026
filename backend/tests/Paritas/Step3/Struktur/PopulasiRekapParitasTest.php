@@ -202,6 +202,28 @@ final class PopulasiRekapParitasTest extends DatabaseTestCase
         $this->assertSame([$lain, $pppk, $pns], array_column($this->dhUntuk([$pns, $pppk, $lain], null, [1, 6]), 'nip'));
     }
 
+    public function testDhPppkTanpaJabatanMemakaiRiwayatKpDanGolPppkKosongTidakJatuhKeKp(): void
+    {
+        // CR-178 R2: override PPPK hanya bila jabatan ada [K isset($list_pmj)]. (a) tanpa jabatan → gol/TMT riwayat_kp;
+        // (b) jabatan ber-gol_pppk NULL/'' → gol '' (tidak jatuh ke riwayat_kp), TMT tetap tmtsk jabatan.
+        $s      = $this->buatSatker();
+        $tanpa  = $this->pegawai(['id_jenis_pegawai' => 6]);
+        $nolGol = $this->pegawai(['id_jenis_pegawai' => 6]);
+        $kosong = $this->pegawai(['id_jenis_pegawai' => 6]);
+        $pns    = $this->pegawai();
+        $this->kp($tanpa, 'IV/e', '2020-01-01');
+        $this->rmj($nolGol, $s, '2020-01-01', 'X', ['kelas_jabatan' => 0, 'gol_pppk' => null]);
+        $this->kp($nolGol, 'IV/e', '2020-01-01');
+        $this->rmj($kosong, $s, '2019-01-01', 'X', ['kelas_jabatan' => 0, 'gol_pppk' => '']);
+        $this->kp($kosong, 'IV/e', '2020-01-01');
+        $this->rmj($pns, $s, '2020-01-01', 'X', ['kelas_jabatan' => 0]);
+        $this->kp($pns, 'II/a', '2020-01-01');
+
+        // kelas 0 semua. $tanpa: gol 'IV/e' (kp) → pertama. $pns 'II/a' → kedua. $kosong/$nolGol gol '' → TMT jabatan naik
+        // ($kosong 2019 sebelum $nolGol 2020). Bila jatuh ke kp 'IV/e' → keduanya di depan $pns.
+        $this->assertSame([$tanpa, $pns, $kosong, $nolGol], array_column($this->dhUntuk([$pns, $nolGol, $kosong, $tanpa], null, [1, 6]), 'nip'));
+    }
+
     public function testIlPppkMemakaiGolPppkTmtTetapRiwayatKp(): void
     {
         // CR-178: IL hanya mengganti golongan [K L_employee.php:6742-6744]; TMT tetap dari riwayat_kp.

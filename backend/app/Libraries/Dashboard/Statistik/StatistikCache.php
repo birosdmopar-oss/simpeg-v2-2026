@@ -93,11 +93,16 @@ final class StatistikCache
     }
 
     /**
-     * Angka kanonik POSITIF (tanpa nol di depan, tanpa spasi, bukan `'0'`) → int; selain itu null — sama dengan
+     * Angka kanonik POSITIF (tanpa nol di depan, tanpa spasi, bukan `'0'`, bukan berakhiran baris baru) → int; selain itu null — sama dengan
      * `PegawaiScope::keInt` (fail-closed, CR-178).
      */
     private static function keInt(?string $nilai): ?int
     {
-        return $nilai !== null && preg_match('/^[1-9][0-9]*$/', $nilai) === 1 ? (int) $nilai : null;
+        // Sama dengan PegawaiScope::keInt: tanpa regex `$` (yang menerima "12\n"), round-trip kanonik, > 0 (CR-178).
+        if ($nilai === null || $nilai === '' || ! ctype_digit($nilai) || (string) (int) $nilai !== $nilai || (int) $nilai <= 0) {
+            return null;
+        }
+
+        return (int) $nilai;
     }
 }
