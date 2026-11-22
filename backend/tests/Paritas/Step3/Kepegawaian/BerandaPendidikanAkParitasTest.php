@@ -76,7 +76,7 @@ final class BerandaPendidikanAkParitasTest extends DatabaseTestCase
         $this->riwayat($nip, ['S.1'], 1);
 
         // perilaku sekarang (dikunci CR-164): status 0 (Menunggu) ikut dihitung karena saringan hanya NOT IN (2, 10)
-        // (KelengkapanData.php:204-205).
+        // (KelengkapanData.php:199-200).
         $this->assertSame(50, $this->persenPendidikan($nip));
     }
 

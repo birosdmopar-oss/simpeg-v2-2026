@@ -27,7 +27,7 @@ use Throwable;
  * 3. daftar status disinkronkan ({@see StatusTarikSiasn::sinkronDaftar()}), batch NIP dipilih, ditandai proses;
  * 4. API per NIP di LUAR transaksi (BP-4); kegagalan per NIP dicatat, tidak menghentikan batch (AC-03.1). Yang
  *    menghentikan hanya pemutus CR-162: gagal transport beruntun sebanyak {@see self::BATAS_GAGAL_BERUNTUN} atau anggaran
- *    {@see self::ANGGARAN_DETIK} detik habis; NIP sisanya tidak dicoba;
+ *    {@see self::ANGGARAN_DETIK} detik habis; NIP sisanya tidak dicoba (minimal satu NIP selalu dicoba);
  * 5. {@see JenisTarikSiasn::rencana()} → {@see PenulisTarik} satu transaksi;
  * 6. flag selesai untuk NIP yang sudah dicoba, NIP yang belum dicoba (batch diputus) kembali ke flag `0`, + satu baris
  *    ringkasan `integrasi_log` (jumlah saja, tanpa NIP/nama; batch kosong tidak dicatat). Ringkasan gagal berkode
