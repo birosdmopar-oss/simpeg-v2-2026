@@ -234,6 +234,34 @@ final class LkhTest extends DatabaseTestCase
         $this->assertSame([$a['id']], array_column($this->svc()->daftar($this->pegawai)['items'], 'id'));
     }
 
+    /**
+     * CR-174: `search` antrean verifikasi dicari sebagai teks biasa; `%`, `_`, dan `!` dari masukan bukan wildcard LIKE.
+     */
+    public function testPencarianVerifikasiPersenDanGarisBawahBukanWildcard(): void
+    {
+        $a = $this->tambah($this->pegawai, '2026-10-12');
+        $b = $this->tambah($this->pegawai, '2026-10-09');
+        $this->db->table('riwayat_lckh')->where('id_riwayat_lckh', $a['id'])->update(['nama' => 'Pegawai Uji']);
+        $this->db->table('riwayat_lckh')->where('id_riwayat_lckh', $b['id'])->update(['nama' => 'Pegawai Lain']);
+        $cari = fn (string $kata): array => array_column($this->svc()->verifikasi($this->atasan, ['search' => $kata])['items'], 'id');
+
+        $this->assertSame([$b['id'], $a['id']], $cari('Pegawai'));
+        $this->assertSame([], $cari('%'), 'tidak ada nama/NIP yang memuat %');
+        $this->assertSame([], $cari('_'), 'tidak ada nama/NIP yang memuat _');
+        $this->assertSame([], $cari('P_gawai'));
+        $this->assertSame([], $cari('!'));
+        $this->assertSame(0, $this->svc()->verifikasi($this->atasan, ['search' => '%'])['meta']['total']);
+
+        // Nama yang memang memuat karakter itu tetap ditemukan.
+        $this->db->table('riwayat_lckh')->where('id_riwayat_lckh', $b['id'])->update(['nama' => 'Hadir 100% Uji_Coba!']);
+
+        $this->assertSame([$b['id']], $cari('%'));
+        $this->assertSame([$b['id']], $cari('100%'));
+        $this->assertSame([$b['id']], $cari('_'));
+        $this->assertSame([$b['id']], $cari('Coba!'));
+        $this->assertSame([$a['id']], $cari('Pegawai Uji'));
+    }
+
     public function testKunciTukinUbahDanHapus(): void
     {
         $this->db->table('riwayat_lckh')->insert([

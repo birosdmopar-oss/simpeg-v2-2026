@@ -13,6 +13,7 @@ use App\Interfaces\Kepegawaian\PegawaiScopeInterface;
 use App\Libraries\Auth\AuthContext;
 use App\Libraries\Kepegawaian\Kalkulasi\TanggalBisnis;
 use App\Libraries\Kepegawaian\Struktur\StrukturService;
+use App\Libraries\ListQuery;
 use App\Libraries\Pdf\DokumenPdf;
 use App\Libraries\Pdf\Pdf;
 use App\Libraries\Waktu\StempelUtc;
@@ -130,7 +131,9 @@ final class LkhService implements LkhServiceInterface
         $search = trim((string) ($filter['search'] ?? ''));
 
         if ($search !== '') {
-            $builder->groupStart()->like('nama', $search)->orLike('nip', $search)->groupEnd();
+            // CR-174: `%`, `_`, dan `!` dari masukan dicari sebagai teks biasa, bukan wildcard LIKE.
+            $s = ListQuery::likeLiteral($this->db(), $search);
+            $builder->groupStart()->like('nama', $s)->orLike('nip', $s)->groupEnd();
         }
 
         $total = $builder->countAllResults(false);

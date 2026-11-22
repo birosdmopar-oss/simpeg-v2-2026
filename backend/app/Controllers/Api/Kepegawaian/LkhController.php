@@ -14,7 +14,7 @@ use CodeIgniter\HTTP\ResponseInterface;
  *
  *   GET    lkh?nip=&page=&per_page=          LKH pegawai (bawaan: milik sendiri)
  *   GET    lkh/opsi?nip=                     rentang tanggal & atasan langsung
- *   GET    lkh/verifikasi?status=&ds=&de=    antrean atasan langsung (bawaan status 0)
+ *   GET    lkh/verifikasi?status=&ds=&de=&search=  antrean atasan langsung (bawaan status 0; `search` = nama/NIP, teks biasa)
  *   GET    lkh/rekap?bulan=                  rekap LKH bawahan per bulan (MAKE-014)
  *   GET    lkh/rekap/{nip}?bulan=            daftar LKH satu bawahan pada bulan itu
  *   POST   lkh                               `{ nip?, tgl_laporan, kegiatan: [{ kegiatan, output, jumlah_diselesaikan, jam_mulai, jam_selesai }] }`
