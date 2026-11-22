@@ -218,8 +218,10 @@ final class ImporLegacyTiketLamaTest extends ImporLegacyTestCase
         $this->src->table('inbox')->insertBatch([
             ['id_inbox' => 6, 'id_question_category' => 3, 'subject' => 'Pertanyaan uji 6', 'sender' => 0, 'sender_name' => 'Uji', 'nip' => '', 'receiver' => 0, 'allow_reply' => 1, 'status' => 0, 'is_read' => 1, 'is_read_off' => 2, 'notify_pic' => 2, 'created_at' => '2026-01-05 10:00:00'],
             ['id_inbox' => 7, 'id_question_category' => 3, 'subject' => '  ', 'sender' => 11, 'sender_name' => 'Uji', 'nip' => "\u{200B} ", 'receiver' => 0, 'allow_reply' => 1, 'status' => 0, 'is_read' => 1, 'is_read_off' => 2, 'notify_pic' => 2, 'created_at' => '2026-01-05 10:00:00'],
+            ['id_inbox' => 8, 'id_question_category' => 3, 'subject' => 'Pertanyaan uji 8', 'sender' => 11, 'sender_name' => 'Uji', 'nip' => '', 'receiver' => 0, 'allow_reply' => 1, 'status' => 0, 'is_read' => 1, 'is_read_off' => 2, 'notify_pic' => 2, 'created_at' => '2026-01-05 10:00:00'],
         ]);
         $this->src->table('inbox_msg')->insertBatch([
+            ['id_inbox_msg' => 18, 'id_inbox' => 8, 'msg_sender' => 11, 'msg_sender_name' => 'Uji', 'msg_receiver' => 0, 'msg' => 'Isi', 'show_notif' => 1, 'is_read' => 0, 'created_at' => '2026-01-05 10:00:00'],
             ['id_inbox_msg' => 16, 'id_inbox' => 6, 'msg_sender' => 11, 'msg_sender_name' => 'Uji', 'msg_receiver' => 0, 'msg' => 'Isi', 'show_notif' => 1, 'is_read' => 0, 'created_at' => '2026-01-05 10:00:00'],
             ['id_inbox_msg' => 17, 'id_inbox' => 7, 'msg_sender' => 11, 'msg_sender_name' => 'Uji', 'msg_receiver' => 0, 'msg' => 'Isi', 'show_notif' => 1, 'is_read' => 0, 'created_at' => '2026-01-05 10:00:00'],
         ]);
@@ -229,6 +231,7 @@ final class ImporLegacyTiketLamaTest extends ImporLegacyTestCase
         $this->assertSame(AturanTiketLama::A_PENGIRIM . ' + ' . AturanTiketLama::A_NIP, $eskalasi['6']);
         $this->assertSame(AturanTiketLama::A_SUBJEK . ' + ' . AturanTiketLama::A_NIP, $eskalasi['7']);
         $this->assertSame(AturanTiketLama::A_PENGIRIM, $eskalasi['3'], 'tiket ber-NIP sah tetap satu alasan');
+        $this->assertSame(AturanTiketLama::A_NIP, $eskalasi['8'], 'hanya NIP kosong → A_NIP saja');
     }
 
     /**

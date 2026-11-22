@@ -53,7 +53,7 @@ final class DefinisiTabel
      *                                                         Dry-run tidak memeriksa rujukan, sama seperti aturan FK lain.
      * @param list<string>                  $kosongKeNull      [CR-172, DBV-034] kolom `kolomKode` NULL-able yang hasil normalisasinya `''` → NULL +
      *                                                         dicatat `<kolom> kosong→NULL (DBV-034)`. Hanya format: nilai yatim TIDAK
-     *                                                         di-NULL-kan (tetap ditolak pra-cek FK ditahan). Kolom NOT NULL → gagal definisi.
+     *                                                         di-NULL-kan (tetap ditolak pra-cek FK ditahan). Kolom NOT NULL → impor gagal bila ada nilai kosong.
      */
     public function __construct(
         public readonly string $tabel,

@@ -72,7 +72,7 @@ DEFAULT dari DB.
 | 5 | Teks: `stripslashes` PHP, kecuali `tanpaStripslashes` | DBV-011 §2.2 #3 |
 | 6 | `kolomNama`: whitespace → satu spasi, lalu trim | DBV-011 §2.2 #2 |
 | 7 | `status` di luar `statusDomain` (bawaan 1/2/10) dan kolom `domain` lain (CHECK v2) → berkas keputusan, kalau tidak gagal; NULL di kolom nullable dibiarkan | DBV-011 §2.4 #5, B-01/B-02 §6 #3 |
-| 8 | `kolomKode`: karakter tak terlihat (U+200B–U+200F, U+2060, U+FEFF) dibuang lalu trim PHP, jumlah baris dicatat di laporan (`<kolom> karakter tak terlihat dibuang`); teks melebihi panjang kolom tujuan → gagal (mis. NIP > 30) | DBV-011 §2.2 #7, B-01/B-02 §6 #2, CR-089 (UP1-06: NIP berawalan U+200C, legacy `unicode_ci` mengabaikannya) |
+| 8 | `kolomKode`: karakter tak terlihat (U+200B–U+200F, U+2060, U+FEFF) dibuang lalu trim PHP, jumlah baris dicatat di laporan (`<kolom> karakter tak terlihat dibuang`); hasil `''` di kolom `kosongKeNull` (kolom NULL-able yang akan ber-FK) → NULL + dicatat `<kolom> kosong→NULL (DBV-034)`, NIP yatim tidak di-NULL-kan; teks melebihi panjang kolom tujuan → gagal (mis. NIP > 30) | DBV-011 §2.2 #7, B-01/B-02 §6 #2, CR-089, CR-172/DBV-034 (UP1-06: NIP berawalan U+200C, legacy `unicode_ci` mengabaikannya) |
 | 9 | Rujukan FK dicek per batch terhadap tabel induk tujuan: yatim → gagal dengan jumlah, kecuali `yatimKeNull` → NULL + dicatat sebagai `koreksi`, atau `yatimBuang` → baris dibuang + dicatat `<kolom> yatim dibuang (K-M12)` (MAKE-097). Dry-run tidak memeriksa rujukan | DBV-019 audit = 0, B-01/B-02 §6 #6, K-M12 |
 
 ## Aturan khusus tabel (`DefinisiTabel`)

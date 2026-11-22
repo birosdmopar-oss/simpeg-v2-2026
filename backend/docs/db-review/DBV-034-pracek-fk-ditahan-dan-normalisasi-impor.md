@@ -63,20 +63,28 @@ SUM(TRIM(kolom) <> '' AND NOT EXISTS (pegawai.nip = kolom))            AS yatim
 
 ### 1.3 Pra-cek ⇔ ALTER (tidak ada nilai yang lolos pra-cek lalu ditolak ALTER)
 
-Pembandingan FK InnoDB memakai collation kolom (PAD SPACE). Akibatnya per jenis nilai:
+Pembandingan FK InnoDB memakai collation kolom (`utf8mb4_unicode_ci`, PAD SPACE). Pada collation ini NBSP (U+00A0) dan
+karakter zero-width (U+200B, U+FEFF) **berbobot nol/setara spasi**, sehingga `TRIM(x) = ''` bernilai 1 untuk nilai yang
+hanya berisi karakter itu. Fakta di bawah diuji reviewer CR dengan SELECT di MySQL 8.0.30 (22-11); untuk MariaDB 10.4
+statusnya **[I]** (hanya lewat CI, tidak diuji terpisah).
 
-| Nilai anak | Pra-cek baru | ALTER | Diuji |
+Kolom "Diuji": ✔ = perilaku pra-cek dikunci test `PraCekFkDitahanKosongTest`; [I] = perilaku ALTER untuk nilai yang
+dihentikan pra-cek lebih dulu (ALTER tidak pernah dijalankan dengan nilai itu di test).
+
+| Nilai anak | Pra-cek baru | ALTER | Diuji (pra-cek / ALTER) |
 |---|---|---|---|
-| NULL | lolos | lolos | ✔ |
-| `''`, `'   '` | **kosong** | ditolak 1452 | ✔ |
-| `'<nip sah>'` | lolos | lolos | ✔ |
-| `'<nip sah>   '` (spasi di belakang) | lolos (`=` PAD SPACE) | lolos | ✔ (up() sukses) |
-| `' <nip sah>'` (spasi di depan) | **yatim** | ditolak 1452 | ✔ |
-| NIP tak ada di `pegawai` | **yatim** | ditolak 1452 | ✔ (test lama) |
-| tab, NBSP, atau karakter tak terlihat saja | **yatim** (TRIM SQL hanya membuang spasi) | ditolak 1452 | [I] tidak diuji terpisah; sifatnya sama dengan yatim |
+| NULL | lolos | lolos | ✔ / ✔ |
+| `''`, `'   '` | **kosong** | ditolak 1452 | ✔ / [I] |
+| NBSP-saja, U+200B-saja, U+FEFF-saja | **kosong** (`TRIM(x) = ''` → 1 di unicode_ci) | ditolak 1452 | SELECT reviewer / [I] |
+| tab-saja | **yatim** (`TRIM(tab) = ''` → 0) | ditolak 1452 | SELECT reviewer / [I] |
+| `'<nip sah>'` | lolos | lolos | ✔ / ✔ |
+| `'<nip sah>   '` (spasi di belakang) | lolos (`=` PAD SPACE) | lolos | ✔ / ✔ (up() sukses) |
+| `'<nip sah>'` + NBSP di belakang | lolos (`=` → 1) | lolos | SELECT reviewer / [I] — **nilai tetap kotor**, lihat §2.4 |
+| `' <nip sah>'` (spasi di depan), NBSP + `'<nip sah>'` | **yatim** (`=` → 0) | ditolak 1452 | ✔ (spasi) / [I] |
+| NIP tak ada di `pegawai` | **yatim** | ditolak 1452 | ✔ / [I] (test lama `MigrasiLayananSiklusTest`) |
 
-Karakter tak terlihat sudah dibuang importer (`Transformasi::kode`) untuk kolom `kolomKode`, jadi baris jenis terakhir hanya
-muncul dari data yang tidak lewat importer.
+Jadi tidak ada nilai yang lolos pra-cek lalu ditolak ALTER: keduanya memakai perbandingan collation yang sama. Kebalikannya
+(nilai kotor yang lolos keduanya) mungkin untuk spasi/NBSP di belakang; itu batasan format, bukan celah FK.
 
 ### 1.4 Pengecualian mengedit MigrationsDitahan ⚠️
 
@@ -121,10 +129,27 @@ Normalisasi `kolomKode` adalah perilaku yang sudah ada (CR-089): karakter tak te
 - Baris legacy dengan approver `''` atau spasi-saja masuk sebagai NULL. Arti NULL sama dengan "belum ada atasan/pejabat" di aplikasi v2, karena kolomnya memang NULL-able. Jumlahnya tercatat di laporan impor sebagai koreksi per kolom.
 - Approver yang berisi NIP dengan spasi atau karakter tak terlihat menjadi NIP bersih. Nilai ini sebelumnya akan dihitung yatim (spasi depan) atau lolos tetapi kotor (spasi belakang).
 - `pa_layanan.nip` diperlakukan sama.
-- Tiket berkode ganda muncul di `impor:sortir-inbox` dengan kode gabungan. Berkas keputusan **lama** yang dibuat per id tetap berlaku, karena kunci putusannya id, bukan kode. Hanya label hitungan "belum diputuskan" yang berubah teksnya.
+- Tiket berkode ganda muncul di `impor:sortir-inbox` dengan kode gabungan. Yang berubah adalah **nilai kode** di
+  `eskalasi.tiket` (manifest/berkas sortir) dan rincian pesan `ImporGagal` "baris ambigu belum diputuskan"; label kelas
+  manifest (`A-ESK belum diputuskan/dibuang/diimpor`) tetap. Putusan berkas keputusan tetap berkunci id, jadi berkas lama
+  masih terbaca.
+- ⚠️ **Berkas keputusan tiket yang dibuat SEBELUM CR-172 wajib ditinjau ulang** untuk tiket ber-NIP kosong: tiket yang
+  sudah diputus `"__impor"` tidak muncul lagi di daftar eskalasi, sehingga NIP `''`-nya tidak akan pernah terlihat lewat
+  kode baru. Tinjau dengan `impor:sortir-inbox` memakai `Keputusan::kosong()` (tanpa berkas) lalu bandingkan id berkode
+  `nip kosong` dengan putusan lama.
+- **Batasan format:** `Transformasi::kode` membuang U+200B–U+200F, U+2060, U+FEFF dan spasi/tab (trim PHP), tetapi **tidak**
+  NBSP (U+00A0). NIP dengan NBSP di belakang lolos pra-cek dan FK (setara di unicode_ci) tetapi tidak sama dengan
+  `pegawai.nip` bila dibandingkan `===` di PHP. NBSP-saja di kolom approver tidak menjadi `''` di importer, sehingga tidak
+  di-NULL-kan, lalu dihitung **kosong** oleh pra-cek. Menambah NBSP ke `kode()` di luar cakupan CR-172 (mengubah semua kolom
+  `kolomKode`); dicatat untuk runbook.
 - Tidak ada perubahan skema, jadi tidak perlu migrate.
 
 ## 3. Keputusan yang diminta dari DB Validator
+
+**Diputus WS-2 (DB Validator) 22-11-2026 @`58e0497a`, APPROVE tanpa blok** (teks lengkap di PR #44):
+Q1 setuju (berkas tidak diedit lagi sesudah dipindah ke `Migrations/`); Q2 setuju; Q3 (a); Q4 (a) sampai DQ-4 diputus,
+bila FK `disiplin_ticket.nip` dipakai maka (b) menjadi CR lanjutan; Q5 cukup dicatat. Catatan non-blok: KOSMETIK-1 (baris
+panjang), INFO-2 (tab/NBSP di runbook, lihat §1.3 dan §2.4).
 
 | Q | Pertanyaan | Usulan coder |
 |---|---|---|
@@ -147,7 +172,24 @@ DB scratch MySQL 8 di 3307, `db-isolasi-penuh`.
 - Kelima test baru **merah di `6ca7e1f8`**: kode `app/` dikembalikan ke `main`, sedangkan test tetap versi baru.
 - Regresi yang dijalankan ulang dan hijau: `MigrasiLayananSiklusTest`, `NipReferenceRegistryTest`, `ImporLegacyTiketLamaTest`, `ImporLegacyTier456Test`, `ImporLegacyMasterHaloTest`.
 
-## 5. Checklist DB Validator
+## 5. Hasil verifikasi developer (22-11-2026)
+
+- Lingkungan: PHP 8.4.27, MySQL 8 di port 3307, DB scratch `simpeg_v2_t_f8cb` (`database_tests_*`, `CI_ENVIRONMENT=testing`,
+  captcha mock), satu proses PHPUnit per DB.
+- @`58e0497a`: `phpunit tests/database/Layanan/PraCekFkDitahanKosongTest.php` 2/2, `tests/Impor/ImporLegacyNormalisasiNipFkTest.php`
+  2/2, seluruh `tests/Impor` 94/94, `MigrasiLayananSiklusTest` dan `NipReferenceRegistryTest` hijau; `composer analyse`
+  (PHPStan level 5) No errors; `php-cs-fixer fix --dry-run` 0 berkas.
+- Merah di `6ca7e1f8` (kode `app/` main, test baru): 5/5 gagal.
+- Revisi dokumentasi review CR (R1–R3): hasil diulang di commit revisi (lihat laporan PR).
+
+## 6. Syarat merge (⛔)
+
+1. Approve DB Validator (WS-2) — ✅ @`58e0497a`.
+2. CI hijau MySQL 8.0 + MariaDB 10.4 pada head PR.
+3. Gate penuh `./check.sh` lolos atas aba-aba reviewer CR.
+4. Izin merge dari Horii; merge oleh reviewer CR.
+
+## 7. Checklist DB Validator
 
 - [ ] Pra-cek: tidak ada nilai yang lolos pra-cek lalu ditolak ALTER (Bagian 1.3).
 - [ ] Pesan kolom NOT NULL tidak menyarankan NULL.

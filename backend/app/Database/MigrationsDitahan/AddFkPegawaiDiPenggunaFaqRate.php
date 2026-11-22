@@ -30,8 +30,9 @@ use Throwable;
  * Keduanya ON DELETE RESTRICT ON UPDATE RESTRICT (legacy `pengguna` SET NULL/CASCADE, `faq_rate` CASCADE/CASCADE;
  * ganti NIP lewat B-06, K1).
  *
- * up() fail-closed: sebelum ALTER apa pun, baris yang NIP-nya tidak ada di `pegawai` (orphan) dihitung; bila ada,
- * migration berhenti dengan pesan jumlah per tabel (impor `pegawai` dulu, atau perbaiki/hapus baris orphan). FK yang
+ * up() fail-closed: sebelum ALTER apa pun, baris yang NIP-nya tidak ada di `pegawai` (orphan) dan baris ber-NIP
+ * kosong/spasi-saja dihitung terpisah per kolom (CR-172/DBV-034); bila ada, migration berhenti dengan pesan jumlah per
+ * kolom (impor `pegawai` dulu, atau perbaiki/hapus baris orphan; NIP kosong di kolom NULL-able di-NULL-kan). FK yang
  * sudah ada dilewati; bila ALTER kedua gagal, FK pertama yang dipasang PADA RUN ITU dilepas lagi sebelum error dilempar
  * ulang. down() hanya melepas FK yang ada (index tetap, seperti sebelum up()).
  */

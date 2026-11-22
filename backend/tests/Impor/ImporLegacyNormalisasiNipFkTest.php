@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Impor;
 
+use App\Libraries\Impor\DefinisiTabel;
+use App\Libraries\Impor\ImporGagal;
 use PHPUnit\Framework\Attributes\Group;
 use Tests\Support\Impor\ImporLegacyTestCase;
 
@@ -65,5 +67,13 @@ final class ImporLegacyNormalisasiNipFkTest extends ImporLegacyTestCase
         $nip = array_column($this->db->table('pa_layanan')->orderBy('id_pa_layanan')->get()->getResultArray(), 'nip', 'id_pa_layanan');
         $this->assertSame([1 => self::NIP_A, 2 => null, 3 => self::NIP_YATIM], array_map(static fn ($n) => $n === null ? null : (string) $n, $nip));
         $this->assertSame(1, $lap['pa_layanan']['koreksi']['nip kosong→NULL (DBV-034)']);
+    }
+
+    public function testKosongKeNullDiLuarKolomKodeDitolakDefinisi(): void
+    {
+        $this->expectException(ImporGagal::class);
+        $this->expectExceptionMessage('kosongKeNull hanya untuk kolom kolomKode');
+
+        new DefinisiTabel('pa_layanan', 'id_pa_layanan', 'uji', kosongKeNull: ['nip']);
     }
 }

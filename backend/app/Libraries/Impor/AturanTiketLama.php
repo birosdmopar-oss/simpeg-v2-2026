@@ -217,7 +217,7 @@ final class AturanTiketLama
             $tiket[$id] = true;
 
             // CR-172/DBV-034: NIP kosong selalu ikut tertulis di kode (juga bila tiket sudah ambigu karena pengirim/subjek),
-            // supaya putusan "__impor" atas tiket ber-NIP `''` terlihat di daftar eskalasi/berkas keputusan.
+            // supaya tiket ber-NIP `''` terlihat di daftar eskalasi sebelum diputus "__impor".
             $alasan = [];
 
             if ((int) $r['sender'] <= 0) {
