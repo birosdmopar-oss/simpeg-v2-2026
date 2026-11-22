@@ -9,33 +9,45 @@ use XMLParser;
 use ZipArchive;
 
 /**
- * Pemindai ukuran berkas `.xlsx` SEBELUM dimuat PhpSpreadsheet (CR-177). Membaca setiap entri ZIP sebagai aliran
- * (`ZipArchive::getStreamIndex` + parser SAX `ext-xml`, potongan 64 KB) tanpa pernah menampung satu entri utuh di memori.
+ * Pemindai berkas `.xlsx` SEBELUM dimuat PhpSpreadsheet (CR-177). Membaca setiap entri ZIP sebagai aliran
+ * (`ZipArchive::getStreamIndex` + parser SAX `ext-xml`, potongan 64 KB) tanpa pernah menampung satu entri utuh di memori,
+ * lalu mengembalikan hitungan untuk dibandingkan dengan anggaran SELURUH berkas di {@see PembacaExcelSlip}.
  *
- * Kenapa tidak memakai `Reader\Xlsx::listWorksheetInfo` (PhpSpreadsheet 5.10):
- * - `totalRows` = atribut `r` milik `<row>` TERAKHIR (ditimpa, bukan maksimum; `<row>` tanpa `r` dihitung 0), padahal
- *   pemuat menaruh sel menurut `r` milik sel atau urutan `<row>`. Sejuta `<row>` tanpa `r` terbaca "0 baris";
- * - path part sheet untuk `Target` relasi absolut dihitung berbeda dengan pemuat, jadi yang diperiksa bisa bukan part
- *   yang dimuat;
- * - isi part ditampung utuh sebagai string.
+ * Kenapa tidak memakai `Reader\Xlsx::listWorksheetInfo` (PhpSpreadsheet 5.10): `totalRows` = atribut `r` milik `<row>`
+ * TERAKHIR (bukan maksimum; tanpa `r` dihitung 0), path part sheet untuk `Target` relasi dihitung berbeda dengan pemuat,
+ * isi part ditampung utuh, dan yang dihitung hanya sel, padahal biaya memuat juga datang dari elemen lain.
  *
- * Karena itu pemindai ini TIDAK mengikuti relasi dan tidak memilih sheet: SEMUA entri ZIP dipindai, dan yang dihitung
- * adalah bentuk yang dibaca pemuat (`Reader\Xlsx::loadSheetData`): elemen akar apa pun → `sheetData` → `row` → `c` di
- * namespace utama SpreadsheetML (transitional atau strict). Hasilnya batas ATAS dari apa yang bisa dibuat pemuat:
+ * Karena itu pemindai TIDAK mengikuti relasi dan tidak memilih sheet: SEMUA entri ZIP dipindai (termasuk yang namanya
+ * berakhiran `/`, yang tetap dimuat pemuat bila `Target` relasinya sama), dan hasilnya batas ATAS dari yang dibangun pemuat:
  *
- * - `baris` = maksimum dari atribut `r` `<row>`, baris pada `r` sel, dan nomor urut `<row>` (pemuat memakai nomor urut
- *   bila sel tanpa `r`);
- * - `kolom` = maksimum dari kolom pada `r` sel dan nomor urut sel di barisnya;
- * - `sel`   = jumlah `<c>` di semua entri;
- * - `byte`  = jumlah ukuran sesudah dekompresi semua entri (`statIndex`), dijaga lagi dengan byte yang benar-benar terbaca.
+ * - `sel`           = jumlah `<c>` pada jalur yang dibaca `Reader\Xlsx::loadSheetData` (akar apa pun → `sheetData` → `row`
+ *                     → `c`, namespace utama SpreadsheetML transitional atau strict), di semua entri;
+ * - `bobot`         = jumlah semua elemen + 2 × jumlah semua atribut, di semua entri. Pemuat membangun pohon SimpleXML
+ *                     (libxml, DI LUAR `memory_limit`) untuk setiap part, part sheet bahkan dua kali; terukur ±125 byte
+ *                     per elemen dan ±235 byte per atribut untuk tiap pohon;
+ * - `iterasi_kolom` = jumlah langkah perulangan `Reader\Xlsx\ColumnAndRowAttributes::readColumnAttributes` untuk semua
+ *                     `<col>`: 1 bila `max` = 16384, selain itu `max − min + 1`. `min`/`max` yang tidak sah (`max` < `min`
+ *                     membuat perulangan pemuat tidak pernah berhenti) dihitung tak hingga;
+ * - `byte`          = jumlah ukuran sesudah dekompresi semua entri (`statIndex`), dijaga lagi dengan byte yang benar-benar
+ *                     terbaca.
  *
- * Supaya byte yang dipindai sama dengan yang diurai pemuat, entri yang akan DIUBAH `Reader\Security\XmlScanner` sebelum
- * diurai ditolak: BOM UTF-16/UTF-32, deklarasi `encoding` selain UTF-8 (pemuat mengonversinya dengan
- * `mb_convert_encoding`), dan `<!DOCTYPE` (pemuat menolaknya). Entri yang gagal diurai (gambar, biner) dilewati: pemuat
- * mengurai byte yang sama dengan libxml yang sama, jadi gagal juga.
+ * Supaya yang dihitung sama dengan yang diurai pemuat (`Reader\Security\XmlScanner` lalu SimpleXML):
+ *
+ * - entri yang deklarasi `encoding` PERTAMA-nya (sesudah byte nol dibuang, seperti `XmlScanner::findCharSet`) bukan UTF-8
+ *   membuat berkas DITOLAK: pemuat mengonversi isinya dengan `mb_convert_encoding` sebelum diurai, jadi byte yang dipindai
+ *   bukan byte yang diurai. Alias `UTF8` diterima. Kecuali entri itu juga memuat `<!DOCTYPE`;
+ * - entri yang memuat `<!DOCTYPE` tidak diurai lebih lanjut dan tidak membuat berkas ditolak: pemuat menolak part
+ *   seperti itu bila benar-benar dimuat (gambar SVG di `xl/media` tidak pernah dimuat sebagai sheet);
+ * - entri ber-BOM UTF-16/UTF-32 diurai apa adanya (libxml mengenali BOM, sama seperti hasil konversi pemuat);
+ * - entri XML (byte bermakna pertamanya `<`, atau ber-BOM UTF-16/32) yang GAGAL diurai membuat berkas DITOLAK: parser SAX
+ *   berhenti pada galat yang masih diteruskan SimpleXML (mis. prefiks namespace tak dideklarasikan), jadi sisa entri
+ *   tidak terhitung. Entri bukan XML (gambar, biner) dilewati: libxml milik pemuat juga menolaknya di byte pertama.
  */
 final class PemindaiXlsx
 {
+    /** Lebar lembar `.xlsx`; `<col max="16384">` membuat pemuat berhenti sesudah satu langkah. */
+    private const KOLOM_LEMBAR = 16384;
+
     private const POTONG = 65536;
 
     /** Byte terakhir potongan sebelumnya yang ikut diperiksa lagi, supaya pola yang terpotong di batas potongan tetap ketemu. */
@@ -43,16 +55,14 @@ final class PemindaiXlsx
 
     private const NS = ['http://schemas.openxmlformats.org/spreadsheetml/2006/main', 'http://purl.oclc.org/ooxml/spreadsheetml/main'];
 
-    private int $baris = 0;
-    private int $kolom = 0;
-    private int $sel   = 0;
+    private int $sel          = 0;
+    private int $bobot        = 0;
+    private int $iterasiKolom = 0;
 
     // Keadaan parser per entri.
     private int $dalam       = 0;
     private bool $dalamData  = false;
     private bool $dalamBaris = false;
-    private int $urutBaris   = 0;
-    private int $urutSel     = 0;
 
     /**
      * @var array<string, true>
@@ -69,23 +79,30 @@ final class PemindaiXlsx
      */
     private array $namaSel = [];
 
-    private function __construct()
+    /**
+     * @var array<string, true>
+     */
+    private array $namaKolom = [];
+
+    private function __construct(private readonly int $maksBobot)
     {
         foreach (self::NS as $ns) {
             $this->namaData[$ns . "\x1F" . 'sheetData'] = true;
             $this->namaBaris[$ns . "\x1F" . 'row']      = true;
             $this->namaSel[$ns . "\x1F" . 'c']          = true;
+            $this->namaKolom[$ns . "\x1F" . 'col']      = true;
         }
     }
 
     /**
-     * @param int $maksByte batas jumlah ukuran sesudah dekompresi; bila terlewati pemindaian berhenti dan `byte` > batas
+     * Pemindaian berhenti lebih awal begitu `byte` melewati `$maksByte` atau `bobot` melewati `$maksBobot`; nilai yang
+     * dikembalikan saat itu sudah melewati batasnya.
      *
-     * @return array{baris: int, kolom: int, sel: int, byte: int}
+     * @return array{sel: int, bobot: int, iterasi_kolom: int, byte: int}
      *
-     * @throws RuntimeException berkas bukan ZIP yang terbaca, atau memuat entri yang akan diubah pemuat sebelum diurai
+     * @throws RuntimeException berkas bukan ZIP yang terbaca, atau memuat entri yang hitungannya tidak bisa dipercaya
      */
-    public static function pindai(string $path, int $maksByte): array
+    public static function pindai(string $path, int $maksByte, int $maksBobot = PHP_INT_MAX): array
     {
         $zip = new ZipArchive();
 
@@ -106,19 +123,19 @@ final class PemindaiXlsx
                 $byte += (int) $stat['size'];
             }
 
-            $pindai = new self();
+            $pindai = new self($maksBobot);
 
             if ($byte <= $maksByte) {
                 $terbaca = 0;
 
-                for ($i = 0; $i < $zip->numFiles && $terbaca <= $maksByte; $i++) {
+                for ($i = 0; $i < $zip->numFiles && $terbaca <= $maksByte && $pindai->bobot <= $maksBobot; $i++) {
                     $terbaca += $pindai->entri($zip, $i, $maksByte - $terbaca);
                 }
 
                 $byte = max($byte, $terbaca);
             }
 
-            return ['baris' => $pindai->baris, 'kolom' => $pindai->kolom, 'sel' => $pindai->sel, 'byte' => $byte];
+            return ['sel' => $pindai->sel, 'bobot' => $pindai->bobot, 'iterasi_kolom' => $pindai->iterasiKolom, 'byte' => $byte];
         } finally {
             $zip->close();
         }
@@ -129,12 +146,6 @@ final class PemindaiXlsx
      */
     private function entri(ZipArchive $zip, int $indeks, int $sisaByte): int
     {
-        $nama = $zip->getNameIndex($indeks);
-
-        if ($nama === false || str_ends_with($nama, '/')) {
-            return 0;
-        }
-
         $aliran = $zip->getStreamIndex($indeks);
 
         if ($aliran === false) {
@@ -148,12 +159,13 @@ final class PemindaiXlsx
         $this->dalam      = 0;
         $this->dalamData  = false;
         $this->dalamBaris = false;
-        $this->urutBaris  = 0;
-        $this->urutSel    = 0;
 
-        $terbaca = 0;
-        $ekor    = '';
-        $urai    = true;
+        $terbaca  = 0;
+        $ekor     = '';
+        $jenis    = 'lain';   // 'xml' | 'bom' | 'lain' (bukan XML: tidak diurai)
+        $urai     = true;
+        $encoding = null;     // null = belum ketemu deklarasi, true = UTF-8, false = selain UTF-8
+        $doctype  = false;
 
         try {
             while (! feof($aliran)) {
@@ -164,7 +176,7 @@ final class PemindaiXlsx
                 }
 
                 if ($terbaca === 0) {
-                    self::tolakBom($potong);
+                    $jenis = self::jenis($potong);
                 }
 
                 $terbaca += strlen($potong);
@@ -173,15 +185,39 @@ final class PemindaiXlsx
                     return $terbaca;
                 }
 
-                $ekor = self::periksaMentah($ekor . (str_contains($potong, "\0") ? str_replace("\0", '', $potong) : $potong), false);
+                $teks = $ekor . (str_contains($potong, "\0") ? str_replace("\0", '', $potong) : $potong);
 
-                // Sesudah galat urai, sisa entri tetap dibaca untuk pemeriksaan mentah di atas; hanya penguraiannya yang berhenti.
-                if ($urai && xml_parse($parser, $potong, false) !== 1) {
-                    $urai = false;
+                if (! $doctype && str_contains($teks, '<!DOCTYPE')) {
+                    $doctype = true;
+                    $urai    = false;
+                }
+
+                // Entri ber-BOM: pemuat memakai BOM, bukan deklarasi, untuk menentukan encoding.
+                if ($encoding === null && $jenis !== 'bom') {
+                    $encoding = self::encodingPertama($teks, false);
+                    $urai     = $urai && $encoding !== false;
+                }
+
+                $ekor = self::ekor($teks);
+
+                if ($urai && $jenis !== 'lain') {
+                    if (xml_parse($parser, $potong, false) !== 1) {
+                        throw new RuntimeException('Entri XML di arsip xlsx tidak dapat diurai sampai selesai.');
+                    }
+
+                    if ($this->bobot > $this->maksBobot) {
+                        return $terbaca;
+                    }
                 }
             }
 
-            self::periksaMentah($ekor, true);
+            if ($encoding === null && $jenis !== 'bom') {
+                $encoding = self::encodingPertama($ekor, true);
+            }
+
+            if ($encoding === false && ! $doctype) {
+                throw new RuntimeException('Entri xlsx berdeklarasi encoding selain UTF-8.');
+            }
         } finally {
             fclose($aliran);
         }
@@ -195,37 +231,18 @@ final class PemindaiXlsx
     private function buka(XMLParser $parser, string $nama, array $atribut): void
     {
         $this->dalam++;
+        $this->bobot += 1 + 2 * count($atribut);
+
+        if (isset($this->namaKolom[$nama])) {
+            $this->hitungKolom((int) ($atribut['min'] ?? 0), (int) ($atribut['max'] ?? 0));
+        }
 
         if ($this->dalam === 2) {
             $this->dalamData = isset($this->namaData[$nama]);
-
-            return;
-        }
-
-        if ($this->dalam === 3 && $this->dalamData && isset($this->namaBaris[$nama])) {
-            $this->dalamBaris = true;
-            $this->urutBaris++;
-            $this->urutSel = 0;
-            $this->baris   = max($this->baris, $this->urutBaris, (int) ($atribut['r'] ?? 0));
-
-            return;
-        }
-
-        if ($this->dalam === 4 && $this->dalamBaris && isset($this->namaSel[$nama])) {
+        } elseif ($this->dalam === 3) {
+            $this->dalamBaris = $this->dalamData && isset($this->namaBaris[$nama]);
+        } elseif ($this->dalam === 4 && $this->dalamBaris && isset($this->namaSel[$nama])) {
             $this->sel++;
-            $this->urutSel++;
-            $this->kolom = max($this->kolom, $this->urutSel);
-
-            if (preg_match('/^\$?([A-Za-z]{1,3})\$?(\d{1,9})$/', $atribut['r'] ?? '', $cocok) === 1) {
-                $indeks = 0;
-
-                foreach (str_split(strtoupper($cocok[1])) as $huruf) {
-                    $indeks = $indeks * 26 + ord($huruf) - 64;
-                }
-
-                $this->kolom = max($this->kolom, $indeks);
-                $this->baris = max($this->baris, (int) $cocok[2]);
-            }
         }
     }
 
@@ -240,47 +257,61 @@ final class PemindaiXlsx
         $this->dalam--;
     }
 
-    private static function tolakBom(string $awal): void
+    private function hitungKolom(int $min, int $maks): void
     {
-        foreach (["\xFF\xFE", "\xFE\xFF", "\x00\x00\xFE\xFF"] as $bom) {
-            if (str_starts_with($awal, $bom)) {
-                throw new RuntimeException('Entri xlsx ber-BOM UTF-16/UTF-32 tidak didukung.');
-            }
+        if ($maks === self::KOLOM_LEMBAR) {
+            $langkah = 1;
+        } elseif ($min >= 1 && $maks >= $min && $maks < self::KOLOM_LEMBAR) {
+            $langkah = $maks - $min + 1;
+        } else {
+            $langkah = PHP_INT_MAX;
         }
+
+        $this->iterasiKolom = $langkah > PHP_INT_MAX - $this->iterasiKolom ? PHP_INT_MAX : $this->iterasiKolom + $langkah;
     }
 
     /**
-     * Pola yang membuat pemuat mengubah atau menolak byte entri (lihat docblock kelas). `$teks` sudah tanpa byte nol,
-     * sama seperti yang dilakukan `XmlScanner` sebelum mencari pola.
-     *
-     * @return string ekor yang harus disambung ke potongan berikutnya
+     * `bom` = BOM UTF-16/UTF-32; `xml` = byte bermakna pertama `<` (atau potongan pertama hanya berisi spasi/byte nol:
+     * dianggap XML supaya tidak ada yang lolos tanpa diurai); selain itu `lain`.
      */
-    private static function periksaMentah(string $teks, bool $akhir): string
+    private static function jenis(string $awal): string
     {
-        if (str_contains($teks, '<!DOCTYPE')) {
-            throw new RuntimeException('Entri xlsx memuat DOCTYPE.');
-        }
-
-        $batas = $akhir ? PHP_INT_MAX : strlen($teks) - self::EKOR;
-
-        if (str_contains($teks, 'encoding') && preg_match_all('/encoding\s*=\s*(["\'])/', $teks, $cocok, PREG_OFFSET_CAPTURE | PREG_SET_ORDER) > 0) {
-            foreach ($cocok as $c) {
-                // Kecocokan di ekor diperiksa bersama potongan berikutnya (nilainya bisa terpotong).
-                if ($c[0][1] >= $batas) {
-                    break;
-                }
-
-                if (strcasecmp(substr($teks, $c[0][1] + strlen($c[0][0]), 6), 'utf-8' . $c[1][0]) !== 0) {
-                    throw new RuntimeException('Entri xlsx berdeklarasi encoding selain UTF-8.');
-                }
+        foreach (["\xFF\xFE", "\xFE\xFF", "\x00\x00\xFE\xFF"] as $bom) {
+            if (str_starts_with($awal, $bom)) {
+                return 'bom';
             }
         }
 
-        if ($akhir) {
-            return '';
+        $isi = ltrim(str_replace("\0", '', str_starts_with($awal, "\xEF\xBB\xBF") ? substr($awal, 3) : $awal), " \t\r\n");
+
+        return $isi === '' || $isi[0] === '<' ? 'xml' : 'lain';
+    }
+
+    /**
+     * Deklarasi `encoding` pertama di `$teks` (sudah tanpa byte nol), dengan pola `XmlScanner::ENCODING_PATTERN`.
+     *
+     * @return bool|null true = UTF-8 (atau alias UTF8), false = selain itu, null = belum ada yang bisa diputuskan
+     */
+    private static function encodingPertama(string $teks, bool $akhir): ?bool
+    {
+        if (! str_contains($teks, 'encoding') || preg_match('/encoding\s*=\s*(["\'])/', $teks, $cocok, PREG_OFFSET_CAPTURE) !== 1) {
+            return null;
         }
 
-        // `encoding` yang diikuti deretan spasi panjang sampai ujung potongan: diringkas supaya tidak hilang dari ekor.
+        // Kecocokan di ekor diputuskan bersama potongan berikutnya (nilainya bisa terpotong).
+        if (! $akhir && $cocok[0][1] >= strlen($teks) - self::EKOR) {
+            return null;
+        }
+
+        return preg_match('/\Gutf-?8' . $cocok[1][0] . '/i', $teks, $nilai, 0, $cocok[0][1] + strlen($cocok[0][0])) === 1;
+    }
+
+    /**
+     * Ekor yang disambung ke potongan berikutnya. `encoding` yang diikuti deretan spasi panjang sampai ujung potongan
+     * diringkas supaya tidak hilang dari ekor.
+     */
+    private static function ekor(string $teks): string
+    {
         if (preg_match('/encoding[\s=]*\z/', $teks, $ujung) === 1 && strlen($ujung[0]) > self::EKOR) {
             return 'encoding' . (str_contains($ujung[0], '=') ? '=' : '');
         }

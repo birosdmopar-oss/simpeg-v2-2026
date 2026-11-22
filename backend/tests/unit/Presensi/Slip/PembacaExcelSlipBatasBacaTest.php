@@ -16,18 +16,24 @@ use RuntimeException;
 use Tests\Support\Presensi\XlsxMentah;
 
 /**
- * CR-177 — ukuran sheet GPP/TK diperiksa SEBELUM berkas dimuat, supaya berkas kecil yang "lebar" (sel di kolom XFD) atau
- * berkas padat ratusan ribu baris ditolak 422 dan tidak menghabiskan memori/waktu (dulu 500). Berkas uji ditulis sebagai
- * XML mentah ({@see XlsxMentah}); kenaikan puncak memori diukur supaya test tetap bermakna saat `memory_limit = -1`.
+ * CR-177 — berkas impor Slip Gaji yang tidak wajar ditolak 422, bukan 500 karena memori/waktu habis:
+ *
+ * - `.xlsx` dipindai dulu (`PemindaiXlsx`, semua entri ZIP sebagai aliran) terhadap anggaran SELURUH berkas: ukuran isi,
+ *   jumlah sel, bobot elemen, dan iterasi `<col>`;
+ * - batas baris dan kolom sheet GPP/TK diperiksa sesudah muat, sebelum array baris × kolom disusun.
+ *
+ * Berkas uji ditulis sebagai XML mentah ({@see XlsxMentah}); kenaikan puncak memori PHP diukur supaya test tetap bermakna
+ * saat `memory_limit = -1`. Memori libxml (di luar hitungan PHP) dijaga lewat asersi "ditolak pemindai", bukan lewat angka.
  *
  * @internal
  */
 final class PembacaExcelSlipBatasBacaTest extends CIUnitTestCase
 {
-    private const NIP          = '199001012020011001';
-    private const PESAN_KOLOM  = 'Jumlah kolom melebihi batas 256 per sheet.';
-    private const PESAN_BARIS  = 'Jumlah baris melebihi batas 10.000 per sheet.';
-    private const BATAS_MEMORI = 64 * 1024 * 1024;
+    private const NIP            = '199001012020011001';
+    private const PESAN_KOLOM    = 'Jumlah kolom melebihi batas 256 per sheet.';
+    private const PESAN_SEL      = 'Jumlah sel melebihi batas 400.040 per berkas. Hapus sheet atau kolom yang tidak dipakai, lalu unggah ulang.';
+    private const PESAN_STRUKTUR = 'Struktur berkas terlalu besar untuk diproses. Simpan ulang berkas hanya dengan sheet GPP dan TK.';
+    private const BATAS_MEMORI   = 64 * 1024 * 1024;
 
     /**
      * @var list<string>
@@ -42,6 +48,10 @@ final class PembacaExcelSlipBatasBacaTest extends CIUnitTestCase
 
         parent::tearDown();
     }
+
+    // ------------------------------------------------------------------------------------------------------------------
+    // Batas kolom dan baris sheet GPP/TK (sesudah muat, sebelum array disusun)
+    // ------------------------------------------------------------------------------------------------------------------
 
     /**
      * @return iterable<string, array{0: string}>
@@ -63,18 +73,15 @@ final class PembacaExcelSlipBatasBacaTest extends CIUnitTestCase
         $path = $this->xlsx(['GPP' => $gpp, 'TK' => self::sheetTk()]);
         $this->assertLessThan(20_000, (int) filesize($path), 'berkas kecil');
 
-        $this->assertDitolak(self::PESAN_KOLOM, $path, 10000);
+        $this->assertDitolak(self::PESAN_KOLOM, $path);
     }
 
     public function testKolomTepatDiBatasDiterima(): void
     {
         // Kolom ke-256 (IV) berisi header tak dikenal: masih dibaca; kolom tak dikenal memang diabaikan penguraian.
         $gpp   = '<row r="1">' . self::selHeader(self::headerGpp()) . XlsxMentah::sel('IV1', 'catatan') . '</row>' . XlsxMentah::baris(2, self::dataGpp());
-        $hasil = (new PembacaExcelSlip(10000))->baca($this->xlsx(['GPP' => $gpp, 'TK' => self::sheetTk()]));
+        $sheet = $this->assertDiterima($this->xlsx(['GPP' => $gpp, 'TK' => self::sheetTk()]));
 
-        $this->assertTrue($hasil->valid);
-        /** @var array{GPP: array<int, list<mixed>>, TK: array<int, list<mixed>>} $sheet */
-        $sheet = $hasil->nilai;
         $this->assertSame([1, 2], array_keys($sheet['GPP']));
         $this->assertCount(Presensi::MAKS_KOLOM_IMPOR, $sheet['GPP'][1]);
         $this->assertSame('catatan', $sheet['GPP'][1][255]);
@@ -85,15 +92,101 @@ final class PembacaExcelSlipBatasBacaTest extends CIUnitTestCase
     {
         $gpp = '<row r="1">' . self::selHeader(self::headerGpp()) . XlsxMentah::sel('IW1', 'catatan') . '</row>' . XlsxMentah::baris(2, self::dataGpp());
 
-        $this->assertDitolak(self::PESAN_KOLOM, $this->xlsx(['GPP' => $gpp, 'TK' => self::sheetTk()]), 10000);
+        $this->assertDitolak(self::PESAN_KOLOM, $this->xlsx(['GPP' => $gpp, 'TK' => self::sheetTk()]));
     }
 
     public function testSheetTkLebarJugaDitolak(): void
     {
         $tk = '<row r="1">' . self::selHeader(self::headerTk()) . XlsxMentah::sel('XFD1', 'x') . '</row>' . XlsxMentah::baris(2, self::dataTk());
 
-        $this->assertDitolak(self::PESAN_KOLOM, $this->xlsx(['GPP' => XlsxMentah::baris(1, self::headerGpp()) . XlsxMentah::baris(2, self::dataGpp()), 'TK' => $tk]), 10000);
+        $this->assertDitolak(self::PESAN_KOLOM, $this->xlsx(['GPP' => self::sheetGpp(), 'TK' => $tk]));
     }
+
+    /**
+     * Sel tanpa atribut `r` ditaruh pemuat menurut nomor urutnya di baris: 300 sel berurutan = kolom 300.
+     */
+    public function testBarisBerisiBanyakSelTanpaAtributRDitolak(): void
+    {
+        $gpp = XlsxMentah::baris(1, self::headerGpp()) . '<row r="2">' . str_repeat('<c><v>1</v></c>', 300) . '</row>';
+
+        $this->assertDitolak(self::PESAN_KOLOM, $this->xlsx(['GPP' => $gpp, 'TK' => self::sheetTk()]));
+    }
+
+    /**
+     * Perilaku lama yang dijaga: sel kosong (hanya bergaya) lewat batas baris tetap dihitung, jadi berkasnya tetap ditolak.
+     */
+    public function testSelKosongLewatBatasBarisTetapDitolak(): void
+    {
+        $gpp = self::sheetGpp() . '<row r="7"><c r="A7" s="0"/></row>';
+
+        $this->assertDitolak('Jumlah baris melebihi batas 5 per sheet.', $this->xlsx(['GPP' => $gpp, 'TK' => self::sheetTk()]), new PembacaExcelSlip(5));
+    }
+
+    public function testSelKosongDiDalamBatasTetapDibacaSebagaiBarisKosong(): void
+    {
+        $gpp   = self::sheetGpp() . '<row r="6"><c r="A6" s="0"/></row>';
+        $sheet = $this->assertDiterima($this->xlsx(['GPP' => $gpp, 'TK' => self::sheetTk()]), new PembacaExcelSlip(5));
+
+        $this->assertSame([1, 2, 3, 4, 5, 6], array_keys($sheet['GPP']));
+        $this->assertSame(array_fill(0, count(self::headerGpp()), null), $sheet['GPP'][6]);
+    }
+
+    /**
+     * Perilaku lama yang dijaga: `<row>` tanpa sel (mis. hanya tinggi baris) tidak dihitung sebagai baris data.
+     */
+    public function testBarisBerformatTanpaSelLewatBatasTetapDiterima(): void
+    {
+        $gpp   = self::sheetGpp() . '<row r="7" ht="20" customHeight="1"/><row r="20000" ht="20" customHeight="1"/>';
+        $sheet = $this->assertDiterima($this->xlsx(['GPP' => $gpp, 'TK' => self::sheetTk()]), new PembacaExcelSlip(5));
+
+        $this->assertSame([1, 2], array_keys($sheet['GPP']));
+    }
+
+    /**
+     * Perilaku lama yang dijaga: batas baris dan kolom hanya untuk sheet GPP dan TK. Sheet lain (referensi 12.000 baris,
+     * matriks 300 kolom) tidak dimuat dan tidak membuat berkas ditolak.
+     */
+    public function testSheetTambahanBesarTetapDiterima(): void
+    {
+        $rekap = '<row r="1">' . XlsxMentah::sel('A1', 'kode') . XlsxMentah::sel('KN1', 'lebar') . '</row>';
+
+        for ($r = 2; $r <= 12_001; $r++) {
+            $rekap .= '<row r="' . $r . '">' . XlsxMentah::sel('A' . $r, $r) . '</row>';
+        }
+
+        $sheet = $this->assertDiterima($this->xlsx(['Rekap' => $rekap, 'GPP' => self::sheetGpp(), 'TK' => self::sheetTk()]));
+
+        $this->assertSame([1, 2], array_keys($sheet['GPP']));
+    }
+
+    /**
+     * Baris diperiksa dulu untuk kedua sheet, baru kolom: pesan tidak bergantung urutan tab (GPP lebar, TK lewat baris).
+     *
+     * @param list<string> $urutan
+     */
+    #[DataProvider('urutanTab')]
+    public function testBarisDiperiksaDuluTanpaBergantungUrutanTab(array $urutan): void
+    {
+        $isi = [
+            'GPP' => '<row r="1">' . self::selHeader(self::headerGpp()) . XlsxMentah::sel('IW1', 'catatan') . '</row>' . XlsxMentah::baris(2, self::dataGpp()),
+            'TK'  => self::sheetTk() . XlsxMentah::baris(8, self::dataTk()),
+        ];
+
+        $this->assertDitolak('Jumlah baris melebihi batas 5 per sheet.', $this->xlsx([$urutan[0] => $isi[$urutan[0]], $urutan[1] => $isi[$urutan[1]]]), new PembacaExcelSlip(5));
+    }
+
+    /**
+     * @return iterable<string, array{0: list<string>}>
+     */
+    public static function urutanTab(): iterable
+    {
+        yield 'GPP di kiri' => [['GPP', 'TK']];
+        yield 'TK di kiri' => [['TK', 'GPP']];
+    }
+
+    // ------------------------------------------------------------------------------------------------------------------
+    // Pemuat tanpa read filter
+    // ------------------------------------------------------------------------------------------------------------------
 
     /**
      * Pagar "tanpa read filter": definisi kolom lebar (`<cols min="1" max="16383">`, bukan sel) + 10.000 baris data tetap
@@ -127,100 +220,46 @@ final class PembacaExcelSlipBatasBacaTest extends CIUnitTestCase
         $this->assertLessThan(self::BATAS_MEMORI, memory_get_peak_usage() - $awal, 'kenaikan puncak memori');
     }
 
+    // ------------------------------------------------------------------------------------------------------------------
+    // Anggaran seluruh berkas: ditolak pemindai, sebelum dimuat
+    // ------------------------------------------------------------------------------------------------------------------
+
     /**
-     * Berkas padat 200.000 baris data GPP: ditolak dengan pesan batas baris yang sama seperti dulu, tetapi SEBELUM dimuat
-     * (dulu seluruh sheet dimuat dulu, ratusan MB, baru ditolak).
+     * Berkas padat 250.000 baris data GPP (500.000 sel) ditolak sebelum dimuat (dulu seluruh sheet dimuat dulu, ratusan
+     * MB, baru ditolak karena baris).
      */
     public function testBerkasPadatDitolakSebelumDimuat(): void
     {
         $path = $this->xlsx(['GPP' => self::gppPadat(), 'TK' => self::sheetTk()]);
         $this->assertLessThan(5 * 1024 * 1024, (int) filesize($path), 'di bawah batas ukuran unggah');
 
-        $this->assertDitolak(self::PESAN_BARIS, $path, 10000);
+        $this->assertDitolak(self::PESAN_SEL, $path);
     }
 
     /**
-     * Perilaku lama yang dijaga: sel kosong (hanya bergaya) lewat batas baris tetap dihitung, jadi berkasnya tetap ditolak.
-     */
-    public function testSelKosongLewatBatasBarisTetapDitolak(): void
-    {
-        $gpp = XlsxMentah::baris(1, self::headerGpp()) . XlsxMentah::baris(2, self::dataGpp()) . '<row r="7"><c r="A7" s="0"/></row>';
-
-        $this->assertDitolak('Jumlah baris melebihi batas 5 per sheet.', $this->xlsx(['GPP' => $gpp, 'TK' => self::sheetTk()]), 5);
-    }
-
-    public function testSelKosongDiDalamBatasTetapDibacaSebagaiBarisKosong(): void
-    {
-        $gpp   = XlsxMentah::baris(1, self::headerGpp()) . XlsxMentah::baris(2, self::dataGpp()) . '<row r="6"><c r="A6" s="0"/></row>';
-        $hasil = (new PembacaExcelSlip(5))->baca($this->xlsx(['GPP' => $gpp, 'TK' => self::sheetTk()]));
-
-        $this->assertTrue($hasil->valid);
-        /** @var array{GPP: array<int, list<mixed>>, TK: array<int, list<mixed>>} $sheet */
-        $sheet = $hasil->nilai;
-        $this->assertSame([1, 2, 3, 4, 5, 6], array_keys($sheet['GPP']));
-        $this->assertSame(array_fill(0, count(self::headerGpp()), null), $sheet['GPP'][6]);
-    }
-
-    /**
-     * [V2] CR-177: `<row>` tanpa sel (mis. hanya tinggi baris) lewat batas ikut dihitung pra-cek, jadi ditolak dengan pesan
-     * batas baris. Dulu baris seperti ini tidak dihitung (tidak ada sel yang dibuat).
-     */
-    public function testBarisTanpaSelLewatBatasDitolak(): void
-    {
-        $gpp = XlsxMentah::baris(1, self::headerGpp()) . XlsxMentah::baris(2, self::dataGpp()) . '<row r="7" ht="20"/>';
-
-        $this->assertDitolak('Jumlah baris melebihi batas 5 per sheet.', $this->xlsx(['GPP' => $gpp, 'TK' => self::sheetTk()]), 5);
-    }
-
-    public function testXlsBarisMelebihiBatasDitolak(): void
-    {
-        $buku = new Spreadsheet();
-        $gpp  = $buku->getActiveSheet()->setTitle(KolomGaji::SHEET_GPP);
-        $gpp->fromArray([self::headerGpp(), self::dataGpp(), self::dataGpp(), self::dataGpp()], null, 'A1', true);
-        $tk = $buku->createSheet()->setTitle(KolomGaji::SHEET_TK);
-        $tk->fromArray([self::headerTk(), self::dataTk()], null, 'A1', true);
-        $path = $this->temp('.xls');
-        IOFactory::createWriter($buku, 'Xls')->save($path);
-        $buku->disconnectWorksheets();
-
-        $this->assertDitolak('Jumlah baris melebihi batas 2 per sheet.', $path, 2);
-        $this->assertTrue((new PembacaExcelSlip(3))->baca($path)->valid);
-    }
-
-    /**
-     * Berkas yang bukan Excel tetapi dikenali reader lain (HTML) tidak lagi dibaca: reader dikunci ke Xlsx/Xls.
-     */
-    public function testBerkasHtmlBerkedokXlsTidakDibaca(): void
-    {
-        $path = $this->temp('.xls');
-        file_put_contents($path, '<html><body><table><tr><td>nip</td><td>bulan</td></tr></table></body></html>');
-
-        $this->assertDitolak(PembacaExcelSlip::PESAN_TIDAK_TERBACA, $path, 10000);
-    }
-
-    /**
-     * BLOK-1a: `<row>` dan `<c>` TANPA atribut `r`. `listWorksheetInfo` membacanya sebagai 0 baris, padahal pemuat menaruh
-     * sel menurut nomor urut. 300.000 baris × 2 sel dalam berkas puluhan KB: harus ditolak sebelum dimuat.
+     * `<row>` dan `<c>` TANPA atribut `r` (`listWorksheetInfo` membacanya sebagai 0 baris): 300.000 baris × 2 sel dalam
+     * berkas puluhan KB.
      */
     public function testBarisTanpaAtributRDitolakSebelumDimuat(): void
     {
         $path = $this->xlsx(['GPP' => XlsxMentah::baris(1, ['nip', 'bulan', 'tahun']) . str_repeat('<row><c><v>1</v></c><c><v>1</v></c></row>', 300_000), 'TK' => self::sheetTk()]);
         $this->assertLessThan(200_000, (int) filesize($path), 'berkas kecil');
 
-        $this->assertDitolak(self::PESAN_BARIS, $path, 10000);
+        $this->assertDitolak(self::PESAN_SEL, $path);
     }
 
     /**
-     * BLOK-1b: berkas padat yang `<row>` terakhirnya bernomor kecil. `listWorksheetInfo` hanya melihat `r` baris terakhir.
+     * Berkas padat yang `<row>` terakhirnya bernomor kecil (`listWorksheetInfo` hanya melihat `r` baris terakhir).
      */
     public function testBarisTerakhirBernomorKecilDitolakSebelumDimuat(): void
     {
-        $this->assertDitolak(self::PESAN_BARIS, $this->xlsx(['GPP' => self::gppPadat() . '<row r="2"/>', 'TK' => self::sheetTk()]), 10000);
+        $this->assertDitolak(self::PESAN_SEL, $this->xlsx(['GPP' => self::gppPadat() . '<row r="2"/>', 'TK' => self::sheetTk()]));
     }
 
     /**
-     * BLOK-2: relasi sheet ber-`Target` absolut. `listWorksheetInfo` membaca `kecil/gpp.xml`, pemuat membaca
-     * `xl/cil/gpp.xml` (potongan path berbeda). Pemindai tidak mengikuti relasi, jadi part padat tetap terlihat.
+     * Relasi sheet ber-`Target` absolut `/kecil/gpp.xml`: `listWorksheetInfo` membaca `kecil/gpp.xml`, sedangkan pemuat
+     * membuang `strlen('xl') + 2` karakter pertama lalu menambahkan `xl/` → `xl/il/gpp.xml`. Pemindai tidak mengikuti
+     * relasi, jadi part padat tetap terhitung.
      */
     public function testTargetRelasiAbsolutDitolakSebelumDimuat(): void
     {
@@ -228,12 +267,26 @@ final class PembacaExcelSlipBatasBacaTest extends CIUnitTestCase
         unset($entri['xl/worksheets/sheet1.xml']);
         $entri['xl/_rels/workbook.xml.rels'] = str_replace('Target="worksheets/sheet1.xml"', 'Target="/kecil/gpp.xml"', $entri['xl/_rels/workbook.xml.rels']);
         $this->assertStringContainsString('Target="/kecil/gpp.xml"', $entri['xl/_rels/workbook.xml.rels']);
-        $entri['kecil/gpp.xml']  = XlsxMentah::lembar(XlsxMentah::baris(1, self::headerGpp()) . XlsxMentah::baris(2, self::dataGpp()));
-        $entri['xl/cil/gpp.xml'] = XlsxMentah::lembar(self::gppPadat());
-        $path                    = $this->temp('.xlsx');
-        XlsxMentah::tulisEntri($path, $entri);
+        $entri['kecil/gpp.xml'] = XlsxMentah::lembar(self::sheetGpp());
+        $entri['xl/il/gpp.xml'] = XlsxMentah::lembar(self::gppPadat());
 
-        $this->assertDitolak(self::PESAN_BARIS, $path, 10000);
+        $this->assertDitolak(self::PESAN_SEL, $this->xlsxEntri($entri));
+    }
+
+    /**
+     * BLOK-3: entri ZIP bernama akhiran `/` tetap dimuat pemuat bila `Target` relasinya juga berakhiran `/`.
+     */
+    public function testEntriBerakhiranGarisMiringTetapDihitung(): void
+    {
+        $entri = XlsxMentah::entri(['GPP' => '', 'TK' => self::sheetTk()]);
+        unset($entri['xl/worksheets/sheet1.xml']);
+        $entri['xl/_rels/workbook.xml.rels'] = str_replace('Target="worksheets/sheet1.xml"', 'Target="worksheets/sheet1.xml/"', $entri['xl/_rels/workbook.xml.rels']);
+        $this->assertStringContainsString('Target="worksheets/sheet1.xml/"', $entri['xl/_rels/workbook.xml.rels']);
+        $entri['xl/worksheets/sheet1.xml/'] = XlsxMentah::lembar(self::gppPadat());
+        $path                               = $this->xlsxEntri($entri);
+        $this->assertLessThan(5 * 1024 * 1024, (int) filesize($path));
+
+        $this->assertDitolak(self::PESAN_SEL, $path);
     }
 
     /**
@@ -242,61 +295,16 @@ final class PembacaExcelSlipBatasBacaTest extends CIUnitTestCase
     public function testPartBerakarLainTetapDihitung(): void
     {
         $entri                             = XlsxMentah::entri(['GPP' => '', 'TK' => self::sheetTk()]);
-        $entri['xl/worksheets/sheet1.xml'] = XlsxMentah::KEPALA . '<lain xmlns="' . XlsxMentah::UTAMA . '"><sheetData>' . XlsxMentah::baris(1, self::headerGpp()) . XlsxMentah::baris(8, self::dataGpp()) . '</sheetData></lain>';
-        $path                              = $this->temp('.xlsx');
-        XlsxMentah::tulisEntri($path, $entri);
+        $entri['xl/worksheets/sheet1.xml'] = XlsxMentah::KEPALA . '<lain xmlns="' . XlsxMentah::UTAMA . '"><sheetData>' . self::sheetGpp() . '</sheetData></lain>';
+        $jumlah                            = 2 * count(self::headerGpp()) + 2 * count(self::headerTk());
+        $path                              = $this->xlsxEntri($entri);
 
-        $this->assertDitolak('Jumlah baris melebihi batas 5 per sheet.', $path, 5);
+        $this->assertDiterima($path, new PembacaExcelSlip(10000, 256, $jumlah));
+        $this->assertDitolak(self::pesanSel($jumlah - 1), $path, new PembacaExcelSlip(10000, 256, $jumlah - 1));
     }
 
     /**
-     * Kolom lewat batas pada berkas yang masih di dalam batas baris dan batas sel: 300 baris × 1.000 kolom = 300.000 sel.
-     * Tanpa cek kolom pra-muat, berkas ini dimuat dulu (ratusan MB) baru ditolak cek pasca-muat.
-     */
-    public function testKolomLewatBatasPadaBerkasPadatDitolakSebelumDimuat(): void
-    {
-        $sel = '';
-
-        for ($k = 1; $k <= 1000; $k++) {
-            $sel .= '<c r="' . XlsxMentah::kolom($k) . '%1$d"><v>1</v></c>';
-        }
-
-        $gpp = XlsxMentah::baris(1, self::headerGpp());
-
-        for ($r = 2; $r <= 301; $r++) {
-            $gpp .= '<row r="' . $r . '">' . sprintf($sel, $r) . '</row>';
-        }
-
-        $this->assertDitolak(self::PESAN_KOLOM, $this->xlsx(['GPP' => $gpp, 'TK' => self::sheetTk()]), 10000);
-    }
-
-    /**
-     * Baris diperiksa dulu untuk semua sheet, baru kolom: pesan tidak bergantung urutan tab (GPP lebar, TK lewat baris).
-     *
-     * @param list<string> $urutan
-     */
-    #[DataProvider('urutanTab')]
-    public function testBarisDiperiksaDuluTanpaBergantungUrutanTab(array $urutan): void
-    {
-        $isi = [
-            'GPP' => '<row r="1">' . self::selHeader(self::headerGpp()) . XlsxMentah::sel('IW1', 'catatan') . '</row>' . XlsxMentah::baris(2, self::dataGpp()),
-            'TK'  => self::sheetTk() . XlsxMentah::baris(8, self::dataTk()),
-        ];
-
-        $this->assertDitolak('Jumlah baris melebihi batas 5 per sheet.', $this->xlsx([$urutan[0] => $isi[$urutan[0]], $urutan[1] => $isi[$urutan[1]]]), 5);
-    }
-
-    /**
-     * @return iterable<string, array{0: list<string>}>
-     */
-    public static function urutanTab(): iterable
-    {
-        yield 'GPP di kiri' => [['GPP', 'TK']];
-        yield 'TK di kiri' => [['TK', 'GPP']];
-    }
-
-    /**
-     * Batas jumlah sel per berkas (semua sheet): di dalam batas baris dan kolom, tetapi 9.000 × 46 = 414.000 sel.
+     * Batas jumlah sel per berkas: di dalam batas baris dan kolom, tetapi 9.000 × 46 = 414.000 sel.
      */
     public function testJumlahSelLewatBatasDitolakSebelumDimuat(): void
     {
@@ -312,16 +320,45 @@ final class PembacaExcelSlipBatasBacaTest extends CIUnitTestCase
             $gpp .= '<row r="' . $r . '">' . sprintf($sel, $r) . '</row>';
         }
 
-        $this->assertDitolak('Jumlah sel melebihi batas 400.000 per berkas.', $this->xlsx(['GPP' => $gpp, 'TK' => self::sheetTk()]), 10000);
+        $this->assertDitolak(self::PESAN_SEL, $this->xlsx(['GPP' => $gpp, 'TK' => self::sheetTk()]));
     }
 
     public function testJumlahSelDihitungDariSemuaSheet(): void
     {
-        $path   = $this->xlsx(['GPP' => XlsxMentah::baris(1, self::headerGpp()) . XlsxMentah::baris(2, self::dataGpp()), 'TK' => self::sheetTk(), 'Lain' => XlsxMentah::baris(1, ['a', 'b'])]);
+        $path   = $this->xlsx(['GPP' => self::sheetGpp(), 'TK' => self::sheetTk(), 'Lain' => XlsxMentah::baris(1, ['a', 'b'])]);
         $jumlah = 2 * count(self::headerGpp()) + 2 * count(self::headerTk()) + 2;
 
-        $this->assertTrue((new PembacaExcelSlip(10000, 256, $jumlah))->baca($path)->valid);
-        $this->assertDitolak('Jumlah sel melebihi batas ' . ($jumlah - 1) . ' per berkas.', $path, 10000, new PembacaExcelSlip(10000, 256, $jumlah - 1));
+        $this->assertDiterima($path, new PembacaExcelSlip(10000, 256, $jumlah));
+        $this->assertDitolak(self::pesanSel($jumlah - 1), $path, new PembacaExcelSlip(10000, 256, $jumlah - 1));
+    }
+
+    /**
+     * Batas sel bawaan naik mengikuti batas baris ((batas baris + 1) × 40) dan tidak turun di bawah hitungan untuk 10.000
+     * baris. Berkas 414.000 sel tanpa sheet GPP/TK: ditolak pemindai pada batas baris 10.000 atau lebih kecil, lolos
+     * pemindai pada 20.000 (lalu berhenti di "sheet tidak ada", tanpa dimuat).
+     */
+    public function testBatasSelBawaanMengikutiBatasBaris(): void
+    {
+        $sel = '';
+
+        for ($k = 1; $k <= 46; $k++) {
+            $sel .= '<c r="' . XlsxMentah::kolom($k) . '%1$d"><v>1</v></c>';
+        }
+
+        $isi = '';
+
+        for ($r = 1; $r <= 9000; $r++) {
+            $isi .= '<row r="' . $r . '">' . sprintf($sel, $r) . '</row>';
+        }
+
+        $path = $this->xlsx(['Lain' => $isi]);
+        unset($isi);
+
+        $this->assertDitolak(self::PESAN_SEL, $path, new PembacaExcelSlip(10000));
+        $this->assertDitolak(self::PESAN_SEL, $path, new PembacaExcelSlip(5));
+
+        $hasil = (new PembacaExcelSlip(20000))->baca($path);
+        $this->assertFalse($hasil->valid, 'lolos pemindai, berhenti di sheet wajib');
     }
 
     /**
@@ -330,57 +367,220 @@ final class PembacaExcelSlipBatasBacaTest extends CIUnitTestCase
      */
     public function testIsiMengembangLewatBatasDitolak(): void
     {
-        $entri                   = XlsxMentah::entri(['GPP' => XlsxMentah::baris(1, self::headerGpp()) . XlsxMentah::baris(2, self::dataGpp()), 'TK' => self::sheetTk()]);
+        $entri                   = XlsxMentah::entri(['GPP' => self::sheetGpp(), 'TK' => self::sheetTk()]);
         $entri['xl/pengisi.xml'] = str_repeat(' ', 33 * 1024 * 1024);
-        $path                    = $this->temp('.xlsx');
-        XlsxMentah::tulisEntri($path, $entri);
+        $path                    = $this->xlsxEntri($entri);
         unset($entri);
         $this->assertLessThan(200_000, (int) filesize($path), 'berkas kecil');
 
-        $this->assertDitolak('Isi berkas terlalu besar sesudah dibuka (maksimal 32 MB).', $path, 10000);
+        $this->assertDitolak('Isi berkas terlalu besar sesudah dibuka (maksimal 32 MB).', $path);
     }
 
     /**
-     * Entri yang akan diubah atau ditolak pemuat sebelum diurai (BOM UTF-16, deklarasi encoding lain, DOCTYPE) membuat
-     * hitungan pemindai tidak bisa dipercaya → berkas ditolak sebagai tidak terbaca, di entri mana pun.
+     * BLOK-4: jutaan elemen kecil di luar `<c>` lolos batas sel dan batas isi, tetapi memakan memori libxml saat pemuat
+     * membangun pohon XML (di luar `memory_limit`). Bobot elemen + atribut seluruh berkas dibatasi.
+     *
+     * @param array<string, string> $entri
      */
-    #[DataProvider('entriTidakDidukung')]
-    public function testEntriYangDiubahPemuatDitolak(string $isi): void
+    #[DataProvider('pengisiElemen')]
+    public function testElemenPengisiLewatAnggaranDitolakSebelumDimuat(array $entri): void
     {
-        $entri                      = XlsxMentah::entri(['GPP' => XlsxMentah::baris(1, self::headerGpp()) . XlsxMentah::baris(2, self::dataGpp()), 'TK' => self::sheetTk()]);
-        $entri['xl/lain/data1.xml'] = $isi;
-        $path                       = $this->temp('.xlsx');
-        XlsxMentah::tulisEntri($path, $entri);
+        $path = $this->xlsxEntri([...XlsxMentah::entri(['GPP' => self::sheetGpp(), 'TK' => self::sheetTk()]), ...$entri]);
+        $this->assertLessThan(200_000, (int) filesize($path), 'berkas kecil');
 
-        $this->assertDitolak(PembacaExcelSlip::PESAN_TIDAK_TERBACA, $path, 10000);
+        $this->assertDitolak(self::PESAN_STRUKTUR, $path);
+    }
+
+    /**
+     * @return iterable<string, array{0: array<string, string>}>
+     */
+    public static function pengisiElemen(): iterable
+    {
+        $buka = XlsxMentah::KEPALA . '<worksheet xmlns="' . XlsxMentah::UTAMA . '">';
+        $data = '<sheetData>' . self::sheetGpp() . '</sheetData></worksheet>';
+
+        yield '3,5 juta elemen kosong di sheetPr' => [['xl/worksheets/sheet1.xml' => $buka . '<sheetPr>' . str_repeat('<x/>', 3_500_000) . '</sheetPr>' . $data]];
+        yield '3,5 juta si kosong di sharedStrings' => [['xl/sharedStrings.xml' => XlsxMentah::KEPALA . '<sst xmlns="' . XlsxMentah::UTAMA . '">' . str_repeat('<si/>', 3_500_000) . '</sst>']];
+        yield '1,2 juta elemen ber-atribut' => [['xl/worksheets/sheet1.xml' => $buka . '<sheetPr>' . str_repeat('<x a="1"/>', 1_200_000) . '</sheetPr>' . $data]];
+    }
+
+    /**
+     * BLOK-5: pemuat mengulang `min..max` untuk setiap `<col>`; 1.000 `<col min="1" max="16383">` dalam berkas 7 KB =
+     * 16 juta iterasi. `max` lebih kecil dari `min` membuat perulangan pemuat tidak pernah berhenti.
+     */
+    #[DataProvider('definisiKolomMahal')]
+    public function testDefinisiKolomMahalDitolakSebelumDimuat(string $cols): void
+    {
+        $path = $this->temp('.xlsx');
+        XlsxMentah::tulis($path, ['GPP' => self::sheetGpp(), 'TK' => self::sheetTk()], ['GPP' => '<cols>' . $cols . '</cols>']);
+        $this->assertLessThan(20_000, (int) filesize($path), 'berkas kecil');
+
+        $mulai = hrtime(true);
+        $this->assertDitolak(self::PESAN_STRUKTUR, $path);
+        $this->assertLessThan(5.0, (hrtime(true) - $mulai) / 1e9);
     }
 
     /**
      * @return iterable<string, array{0: string}>
      */
-    public static function entriTidakDidukung(): iterable
+    public static function definisiKolomMahal(): iterable
+    {
+        yield '1.000 col selebar 16.383' => [str_repeat('<col min="1" max="16383" width="9" customWidth="1"/>', 1000)];
+        yield 'max lebih kecil dari min' => ['<col min="5" max="2" width="9"/>'];
+        yield 'max di luar lembar' => ['<col min="1" max="900000000" width="9"/>'];
+    }
+
+    public function testDefinisiKolomSeluruhLembarDiterima(): void
+    {
+        // `max="16384"`: pemuat berhenti sesudah satu iterasi. Bentuk ini ditulis Excel untuk "seluruh kolom".
+        $path = $this->temp('.xlsx');
+        XlsxMentah::tulis($path, ['GPP' => self::sheetGpp(), 'TK' => self::sheetTk()], ['GPP' => '<cols>' . str_repeat('<col min="1" max="16384" width="9"/>', 500) . '</cols>']);
+
+        $this->assertDiterima($path);
+    }
+
+    // ------------------------------------------------------------------------------------------------------------------
+    // Entri yang diperlakukan khusus oleh pemuat (encoding, DOCTYPE, galat urai)
+    // ------------------------------------------------------------------------------------------------------------------
+
+    /**
+     * Berkas sah dengan entri tambahan yang tidak mengganggu: tetap diterima.
+     *
+     * @param array<string, string> $entri
+     */
+    #[DataProvider('entriTambahanSah')]
+    public function testEntriTambahanSahTetapDiterima(array $entri): void
+    {
+        $this->assertDiterima($this->xlsxEntri([...XlsxMentah::entri(['GPP' => self::sheetGpp(), 'TK' => self::sheetTk()]), ...$entri]));
+    }
+
+    /**
+     * @return iterable<string, array{0: array<string, string>}>
+     */
+    public static function entriTambahanSah(): iterable
     {
         $lembar = '<worksheet xmlns="' . XlsxMentah::UTAMA . '"><sheetData/></worksheet>';
 
-        yield 'BOM UTF-16LE' => ["\xFF\xFE" . mb_convert_encoding('<?xml version="1.0" encoding="UTF-16"?>' . $lembar, 'UTF-16LE', 'UTF-8')];
-        yield 'deklarasi UTF-7' => ['<?xml version="1.0" encoding="UTF-7"?>' . $lembar];
-        yield 'deklarasi sesudah spasi panjang' => ['<?xml version="1.0" encoding' . str_repeat(' ', 70_000) . '="ISO-8859-1"?>' . $lembar];
-        yield 'DOCTYPE' => ['<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE worksheet [<!ENTITY a "aaaa">]>' . $lembar];
+        yield 'SVG Illustrator ber-DOCTYPE dan iso-8859-1' => [['xl/media/image1.svg' => '<?xml version="1.0" encoding="iso-8859-1"?><!-- Generator: Adobe Illustrator 19.0.0 -->'
+            . '<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd"><svg xmlns="http://www.w3.org/2000/svg"/>']];
+        yield 'customXml UTF-16 ber-BOM' => [['customXml/item1.xml' => "\xFF\xFE" . mb_convert_encoding('<?xml version="1.0" encoding="utf-16"?><b:Sources xmlns:b="http://schemas.openxmlformats.org/officeDocument/2006/bibliography"/>', 'UTF-16LE', 'UTF-8')]];
+        // BOM menang atas deklarasi, di libxml maupun di pemuat (konversi menurut BOM, lalu deklarasi dibuang).
+        yield 'BOM UTF-16 dengan deklarasi encoding lain' => [['xl/lain/data1.xml' => "\xFF\xFE" . mb_convert_encoding('<?xml version="1.0" encoding="ISO-8859-1"?>' . $lembar, 'UTF-16LE', 'UTF-8')]];
+        yield 'deklarasi alias UTF8' => [['xl/lain/data1.xml' => '<?xml version="1.0" encoding="UTF8"?>' . $lembar]];
+        yield 'teks sel memuat encoding="latin1"' => [['xl/lain/data1.xml' => XlsxMentah::lembar('<row r="1">' . XlsxMentah::sel('A1', 'catatan: encoding="latin1" pada berkas lama') . '</row>')]];
+        yield 'gambar biner' => [['xl/media/image1.png' => "\x89PNG\r\n\x1a\n" . str_repeat("\x00\xFF<c>", 500)]];
+        yield 'entri kosong' => [['xl/lain/kosong.xml' => '']];
     }
 
-    private function assertDitolak(string $pesan, string $path, int $maksBaris, ?PembacaExcelSlip $pembaca = null): void
+    /**
+     * Entri yang hitungannya tidak bisa dipercaya → berkas ditolak sebagai tidak terbaca, di entri mana pun:
+     * deklarasi encoding selain UTF-8 (pemuat mengonversi isinya sebelum diurai) dan galat urai di tengah entri XML
+     * (parser pemindai berhenti, sedangkan SimpleXML milik pemuat bisa meneruskan).
+     */
+    #[DataProvider('entriTidakTerpercaya')]
+    public function testEntriTidakTerpercayaDitolak(string $isi): void
+    {
+        $entri                      = XlsxMentah::entri(['GPP' => self::sheetGpp(), 'TK' => self::sheetTk()]);
+        $entri['xl/lain/data1.xml'] = $isi;
+
+        $this->assertDitolak(PembacaExcelSlip::PESAN_TIDAK_TERBACA, $this->xlsxEntri($entri));
+    }
+
+    /**
+     * @return iterable<string, array{0: string}>
+     */
+    public static function entriTidakTerpercaya(): iterable
+    {
+        $lembar = '<worksheet xmlns="' . XlsxMentah::UTAMA . '"><sheetData/></worksheet>';
+        $sel    = str_repeat('<row><c><v>1</v></c></row>', 50_000);
+
+        yield 'deklarasi UTF-7' => ['<?xml version="1.0" encoding="UTF-7"?>' . $lembar];
+        yield 'deklarasi sesudah spasi panjang' => ['<?xml version="1.0" encoding' . str_repeat(' ', 70_000) . '="ISO-8859-1"?>' . $lembar];
+        yield 'prefiks namespace tak dideklarasikan sebelum data' => ['<worksheet xmlns="' . XlsxMentah::UTAMA . '"><foo:bar/><sheetData>' . $sel . '</sheetData></worksheet>'];
+    }
+
+    /**
+     * Entri UTF-16 ber-BOM tanpa deklarasi encoding diurai apa adanya, jadi selnya ikut dihitung.
+     */
+    public function testEntriUtf16TanpaDeklarasiIkutDihitung(): void
+    {
+        $entri                      = XlsxMentah::entri(['GPP' => self::sheetGpp(), 'TK' => self::sheetTk()]);
+        $entri['xl/lain/data1.xml'] = "\xFF\xFE" . mb_convert_encoding('<worksheet xmlns="' . XlsxMentah::UTAMA . '"><sheetData>' . XlsxMentah::baris(1, ['a', 'b', 'c']) . '</sheetData></worksheet>', 'UTF-16LE', 'UTF-8');
+        $jumlah                     = 2 * count(self::headerGpp()) + 2 * count(self::headerTk()) + 3;
+        $path                       = $this->xlsxEntri($entri);
+
+        $this->assertDiterima($path, new PembacaExcelSlip(10000, 256, $jumlah));
+        $this->assertDitolak(self::pesanSel($jumlah - 1), $path, new PembacaExcelSlip(10000, 256, $jumlah - 1));
+    }
+
+    // ------------------------------------------------------------------------------------------------------------------
+    // .xls dan reader terkunci
+    // ------------------------------------------------------------------------------------------------------------------
+
+    public function testXlsBarisMelebihiBatasDitolak(): void
+    {
+        $path = $this->xls();
+
+        $this->assertDitolak('Jumlah baris melebihi batas 2 per sheet.', $path, new PembacaExcelSlip(2));
+        $this->assertDiterima($path, new PembacaExcelSlip(3));
+    }
+
+    /**
+     * `.xls`: batas sel memakai baris × kolom sheet GPP dan TK (4 × 26 + 2 × 9).
+     */
+    public function testXlsJumlahSelLewatBatasDitolak(): void
+    {
+        $path   = $this->xls();
+        $jumlah = 4 * count(self::headerGpp()) + 2 * count(self::headerTk());
+
+        $this->assertDiterima($path, new PembacaExcelSlip(10000, 256, $jumlah));
+        $this->assertDitolak(self::pesanSel($jumlah - 1), $path, new PembacaExcelSlip(10000, 256, $jumlah - 1));
+    }
+
+    /**
+     * [V2] Berkas yang bukan Excel tetapi dikenali reader lain (HTML) tidak lagi dibaca: reader dikunci ke Xlsx/Xls.
+     */
+    public function testBerkasHtmlBerkedokXlsTidakDibaca(): void
+    {
+        $path = $this->temp('.xls');
+        file_put_contents($path, '<html><body><table><tr><td>nip</td><td>bulan</td></tr></table></body></html>');
+
+        $this->assertDitolak(PembacaExcelSlip::PESAN_TIDAK_TERBACA, $path);
+    }
+
+    // ------------------------------------------------------------------------------------------------------------------
+
+    private function assertDitolak(string $pesan, string $path, ?PembacaExcelSlip $pembaca = null): void
     {
         memory_reset_peak_usage();
         $awal = memory_get_peak_usage();
 
         try {
-            ($pembaca ?? new PembacaExcelSlip($maksBaris))->baca($path);
+            ($pembaca ?? new PembacaExcelSlip(10000))->baca($path);
             $this->fail('berkas harus ditolak');
         } catch (BerkasImporDitolak $e) {
             $this->assertSame($pesan, $e->getMessage());
         }
 
         $this->assertLessThan(self::BATAS_MEMORI, memory_get_peak_usage() - $awal, 'kenaikan puncak memori');
+    }
+
+    /**
+     * @return array{GPP: array<int, list<mixed>>, TK: array<int, list<mixed>>}
+     */
+    private function assertDiterima(string $path, ?PembacaExcelSlip $pembaca = null): array
+    {
+        $hasil = ($pembaca ?? new PembacaExcelSlip(10000))->baca($path);
+        $this->assertTrue($hasil->valid);
+        /** @var array{GPP: array<int, list<mixed>>, TK: array<int, list<mixed>>} $sheet */
+        $sheet = $hasil->nilai;
+
+        return $sheet;
+    }
+
+    private static function pesanSel(int $batas): string
+    {
+        return 'Jumlah sel melebihi batas ' . number_format($batas, 0, ',', '.') . ' per berkas. Hapus sheet atau kolom yang tidak dipakai, lalu unggah ulang.';
     }
 
     /**
@@ -416,13 +616,21 @@ final class PembacaExcelSlipBatasBacaTest extends CIUnitTestCase
     }
 
     /**
-     * Isi `<sheetData>` GPP padat: header + 200.000 baris data (2 sel per baris).
+     * Isi `<sheetData>` GPP sah: header + satu baris data.
+     */
+    private static function sheetGpp(): string
+    {
+        return XlsxMentah::baris(1, self::headerGpp()) . XlsxMentah::baris(2, self::dataGpp());
+    }
+
+    /**
+     * Isi `<sheetData>` GPP padat: header + 250.000 baris data (2 sel per baris) = 500.003 sel.
      */
     private static function gppPadat(): string
     {
         $gpp = XlsxMentah::baris(1, ['nip', 'bulan', 'tahun']);
 
-        for ($r = 2; $r <= 200_001; $r++) {
+        for ($r = 2; $r <= 250_001; $r++) {
             $gpp .= '<row r="' . $r . '">' . XlsxMentah::sel('A' . $r, self::NIP) . XlsxMentah::sel('B' . $r, 9) . '</row>';
         }
 
@@ -451,6 +659,34 @@ final class PembacaExcelSlipBatasBacaTest extends CIUnitTestCase
     {
         $path = $this->temp('.xlsx');
         XlsxMentah::tulis($path, $sheet);
+
+        return $path;
+    }
+
+    /**
+     * @param array<string, string> $entri
+     */
+    private function xlsxEntri(array $entri): string
+    {
+        $path = $this->temp('.xlsx');
+        XlsxMentah::tulisEntri($path, $entri);
+
+        return $path;
+    }
+
+    /**
+     * `.xls` sah: GPP header + 3 baris data, TK header + 1 baris data.
+     */
+    private function xls(): string
+    {
+        $buku = new Spreadsheet();
+        $gpp  = $buku->getActiveSheet()->setTitle(KolomGaji::SHEET_GPP);
+        $gpp->fromArray([self::headerGpp(), self::dataGpp(), self::dataGpp(), self::dataGpp()], null, 'A1', true);
+        $tk = $buku->createSheet()->setTitle(KolomGaji::SHEET_TK);
+        $tk->fromArray([self::headerTk(), self::dataTk()], null, 'A1', true);
+        $path = $this->temp('.xls');
+        IOFactory::createWriter($buku, 'Xls')->save($path);
+        $buku->disconnectWorksheets();
 
         return $path;
     }
