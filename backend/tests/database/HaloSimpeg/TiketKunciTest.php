@@ -155,10 +155,9 @@ final class TiketKunciTest extends DatabaseTestCase
         $nip     = $this->buatPegawai(['nama' => 'Pelapor Hilang']);
         $pemilik = $this->buatAkunUntuk($nip, Role::PEGAWAI);
         $fk      = $this->fkLayananDitahan();
-        $fk->up();
-        $lain   = Database::connect('tests', false);
-        $sekali = false;
-        $balap  = static function (Query $q) use ($lain, $nip, &$sekali): void {
+        $lain    = Database::connect('tests', false);
+        $sekali  = false;
+        $balap   = static function (Query $q) use ($lain, $nip, &$sekali): void {
             if (! $sekali && str_contains($q->getQuery(), 'LOCK IN SHARE MODE')) {
                 $sekali = true;
                 // Hapus fisik tanpa menunggu anak lain (pmj/pengguna) — yang diuji hanya FK tiket → pegawai.
@@ -167,9 +166,10 @@ final class TiketKunciTest extends DatabaseTestCase
                 $lain->query('SET FOREIGN_KEY_CHECKS = 1');
             }
         };
-        Events::on('DBQuery', $balap);
 
         try {
+            $fk->up();
+            Events::on('DBQuery', $balap);
             $res = $this->sebagai($pemilik)->post(self::URL . 'tiket', ['id_question_category' => $k, 'subject' => 'S', 'msg' => 'M']);
         } finally {
             Events::removeListener('DBQuery', $balap);

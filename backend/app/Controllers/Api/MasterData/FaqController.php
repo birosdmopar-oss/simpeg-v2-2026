@@ -59,7 +59,7 @@ class FaqController extends BaseMasterController
         $auth = service('authContext');
 
         return $this->respondSuccess(
-            service('faqService')->rate($id, $auth->nip(), $auth->role(), (int) $data['rate'], $payload['reason'] ?? null),
+            service('faqService')->rate($id, $auth->nip(), $auth->idPengguna(), $auth->role(), (int) $data['rate'], $payload['reason'] ?? null),
             201,
         );
     }

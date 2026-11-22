@@ -189,9 +189,12 @@ class FaqService
      * Simpan penilaian pegawai untuk artikel yang tampil. Satu kali per artikel per pegawai, tidak bisa diubah.
      * rate 1 (Membantu) → reason NULL; rate 2 (Kurang Membantu) → reason wajib (trim, maks 255 byte).
      *
+     * @param string|null $nip        claim `nip` token
+     * @param int|null    $idPengguna claim `sub` token (akun pemilik sesi)
+     *
      * @return array{rated: true, rate: int}
      */
-    public function rate(string $id, ?string $nip, ?int $role, int $rate, mixed $reason): array
+    public function rate(string $id, ?string $nip, ?int $idPengguna, ?int $role, int $rate, mixed $reason): array
     {
         // Lapis kedua; lapis utama filter role di routing.
         if ($nip === null || $nip === '' || ! $this->canRate($role)) {
@@ -202,9 +205,10 @@ class FaqService
 
         // CR-171 (G2): NIP claim token bisa basi — sesudah koreksi NIP (B-06) `pengguna.nip` pindah ke NIP baru, sesudah hapus
         // pegawai di-NULL-kan, sedangkan access token lama tetap membawa NIP lama sampai kedaluwarsa. Tanpa cek ini token lama
-        // menulis rating yatim, rating ganda (rating lama sudah ikut pindah ke NIP baru), dan `created_by` NULL. Ditolak 403
-        // seperti penolakan identitas penilai di atas.
-        $idAktor = $this->actorId($nip) ?? throw self::sesiBasi();
+        // menulis rating yatim, rating ganda (rating lama sudah ikut pindah ke NIP baru), dan `created_by` NULL. Akun pemilik
+        // token (`sub`) harus masih memegang NIP claim — bukan sembarang akun ber-NIP itu, supaya token basi tidak lolos bila NIP
+        // lama kini dipegang akun lain. Ditolak 403 seperti penolakan identitas penilai di atas.
+        $idAktor = $this->akunPemegangNip($idPengguna, $nip) ?? throw self::sesiBasi();
 
         if ($this->rates()->findRating($articleId, $nip) !== null) {
             throw self::alreadyRated();
@@ -213,8 +217,9 @@ class FaqService
         $reason = $rate === FaqRateModel::RATE_NOT_HELPFUL ? $this->normalizeReason($reason) : null;
 
         // MAKE-015: `nip` selalu dari claim sesi akun (bukan input), dan NIP akun sudah divalidasi terdaftar di `pegawai`
-        // saat akun dibuat/ditautkan. Balapan (pegawai dihapus/dikoreksi di sela cek dan INSERT) ditolak FK masuk DBV-019
-        // `fk_nip_faqrate_to_peg` (1452) → 403 yang sama (CR-171).
+        // saat akun dibuat/ditautkan. CR-171: jaring 1452 di bawah aktif sesudah FK ditahan DBV-019 `fk_nip_faqrate_to_peg`
+        // dipasang (403 yang sama); sampai saat itu balapan sempit antara cek di atas dan INSERT (pegawai dihapus/dikoreksi di
+        // selanya) masih bisa menulis rating ber-NIP lama.
 
         try {
             $this->rates()->record([
@@ -407,12 +412,17 @@ class FaqService
     }
 
     /**
-     * id_pengguna aktor untuk kolom audit legacy created_by (null bila akun tidak ditemukan).
+     * id_pengguna aktor untuk kolom audit legacy created_by: akun pemilik token ($idPengguna = claim `sub`) yang masih memegang
+     * $nip. Null bila sub kosong atau akun itu tidak lagi ber-NIP $nip (sesi basi, CR-171).
      */
-    private function actorId(string $nip): ?int
+    private function akunPemegangNip(?int $idPengguna, string $nip): ?int
     {
+        if ($idPengguna === null) {
+            return null;
+        }
+
         /** @var array<string, mixed>|null $row */
-        $row = $this->db->table('pengguna')->select('id_pengguna')->where('nip', $nip)->get()->getRowArray();
+        $row = $this->db->table('pengguna')->select('id_pengguna')->where('id_pengguna', $idPengguna)->where('nip', $nip)->get()->getRowArray();
 
         return $row === null ? null : (int) $row['id_pengguna'];
     }

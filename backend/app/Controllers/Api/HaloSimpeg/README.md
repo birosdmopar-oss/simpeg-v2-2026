@@ -310,6 +310,9 @@ Nama pengirim pesan baru = nama bergelar bila akun punya data pegawai (B-28), se
 - `id_question_category` kategori **aktif**; `subject` wajib ≤ 250; `msg` wajib (dicek sesudah trim **Unicode**, CR-148) dan ≤ 5.000 karakter nilai yang disimpan (sesudah trim ASCII; spasi Unicode di tepi ikut dihitung); `arsip` opsional.
 - Kategori aktif dicek ulang di dalam transaksi di bawah kunci bersama (`LOCK IN SHARE MODE`) sebelum INSERT; kategori yang
   dinonaktifkan/dihapus di sela itu (termasuk FK 1452) → 422 `errors.id_question_category` "Kategori tidak tersedia.".
+- FK 1452 karena pelapor sudah tidak ada di `pegawai` (FK ditahan DBV-022 `fk_nip_disiplin_ticket_to_pegawai`, aktif sesudah
+  dipasang; pegawai dihapus/dikoreksi NIP di sela cek awal dan INSERT) → 422 "Data pegawai tidak ditemukan didalam sistem."
+  (sama dengan cek awal), bukan pesan kategori (CR-171).
 - Tersimpan: `status = 0`, `allow_reply = 1`, `is_read = 1`, `is_read_off = 2`, `notify_pic = 2`, `receiver = 0`, `sender_name` =
   nama bergelar, `nip`, snapshot `jabatan`/`satker` jabatan aktif (AC-E03.8) + pesan pertama, dalam satu transaksi. Tidak menulis
   `inbox`/`inbox_msg` (BP8-1, AC-E03.2).

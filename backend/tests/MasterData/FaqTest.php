@@ -612,9 +612,10 @@ final class FaqTest extends DatabaseTestCase
 
         // Lapis service (tanpa HTTP).
         $service = service('faqService');
+        $idPeg   = $this->penggunaId(AuthSeeder::nipForRole(Role::PEGAWAI));
         $cases   = [
             'search' => ['Kata kunci pencarian tidak valid.', static fn () => $service->browse("sandi\xFF")],
-            'reason' => ['Alasan tidak valid.', static fn () => $service->rate('1', AuthSeeder::nipForRole(Role::PEGAWAI), Role::PEGAWAI, 2, "\xFF\xFF")],
+            'reason' => ['Alasan tidak valid.', static fn () => $service->rate('1', AuthSeeder::nipForRole(Role::PEGAWAI), $idPeg, Role::PEGAWAI, 2, "\xFF\xFF")],
         ];
 
         foreach ($cases as $field => [$message, $call]) {
@@ -805,10 +806,10 @@ final class FaqTest extends DatabaseTestCase
         };
         (new ReflectionProperty(FaqService::class, 'rates'))->setValue($service, $blind);
 
-        $this->assertSame(['rated' => true, 'rate' => 1], $service->rate('1', $nip, Role::PEGAWAI, 1, null));
+        $this->assertSame(['rated' => true, 'rate' => 1], $service->rate('1', $nip, $this->penggunaId($nip), Role::PEGAWAI, 1, null));
 
         try {
-            $service->rate('1', $nip, Role::PEGAWAI, 2, 'balapan');
+            $service->rate('1', $nip, $this->penggunaId($nip), Role::PEGAWAI, 2, 'balapan');
             $this->fail('PK ganda harus diterjemahkan menjadi ValidationException (422).');
         } catch (ValidationException $e) {
             $this->assertSame(['rate' => ['Artikel ini sudah Anda nilai.']], $e->getErrors());

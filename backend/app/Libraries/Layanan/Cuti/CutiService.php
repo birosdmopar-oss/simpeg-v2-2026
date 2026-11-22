@@ -1355,8 +1355,11 @@ class CutiService
      */
     private function galatTulis(string $pesan): \RuntimeException
     {
-        if ((int) $this->db->error()['code'] === self::ER_FK_TANPA_INDUK) {
-            return new DatabaseException($pesan, self::ER_FK_TANPA_INDUK);
+        $galat = $this->db->error();
+
+        if ((int) $galat['code'] === self::ER_FK_TANPA_INDUK) {
+            // Pesan MySQL (nama constraint) ikut, supaya log 500 untuk FK non-approver menyebut constraint-nya.
+            return new DatabaseException($pesan . ' ' . $galat['message'], self::ER_FK_TANPA_INDUK);
         }
 
         return new \RuntimeException($pesan);
