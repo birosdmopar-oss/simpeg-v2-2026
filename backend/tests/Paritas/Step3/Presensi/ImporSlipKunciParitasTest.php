@@ -20,7 +20,7 @@ use Throwable;
 
 /**
  * CR-164 butir 8 (pagar paritas step 3, test karakterisasi): kunci baris commit impor slip vs koneksi DB kedua. Commit
- * memegang `SELECT … WHERE nip IN (…) FOR UPDATE` (ImporSlipService::kunciSudahAda, ImporSlipService.php:390) selama
+ * memegang `SELECT … WHERE nip IN (…) FOR UPDATE` (ImporSlipService::kunciSudahAda, ImporSlipService.php:427-428) selama
  * transaksi; koneksi kedua (sesi `innodb_lock_wait_timeout = 1`) menjalankan UPDATE bentuk "buka slip"
  * (SlipGajiService.php:134: `WHERE id = ? AND viewed_at IS NULL`) dari seam `kaitSebelumTulis`, saat kunci commit masih
  * dipegang. Koneksi kedua butuh data ter-commit → `db-isolasi-penuh`; data & koneksi dibersihkan di finally/tearDown.
@@ -83,11 +83,12 @@ final class ImporSlipKunciParitasTest extends DatabaseTestCase
     }
 
     /**
-     * Perilaku saat ini; akan diubah di CR-167 (#18.2).
+     * Perilaku yang dipertahankan: CR-167 memutuskan TIDAK mempersempit predikat kunci (docblock
+     * `ImporSlipService::kunciSudahAda`, ImporSlipService.php:402-416), jadi slip periode lain NIP yang sama ikut terkunci.
      */
-    public function testPerilakuSebelumCr167BukaSlipPeriodeLainIkutMenunggu(): void
+    public function testBukaSlipPeriodeLainNipSamaIkutMenungguKunciCommit(): void
     {
-        // Perilaku saat ini; akan diubah di CR-167 (#18.2).
+        // Dipertahankan sesudah CR-167 (predikat `nip IN (…)`, bukan per periode).
         [$nip, $admin, $token] = $this->siapkan();
         $idAgustus             = $this->slip($nip, 8);
         $this->slip($nip, 9);
@@ -157,7 +158,7 @@ final class ImporSlipKunciParitasTest extends DatabaseTestCase
 
         $commit = (new ImporSlipService(null, null, null, null, $kait))->commit($this->auth($admin), $token, true);
 
-        // perilaku sekarang (dikunci CR-164): FOR UPDATE `WHERE nip IN (…)` (ImporSlipService.php:390) memegang kunci celah
+        // perilaku sekarang (dikunci CR-164): FOR UPDATE `WHERE nip IN (…)` (ImporSlipService.php:427-428) memegang kunci celah
         // indeks NIP → INSERT tuple baru dari koneksi lain menunggu lalu 1205; commit menyisip September tanpa konflik.
         $this->assertSame(self::ER_LOCK_WAIT_TIMEOUT, $kode);
         $this->assertSame([1, 1], [$commit['disisip'], $commit['diperbarui']]);
@@ -180,7 +181,7 @@ final class ImporSlipKunciParitasTest extends DatabaseTestCase
             (new ImporSlipService())->commit($this->auth($admin), $token, true);
             $this->fail('commit harus gagal karena lock wait');
         } catch (ApiException $e) {
-            // perilaku sekarang (dikunci CR-164): ImporSlipService.php:241-245 — 1205 tidak dipetakan khusus (bukan 409/503),
+            // perilaku sekarang (dikunci CR-164): ImporSlipService.php:253-258 — 1205 tidak dipetakan khusus (bukan 409/503),
             // jatuh ke 500 generik "gagal commit".
             $this->assertSame([500, ImporSlipService::PESAN_GAGAL_COMMIT, null], [$e->getStatusCode(), $e->getMessage(), $e->getKode()]);
         } finally {

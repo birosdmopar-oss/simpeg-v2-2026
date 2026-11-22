@@ -21,9 +21,10 @@ use Throwable;
  * Titik invalidasi (semua `invalidateMatching('dashboard_stat_*')`):
  *  (a) listener `Events::on(RiwayatEngine::EVENT_NOTIFIKASI, [StatistikCache::class, 'invalidasiDariEvent'])` di
  *      `Config\Events` — setiap transisi riwayat/snapshot;
- *  (b) hook `afterInsert/afterUpdate/afterDelete` `PegawaiModel::invalidasiStatistik()` — tulis tabel `pegawai`.
- * Jalur tulis lain (mis. `RiwayatEngine::tambah` alur Admin yang langsung Disetujui tanpa event, SiklusPegawai, koreksi
- * NIP) diterima basi paling lama TTL (keputusan reviewer CR 21-10-2026; PRD §13 pertanyaan terbuka).
+ *  (b) hook `afterInsert/afterUpdate/afterDelete` `PegawaiModel::invalidasiStatistik()` — tulis tabel `pegawai`
+ *      (termasuk `SiklusPegawai`, yang menulis lewat `PegawaiModel`).
+ * Jalur tulis lain (mis. `RiwayatEngine::tambah` alur Admin yang langsung Disetujui tanpa event, koreksi NIP) diterima
+ * basi paling lama TTL (keputusan reviewer CR 21-10-2026; PRD §13 pertanyaan terbuka).
  * Kegagalan cache (mis. folder tidak bisa ditulis) hanya dicatat ke log; respons tidak berubah.
  */
 final class StatistikCache
@@ -92,10 +93,11 @@ final class StatistikCache
     }
 
     /**
-     * Angka kanonik (tanpa nol di depan, tanpa spasi) → int; selain itu null — sama dengan `PegawaiScope` (fail-closed).
+     * Angka kanonik POSITIF (tanpa nol di depan, tanpa spasi, bukan `'0'`) → int; selain itu null — sama dengan
+     * `PegawaiScope::keInt` (fail-closed, CR-178).
      */
     private static function keInt(?string $nilai): ?int
     {
-        return $nilai !== null && preg_match('/^(0|[1-9][0-9]*)$/', $nilai) === 1 ? (int) $nilai : null;
+        return $nilai !== null && preg_match('/^[1-9][0-9]*$/', $nilai) === 1 ? (int) $nilai : null;
     }
 }

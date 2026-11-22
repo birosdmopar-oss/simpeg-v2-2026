@@ -125,7 +125,7 @@ final class LkhUrutanParitasTest extends DatabaseTestCase
         $y  = $this->lkh($b1, '2026-10-02', LkhService::MENUNGGU, $this->nipAtasan);
 
         // perilaku sekarang (dikunci CR-164): status '' (string kosong) tidak masuk 0..3 → semua status tampil,
-        // sedangkan status tidak dikirim → bawaan Menunggu (LkhService.php:118-120).
+        // sedangkan status tidak dikirim → bawaan Menunggu (LkhService.php:119-123).
         $this->assertSame([$y, $x], array_column($this->svc()->verifikasi($this->atasan, ['status' => ''])['items'], 'id'));
         $this->assertSame([$y], array_column($this->svc()->verifikasi($this->atasan)['items'], 'id'));
     }

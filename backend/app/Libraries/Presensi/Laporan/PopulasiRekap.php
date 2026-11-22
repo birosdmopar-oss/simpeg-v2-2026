@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Libraries\Presensi\Laporan;
 
+use App\Libraries\Kepegawaian\Riwayat\Definisi\Jabatan;
 use App\Libraries\Kepegawaian\Struktur\StrukturService;
 use App\Libraries\Waktu\StempelUtc;
 use CodeIgniter\Database\BaseConnection;
@@ -21,7 +22,9 @@ use CodeIgniter\Database\BaseConnection;
  *   **awal** bulan [K]; jabatan dari `riwayat_mutasi_jabatan` `jenis_jabatan = 2`, `tmtsk ≤` awal bulan; tanpa filter jenis
  *   pegawai & lingkup.
  * - Urutan [K `:6607-6611`]: `kelas_jabatan` turun, `gol_ruang` turun (teks), TMT pangkat naik, `id_satker` naik; lalu NIP
- *   naik [V2] agar stabil. Daftar NIP tester legacy tidak di-port (F5B-12).
+ *   naik [V2] agar stabil. Pegawai PPPK (`id_jenis_pegawai` 6) yang punya jabatan memakai `gol_pppk` jabatan itu sebagai
+ *   golongan urutan, dan di DH juga `tmtsk` jabatan sebagai TMT urutan [K `:6581-6584`; IL hanya golongan `:6742-6744`]
+ *   (CR-178). Daftar NIP tester legacy tidak di-port (F5B-12).
  */
 final class PopulasiRekap
 {
@@ -39,14 +42,14 @@ final class PopulasiRekap
     public function dh(string $awal, string $akhir, LingkupLaporan $lingkup, array $jenisPegawai): array
     {
         $pegawai = $this->db->table('pegawai')
-            ->select('nip, nama, glr_awal, glr_akhir, created_at')
+            ->select('nip, nama, glr_awal, glr_akhir, created_at, id_jenis_pegawai')
             ->groupStart()->where('status', 1)->orGroupStart()->where('status', 2)->where('tmt_status >', $awal)->groupEnd()->groupEnd()
             ->where('created_at <', StempelUtc::awalHariBerikut($akhir)) // DATE(created_at) <= akhir, WIB atas UTC (CR-083)
             ->whereIn('id_jenis_pegawai', $jenisPegawai === [] ? [0] : $jenisPegawai)
             ->orderBy('nip', 'ASC')
             ->get()->getResultArray();
 
-        return $this->lengkapi($pegawai, 1, $akhir, $awal, $lingkup);
+        return $this->lengkapi($pegawai, 1, $akhir, $awal, true, $lingkup);
     }
 
     /**
@@ -55,7 +58,7 @@ final class PopulasiRekap
     public function il(string $awal): array
     {
         $pegawai = $this->db->table('pegawai peg')
-            ->select('peg.nip, peg.nama, peg.glr_awal, peg.glr_akhir, peg.created_at')
+            ->select('peg.nip, peg.nama, peg.glr_awal, peg.glr_akhir, peg.created_at, peg.id_jenis_pegawai')
             ->join('pegawai_mutasi_jabatan pmj', 'pmj.nip = peg.nip', 'inner')
             ->groupStart()->where('peg.status', 1)->orGroupStart()->where('peg.status', 2)->where('peg.tmt_status >', $awal)->groupEnd()->groupEnd()
             ->where('peg.created_at <', StempelUtc::awalHariBerikut($awal)) // DATE(created_at) <= awal, WIB atas UTC (CR-083)
@@ -63,7 +66,7 @@ final class PopulasiRekap
             ->orderBy('peg.nip', 'ASC')
             ->get()->getResultArray();
 
-        return $this->lengkapi($pegawai, 2, $awal, $awal);
+        return $this->lengkapi($pegawai, 2, $awal, $awal, false);
     }
 
     /**
@@ -75,13 +78,13 @@ final class PopulasiRekap
      *
      * @return list<array{nip: string, nama: string, jabatan: string, id_unit: int|null, id_satker: int|null, unit: string, satker: string, dibuat: string}>
      */
-    private function lengkapi(array $pegawai, int $jenisJabatan, string $batasJabatan, string $batasPangkat, ?LingkupLaporan $lingkup = null): array
+    private function lengkapi(array $pegawai, int $jenisJabatan, string $batasJabatan, string $batasPangkat, bool $tmtPppkDariJabatan, ?LingkupLaporan $lingkup = null): array
     {
         $hasil = [];
 
         foreach (array_chunk($pegawai, self::BATCH_NIP) as $batch) {
             $nip     = array_map(static fn (array $p): string => (string) $p['nip'], $batch);
-            $jabatan = $this->terbaru('riwayat_mutasi_jabatan', 'id_riwayat_mutasi_jabatan', 'nip, jabatan, id_unit, id_satker, unit, satker, kelas_jabatan', $nip, $batasJabatan, ['jenis_jabatan' => $jenisJabatan]);
+            $jabatan = $this->terbaru('riwayat_mutasi_jabatan', 'id_riwayat_mutasi_jabatan', 'nip, jabatan, id_unit, id_satker, unit, satker, kelas_jabatan, gol_pppk, tmtsk', $nip, $batasJabatan, ['jenis_jabatan' => $jenisJabatan]);
             $lolos   = [];
 
             foreach ($batch as $p) {
@@ -98,6 +101,10 @@ final class PopulasiRekap
                     'satker'    => (string) ($j['satker'] ?? ''),
                     'dibuat'    => (string) ($p['created_at'] ?? ''),
                     '_kelas'    => (int) ($j['kelas_jabatan'] ?? 0),
+                    // PPPK ber-jabatan: golongan urutan dari jabatan, bukan riwayat_kp; TMT juga dari jabatan hanya di DH
+                    // [K `L_employee.php:6581-6584` DH, `:6742-6744` IL] (CR-178)
+                    '_pppk' => (int) ($p['id_jenis_pegawai'] ?? 0) === Jabatan::JENIS_PEGAWAI_PPPK && $j !== []
+                        ? [(string) ($j['gol_pppk'] ?? ''), $tmtPppkDariJabatan ? (string) ($j['tmtsk'] ?? '') : null] : null,
                 ];
 
                 if ($lingkup === null || $lingkup->mencakup($baris)) {
@@ -108,10 +115,12 @@ final class PopulasiRekap
             $pangkat = $this->terbaru('riwayat_kp', 'id_riwayat_kp', 'nip, gol_ruang, tmtsk', array_column($lolos, 'nip'), $batasPangkat, []);
 
             foreach ($lolos as $baris) {
-                $k       = $pangkat[$baris['nip']] ?? [];
+                $k    = $pangkat[$baris['nip']] ?? [];
+                $pppk = $baris['_pppk'];
+                unset($baris['_pppk']);
                 $hasil[] = $baris + [
-                    '_gol' => (string) ($k['gol_ruang'] ?? ''),
-                    '_tmt' => (string) ($k['tmtsk'] ?? '9999-12-31'),
+                    '_gol' => $pppk[0] ?? (string) ($k['gol_ruang'] ?? ''),
+                    '_tmt' => $pppk[1] ?? (string) ($k['tmtsk'] ?? '9999-12-31'),
                 ];
             }
         }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Paritas\Step3\Kepegawaian;
 
 use App\Constants\Role;
+use App\Exceptions\ForbiddenException;
 use App\Libraries\Auth\AuthContext;
 use App\Libraries\CacheService;
 use App\Libraries\Dashboard\Statistik\StatistikCache;
@@ -114,8 +115,24 @@ final class StatistikCacheParitasTest extends DatabaseTestCase
         $this->assertSame('none', StatistikCache::segmenScope($this->auth(Role::ADMIN_SATKER)));
         $this->assertSame('none', StatistikCache::segmenScope($this->auth(Role::PEGAWAI, ['id_satker' => '7'])));
         $this->assertSame('none', StatistikCache::segmenScope(new AuthContext()));
-        // perilaku sekarang (dikunci CR-164): satker '0' dianggap angka kanonik → segmen 's0' (StatistikCache.php:54-56, :99).
-        $this->assertSame('s0', StatistikCache::segmenScope($this->auth(Role::ADMIN_SATKER, ['id_satker' => '0'])));
+        // CR-178 (perubahan disengaja dari kunci CR-164 's0'): '0' bukan angka kanonik positif, sama dengan
+        // PegawaiScope::keInt yang menolak nilai ≤ 0 → fail-closed, tidak ada segmen 's0'/'u0'.
+        $this->assertSame('none', StatistikCache::segmenScope($this->auth(Role::ADMIN_SATKER, ['id_satker' => '0'])));
+        $this->assertSame('none', StatistikCache::segmenScope($this->auth(Role::ADMIN_SATKER, ['id_satker' => '0', 'id_unit' => '3'])), "satker '0' ada → tidak jatuh ke unit");
+        $this->assertSame('none', StatistikCache::segmenScope($this->auth(Role::ADMIN_SATKER, ['id_unit' => '0'])));
+    }
+
+    public function testLingkupAkunSatkerAtauUnitNolDitolak403(): void
+    {
+        // CR-178: sebelumnya '0' lolos regex → satker/unit 0 → 404; kini sama dengan PegawaiScope → 403.
+        foreach ([['id_satker' => '0'], ['id_unit' => '0']] as $claims) {
+            try {
+                $this->svc()->statistik($this->auth(Role::ADMIN_SATKER, $claims), StatistikService::JENIS_KELAMIN, []);
+                $this->fail('lingkup 0 seharusnya ditolak: ' . json_encode($claims));
+            } catch (ForbiddenException $e) {
+                $this->assertSame('Lingkup akun tidak valid.', $e->getMessage());
+            }
+        }
     }
 
     public function testInvalidasiDariPegawaiModelMenghapusSemuaKunciStatistikSaja(): void

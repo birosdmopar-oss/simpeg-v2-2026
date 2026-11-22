@@ -26,7 +26,7 @@ final class PopulasiRekapParitasTest extends DatabaseTestCase
     {
         parent::setUp();
 
-        foreach ([1 => 'PNS Uji', 2 => 'PPPK Uji'] as $id => $nama) {
+        foreach ([1 => 'PNS Uji', 2 => 'Jenis Uji 2', 6 => 'PPPK Uji'] as $id => $nama) {
             if ($this->db->table('jenis_pegawai')->where('id_jenis_pegawai', $id)->countAllResults() === 0) {
                 $this->db->table('jenis_pegawai')->insert(['id_jenis_pegawai' => $id, 'jenis_pegawai' => $nama, 'status' => 1]);
             }
@@ -180,8 +180,46 @@ final class PopulasiRekapParitasTest extends DatabaseTestCase
         $this->kp($ii, 'II/e', '2020-01-01');
 
         // perilaku sekarang (dikunci CR-164): gol_ruang dibandingkan sebagai TEKS (<=>), bukan peringkat pangkat
-        // (PopulasiRekap.php:106-107) — 'IV/a' > 'II/e' benar secara kebetulan karena 'V' > 'I'; 'IV' < 'V' dst. tidak diuji.
+        // (PopulasiRekap.php:128-129) — 'IV/a' > 'II/e' benar secara kebetulan karena 'V' > 'I'; 'IV' < 'V' dst. tidak diuji.
         $this->assertSame([$iv, $ii], array_column($this->dhUntuk([$ii, $iv]), 'nip'));
+    }
+
+    public function testDhPppkMemakaiGolPppkDanTmtJabatan(): void
+    {
+        // CR-178: PPPK → gol_ruang = gol_pppk jabatan & TMT = tmtsk jabatan [K L_employee.php:6581-6584]. Sebelumnya PPPK
+        // mendapat gol '' dan TMT 9999-12-31 (riwayat_kp kosong) → selalu di bawah PNS sekelas.
+        $s    = $this->buatSatker();
+        $pns  = $this->pegawai();
+        $pppk = $this->pegawai(['id_jenis_pegawai' => 6]);
+        $lain = $this->pegawai(['id_jenis_pegawai' => 6]);
+        $this->rmj($pns, $s, '2020-01-01', 'X', ['kelas_jabatan' => 7]);
+        $this->kp($pns, 'III/a', '2020-01-01');
+        $this->rmj($pppk, $s, '2020-01-01', 'X', ['kelas_jabatan' => 7, 'gol_pppk' => 'IX']);
+        $this->kp($pppk, 'II/a', '2019-01-01'); // diabaikan untuk PPPK
+        $this->rmj($lain, $s, '2019-06-01', 'X', ['kelas_jabatan' => 7, 'gol_pppk' => 'IX']);
+
+        // 'IX' > 'III/a' (teks); sesama 'IX' → tmtsk jabatan naik: $lain (2019-06) sebelum $pppk (2020-01).
+        $this->assertSame([$lain, $pppk, $pns], array_column($this->dhUntuk([$pns, $pppk, $lain], null, [1, 6]), 'nip'));
+    }
+
+    public function testIlPppkMemakaiGolPppkTmtTetapRiwayatKp(): void
+    {
+        // CR-178: IL hanya mengganti golongan [K L_employee.php:6742-6744]; TMT tetap dari riwayat_kp.
+        $s     = $this->buatSatker();
+        $pppk  = $this->pegawai(['id_jenis_pegawai' => 6], ['jenis_jabatan' => 2]);
+        $pppk2 = $this->pegawai(['id_jenis_pegawai' => 6], ['jenis_jabatan' => 2]);
+        $pns   = $this->pegawai([], ['jenis_jabatan' => 2]);
+        $this->rmj($pppk, $s, '2019-01-01', 'X', ['jenis_jabatan' => 2, 'kelas_jabatan' => 7, 'gol_pppk' => 'IX']);
+        $this->kp($pppk, 'II/a', '2021-01-01');
+        $this->rmj($pppk2, $s, '2020-01-01', 'X', ['jenis_jabatan' => 2, 'kelas_jabatan' => 7, 'gol_pppk' => 'IX']);
+        $this->kp($pppk2, 'II/a', '2018-01-01');
+        $this->rmj($pns, $s, '2018-01-01', 'X', ['jenis_jabatan' => 2, 'kelas_jabatan' => 7]);
+        $this->kp($pns, 'III/a', '2018-01-01');
+
+        $hasil = array_values(array_filter((new PopulasiRekap($this->db))->il(self::AWAL), static fn (array $r): bool => in_array($r['nip'], [$pppk, $pppk2, $pns], true)));
+
+        // sesama 'IX' → TMT riwayat_kp naik ($pppk2 2018 sebelum $pppk 2021), bukan tmtsk jabatan.
+        $this->assertSame([$pppk2, $pppk, $pns], array_column($hasil, 'nip'));
     }
 
     public function testDhLingkupSatkerRole3MemakaiJabatanBerlaku(): void
@@ -277,12 +315,13 @@ final class PopulasiRekapParitasTest extends DatabaseTestCase
 
     /**
      * @param list<string> $nip
+     * @param list<int>    $jenis
      *
      * @return list<array<string, mixed>>
      */
-    private function dhUntuk(array $nip, ?LingkupLaporan $lingkup = null): array
+    private function dhUntuk(array $nip, ?LingkupLaporan $lingkup = null, array $jenis = [1]): array
     {
-        $hasil = (new PopulasiRekap($this->db))->dh(self::AWAL, self::AKHIR, $lingkup ?? new LingkupLaporan(LingkupLaporan::KEMENTERIAN, null, 'Kem'), [1]);
+        $hasil = (new PopulasiRekap($this->db))->dh(self::AWAL, self::AKHIR, $lingkup ?? new LingkupLaporan(LingkupLaporan::KEMENTERIAN, null, 'Kem'), $jenis);
 
         return array_values(array_filter($hasil, static fn (array $r): bool => in_array($r['nip'], $nip, true)));
     }

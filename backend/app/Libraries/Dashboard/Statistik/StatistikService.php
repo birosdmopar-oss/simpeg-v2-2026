@@ -304,7 +304,7 @@ final class StatistikService
 
     /**
      * Lingkup akun Admin Satker dari claims, aturan yang sama dengan `PegawaiScope` (satker menang; satker ada tetapi bukan
-     * angka kanonik → fail-closed).
+     * angka kanonik positif, termasuk `'0'` → fail-closed, CR-178).
      *
      * @return array{satker: int}|array{unit: int}|null
      */
@@ -398,6 +398,6 @@ final class StatistikService
 
     private static function keInt(?string $nilai): ?int
     {
-        return $nilai !== null && preg_match('/^(0|[1-9][0-9]*)$/', $nilai) === 1 ? (int) $nilai : null;
+        return $nilai !== null && preg_match('/^[1-9][0-9]*$/', $nilai) === 1 ? (int) $nilai : null;
     }
 }
