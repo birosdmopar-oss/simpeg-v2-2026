@@ -76,7 +76,7 @@ final class BerandaPendidikanAkParitasTest extends DatabaseTestCase
         $this->riwayat($nip, ['S.1'], 1);
 
         // perilaku sekarang (dikunci CR-164): status 0 (Menunggu) ikut dihitung karena saringan hanya NOT IN (2, 10)
-        // (KelengkapanData.php:204-205).
+        // (KelengkapanData.php:199-200).
         $this->assertSame(50, $this->persenPendidikan($nip));
     }
 
@@ -148,7 +148,7 @@ final class BerandaPendidikanAkParitasTest extends DatabaseTestCase
             array_map(static fn (array $r): array => [$r['order'], $r['ak_now'], $r['ak_kp'], $r['kurang']], $hasil['ak']),
         );
         // perilaku sekarang (dikunci CR-164): JF tanpa jenjang (target 0) tetapi ber-AK mendapat order negatif sehingga
-        // tampil PALING ATAS, mendahului JF yang masih kurang AK (BawahanPegawai.php:82, :95).
+        // tampil PALING ATAS, mendahului JF yang masih kurang AK (BawahanPegawai.php:87, :100).
         $this->assertSame('III/a', $hasil['ak'][1]['gol_ruang']);
     }
 
@@ -179,7 +179,7 @@ final class BerandaPendidikanAkParitasTest extends DatabaseTestCase
         // untuk B (saringan nip).
         $this->siasn($a, $jabB, 40, '1', null);
         $this->siasn($b, $jabB, 5, null, '1');
-        // C: jumlah negatif → dipotong 0 (AkPermenpanrb.php:60, max(0.0, …)).
+        // C: jumlah negatif → dipotong 0 (jalur beranda: AkPermenpanrb::hitungBanyak(), AkPermenpanrb.php:143, max(0.0, …)).
         $this->siasn($c, $jabC, -10, '1', null);
         $this->siasn($c, $jabC, 3, '1', null);
 
