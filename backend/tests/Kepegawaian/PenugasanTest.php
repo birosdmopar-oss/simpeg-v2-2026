@@ -137,6 +137,59 @@ final class PenugasanTest extends DatabaseTestCase
         }
     }
 
+    /**
+     * CR-184: parameter daftar lewat ListQuery (plt & plh) — `search[]`/`status[]` → 422 per key, page raksasa/0/abc → 422;
+     * pencarian memakai likeLiteral: `%` dan `_` dicari sebagai karakter, bukan wildcard.
+     */
+    public function testDaftarParameterListQueryDanPencarianLiteral(): void
+    {
+        [, , $super] = $this->aktor(Role::SUPER_ADMIN);
+
+        foreach (['plt', 'plh'] as $jenis) {
+            $url = "api/v1/penugasan/{$jenis}";
+            $this->assert422ListQuery($this->asUser($super)->get($url . '?search[]=a'), ['search']);
+            $this->assert422ListQuery($this->asUser($super)->get($url . '?status[]=1'), ['status']);
+
+            foreach (['99999999999999999999', '0', 'abc'] as $page) {
+                $this->assert422ListQuery($this->asUser($super)->get($url . '?page=' . $page), ['page']);
+            }
+        }
+
+        $persen = $this->buatPegawai();
+        $garis  = $this->buatPegawai();
+        $this->db->table('pegawai')->where('nip', $this->nipPlt)->update(['nama' => 'Pegawai Biasa']);
+        $this->db->table('pegawai')->where('nip', $persen)->update(['nama' => 'Hadir 100% Uji']);
+        $this->db->table('pegawai')->where('nip', $garis)->update(['nama' => 'Uji_Coba Garis']);
+        $admin    = $this->admin();
+        $idBiasa  = $this->svc()->tambah($admin, 'plt', $this->data(), null)['id'];
+        $idPersen = $this->svc()->tambah($admin, 'plt', ['nip_plt' => $persen] + $this->data(), null)['id'];
+        $idGaris  = $this->svc()->tambah($admin, 'plt', ['nip_plt' => $garis, 'status' => 2] + $this->data(), null)['id'];
+        $cari     = fn (array $filter): array => array_column($this->svc()->daftar($admin, 'plt', $filter)['items'], 'id');
+
+        $this->assertSame([$idPersen], $cari(['search' => '%']), 'hanya nama yang memuat %');
+        $this->assertSame([$idGaris], $cari(['search' => '_']), 'hanya nama yang memuat _');
+        $this->assertSame([$idPersen], $cari(['search' => '100%']));
+        $this->assertSame([], $cari(['search' => 'P_gawai']), '_ bukan wildcard satu karakter');
+        $this->assertSame([$idGaris, $idPersen, $idBiasa], $cari([]), 'tanpa filter: semua, urutan tetap');
+        $this->assertSame([$idGaris], $cari(['status' => '2']));
+        $this->assertSame([$idGaris, $idPersen, $idBiasa], $cari(['status' => '9']), 'status di luar 1/2: semua (perilaku lama)');
+
+        $semua = $this->svc()->daftar($admin, 'plt', ['per_page' => '1000']);
+        $this->assertSame([100, 3], [$semua['meta']['per_page'], $semua['meta']['total']], 'per_page dijepit 100, total tetap');
+    }
+
+
+    /**
+     * CR-184: 422 dengan `errors` tepat pada key itu (ADR-001).
+     *
+     * @param list<string> $keys
+     */
+    private function assert422ListQuery(\CodeIgniter\Test\TestResponse $res, array $keys): void
+    {
+        $res->assertStatus(422);
+        $this->assertSame($keys, array_keys((array) (json_decode($res->getJSON(), true)['errors'] ?? [])), (string) $res->getJSON());
+    }
+
     public function testEndpoint(): void
     {
         [, , $super]   = $this->aktor(Role::SUPER_ADMIN);

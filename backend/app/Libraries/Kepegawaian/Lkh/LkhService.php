@@ -90,7 +90,7 @@ final class LkhService implements LkhServiceInterface
     {
         $this->wajibRole($auth);
         $nip              = $this->nipSasaran($auth, $filter['nip'] ?? null, false);
-        [$page, $perPage] = $this->halaman($filter);
+        [$page, $perPage] = $this->halaman(ListQuery::from($filter, ['page', 'per_page']));
 
         $builder = $this->db()->table('riwayat_lckh')->where('nip', $nip)->whereNotIn('status', [self::DITOLAK, self::DIHAPUS]);
         $total   = $builder->countAllResults(false);
@@ -113,10 +113,13 @@ final class LkhService implements LkhServiceInterface
     {
         $this->wajibRole($auth);
         $nipSaya          = (string) $auth->nip();
-        [$page, $perPage] = $this->halaman($filter);
+        $query            = ListQuery::from($filter, ['page', 'per_page', 'search', 'status']);
+        [$page, $perPage] = $this->halaman($query);
 
         $builder = $this->db()->table('riwayat_lckh')->where('nip_atasan', $nipSaya === '' ? '-' : $nipSaya)->where('status !=', self::DIHAPUS);
-        $status  = (string) ($filter['status'] ?? (string) self::MENUNGGU);
+        // Jebakan (dijaga CR-184): `status` TIDAK dikirim = Menunggu (antrean legacy), sedangkan `status=` kosong = semua.
+        // ListQuery::string() menyamakan keduanya, jadi keberadaan key dibaca dari $filter mentah. Nilai di luar 0..3 = semua (tanpa 422).
+        $status = array_key_exists('status', $filter) ? $query->string('status') : (string) self::MENUNGGU;
 
         if (in_array($status, ['0', '1', '2', '3'], true)) {
             $builder->where('status', (int) $status);
@@ -128,11 +131,9 @@ final class LkhService implements LkhServiceInterface
             }
         }
 
-        $search = trim((string) ($filter['search'] ?? ''));
-
-        if ($search !== '') {
+        if ($query->filled('search')) {
             // CR-174: `%`, `_`, dan `!` dari masukan dicari sebagai teks biasa, bukan wildcard LIKE.
-            $s = ListQuery::likeLiteral($this->db(), $search);
+            $s = ListQuery::likeLiteral($this->db(), $query->string('search'));
             $builder->groupStart()->like('nama', $s)->orLike('nip', $s)->groupEnd();
         }
 
@@ -849,13 +850,13 @@ final class LkhService implements LkhServiceInterface
     }
 
     /**
-     * @param array<string, mixed> $filter
+     * Halaman + per_page dari ListQuery (CR-184): page 1..PAGE_MAX (selain itu 422), per_page dijepit 1..100.
      *
      * @return array{0: int, 1: int}
      */
-    private function halaman(array $filter): array
+    private function halaman(ListQuery $query): array
     {
-        return [max(1, (int) ($filter['page'] ?? 1)), min(100, max(1, (int) ($filter['per_page'] ?? 20)))];
+        return [$query->page(), $query->perPage(20, 100)];
     }
 
     /**

@@ -11,6 +11,7 @@ use App\Exceptions\ValidationException;
 use App\Libraries\Auth\AuthContext;
 use App\Libraries\Kepegawaian\Lampiran\KolomBerkas;
 use App\Libraries\Kepegawaian\Riwayat\AturanLampiran;
+use App\Libraries\ListQuery;
 use App\Models\Kepegawaian\PegawaiPlhModel;
 use App\Models\Kepegawaian\PegawaiPltModel;
 use CodeIgniter\Database\BaseBuilder;
@@ -70,17 +71,20 @@ final class PenugasanService
         $this->periksaJenis($jenis);
         $this->wajibRole($auth, self::ROLE_LIHAT);
 
-        $page    = max(1, (int) ($filter['page'] ?? 1));
-        $perPage = min(100, max(1, (int) ($filter['per_page'] ?? 20)));
+        // CR-184: parameter daftar lewat ListQuery (array → 422 per key, page 1..PAGE_MAX, ADR-001); per_page tetap dijepit 1..100.
+        $query   = ListQuery::from($filter, ['page', 'per_page', 'search', 'status']);
+        $page    = $query->page();
+        $perPage = $query->perPage(20, 100);
         $builder = $this->query($auth, $jenis);
-        $search  = trim((string) ($filter['search'] ?? ''));
 
-        if ($search !== '') {
-            $builder->groupStart()->like('p.nama', $search)->orLike("t.nip_{$jenis}", $search)->groupEnd();
+        if ($query->filled('search')) {
+            // CR-184: `%`, `_`, dan `!` dari masukan dicari sebagai teks biasa, bukan wildcard LIKE (pola CR-174).
+            $s = ListQuery::likeLiteral($this->db(), $query->string('search'));
+            $builder->groupStart()->like('p.nama', $s)->orLike("t.nip_{$jenis}", $s)->groupEnd();
         }
 
-        if (in_array((string) ($filter['status'] ?? ''), ['1', '2'], true)) {
-            $builder->where('t.status', (int) $filter['status']);
+        if (in_array($query->string('status'), ['1', '2'], true)) {
+            $builder->where('t.status', (int) $query->string('status'));
         }
 
         $total = $builder->countAllResults(false);
