@@ -303,8 +303,9 @@ Perlakuan khusus:
   Access token lama (claim NIP lama, berlaku sampai `exp`) ditolak **401** oleh `JwtAuthFilter` sejak CR-175 (akun tidak
   lagi memegang NIP claim); begitu pula sesudah hapus pegawai (`pengguna.nip` → NULL). Request yang lolos filter sesaat
   sebelum koreksi di-commit lalu kena FK 1452 dengan NIP lama dijawab **401** oleh jaring terpusat `ApiController::_remap`
-  (CR-185; sesi terbukti basi saja, selain itu tetap 500). Sisa: cabang 1205 presensi "Presensi bentrok berulang." (lihat
-  `Libraries/Auth/README.md`).
+  (CR-185; sesi terbukti basi saja, selain itu tetap 500). Sisa: cabang 1205/1213 berulang presensi ("Presensi bentrok
+  berulang.", 500) dan galat FK yang di service lain dibungkus `RuntimeException` tanpa kode (tidak dikenali jaring); lihat
+  `Libraries/Auth/README.md`.
 - **JSON array NIP** (`JsonArrayNip`, MAKE-011, keputusan user 13-10-2026): elemen = NIP lama di
   `dm_user_lokasi_presensi.target_peg`/`excl_peg` diganti NIP baru, dan awalan "NIP lama - " di `*_desc`; baris dikunci
   `FOR UPDATE`, NIP yang hanya mirip (awalan sama) tidak tersentuh. `user_lokasi_presensi` (tabel legacy) tidak dibuat di

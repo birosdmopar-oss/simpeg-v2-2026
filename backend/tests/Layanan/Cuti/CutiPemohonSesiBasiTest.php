@@ -6,11 +6,13 @@ namespace Tests\Layanan\Cuti;
 
 use App\Constants\Role;
 use App\Libraries\Kepegawaian\NipCascadeService;
+use App\Libraries\Layanan\Cuti\AturanCuti;
 use CodeIgniter\Test\FeatureTestTrait;
 use Config\Services;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\MasterDataSeeder;
 use Tests\Support\DatabaseTestCase;
+use Tests\Support\JaringSesiBasiLog;
 use Tests\Support\Layanan\CutiUjiTrait;
 
 /**
@@ -58,12 +60,14 @@ final class CutiPemohonSesiBasiTest extends DatabaseTestCase
             (new NipCascadeService())->koreksi($super, $lama, self::NIP_BARU);
         }));
 
-        $res = $this->withHeaders(['Authorization' => 'Bearer ' . $token])->withBodyFormat('json')
-            ->post('api/v1/cuti', $this->isianCuti($a['al']['nip'], $a['pyb']['nip'], ['id_jenis_cuti' => 5]));
+        $logAwal = JaringSesiBasiLog::jumlah();
+        $res     = $this->withHeaders(['Authorization' => 'Bearer ' . $token])->withBodyFormat('json')
+            ->post('api/v1/cuti', $this->isianCuti($a['al']['nip'], $a['pyb']['nip'], ['id_jenis_cuti' => AturanCuti::JENIS_ALASAN_PENTING]));
 
         $res->assertStatus(401);
         $this->assertSame(['status' => 'error', 'message' => 'Unauthorized'], json_decode($res->getJSON(), true));
         $this->assertSame(0, $this->db->table('riwayat_cuti')->where('nip', $lama)->countAllResults(), 'tanpa baris ber-NIP lama');
         $this->assertSame(0, $this->db->table('riwayat_cuti')->where('nip', self::NIP_BARU)->countAllResults());
+        $this->assertSame($logAwal + 1, JaringSesiBasiLog::jumlah(), '401 dari jaring _remap (log warning), bukan dari filter');
     }
 }

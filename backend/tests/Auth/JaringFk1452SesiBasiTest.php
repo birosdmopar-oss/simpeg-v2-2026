@@ -15,7 +15,6 @@ use CodeIgniter\Database\Query;
 use CodeIgniter\Events\Events;
 use CodeIgniter\I18n\Time;
 use CodeIgniter\Test\FeatureTestTrait;
-use CodeIgniter\Test\TestLogger;
 use CodeIgniter\Test\TestResponse;
 use Config\Presensi;
 use Config\Services;
@@ -25,6 +24,7 @@ use Tests\Support\AuthTestTrait;
 use Tests\Support\Controllers\SesiBasiProbeController;
 use Tests\Support\Database\Seeds\MasterDataSeeder;
 use Tests\Support\DatabaseTestCase;
+use Tests\Support\JaringSesiBasiLog;
 use Tests\Support\Kepegawaian\RiwayatUjiTrait;
 use Tests\Support\Presensi\PresensiUjiTrait;
 
@@ -85,10 +85,11 @@ final class JaringFk1452SesiBasiTest extends DatabaseTestCase
     public function testFk1452SesudahAkunBerhentiMemegangNip401BodyPersis(): void
     {
         [, $token] = $this->pegawaiDenganToken();
+        $logAwal   = JaringSesiBasiLog::jumlah();
 
         $this->assertUnauthorized($this->withBearer($token)->post('api/v1/_probe/fk/ganti'));
         $this->assertNull(service('authContext')->idPengguna(), 'authContext dibersihkan');
-        $this->assertTrue(TestLogger::didLog('warning', 'FK 1452 pada sesi NIP basi diterjemahkan ke 401: [1452] ' . DatabaseException::class . '.'), 'galat asli dicatat (kode + kelas, tanpa NIP)');
+        $this->assertSame($logAwal + 1, JaringSesiBasiLog::jumlah(), 'galat asli dicatat (kode + kelas, tanpa NIP)');
     }
 
     public function testFk1452SesiMasihSahTetap500(): void
@@ -128,9 +129,11 @@ final class JaringFk1452SesiBasiTest extends DatabaseTestCase
             (new NipCascadeService())->koreksi($super, $lama, self::NIP_BARU);
         };
 
-        $res = $this->withBearer($token)->withBodyFormat('json')->post('api/v1/_probe/presensi/masuk', self::MASUK);
+        $logAwal = JaringSesiBasiLog::jumlah();
+        $res     = $this->withBearer($token)->withBodyFormat('json')->post('api/v1/_probe/presensi/masuk', self::MASUK);
 
         $this->assertUnauthorized($res);
+        $this->assertSame($logAwal + 1, JaringSesiBasiLog::jumlah(), '401 dari jaring _remap (log warning), bukan dari filter');
         $this->assertSame(0, $this->db->table('dh_online')->where('nip', $lama)->countAllResults(), 'tanpa baris ber-NIP lama');
         $this->assertSame(0, $this->db->table('dh_online')->where('nip', self::NIP_BARU)->countAllResults());
         $this->assertSame(0, $this->db->table('audit_logs')->where('entity', 'dh_online')->like('entity_id', $lama . ':', 'after')->countAllResults(), 'tanpa audit dh_online lama');
