@@ -398,6 +398,8 @@ final class LkhTest extends DatabaseTestCase
         $this->assertSame([$setuju, $menunggu], $antrean(['status' => '']), 'status= kosong = semua');
         $this->assertSame([$setuju], $antrean(['status' => '1']));
         $this->assertSame([$setuju, $menunggu], $antrean(['status' => '7']), 'di luar 0..3 = semua (perilaku lama, tanpa 422)');
+        $this->assertSame([$setuju], $antrean(['status' => ' 1']), 'nilai dipangkas spasi (ListQuery): " 1" dibaca 1');
+        $this->assertSame(20, $this->svc()->verifikasi($this->atasan, ['per_page' => ' '])['meta']['per_page'], 'per_page kosong/spasi = bawaan 20');
 
         $res = $this->asUser($akunAtasan)->get('api/v1/lkh/verifikasi');
         $res->assertStatus(200);
