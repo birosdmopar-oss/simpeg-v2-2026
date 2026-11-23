@@ -249,8 +249,8 @@ describe('Buka — galat (privat)', () => {
 
   // CR-186: sebelumnya judul test ini mengunci "interceptor tak memicu handler untuk body Blob". Sejak CR-186 interceptor
   // mengurai body Blob JSON 403 dan MEMICU handler ganti password (diuji dengan klien asli di lib/__tests__/axios.blob.spec.ts);
-  // galat yang sampai ke composable sudah berbody objek terurai. Composable tetap menutup popup dan menampilkan pesan
-  // sebagai jaring pengaman, jadi asersi di sini sengaja berubah dari "handler tidak terpicu" menjadi "body terurai → pesan".
+  // galat yang sampai ke composable sudah berbody objek terurai. Judul diperbarui, asersi tetap: test ini me-mock
+  // `ambilBerkas`, sehingga yang diuji di sini hanya jaring pengaman composable (popup ditutup, pesan tampil).
   it('403 password_change_required (body sudah diurai interceptor, handler dipicu di sana): popup ditutup, pesan server tampil', async () => {
     const popup = popupTiruan()
     openSpy.mockReturnValue(popup as unknown as Window)

@@ -69,8 +69,8 @@ function pesanGalat(error: unknown): string | null {
   const dikenal = badan !== undefined && badan !== null && typeof badan === 'object'
   // Body JSON yang terbaca (diurai `ambilBerkas`) membawa pesan server; bila tidak terbaca pakai pesan baku.
   const dariServer = dikenal && typeof badan.message === 'string' ? badan.message : ''
-  // Interceptor membaca `code` saat body masih Blob, jadi handler ganti password tidak jalan untuk unduhan blob:
-  // tampilkan pesannya agar klik Buka tidak diam.
+  // CR-186: interceptor sudah mengurai body Blob JSON 403 dan memicu handler ganti password; pesannya tetap ditampilkan
+  // sebagai jaring pengaman (mis. handler belum terpasang) agar klik Buka tidak diam.
   if (error.status === 403 && dikenal && badan.code === PASSWORD_CHANGE_REQUIRED_CODE) return dariServer !== '' ? dariServer : PESAN_GANTI_PASSWORD
   if (dariServer !== '') return dariServer
   return error.status === 429 ? PESAN_TERLALU_BANYAK : describeApiError(error).message

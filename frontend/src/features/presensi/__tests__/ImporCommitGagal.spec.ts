@@ -20,6 +20,7 @@ vi.mock('@/lib/axios', async (importOriginal) => {
     const url = config.url ?? ''
     let b: { status: number; body: unknown } | 'jaringan'
     if (url === '/slip-gaji/impor/pratinjau') b = { status: 200, body: { status: 'success', data: PRATINJAU } }
+    else if (url === actual.REFRESH_PATH) b = { status: 401, body: { status: 'error', message: 'Sesi berakhir.' } }
     else if (url.endsWith('/commit')) {
       server.panggilanCommit += 1
       b = server.commit.shift() ?? { status: 404, body: { status: 'error', message: 'Pratinjau tidak ditemukan atau sudah kedaluwarsa.' } }
@@ -31,6 +32,9 @@ vi.mock('@/lib/axios', async (importOriginal) => {
   }
   return { ...actual, api: actual.createApiClient({ adapter }) }
 })
+
+import { setAuthFailureHandler } from '@/lib/axios'
+import ConfirmDialog from '@/shared/components/ConfirmDialog.vue'
 
 import SlipGajiImpor from '../components/SlipGajiImpor.vue'
 
@@ -71,11 +75,16 @@ async function simpan(): Promise<void> {
   await flushPromises()
 }
 
+const gagalAuth = vi.fn()
+
 beforeEach(() => {
   server.commit = []
   server.panggilanCommit = 0
+  gagalAuth.mockReset()
+  setAuthFailureHandler(gagalAuth)
 })
 afterEach(() => {
+  setAuthFailureHandler(null)
   document.body.innerHTML = ''
 })
 enableAutoUnmount(afterEach)
@@ -94,12 +103,46 @@ describe('Impor Slip Gaji — commit gagal (CR-186)', () => {
     expect(testid('impor-batal')).not.toBeNull()
   })
 
-  it('422 commit → pesan server tampil, Simpan hilang, tidak ada commit kedua', async () => {
-    server.commit = [galatBe(422, 'Opsi timpa harus bernilai true atau false.', { timpa: ['Opsi timpa harus bernilai true atau false.'] })]
+  it('R1-2: token habis → keterangan di posisi Simpan dan fokus pindah ke Batal (tidak lepas ke body)', async () => {
+    server.commit = [galatBe(500, 'Impor gagal diproses. Tidak ada data yang disimpan.')]
     await sampaiPratinjau()
     await simpan()
 
-    expect(testid('impor-failure')?.textContent).toContain('Opsi timpa harus bernilai true atau false.')
+    expect(testid('impor-token-habis')?.textContent).toContain('Pratinjau ini tidak berlaku lagi. Gunakan Batal untuk mengunggah ulang berkas.')
+    await vi.waitFor(() => expect(document.activeElement).toBe(testid('impor-batal')))
+  })
+
+  it('R1-3: penjaga simpan() — confirm ConfirmDialog sesudah token habis tidak memanggil commit kedua', async () => {
+    server.commit = [galatBe(500, 'Impor gagal diproses. Tidak ada data yang disimpan.')]
+    const wrapper = await sampaiPratinjau()
+    await simpan()
+    expect(server.panggilanCommit).toBe(1)
+
+    // Jalur yang tidak terlihat dari tombol (Simpan sudah hilang): ConfirmDialog tetap terpasang dan bisa memancarkan confirm.
+    wrapper.findComponent(ConfirmDialog).vm.$emit('confirm')
+    await flushPromises()
+    expect(server.panggilanCommit).toBe(1)
+  })
+
+  it('R1-3 pagar: 401 dari commit (refresh gagal) → handler login, pratinjau dan Simpan tetap', async () => {
+    server.commit = [galatBe(401, 'Unauthorized')]
+    await sampaiPratinjau()
+    await simpan()
+
+    expect(gagalAuth).toHaveBeenCalled()
+    expect(testid('impor-pratinjau')).not.toBeNull()
+    expect(testid('impor-simpan')).not.toBeNull()
+    expect(testid('impor-token-habis')).toBeNull()
+  })
+
+  // 422 yang menghabiskan token: galat urai ulang berkas (`errors.berkas`, ImporSlipService::uraiBerkas) di dalam try commit
+  // sesudah pratinjau dimuat. 422 `timpa` terjadi SEBELUM muat (token masih ada) dan tidak terjangkau dari UI (selalu boolean).
+  it('422 commit (urai ulang berkas) → pesan server tampil, Simpan hilang, tidak ada commit kedua', async () => {
+    server.commit = [galatBe(422, 'Berkas tidak dapat dibaca.', { berkas: ['Berkas tidak dapat dibaca.'] })]
+    await sampaiPratinjau()
+    await simpan()
+
+    expect(testid('impor-failure')?.textContent).toContain('Berkas tidak dapat dibaca.')
     expect(testid('impor-simpan')).toBeNull()
     await simpan()
     expect(server.panggilanCommit).toBe(1)

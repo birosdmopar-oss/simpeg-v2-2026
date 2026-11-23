@@ -13,7 +13,7 @@
  * diminta memeriksa data slip dulu. 401 (interceptor), 403, dan galat jaringan (status null) mempertahankan pratinjau.
  */
 import { Upload } from 'lucide-vue-next'
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 
 import { isApiError, type ApiError } from '@/lib/axios'
 import ConfirmDialog from '@/shared/components/ConfirmDialog.vue'
@@ -37,6 +37,17 @@ const galatField = ref<Record<string, string>>({})
 const konflik = ref(false)
 /** Token pratinjau sudah dihapus server (commit gagal sesudah dimuat): Simpan tidak ditawarkan lagi. */
 const tokenHabis = ref(false)
+const batalEl = ref<{ $el?: HTMLElement } | null>(null)
+
+/**
+ * Tombol Simpan diganti keterangan; fokus dipindah ke Batal agar fokus keyboard tidak lepas ke body. Ditunda satu
+ * tick timer sesudah render, karena ConfirmDialog (radix) mengembalikan fokus ke pemicunya (Simpan, sudah hilang) lewat
+ * `setTimeout` saat ditutup.
+ */
+async function fokusKeBatal(): Promise<void> {
+  await nextTick()
+  setTimeout(() => batalEl.value?.$el?.focus(), 0)
+}
 const konfirmasi = ref(false)
 const kunciUnggah = ref(0)
 
@@ -133,6 +144,7 @@ async function simpan(): Promise<void> {
       const tanpaEnvelope = err.status !== null && err.status >= 500 && !berEnvelope(err)
       konflik.value = !tanpaEnvelope
       failure.value = tanpaEnvelope ? PESAN_COMMIT_TAK_PASTI : err.message || describeApiError(err).message
+      void fokusKeBatal()
     } else {
       konflik.value = false
       failure.value = isApiError(err) && err.message && err.status !== null && err.status < 500 ? err.message : describeApiError(err).message
@@ -198,7 +210,7 @@ function ulang(): void {
         <h2 id="impor-langkah-2" class="text-h5 text-slate-900">
           Langkah 2: Pratinjau &amp; Validasi<template v-if="pratinjau.filter"> · {{ labelPeriode(pratinjau.filter) }}</template>
         </h2>
-        <UiButton variant="secondary" appearance="outline" size="sm" :disabled="memproses" data-testid="impor-batal" @click="ulang">Batal</UiButton>
+        <UiButton ref="batalEl" variant="secondary" appearance="outline" size="sm" :disabled="memproses" data-testid="impor-batal" @click="ulang">Batal</UiButton>
       </div>
       <div class="grid grid-cols-2 gap-3 sm:grid-cols-4" data-testid="impor-ringkasan">
         <UiStatTile label="Total Baris" :value="pratinjau.baris.length" />
@@ -260,7 +272,10 @@ function ulang(): void {
         </p>
       </div>
 
-      <div v-if="!tokenHabis" class="flex justify-end">
+      <p v-if="tokenHabis" class="text-right text-body2 text-slate-600" data-testid="impor-token-habis">
+        Pratinjau ini tidak berlaku lagi. Gunakan Batal untuk mengunggah ulang berkas.
+      </p>
+      <div v-else class="flex justify-end">
         <UiButton :disabled="akanDisimpan === 0" :loading="memproses" data-testid="impor-simpan" @click="konfirmasi = true">Simpan ke Database</UiButton>
       </div>
     </section>

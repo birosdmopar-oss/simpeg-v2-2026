@@ -1,6 +1,7 @@
 /**
  * CR-186 (F10-L3): unduhan `responseType: 'blob'` yang dijawab 403 `password_change_required` dengan body Blob JSON
- * memicu handler wajib-ganti-password (sekali, juga bersama request JSON paralel) dan memakai pesan server. Diuji dengan
+ * memicu handler wajib-ganti-password dan memakai pesan server; 403 bersamaan selama handler berjalan berbagi satu
+ * pemanggilan handler. Diuji dengan
  * KLIEN ASLI (`createApiClient`) + adapter palsu yang meniru XHR blob: body galat berupa Blob ber-tipe JSON.
  */
 import { AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
@@ -56,9 +57,28 @@ describe('interceptor: body galat Blob (CR-186)', () => {
     expect(isApiError(galat) && galat.original.response?.data).toMatchObject({ code: PASSWORD_CHANGE_REQUIRED_CODE })
   })
 
-  it('blob 403 + request JSON 403 paralel → handler tetap SEKALI', async () => {
+  it('blob 403 + JSON 403 bersamaan → handler sekali (bersama selama handler berjalan)', async () => {
     const { api } = klien({ '/berkas': [{ ...PASSWORD_403 }], '/master': [{ ...PASSWORD_403 }] })
     await Promise.allSettled([api.get('/berkas', { responseType: 'blob' }), api.get('/master')])
+    expect(handler).toHaveBeenCalledTimes(1)
+  })
+
+  it('dua blob 403 bersamaan + handler async (deferred) → handler SEKALI selama berjalan; kedua request menunggu handler', async () => {
+    let selesai!: () => void
+    handler.mockImplementation(() => new Promise<void>((r) => (selesai = r)))
+    const { api } = klien({ '/berkas-a': [{ ...PASSWORD_403 }], '/berkas-b': [{ ...PASSWORD_403 }] })
+    const status = { a: 'pending', b: 'pending' }
+    const a = api.get('/berkas-a', { responseType: 'blob' }).catch(() => (status.a = 'ditolak'))
+    const b = api.get('/berkas-b', { responseType: 'blob' }).catch(() => (status.b = 'ditolak'))
+
+    await vi.waitFor(() => expect(handler).toHaveBeenCalledTimes(1))
+    await new Promise((r) => setTimeout(r, 10))
+    expect(handler).toHaveBeenCalledTimes(1)
+    expect(status).toEqual({ a: 'pending', b: 'pending' })
+
+    selesai()
+    await Promise.all([a, b])
+    expect(status).toEqual({ a: 'ditolak', b: 'ditolak' })
     expect(handler).toHaveBeenCalledTimes(1)
   })
 
