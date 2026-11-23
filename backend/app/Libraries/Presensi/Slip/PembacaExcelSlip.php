@@ -8,9 +8,11 @@ use App\Libraries\Presensi\SlipGaji\HasilSlip;
 use App\Libraries\Presensi\SlipGaji\KolomGaji;
 use Config\Presensi;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Reader\Xlsx;
 use PhpOffice\PhpSpreadsheet\RichText\RichText;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use Throwable;
 
@@ -27,7 +29,7 @@ use Throwable;
  * - Berkas rusak/tidak terbaca → {@see BerkasImporDitolak} pesan generik (P5-39); rincian exception hanya ke log
  *   aplikasi, tanpa isi sel.
  *
- * Pengaman memori dan waktu (CR-177), dua lapis:
+ * Pengaman memori dan waktu (CR-177, CR-181), tiga lapis:
  *
  * 1. SEBELUM dimuat, anggaran SELURUH berkas. `.xlsx`: {@see PemindaiXlsx} memindai semua entri ZIP sebagai aliran →
  *    ukuran isi sesudah dekompresi, jumlah sel, bobot elemen XML, dan iterasi `<col>` (konstanta `Config\Presensi`).
@@ -39,6 +41,10 @@ use Throwable;
  *    semua baris. GPP diperiksa dulu, lalu TK, jadi pesan tidak bergantung urutan tab. Keduanya dimuat dalam SATU
  *    muatan supaya rumus lintas sheet tetap terhitung; berkas yang kedua sheet-nya berisi part yang sama ditolak
  *    {@see PemuatXlsxSlip}.
+ * 3. SEBELUM ada sel rumus yang dihitung (CR-181), anggaran beban hitung rumus GPP + TK, ditaksir dari teks rumus
+ *    ({@see PenaksirBebanRumus}): batas per sel rumus dan batas jumlah (konstanta `Config\Presensi`). Lewat batas →
+ *    {@see self::PESAN_RUMUS}. Ini pagar masukan saja: sel rumus berkas yang lolos tetap dihitung ulang dengan
+ *    `getCalculatedValue` seperti legacy; nilai tersimpan di berkas (`<v>`) tidak pernah dipakai.
  *
  * Read filter (`IReadFilter`) SENGAJA TIDAK dipasang pada pemuat, jangan ditambahkan: begitu ada read filter kustom,
  * reader Xlsx memanggilnya untuk setiap kolom `<cols>` × setiap `<row>` (`Reader/Xlsx/ColumnAndRowAttributes`, juga saat
@@ -50,6 +56,7 @@ use Throwable;
 final class PembacaExcelSlip
 {
     public const PESAN_TIDAK_TERBACA = 'Berkas tidak dapat dibaca. Pastikan berkas Excel (.xlsx/.xls) yang valid.';
+    public const PESAN_RUMUS         = 'Rumus di sheet GPP/TK terlalu berat untuk dihitung. Tempel sebagai nilai (Paste Values), lalu unggah ulang.';
     public const PESAN_STRUKTUR      = 'Struktur berkas terlalu besar untuk diproses. Simpan ulang berkas hanya dengan sheet GPP dan TK, tanpa rumus (tempel sebagai nilai) atau teks sangat panjang.';
 
     /**
@@ -72,6 +79,8 @@ final class PembacaExcelSlip
         private readonly int $maksByteIsi = Presensi::MAKS_BYTE_ISI_IMPOR,
         ?int $maksBobot = null,
         private readonly int $maksIterasiKolom = Presensi::MAKS_ITERASI_KOLOM_IMPOR,
+        private readonly int $maksBebanPerRumus = Presensi::MAKS_BEBAN_PER_RUMUS_IMPOR,
+        private readonly int $maksBebanRumus = Presensi::MAKS_BEBAN_RUMUS_IMPOR,
     ) {
         $this->maksSel   = $maksSel ?? (max($maksBarisPerSheet, Presensi::BARIS_ACUAN_ANGGARAN_IMPOR) + 1) * Presensi::SEL_PER_BARIS_IMPOR;
         $this->maksBobot = $maksBobot ?? $this->maksSel * Presensi::BOBOT_PER_SEL_IMPOR;
@@ -141,6 +150,9 @@ final class PembacaExcelSlip
         }
 
         try {
+            // Sebelum ada sel yang dihitung. Sesudah langkah ini pembacaan berjalan persis seperti sebelum CR-181.
+            $this->periksaRumus($buku, array_values($nama));
+
             $hasil = [];
 
             // GPP diperiksa dulu, lalu TK; masing-masing sebelum array baris × kolomnya disusun.
@@ -255,6 +267,42 @@ final class PembacaExcelSlip
     {
         if ($sel > $this->maksSel) {
             throw new BerkasImporDitolak('Jumlah sel melebihi batas ' . number_format($this->maksSel, 0, ',', '.') . ' per berkas. Hapus sheet atau kolom yang tidak dipakai, lalu unggah ulang.');
+        }
+    }
+
+    /**
+     * Anggaran beban hitung rumus (CR-181): beban semua sel rumus GPP dan TK ditaksir dari teks rumusnya
+     * ({@see PenaksirBebanRumus}) SEBELUM ada yang dihitung; tidak ada sel yang dihitung, dibuat, atau diubah di sini. Sel
+     * rumus sheet lain tidak dimuat, dan sel rumus GPP/TK yang dirujuk rumus lain dihitung sekali saja (cache
+     * kalkulator), jadi jumlah ini mencakup semua yang akan dihitung. Sel rumus dikenali dari tipe datanya: sama dengan
+     * `Cell::isFormula()` di {@see self::nilaiMentah}, karena gaya sel (quote prefix) tidak dimuat (`setReadDataOnly`).
+     *
+     * @param list<string> $nama nama asli sheet GPP dan TK di berkas
+     *
+     * @throws BerkasImporDitolak
+     */
+    private function periksaRumus(Spreadsheet $buku, array $nama): void
+    {
+        $penaksir = null;
+        $total    = 0;
+
+        foreach ($nama as $n) {
+            $sel = $buku->getSheetByName($n)?->getCellCollection();
+
+            foreach ($sel?->getCoordinates() ?? [] as $koordinat) {
+                $s = $sel->get($koordinat);
+
+                if ($s === null || $s->getDataType() !== DataType::TYPE_FORMULA) {
+                    continue;
+                }
+
+                $penaksir ??= new PenaksirBebanRumus($buku);
+                $beban = $penaksir->beban($s);
+
+                if ($beban > $this->maksBebanPerRumus || ($total += $beban) > $this->maksBebanRumus) {
+                    throw new BerkasImporDitolak(self::PESAN_RUMUS);
+                }
+            }
         }
     }
 

@@ -220,6 +220,16 @@ MAKE-052 merged + MAKE-054.
   612 MB; 390 ribu sel teks pendek: PHP +258 MB, RSS 925 MB). Rincian dan angka ukur: README `Libraries/Presensi`
   BB-1..BB-11. Test:
   `tests/unit/Presensi/Slip/PembacaExcelSlipBatasBacaTest.php`, `tests/Presensi/Slip/ImporSlipBatasBacaTest.php`.
+- **CR-181 (23-11-2026):** impor slip tidak lagi 500/timeout karena menghitung rumus. Sel rumus GPP/TK tetap dihitung
+  ulang (legacy, AC-D10.9; nilai tersimpan tidak dipakai); yang ditambahkan hanya taksiran beban dari teks rumus sebelum
+  dihitung (`Slip/PenaksirBebanRumus`, memakai pengurai kalkulator PhpSpreadsheet): beban sel = 10 + panjang teks + luas
+  tiap rentang (baris × kolom + baris² / 15.000); `INDIRECT`/`OFFSET`/pembangkit larik, ujung rentang hasil hitung,
+  rujukan 3D, dan rumus tidak terurai dianggap tak terbatas. Batas `Config\Presensi`: 400.000 per sel rumus, 1.500.000
+  untuk GPP + TK; lewat batas → 422 `errors.berkas` "Rumus di sheet GPP/TK terlalu berat untuk dihitung. …". Perubahan
+  perilaku yang disengaja: berkas seperti itu dulu 500/timeout (atau "Berkas tidak dapat dibaca" untuk rujukan 3D).
+  Nilai berkas yang diterima identik. Ukur: templat penuh + 20.000 sel rumus dibaca 13,9 detik. Rincian dan tabel ukur:
+  README `Libraries/Presensi` BB-12. Test: `tests/unit/Presensi/Slip/PembacaExcelSlipAnggaranRumusTest.php`,
+  `tests/Presensi/Slip/ImporSlipBatasBacaTest.php`.
 - **Catatan perilaku:** berkas tanpa ekstensi ditolak "Isi berkas tidak sesuai dengan ekstensinya." dan isi ber-jenis lain
   (mis. PDF bernama `.xlsx`) "Format berkas harus .xlsx atau .xls." — sama dengan aturan `ValidasiBerkas` jalur lampiran
   (CR-054); galat filter periode dipetakan ke `errors.filter_bulan` + `code`.

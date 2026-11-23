@@ -88,6 +88,33 @@ class Presensi extends BaseConfig
      */
     public const MAKS_BYTE_ISI_IMPOR = 32 * 1024 * 1024;
 
+    // --- Anggaran beban hitung rumus impor Slip Gaji (CR-181) ---
+    // Sel rumus GPP/TK tetap dihitung ulang (legacy, AC-D10.9); yang dibatasi adalah perkiraan kerjanya, ditaksir dari teks
+    // rumus sebelum dihitung (`App\Libraries\Presensi\Slip\PenaksirBebanRumus`). Satu satuan beban ±5–10 mikrodetik hitung
+    // di mesin ukur. Tabel ukur dan alasan angka: README `Libraries/Presensi` BB-12.
+
+    /** Beban tetap satu sel rumus; ditambah panjang teks rumusnya (rumus `=A2+B2` terukur ±150 mikrodetik). */
+    public const BEBAN_DASAR_RUMUS_IMPOR = 10;
+
+    /**
+     * Beban satu rentang = baris × kolom + baris² / nilai ini. Kalkulator menjabarkan rentang menjadi daftar sel dan
+     * biayanya tumbuh kuadratik menurut jumlah baris: satu kolom 10.000 baris ±7–19 mikrodetik per sel, 100.000 baris
+     * ±50–70.
+     */
+    public const PEMBAGI_KUADRAT_BARIS_RUMUS_IMPOR = 15_000;
+
+    /** Sel sheet rujukan per satuan beban untuk memangkas rentang kolom/baris penuh (`J:J`): kalkulator memindai indeks sel sheet itu. */
+    public const SEL_PER_BEBAN_PINDAI_RUMUS_IMPOR = 200;
+
+    /**
+     * Batas beban SATU sel rumus: membatasi memori penjabaran satu rentang (±0,55 KB per baris rentang) dan waktu satu
+     * sel (±2–4 detik). Cukup untuk `VLOOKUP` ke seluruh GPP 10.001 baris × 26 kolom (±267 ribu).
+     */
+    public const MAKS_BEBAN_PER_RUMUS_IMPOR = 400_000;
+
+    /** Batas jumlah beban semua sel rumus GPP + TK (±6–14 detik hitung di mesin ukur; batas waktu request impor 60 detik). */
+    public const MAKS_BEBAN_RUMUS_IMPOR = 1_500_000;
+
     /** Masa berlaku pratinjau impor dalam detik (Q5A-05 default 30 menit). */
     public int $ttlPratinjauDetik = 1800;
 

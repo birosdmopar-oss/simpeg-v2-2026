@@ -122,6 +122,15 @@ final class XlsxMentah
         return '<c r="' . $alamat . '"><v>' . $nilai . '</v></c>';
     }
 
+    /**
+     * Sel rumus TANPA nilai tersimpan (`<v>`), seperti tulisan generator yang tidak menghitung: nilainya hanya bisa
+     * berasal dari hitung ulang.
+     */
+    public static function rumus(string $alamat, string $rumus): string
+    {
+        return '<c r="' . $alamat . '"><f>' . htmlspecialchars(ltrim($rumus, '='), ENT_XML1) . '</f></c>';
+    }
+
     public static function kolom(int $indeks): string
     {
         $huruf = '';
