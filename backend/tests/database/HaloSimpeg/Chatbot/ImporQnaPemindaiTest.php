@@ -8,6 +8,9 @@ use App\Exceptions\ValidationException;
 use App\Libraries\HaloSimpeg\Chatbot\ImporQna;
 use CodeIgniter\HTTP\Files\UploadedFile;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use PhpOffice\PhpSpreadsheet\Shared\OLE;
+use PhpOffice\PhpSpreadsheet\Shared\OLE\PPS\File;
+use PhpOffice\PhpSpreadsheet\Shared\OLE\PPS\Root;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx as XlsxWriter;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -34,6 +37,9 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
 
     /** Batas waktu test berbasis waktu: target ±2 s di mesin pengembang, ruang aman untuk runner CI yang lebih lambat. */
     private const DETIK_CI = 6.0;
+
+    /** Ruang waktu test kasus terburuk teks panjang (terukur ±3,1-3,4 s di mesin pengembang, R2-4). */
+    private const DETIK_CI_TERBURUK = 15.0;
 
     /** @var list<string> */
     private array $tmp = [];
@@ -66,7 +72,7 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
     public function testColSelebarLembarDenganBarisAcakCepatDanBarisLebihTetapTidakIkut(): void
     {
         // Baris 3..1.502 diacak lalu baris 3 terakhir: listWorksheetInfo melihat totalRows 3, padahal ada 1.500 baris.
-        // Sebelum CR-182 dimuat ±8 detik (readCell per kolom × baris karena read filter). Sekarang muat tanpa filter
+        // Sebelum CR-182 dimuat lambat (readCell per kolom × baris karena read filter). Sekarang muat tanpa filter
         // (R1-3) sehingga cepat. Baris di atas 1.001 tetap tidak ikut diimpor, sama seperti sebelumnya (catatan review b).
         $nomor = range(4, 1502);
         mt_srand(182);
@@ -88,8 +94,8 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
     }
 
     /**
-     * `<col 1..2048>` + baris kosong ber-`r` (verifikator R1-3): sebelum R1 varian 20 ribu baris dimuat ±16 detik dan
-     * varian 130 ribu baris fatal max_execution_time. Dijalankan di proses anak supaya PHPUnit tidak ikut berhenti. Baris
+     * `<col 1..2048>` + baris kosong ber-`r` (verifikator R1-3): sebelum R1 varian 20 ribu baris dimuat 7,5-8,6 detik dan
+     * varian 130 ribu baris fatal (bukti merah utama). Dijalankan di proses anak supaya PHPUnit tidak ikut berhenti. Baris
      * contoh template diganti baris tanpa kategori → galat baris, transaksi dibatalkan (tidak ada yang tersimpan).
      */
     #[DataProvider('barisKosongBanyak')]
@@ -165,7 +171,7 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
 
     /**
      * Kasus terburuk yang masih lolos batas sel (RUANG_SEL 10, tabel ukur di docblock ImporQna): 1.000 baris × 50 kolom
-     * teks = ±50 ribu sel sheet 1, semuanya dibangun karena muat tanpa read filter. Terukur ±1,8 s, puncak PHP 41 MB.
+     * teks = ±50 ribu sel sheet 1, semuanya dibangun karena muat tanpa read filter. Angka terukur di docblock RUANG_SEL.
      */
     public function testKasusTerburukLolosTetapCepat(): void
     {
@@ -191,6 +197,111 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
         $this->assertLessThan(128 * 1024 * 1024, memory_get_peak_usage() - $awal);
         $this->assertCount(1000, $hasil['galat'], 'kategori kosong di semua baris: galat, tidak tersimpan');
         $this->assertSame(0, $this->db->table('qna')->countAllResults());
+    }
+
+    /**
+     * Berkas padat dengan part sheet raksasa (R2-1): unggahan kecil berisi sheet ±32 MB `<c/>`. Di d073a642 jalur pesan
+     * baris (R1-4) menjalankan listWorksheetInfo pada sheet itu (7-12 detik) sebelum "rusak". Sekarang langsung "rusak".
+     */
+    public function testPadatDenganSheetRaksasaDitolakCepat(): void
+    {
+        $berkas = $this->rakit('', '<row r="3">' . str_repeat('<c/>', 7_500_000) . '</row>', [], '', true);
+        $this->assertLessThan(100 * 1024, (int) filesize($berkas), 'unggahan kecil');
+
+        // Ditolak sebelum reader vendor dibuka (terukur < 0,2 s); listWorksheetInfo pada sheet ini saja ±4 s.
+        $mulai = hrtime(true);
+        $this->assertGalatBerkas(self::RUSAK, $berkas);
+        $this->assertLessThan(2.5, (hrtime(true) - $mulai) / 1e9);
+    }
+
+    /**
+     * Penjaga memori opsi A (R2-2): baris ≤ batas, tetapi sel sheet 1 melewati batas (999 baris × 62 kolom ±61 ribu sel)
+     * → "rusak" tanpa memuat. Tanpa penjaga ini seluruh sel dimuat karena tidak ada read filter.
+     */
+    public function testPadatBarisDalamBatasDitolakTanpaMemuat(): void
+    {
+        $baris = '';
+
+        for ($r = 3; $r <= 1001; $r++) {
+            $baris .= "<row r=\"{$r}\"><c r=\"A{$r}\" t=\"inlineStr\"><is><t>P{$r}?</t></is></c>";
+
+            for ($k = 5; $k <= 66; $k++) {
+                $baris .= '<c r="' . Coordinate::stringFromColumnIndex($k) . $r . "\" t=\"inlineStr\"><is><t>isi{$r}</t></is></c>";
+            }
+
+            $baris .= '</row>';
+        }
+
+        $berkas = $this->rakit('', $baris, [], '', true);
+
+        memory_reset_peak_usage();
+        $awal = memory_get_peak_usage();
+        $this->assertGalatBerkas(self::RUSAK, $berkas);
+        $this->assertLessThan(16 * 1024 * 1024, memory_get_peak_usage() - $awal, 'tidak dimuat');
+    }
+
+    /**
+     * xlsx bersandi (paket OLE berisi EncryptionInfo + EncryptedPackage, bentuk yang ditulis Excel; PhpSpreadsheet tidak
+     * bisa menulis xlsx bersandi): bukan ZIP, tetapi `canRead` menerimanya → "rusak" seperti main (R2-3). Berkas yang
+     * benar-benar bukan xlsx tetap mendapat pesan format (ImporQnaTest::testBerkasDitolak).
+     */
+    public function testXlsxBersandiPesanRusakSepertiMain(): void
+    {
+        $info  = new File(OLE::ascToUcs('EncryptionInfo'));
+        $paket = new File(OLE::ascToUcs('EncryptedPackage'));
+        $info->append(str_repeat("\x04", 600));
+        $paket->append(str_repeat("\x01", 5000));
+        $path        = (string) tempnam(sys_get_temp_dir(), 'cbo');
+        $this->tmp[] = $path;
+        $h           = fopen($path, 'wb');
+        $this->assertIsResource($h);
+        (new Root(time(), time(), [$info, $paket]))->save($h);
+        fclose($h);
+
+        $this->assertGalatBerkas(self::RUSAK, $path);
+    }
+
+    /**
+     * Trade-off yang diterima reviewer (R2-6): entri yang tidak pernah dimuat tetapi berdeklarasi encoding selain UTF-8
+     * (mis. SVG di `xl/media`) membuat PemindaiXlsx menolak berkas → "rusak". Di main berkas ini diterima.
+     */
+    public function testEntriBukanUtf8DitolakTradeOff(): void
+    {
+        $svg = '<?xml version="1.0" encoding="ISO-8859-1"?><svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>';
+
+        $this->assertGalatBerkas(self::RUSAK, $this->rakit('', '', ['xl/media/image1.svg' => $svg]));
+    }
+
+    /**
+     * Kasus terburuk yang LOLOS (R2-4): ±48 ribu sel teks inline ±600 byte (999 baris × kolom E-AX), sel dan isi
+     * mendekati batas (50.050 sel, 32 MB). Terukur ±2,8-3,3 s, puncak PHP ±76 MB. Asersi utama memori; waktu diberi
+     * ruang lebar (DETIK_CI_TERBURUK).
+     */
+    public function testKasusTerburukTeksPanjangLolosDenganMemoriTerbatas(): void
+    {
+        $isi   = str_repeat('teks panjang ', 46);
+        $baris = '';
+
+        for ($r = 3; $r <= 1001; $r++) {
+            $baris .= "<row r=\"{$r}\"><c r=\"A{$r}\" t=\"inlineStr\"><is><t>P{$r}?</t></is></c><c r=\"B{$r}\" t=\"inlineStr\"><is><t>J</t></is></c>";
+
+            for ($k = 5; $k <= 50; $k++) {
+                $baris .= '<c r="' . Coordinate::stringFromColumnIndex($k) . $r . "\" t=\"inlineStr\"><is><t>{$isi}{$r}</t></is></c>";
+            }
+
+            $baris .= '</row>';
+        }
+
+        $berkas = $this->rakit('', $baris, [], '', true);
+        $this->assertLessThan(2 * 1024 * 1024, (int) filesize($berkas));
+
+        memory_reset_peak_usage();
+        $awal  = memory_get_peak_usage();
+        $mulai = hrtime(true);
+        $hasil = (new ImporQna($this->db))->impor($this->unggah($berkas));
+        $this->assertLessThan(128 * 1024 * 1024, memory_get_peak_usage() - $awal);
+        $this->assertLessThan(self::DETIK_CI_TERBURUK, (hrtime(true) - $mulai) / 1e9);
+        $this->assertCount(1000, $hasil['galat']);
     }
 
     /**
@@ -273,8 +384,8 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
     public function testBerkasSahTerlaluBanyakBarisTetapPesanBaris(): void
     {
         // Berkas sah yang barisnya terlalu banyak tetap mendapat pesan kontrak lama, bukan "rusak" (R1-4): 13.000 baris
-        // (52.004 sel, di atas ruang sel putaran pertama) dan 55.000 baris (220.004 sel, di atas batas sel sekarang).
-        foreach ([13_001, 55_001] as $akhir) {
+        // (52.004 sel) dan 25.000 baris (100.004 sel); keduanya padat dengan part sheet di bawah MAKS_BYTE_SHEET_PADAT.
+        foreach ([13_001, 25_001] as $akhir) {
             $this->assertGalatBerkas('Jumlah baris data maksimal 1000.', $this->rakit('', $this->barisData(3, $akhir)));
         }
     }

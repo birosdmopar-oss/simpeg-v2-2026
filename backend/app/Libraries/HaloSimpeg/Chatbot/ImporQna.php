@@ -46,15 +46,19 @@ final class ImporQna
     /**
      * Pengali ruang sel untuk pemindaian struktur: sel kosong bergaya, kolom di luar A-E, dan sheet lain tetap ada di XML.
      * Karena muat tanpa read filter, SEMUA sel berisi sheet 1 dibangun, jadi nilai ini ditetapkan dari kasus terburuk yang
-     * lolos (review CR-182 R1-5, PHP 8.4 Windows, satu proses):
+     * lolos (review CR-182 R1-5/R2-4). Diukur 23-11 di mesin pengembang (Windows, PHP 8.4.27 NTS, satu proses CLI,
+     * listWorksheetInfo + load + rangeToArray; beberapa kali, rentang = variasi antarjalan; angka bisa lebih lambat saat
+     * proses lain berjalan):
      *
-     * | sheet 1 (semua lolos `totalRows` ≤ 1.001)          | muat    | puncak PHP | puncak RSS |
-     * |----------------------------------------------------|---------|------------|------------|
-     * | 1.000 baris × 50 kolom teks = 50.050 sel ← batas 10 | ±1,8 s  | 41 MB      | 164 MB     |
-     * | 1.000 baris × 50 kolom angka                        | ±1,35 s | 38 MB      | 120 MB     |
-     * | 50.050 sel teks tersebar sampai kolom 16.000        | ±1,75 s | 42 MB      | 164 MB     |
-     * | 50.050 sel bergaya kosong                           | ±1,1 s  | 8 MB       | 103 MB     |
-     * | (nilai 40) 200.200 sel teks                         | ±8 s    | 136 MB     | 599 MB     |
+     * | sheet 1 (semua lolos `totalRows` ≤ 1.001)                    | muat        | puncak PHP | puncak RSS |
+     * |--------------------------------------------------------------|-------------|------------|------------|
+     * | ±50 ribu sel teks inline ±620 byte (isi ±32 MB) ← terburuk    | 2,8-3,3 s   | 76 MB      | 259 MB     |
+     * | ±50 ribu sel rumus panjang (isi ±32 MB)                      | 1,9-2,6 s   | 70-74 MB   | 266 MB     |
+     * | 1.000 baris × 50 kolom teks pendek = 50.050 sel              | 1,3-1,8 s   | 41 MB      | 164 MB     |
+     * | 50.050 sel bergaya kosong                                    | ±1,1 s      | 8 MB       | 103 MB     |
+     * | (nilai 40) 200.200 sel teks pendek                           | ±8 s        | 136 MB     | 599 MB     |
+     *
+     * Pembanding main (read filter A-D/E1) untuk teks panjang: ±1,3 s / 40 MB (verifikator review).
      *
      * 10 → bawaan 50.050 sel, bobot 400.400. Trade-off: sel dihitung di SEMUA sheet, jadi border/format sampai lebih dari
      * ±12.500 baris, sheet referensi besar, atau rich text ber-run banyak ditolak "rusak" walau di bawah 2 MB; berkas yang
@@ -68,6 +72,14 @@ final class ImporQna
      * (1 langkah); LibreOffice ≤ 7.3 sampai `max="1025"` (±1.021 langkah per sheet) → ±19 sheet bergaya LO masih lolos.
      */
     private const MAKS_ITERASI_KOLOM = 20_000;
+
+    /**
+     * Batas ukuran part sheet terbesar (`xl/worksheets/*`) agar berkas padat masih dibuka listWorksheetInfo untuk pesan
+     * baris (R2-1). Terukur: berkas sah 13.000 baris (unggahan 0,3 MB) → part 2,1 MB; 55.000 baris (1,3 MB) → 9,2 MB;
+     * listWorksheetInfo pada part 8 MB berisi `<c/>` ±1,3 s, 30 MB ±4,1 s. 8 MB → berkas sah sampai ±45 ribu baris masih
+     * mendapat pesan baris; di atas itu "rusak".
+     */
+    private const MAKS_BYTE_SHEET_PADAT = 8 * 1024 * 1024;
 
     /** Batas isi terdekompresi dan byte teks yang disalin pemuat; berkas unggahan sendiri maks 2 MB. */
     private const MAKS_BYTE_ISI = 32 * 1024 * 1024;
@@ -242,8 +254,15 @@ final class ImporQna
             // Urutan penting (review CR-182 R1-1): ukuran isi dari direktori ZIP dulu (tanpa dekompresi), lalu pemindai,
             // BARU reader vendor. `canRead` sudah mendekompresi utuh `_rels/.rels`, jadi bom dekompresi di part itu harus
             // ditolak sebelumnya; fatal memori tidak bisa ditangkap try/catch.
-            $this->periksaUkuranZip($path);
-            $padat = $this->periksaStruktur($path);
+            $sheetTerbesar = $this->periksaUkuranZip($path, $reader);
+            $padat         = $this->periksaStruktur($path);
+
+            // Berkas padat (sel/bobot terlampaui) hanya dibuka listWorksheetInfo untuk memilih pesan (R1-4) bila part sheet
+            // terbesarnya wajar untuk berkas sah: listWorksheetInfo menampung part sheet utuh dan membaca semua node, jadi
+            // sheet 32 MB berisi `<c/>` butuh 7-12 detik (review CR-182 R2-1). Selain itu langsung "rusak".
+            if ($padat && $sheetTerbesar > self::MAKS_BYTE_SHEET_PADAT) {
+                throw ValidationException::forField('berkas', 'Berkas Excel rusak atau tidak dapat dibaca.');
+            }
 
             if (! $reader->canRead($path)) {
                 throw ValidationException::forField('berkas', 'Berkas harus berformat .xlsx.');
@@ -270,9 +289,11 @@ final class ImporQna
             $reader->setReadDataOnly(true);
             $reader->setLoadSheetsOnly([(string) $info['worksheetName']]);
             // TANPA read filter (review CR-182 R1-3): dengan filter, `ColumnAndRowAttributes` PhpSpreadsheet 5.10 memanggil
-            // readCell untuk setiap kolom `<col>` × setiap baris (`<col 1..2048>` + 20 ribu baris kosong = 16 detik). Tanpa
-            // filter dan readDataOnly, biayanya linear; baris tanpa sel juga tidak dicatat. Sel yang dimuat = sel sheet 1,
-            // dibatasi `sel`/`bobot` pemindai. Isi tetap hanya A1:D(maks+1) + E1 (review CR V-2); rumus tidak dihitung
+            // readCell untuk setiap kolom `<col>` × setiap baris (`<col 1..2048>` + 20 ribu baris kosong: 7,5-8,6 detik terukur;
+            // 130 ribu baris: fatal max_execution_time). Biaya linear berasal dari TIDAK adanya filter: tanpa filter
+            // rowsAttributes tidak dibangun di readDataOnly. `setIgnoreRowsWithNoCells(true)` dalam kondisi ini no-op, dipasang
+            // hanya sebagai pertahanan berlapis bila filter kelak dipasang lagi. Sel yang dimuat = sel sheet 1, dibatasi
+            // `sel`/`bobot` pemindai. Isi tetap hanya A1:D(maks+1) + E1 (review CR V-2); rumus tidak dihitung
             // (`calculateFormulas` false) sehingga teks sel sama dengan saat masih memakai filter. Baris di atas maks+1
             // (mis. urutan `r` acak yang menipu totalRows) tetap tidak ikut, seperti sebelumnya.
             $reader->setIgnoreRowsWithNoCells(true);
@@ -380,9 +401,14 @@ final class ImporQna
      * (border template, review CR V-1) dan kolom lain di luar A-E; anggaran bobot per sel sama dengan impor slip
      * (`Presensi::BOBOT_PER_SEL_IMPOR`). Yang ditolak: `<col>` tidak sah (`max` < `min` membuat
      * `Reader\Xlsx\ColumnAndRowAttributes::readColumnAttributes` PhpSpreadsheet 5.10 berputar tanpa akhir walau
-     * readDataOnly), definisi kolom yang terlalu lebar diulang (biaya muat naik linear × jumlah baris), isi terdekompresi
-     * atau salinan teks terlalu besar, terlalu banyak tabel, dan berkas yang tidak bisa dipindai. Semuanya → 422 dengan
-     * pesan "rusak" yang sudah ada; tidak ada pesan baru.
+     * readDataOnly), langkah `<col>` di atas batas (tanpa read filter biayanya linear, tidak dikali jumlah baris), isi
+     * terdekompresi atau salinan teks terlalu besar, terlalu banyak tabel, dan berkas yang tidak bisa dipindai. Semuanya
+     * → 422 dengan pesan "rusak" yang sudah ada; tidak ada pesan baru. Sel/bobot terlampaui → `true` (padat), pemanggil
+     * memilih pesan baris atau "rusak".
+     *
+     * Trade-off yang diterima reviewer (R2-6): entri ZIP yang deklarasi encoding-nya bukan UTF-8 ditolak pemindai walau
+     * entri itu tidak pernah dimuat (SVG di `xl/media`, `docProps`, `customXml`); di main berkas seperti ini diterima.
+     * PemindaiXlsx tidak boleh diubah di CR ini.
      */
     private function periksaStruktur(string $path): bool
     {
@@ -409,27 +435,45 @@ final class ImporQna
 
     /**
      * Jumlah ukuran sesudah dekompresi semua entri menurut direktori ZIP (`statIndex`, tanpa mendekompresi apa pun),
-     * sebelum reader vendor menyentuh berkas (R1-1). Bukan ZIP → pesan format seperti `canRead` (perilaku lama).
+     * sebelum reader vendor menyentuh berkas (R1-1).
+     *
+     * Bukan ZIP: pesan format hanya bila `canRead` juga menolak (perilaku lama). `canRead` untuk berkas bukan ZIP hanya
+     * membaca header, jadi aman; xlsx bersandi (paket OLE terenkripsi) lolos `canRead` → "rusak" seperti main (R2-3).
+     *
+     * @return int ukuran terbesar entri di bawah `xl/worksheets/` (dipakai untuk jalur padat, R2-1)
      */
-    private function periksaUkuranZip(string $path): void
+    private function periksaUkuranZip(string $path, Xlsx $reader): int
     {
         $zip = new ZipArchive();
 
         if ($zip->open($path, ZipArchive::RDONLY) !== true) {
-            throw ValidationException::forField('berkas', 'Berkas harus berformat .xlsx.');
+            if (! $reader->canRead($path)) {
+                throw ValidationException::forField('berkas', 'Berkas harus berformat .xlsx.');
+            }
+
+            throw ValidationException::forField('berkas', 'Berkas Excel rusak atau tidak dapat dibaca.');
         }
 
         try {
-            $byte = 0;
+            $byte     = 0;
+            $terbesar = 0;
 
             for ($i = 0; $i < $zip->numFiles; $i++) {
-                $stat = $zip->statIndex($i);
-                $byte += $stat === false ? PHP_INT_MAX >> 1 : (int) $stat['size'];
+                $stat   = $zip->statIndex($i);
+                $ukuran = $stat === false ? PHP_INT_MAX >> 1 : (int) $stat['size'];
+                $byte += $ukuran;
 
                 if ($byte > self::MAKS_BYTE_ISI) {
                     throw ValidationException::forField('berkas', 'Berkas Excel rusak atau tidak dapat dibaca.');
                 }
+
+                // Nama entri dibandingkan tanpa peka huruf dan tanpa `/` di depan, longgar terhadap Target relasi pemuat.
+                if ($stat === false || str_starts_with(strtolower(ltrim((string) $stat['name'], '/')), 'xl/worksheets/')) {
+                    $terbesar = max($terbesar, $ukuran);
+                }
             }
+
+            return $terbesar;
         } finally {
             $zip->close();
         }
