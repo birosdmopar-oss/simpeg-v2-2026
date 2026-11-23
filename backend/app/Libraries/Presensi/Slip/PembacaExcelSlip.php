@@ -173,11 +173,15 @@ final class PembacaExcelSlip
 
     /**
      * Ukuran isi arsip sebelum APA PUN dibaca darinya (CR-188). `IOFactory::createReaderForFile` menjalankan
-     * `Xlsx::canRead`, yang mendekompresi `_rels/.rels` utuh ke memori (dua kali), dan `listWorksheetNames` berikutnya
-     * menampung `[Content_Types].xml`, relasi workbook, dan `xl/workbook.xml`; semuanya terjadi sebelum
-     * {@see PemindaiXlsx::pindai()}. Entri 700 MB di salah satunya (berkas < 1 MB) dulu berakhir fatal memori (500), bukan
-     * 422. Jumlah ukuran SEMUA entri menurut direktori pusat ZIP dibandingkan dengan batas isi yang sama dengan
-     * {@see self::praCekXlsx()}, tanpa mendekompresi apa pun. Berkas yang bukan ZIP (`.xls`) tidak diperiksa di sini.
+     * `Xlsx::canRead`, yang mendekompresi `_rels/.rels` utuh ke memori (dua kali) SEBELUM {@see PemindaiXlsx::pindai()}
+     * berjalan: `_rels/.rels` 700 MB (berkas ±3 MB) dulu berakhir fatal memori (500), bukan 422. Hanya entri itu yang
+     * ditampung utuh sebelum pemindai; entri lain yang dibaca utuh (`[Content_Types].xml`, relasi workbook,
+     * `xl/workbook.xml` lewat `listWorksheetNames`) baru dibaca sesudah pemindai dan sudah tertolak di sana. Sebagai pagar
+     * umum, jumlah ukuran SEMUA entri menurut direktori pusat ZIP dibandingkan dengan batas isi yang sama dengan
+     * {@see self::praCekXlsx()}, tanpa mendekompresi apa pun.
+     *
+     * Berkas yang bukan ZIP (`.xls`) tidak diperiksa di sini, dan tahap pengenalan reader untuk `.xls` BELUM dipagari:
+     * berkas berkepala OLE palsu masih bisa fatal memori di `Xls::canRead` (lihat README BB-2).
      *
      * @throws BerkasImporDitolak
      */

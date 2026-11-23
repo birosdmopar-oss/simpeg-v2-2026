@@ -17,13 +17,15 @@ use Tests\Support\Presensi\XlsxMentah;
 
 /**
  * CR-188 — ukuran isi arsip diperiksa SEBELUM reader vendor menyentuh berkas. Mengenali jenis berkas saja
- * (`IOFactory::createReaderForFile` → `Xlsx::canRead`) sudah mendekompresi `_rels/.rels` utuh ke memori, dan
- * `listWorksheetNames` menampung `[Content_Types].xml`, relasi workbook, dan `xl/workbook.xml`; semuanya sebelum
- * `PemindaiXlsx::pindai`. Berkas < 1 MB dengan salah satu entri itu mengembang ratusan MB dulu berakhir fatal memori
- * (500, tidak tertangkap), bukan 422.
+ * (`IOFactory::createReaderForFile` → `Xlsx::canRead`) sudah mendekompresi `_rels/.rels` utuh ke memori (dua kali),
+ * sebelum `PemindaiXlsx::pindai`. Berkas ±3 MB dengan `_rels/.rels` mengembang 700 MB dulu berakhir fatal memori (500,
+ * tidak tertangkap), bukan 422; 300 MB ditolak tetapi sesudah ditampung utuh. Entri lain yang dibaca utuh
+ * (`[Content_Types].xml`, relasi workbook, `xl/workbook.xml`) baru dibaca sesudah pemindai, jadi sebelum CR-188 pun
+ * sudah tertolak; kasusnya ada di sini sebagai pagar regresi.
  *
  * Berkas dibaca di proses PHP tersendiri (`tests/_support/Presensi/anak_baca_slip.php`) dengan `memory_limit` 512M (syarat
- * deploy) dan 256M, supaya galat fatal terlihat sebagai kegagalan test, bukan mematikan PHPUnit.
+ * deploy) dan 256M serta `max_execution_time` 30, supaya galat fatal dan kemacetan terlihat sebagai kegagalan test,
+ * bukan mematikan atau menggantung PHPUnit.
  *
  * @internal
  */
@@ -51,9 +53,10 @@ final class PembacaExcelSlipBomArsipTest extends CIUnitTestCase
     }
 
     /**
-     * Entri yang ditampung utuh sebelum pemindai berjalan, mengembang jauh di atas `memory_limit`: 422 dengan pesan batas
-     * isi, cepat, dan puncak memori kecil. Isi entri tetap XML yang sah (isi asli + spasi), jadi satu-satunya yang tidak
-     * wajar adalah ukurannya.
+     * Entri yang mengembang jauh di atas batas isi: 422 dengan pesan batas isi, cepat, dan puncak memori kecil. Isi entri
+     * tetap XML yang sah (isi asli + spasi), jadi satu-satunya yang tidak wajar adalah ukurannya. Yang merah sebelum
+     * CR-188 hanya dua data set `_rels/.rels` (satu-satunya entri yang ditampung utuh sebelum pemindai); data set lain
+     * adalah pagar regresi: sebelum CR-188 sudah ditolak pemindai, dan harus tetap ditolak tanpa ditampung.
      */
     #[DataProvider('entriBom')]
     public function testEntriMengembangDitolakSebelumReaderDibuka(string $entri, int $mb): void
@@ -81,10 +84,10 @@ final class PembacaExcelSlipBomArsipTest extends CIUnitTestCase
     {
         yield '_rels/.rels 700 MB (dibaca Xlsx::canRead)' => ['_rels/.rels', 700];
         yield '_rels/.rels 300 MB (di bawah memory_limit 512M, tetap tidak boleh ditampung)' => ['_rels/.rels', 300];
-        yield '[Content_Types].xml 300 MB' => ['[Content_Types].xml', 300];
-        yield 'xl/_rels/workbook.xml.rels 300 MB' => ['xl/_rels/workbook.xml.rels', 300];
-        yield 'xl/workbook.xml 300 MB (listWorksheetNames)' => ['xl/workbook.xml', 300];
-        yield 'entri di luar yang dibaca reader 300 MB' => ['docProps/app.xml', 300];
+        yield '[Content_Types].xml 300 MB (pagar regresi)' => ['[Content_Types].xml', 300];
+        yield 'xl/_rels/workbook.xml.rels 300 MB (pagar regresi)' => ['xl/_rels/workbook.xml.rels', 300];
+        yield 'xl/workbook.xml 300 MB (pagar regresi)' => ['xl/workbook.xml', 300];
+        yield 'entri di luar yang dibaca reader 300 MB (pagar regresi)' => ['docProps/app.xml', 300];
     }
 
     /**
@@ -169,7 +172,7 @@ final class PembacaExcelSlipBomArsipTest extends CIUnitTestCase
      */
     private function bacaDiProsesAnak(string $path, string $batasMemori): array
     {
-        $perintah = escapeshellarg(PHP_BINARY) . ' -d memory_limit=' . $batasMemori . ' -d display_errors=1 '
+        $perintah = escapeshellarg(PHP_BINARY) . ' -d memory_limit=' . $batasMemori . ' -d max_execution_time=30 -d display_errors=1 '
             . escapeshellarg(SUPPORTPATH . 'Presensi/anak_baca_slip.php') . ' ' . escapeshellarg($path) . ' 2>&1';
         $baris = [];
         $kode  = 0;
