@@ -208,6 +208,18 @@ MAKE-052 merged + MAKE-054.
 - **Test (AC-D10.1–10):** `tests/Presensi/Slip/ImporSlip{Pratinjau,Commit,MismatchNama,Duplikat,KonflikUnique,Akses,Berkas}Test.php`
   + `tests/unit/Presensi/Slip/{PembacaExcelSlip,PenyimpanPratinjau}Test.php`; berkas Excel sintetis dibangkitkan test
   (`tests/_support/Presensi/ImporSlipUjiTrait.php`). Konflik 1062 lewat seam `kaitSebelumTulis` (PRD §7.2.6).
+- **CR-177 (22-11-2026):** impor slip tidak lagi 500 karena memori/waktu habis saat membaca berkas. `PembacaExcelSlip`:
+  reader dikunci ke Xlsx/Xls; `.xlsx` dipindai dulu oleh `PemindaiXlsx` (semua entri ZIP, aliran, tanpa mengikuti relasi)
+  terhadap anggaran seluruh berkas: isi ≤ 32 MB, sel ≤ (batas baris + 1) × 40, bobot elemen XML ≤ batas sel × 8, langkah
+  `<col>` ≤ 200.000, `<tablePart>` ≤ 50, salinan teks (shared string + rumus shared) ≤ 32 MB (konstanta
+  `Config\Presensi`; pesan 422 sendiri untuk isi dan sel, satu pesan "struktur" untuk empat lainnya); `.xls` lewat
+  `listWorksheetInfo`; GPP dan TK tetap dimuat dalam satu muatan (rumus lintas sheet terhitung), batas baris dan kolom
+  (256, baru) diperiksa sesudah muat sebelum array disusun; tanpa read filter. Perubahan perilaku [V2]: berkas HTML/CSV
+  berkedok Excel, entri ber-encoding selain UTF-8, nama sheet kembar, dan GPP/TK berisi part yang sama → "Berkas tidak
+  dapat dibaca". Kebutuhan server: `memory_limit` ≥ 512M dan RAM bebas ±1 GB per impor (template penuh: PHP +214 MB, RSS
+  612 MB; 390 ribu sel teks pendek: PHP +258 MB, RSS 925 MB). Rincian dan angka ukur: README `Libraries/Presensi`
+  BB-1..BB-11. Test:
+  `tests/unit/Presensi/Slip/PembacaExcelSlipBatasBacaTest.php`, `tests/Presensi/Slip/ImporSlipBatasBacaTest.php`.
 - **Catatan perilaku:** berkas tanpa ekstensi ditolak "Isi berkas tidak sesuai dengan ekstensinya." dan isi ber-jenis lain
   (mis. PDF bernama `.xlsx`) "Format berkas harus .xlsx atau .xls." — sama dengan aturan `ValidasiBerkas` jalur lampiran
   (CR-054); galat filter periode dipetakan ke `errors.filter_bulan` + `code`.

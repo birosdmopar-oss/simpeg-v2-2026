@@ -196,8 +196,10 @@ final class ImporQna
         $buku   = null;
         $ekstra = '';
 
-        // Ukuran sheet diperiksa SEBELUM memuat (listWorksheetInfo membaca dimensi secara streaming): xlsx kecil dengan satu sel
-        // di baris 1.048.576 tidak boleh dimuat penuh ke memori (pola PembacaExcelSlip).
+        // Ukuran sheet diperiksa SEBELUM memuat: xlsx kecil dengan satu sel di baris 1.048.576 tidak boleh dimuat penuh ke
+        // memori. listWorksheetInfo memindai XML sheet tanpa membangun sel, tetapi isi part tetap ditampung utuh sebagai
+        // string dan `totalRows` = atribut `r` baris TERAKHIR (bukan maksimum). Impor slip memakai pemindai sendiri
+        // (`Presensi\Slip\PemindaiXlsx`, CR-177) karena itu; di sini berkas dibatasi 2 MB dan muatan dibatasi read filter.
         try {
             if (! $reader->canRead($path)) {
                 throw ValidationException::forField('berkas', 'Berkas harus berformat .xlsx.');
