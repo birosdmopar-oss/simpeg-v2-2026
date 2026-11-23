@@ -7,9 +7,11 @@ namespace Tests\Unit\Presensi\Slip;
 use App\Libraries\Presensi\Slip\BerkasImporDitolak;
 use App\Libraries\Presensi\Slip\PembacaExcelSlip;
 use App\Libraries\Presensi\Slip\PemuatXlsxSlip;
+use App\Libraries\Presensi\Slip\PenaksirBebanRumus;
 use App\Libraries\Presensi\SlipGaji\KolomGaji;
 use CodeIgniter\Test\CIUnitTestCase;
 use Config\Presensi;
+use PhpOffice\PhpSpreadsheet\Calculation\Calculation;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\IOFactory;
@@ -17,8 +19,10 @@ use PhpOffice\PhpSpreadsheet\NamedRange;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Worksheet\Table;
 use PHPUnit\Framework\Attributes\DataProvider;
+use ReflectionProperty;
 use RuntimeException;
 use Tests\Support\Presensi\XlsxMentah;
+use ZipArchive;
 
 /**
  * CR-181 — anggaran beban hitung rumus impor Slip Gaji. Sel rumus GPP/TK tetap DIHITUNG ULANG (legacy, AC-D10.9); yang
@@ -108,6 +112,23 @@ final class PembacaExcelSlipAnggaranRumusTest extends CIUnitTestCase
         yield 'rumus bernama raksasa' => [...$tk('=TOTAL+1'), ['TOTAL' => 'SUM(GPP!$J$2:$J$1048576)']];
         yield 'nama berantai ke rentang raksasa' => [...$tk('=LUAR'), ['LUAR' => 'DALAM+1', 'DALAM' => 'SUM(GPP!$J$2:$J$1048576)']];
         yield 'nama terdefinisi berputar' => [...$tk('=PUTAR1'), ['PUTAR1' => 'PUTAR2+1', 'PUTAR2' => 'PUTAR1+1']];
+
+        // Nama bercabang 10 pangkat 7: penaksiran harus berhenti begitu batas terlewati, bukan menelusuri semuanya.
+        $cabang = ['Nm_7' => '1'];
+
+        for ($i = 0; $i < 7; $i++) {
+            $cabang['Nm_' . $i] = implode('+', array_fill(0, 10, 'Nm_' . ($i + 1)));
+        }
+
+        yield 'nama bercabang 10 pangkat 7' => [...$tk('=Nm_0'), $cabang];
+
+        // Rumus lebih panjang dari batas Excel (8.192 karakter): biaya urai kalkulator kuadratik.
+        yield 'rumus 200 ribu karakter tanpa titik dua' => $tk('=' . implode('+', array_fill(0, 66_667, 'A1')));
+        yield 'rumus satu karakter di atas batas Excel' => $gpp('=' . str_repeat('1+', 4095) . '11');
+        // REPT memanggil str_repeat sebelum memeriksa panjang hasil.
+        yield 'REPT berjumlah ulang raksasa' => $gpp('=REPT("x",2000000000)');
+        yield 'REPT berjumlah ulang bukan literal' => $gpp('=REPT("0",18-LEN(A2))');
+        yield 'COUNTIFS tiga rentang 10.000 baris' => $tk('=COUNTIFS(GPP!$C$2:$C$10001,">5",GPP!$A$2:$A$10001,">5",GPP!$C$2:$C$10001,"<90")');
     }
 
     /**
@@ -137,7 +158,7 @@ final class PembacaExcelSlipAnggaranRumusTest extends CIUnitTestCase
         $tk   = $buku->getSheetByName(KolomGaji::SHEET_TK);
         $this->assertNotNull($tk);
 
-        for ($r = 2; $r <= 9; $r++) {
+        for ($r = 2; $r <= 13; $r++) {
             $tk->setCellValue('M' . $r, '=VLOOKUP(A' . $r . ',GPP!$A$1:$Z$10001,5,0)');
         }
 
@@ -156,7 +177,7 @@ final class PembacaExcelSlipAnggaranRumusTest extends CIUnitTestCase
     {
         $sel = [];
 
-        // 40 sel "=E2+1": beban 40 × (beban dasar + 5 karakter).
+        // 40 sel "=E2+1": beban 40 × (beban dasar + 5 karakter); suku kuadratik panjangnya nol.
         for ($c = 28; $c < 68; $c++) {
             $sel[] = XlsxMentah::rumus(XlsxMentah::kolom($c) . '2', '=E2+1');
         }
@@ -169,17 +190,300 @@ final class PembacaExcelSlipAnggaranRumusTest extends CIUnitTestCase
     }
 
     /**
-     * Satuan beban satu rentang: baris × kolom + baris² / pembagi, ditambah beban dasar dan panjang teks rumus.
+     * Satuan beban satu rentang: beban tetap + baris × kolom + baris² / pembagi, ditambah beban dasar sel (beban tetap +
+     * panjang teks). Rentang yang menjadi argumen fungsi selain yang terukur murah (`SUM`, `COUNT`, `AVERAGE`, …)
+     * memakai pembagi kuadratik yang lebih kecil; argumen fungsi berkriteria luasnya dikalikan 10.
+     *
+     * @param callable(int, int): int $rentang beban rentang dari (baris, kolom)
      */
-    public function testBebanRentangDihitungDariLuasDanJumlahBaris(): void
+    #[DataProvider('bebanRentang')]
+    public function testBebanRentangDihitungDariLuasBarisDanFungsi(string $rumus, callable $rentang, int $harapan): void
     {
-        $rumus = '=SUM(A1:J300)';
         $path  = $this->xlsx([XlsxMentah::rumus('AB2', $rumus)]);
-        $beban = Presensi::BEBAN_DASAR_RUMUS_IMPOR + strlen($rumus) + 300 * 10 + intdiv(300 * 300, Presensi::PEMBAGI_KUADRAT_BARIS_RUMUS_IMPOR);
+        $beban = Presensi::BEBAN_DASAR_RUMUS_IMPOR + strlen($rumus) + Presensi::BEBAN_TETAP_RENTANG_RUMUS_IMPOR + $rentang(600, 10);
 
-        $this->assertSame(3029, $beban);
+        $this->assertSame($harapan, $beban);
         $this->assertDitolak($path, new PembacaExcelSlip(10000, maksBebanPerRumus: $beban - 1));
         $this->assertDiterima($path, new PembacaExcelSlip(10000, maksBebanPerRumus: $beban));
+    }
+
+    /**
+     * @return iterable<string, array{0: string, 1: callable(int, int): int, 2: int}>
+     */
+    public static function bebanRentang(): iterable
+    {
+        $murah = static fn (int $baris, int $kolom): int => $baris * $kolom + intdiv($baris * $baris, Presensi::PEMBAGI_KUADRAT_BARIS_RUMUS_IMPOR);
+        $umum  = static fn (int $baris, int $kolom): int => $baris * $kolom + intdiv($baris * $baris, Presensi::PEMBAGI_KUADRAT_BARIS_UMUM_RUMUS_IMPOR);
+
+        yield 'SUM (murah)' => ['=SUM(A1:J600)', $murah, 18 + 13 + 20 + 6000 + 60];
+        yield 'rentang tanpa fungsi' => ['=A1:J600', $murah, 18 + 8 + 20 + 6000 + 60];
+        yield 'MAX (umum)' => ['=MAX(A1:J600)', $umum, 18 + 13 + 20 + 6000 + 400];
+        yield 'VLOOKUP (umum)' => ['=VLOOKUP(1,A1:J600,2,0)', $umum, 18 + 23 + 20 + 6000 + 400];
+        yield 'COUNTIF (berkriteria)' => ['=COUNTIF(A1:J600,1)', static fn (int $baris, int $kolom): int => $umum($baris, $kolom) + 9 * $baris * $kolom, 18 + 19 + 20 + 60000 + 400];
+        yield 'rentang di dalam fungsi di dalam fungsi' => ['=ROUND(MAX(A1:J600),0)', $umum, 18 + 22 + 20 + 6000 + 400];
+    }
+
+    /**
+     * `REPT` berargumen literal ditaksir dari byte hasilnya (tiap hasil tersimpan beberapa salinan sampai impor selesai):
+     * 2.000 sel × 32.767 emoji dulu lolos taksiran lalu memori habis.
+     */
+    public function testReptLiteralDitaksirDariUkuranHasil(): void
+    {
+        $rumus = '=REPT("ab",500)';
+        $path  = $this->xlsx([XlsxMentah::rumus('AB2', $rumus)]);
+        $beban = Presensi::BEBAN_DASAR_RUMUS_IMPOR + strlen($rumus) + intdiv(2 * 500, Presensi::BYTE_PER_BEBAN_TEKS_RUMUS_IMPOR);
+
+        $this->assertDitolak($path, new PembacaExcelSlip(10000, maksBebanPerRumus: $beban - 1));
+        $sheet = $this->assertDiterima($path, new PembacaExcelSlip(10000, maksBebanPerRumus: $beban));
+        $this->assertSame(str_repeat('ab', 500), $sheet['GPP'][2][27]);
+
+        $emoji = '';
+
+        for ($r = 2; $r <= 2001; $r++) {
+            $emoji .= '<row r="' . $r . '">' . XlsxMentah::sel('A' . $r, self::NIP) . XlsxMentah::rumus('M' . $r, '=REPT("😀",32767)') . '</row>';
+        }
+
+        $path = $this->temp('.xlsx');
+        XlsxMentah::tulis($path, ['GPP' => self::sheetGpp(), 'TK' => XlsxMentah::baris(1, self::headerTk()) . $emoji]);
+
+        $this->assertDitolak($path);
+    }
+
+    /**
+     * 29 sel `COUNTIFS` dua rentang 10.000 baris: tiap sel masih di bawah batas per rumus. Sebelum pengali fungsi
+     * berkriteria, berkas ini lolos taksiran lalu dihitung 141 detik.
+     */
+    public function testFungsiBerkriteriaAtasRentangBesarDitolakLewatJumlahAnggaran(): void
+    {
+        $gpp = XlsxMentah::baris(1, self::headerGpp());
+
+        for ($r = 2; $r <= 10001; $r++) {
+            $gpp .= '<row r="' . $r . '">' . XlsxMentah::sel('A' . $r, self::NIP) . XlsxMentah::sel('E' . $r, $r % 97) . '</row>';
+        }
+
+        $tk = XlsxMentah::baris(1, self::headerTk());
+
+        for ($r = 2; $r <= 30; $r++) {
+            $tk .= '<row r="' . $r . '">' . XlsxMentah::sel('A' . $r, self::NIP) . XlsxMentah::rumus('M' . $r, '=COUNTIFS(GPP!$E$2:$E$5001,">5",GPP!$E$5002:$E$10001,"<90")') . '</row>';
+        }
+
+        $path = $this->temp('.xlsx');
+        XlsxMentah::tulis($path, ['GPP' => $gpp, 'TK' => $tk]);
+
+        $this->assertDitolak($path);
+    }
+
+    /**
+     * Pesan baris/kolom tetap menang atas pesan rumus, seperti sebelum CR-181: admin yang mengunggah terlalu banyak
+     * baris tidak disuruh menempel nilai dulu.
+     */
+    public function testPesanUkuranMenangAtasPesanRumus(): void
+    {
+        $gpp = XlsxMentah::baris(1, self::headerGpp());
+
+        for ($r = 2; $r <= 10003; $r++) {
+            $gpp .= '<row r="' . $r . '">' . XlsxMentah::sel('A' . $r, self::NIP) . '</row>';
+        }
+
+        $berat = '<row r="2">' . XlsxMentah::sel('A2', self::NIP) . XlsxMentah::rumus('M2', '=SUM(GPP!J2:J1048576)') . '</row>';
+        $path  = $this->temp('.xlsx');
+        XlsxMentah::tulis($path, ['GPP' => $gpp, 'TK' => XlsxMentah::baris(1, self::headerTk()) . $berat]);
+
+        try {
+            (new PembacaExcelSlip(10000))->baca($path);
+            $this->fail('berkas harus ditolak');
+        } catch (BerkasImporDitolak $e) {
+            $this->assertSame('Jumlah baris melebihi batas 10.000 per sheet.', $e->getMessage());
+        }
+
+        // Kolom TK lewat batas + rumus berat di GPP: pesan kolom.
+        $path = $this->xlsx([XlsxMentah::rumus('AB2', '=SUM(J2:J1048576)')], [XlsxMentah::sel('IW2', 1)]);
+
+        try {
+            (new PembacaExcelSlip(10000))->baca($path);
+            $this->fail('berkas harus ditolak');
+        } catch (BerkasImporDitolak $e) {
+            $this->assertSame('Jumlah kolom melebihi batas 256 per sheet.', $e->getMessage());
+        }
+    }
+
+    /**
+     * Rumus tepat di batas panjang Excel (8.192 karakter) masih diterima dan dihitung.
+     */
+    public function testRumusTepatDiBatasPanjangExcelDiterima(): void
+    {
+        $rumus = '=' . str_repeat('1+', 4095) . '1';
+        $this->assertSame(Presensi::MAKS_PANJANG_RUMUS_IMPOR, strlen($rumus));
+
+        $sheet = $this->assertDiterima($this->xlsx([XlsxMentah::rumus('AB2', $rumus)]));
+
+        $this->assertEquals(4096, $sheet['GPP'][2][27]);
+    }
+
+    /**
+     * Kalibrasi: templat 10.000 baris dengan beberapa kolom rumus wajar harus masuk anggaran (diterima cepat sebelum
+     * CR-181). Dihitung dari taksiran satu baris × 10.000, tanpa menghitung berkasnya.
+     *
+     * @param list<string> $rumus rumus kolom-kolom satu baris
+     */
+    #[DataProvider('templatWajar')]
+    public function testTemplatBerumusWajarMasukAnggaran(array $rumus, int $baris): void
+    {
+        $buku = self::bukuSah();
+        $gpp  = $buku->getSheetByName(KolomGaji::SHEET_GPP);
+        $this->assertNotNull($gpp);
+        $penaksir = new PenaksirBebanRumus($buku);
+        $beban    = 0;
+
+        foreach ($rumus as $i => $r) {
+            $sel = $gpp->getCell(XlsxMentah::kolom(40 + $i) . '2');
+            $sel->setValue($r);
+            $beban += $penaksir->beban($sel);
+        }
+
+        $buku->disconnectWorksheets();
+
+        $this->assertLessThanOrEqual(Presensi::MAKS_BEBAN_RUMUS_IMPOR, $beban * $baris, 'beban per baris ' . $beban);
+    }
+
+    /**
+     * @return iterable<string, array{0: list<string>, 1: int}>
+     */
+    public static function templatWajar(): iterable
+    {
+        $pph = '=ROUND(IF(G2<=5000000,G2*5%,IF(G2<=20000000,250000+(G2-5000000)*15%,IF(G2<=40000000,2500000+(G2-20000000)*25%,7500000+(G2-40000000)*30%))),0)';
+
+        yield '10.000 baris, 3 kolom ROUND(IF)' => [array_fill(0, 3, '=ROUND(IF(C2>0,C2*0.05+D2*0.1-E2,0),0)'), 10000];
+        yield '10.000 baris, satu kolom PPh progresif' => [[$pph], 10000];
+        yield '10.000 baris, 6 kolom selisih sederhana' => [array_fill(0, 6, '=E2-F2'), 10000];
+        yield '10.000 baris, 2 kolom SUM baris' => [['=SUM(E2:Z2)', '=SUM(E2:Q2)-SUM(R2:Y2)'], 10000];
+        yield '3.000 pegawai, 10 kolom rumus campuran' => [[
+            '=ROUND(2%*(E2+F2+G2),0)', '=ROUND(10%*(E2+F2+G2),0)', '=ROUNDUP(SUM(E2:N2),-2)-SUM(E2:N2)', '=SUM(E2:Q2)-SUM(R2:Y2)',
+            '=VLOOKUP(K2,$N$2:$O$18,2,0)', '=ROUND(E2*L2,0)', '=E2-F2', $pph, '=H2', '=G2+I2-H2',
+        ], 3000];
+    }
+
+    // ------------------------------------------------------------------------------------------------------------------
+    // Penaksir tidak menyentuh workbook
+    // ------------------------------------------------------------------------------------------------------------------
+
+    /**
+     * Penaksir tidak boleh membuat sel, menghitung sel, atau mengisi cache kalkulator milik workbook. Tabel dengan sel
+     * judul yang tidak ada dan sel judul berumus: `StructuredReference::parse` milik vendor membuat sel judul itu dan
+     * menghitungnya lewat kalkulator workbook.
+     */
+    public function testPenaksirTidakMembuatAtauMenghitungSel(): void
+    {
+        $buku = self::bukuSah();
+        $gpp  = $buku->getSheetByName(KolomGaji::SHEET_GPP);
+        $tk   = $buku->getSheetByName(KolomGaji::SHEET_TK);
+        $this->assertNotNull($gpp);
+        $this->assertNotNull($tk);
+
+        // Tabel GPP selebar satu kolom lebih dari data; tabel TK dengan sel judul berumus.
+        $akhir = XlsxMentah::kolom(count(self::headerGpp()) + 1);
+        $gpp->addTable(new Table('A1:' . $akhir . '2', 'TabelGpp'));
+        $tk->setCellValue('M1', 'jumlah');
+        $tk->addTable(new Table('A1:M2', 'TabelTk'));
+        $buku->addNamedRange(new NamedRange('POKOK', $gpp, '$E$2'));
+
+        $tk->setCellValue('N2', '=SUM(TabelGpp[' . self::headerGpp()[4] . '])+COUNTA(TabelGpp)+POKOK+SUM(GPP!E:E)');
+        $gpp->setCellValue('AD2', '=SUM(TabelTk[jumlah])+SUM(TabelTk[[#All],[nip]:[jumlah]])');
+        $gpp->setCellValue('AE2', '=TabelGpp[[#This Row],[' . self::headerGpp()[4] . ']]*2');
+
+        // Sel judul yang "tidak ditulis" dan sel judul berumus, sesudah tabel terdaftar.
+        $gpp->getCellCollection()->delete($akhir . '1');
+        $tk->getCell('M1')->setValueExplicit('=GPP!E2&"x"', DataType::TYPE_FORMULA);
+        Calculation::getInstance($buku)->clearCalculationCache();
+
+        $selGpp   = $gpp->getCoordinates();
+        $selTk    = $tk->getCoordinates();
+        $penaksir = new PenaksirBebanRumus($buku);
+
+        foreach ([[$tk, 'N2'], [$gpp, 'AD2'], [$gpp, 'AE2'], [$tk, 'M1']] as [$lembar, $koordinat]) {
+            $beban = $penaksir->beban($lembar->getCell($koordinat));
+
+            $this->assertGreaterThan(Presensi::BEBAN_DASAR_RUMUS_IMPOR, $beban, $koordinat);
+            $this->assertLessThan(10_000, $beban, $koordinat);
+        }
+
+        $this->assertSame($selGpp, $gpp->getCoordinates(), 'tidak ada sel GPP yang dibuat');
+        $this->assertSame($selTk, $tk->getCoordinates(), 'tidak ada sel TK yang dibuat');
+
+        $cache = new ReflectionProperty(Calculation::class, 'calculationCache');
+        $this->assertSame([], $cache->getValue(Calculation::getInstance($buku)), 'cache kalkulator workbook tetap kosong');
+
+        $buku->disconnectWorksheets();
+    }
+
+    /**
+     * Lewat pembaca: tabel yang sel judulnya tidak ada di berkas tidak menambah kolom pada hasil baca (dulu penaksir
+     * membuat sel judul itu sebelum dimensi sheet dihitung), dan rujukan terstruktur tetap dihitung.
+     */
+    public function testTabelBerjudulHilangTidakMengubahHasilBaca(): void
+    {
+        $buku = self::bukuSah();
+        $gpp  = $buku->getSheetByName(KolomGaji::SHEET_GPP);
+        $tk   = $buku->getSheetByName(KolomGaji::SHEET_TK);
+        $this->assertNotNull($gpp);
+        $this->assertNotNull($tk);
+
+        $lebar = count(self::headerGpp());
+        $akhir = XlsxMentah::kolom($lebar + 1);
+        $gpp->setCellValue($akhir . '1', 'kosong');
+        $gpp->addTable(new Table('A1:' . $akhir . '2', 'TabelGpp'));
+        $tk->setCellValue('M2', '=SUM(TabelGpp[' . self::headerGpp()[4] . '])');
+
+        $path = $this->temp('.xlsx');
+        IOFactory::createWriter($buku, 'Xlsx')->save($path);
+        $buku->disconnectWorksheets();
+
+        // Buang sel judul kolom terakhir tabel dari XML sheet GPP.
+        $this->ubahEntri($path, 'xl/worksheets/sheet1.xml', static function (string $xml) use ($akhir): string {
+            $baru = preg_replace('~<c r="' . $akhir . '1"[^>]*>.*?</c>~s', '', $xml, 1, $jumlah);
+            self::assertSame(1, $jumlah);
+
+            return (string) $baru;
+        });
+
+        $acuan = $this->nilaiKalkulator($path);
+        $sheet = $this->assertDiterima($path);
+
+        $this->assertCount($lebar, $sheet['GPP'][1], 'tidak ada kolom tambahan di GPP');
+        $this->assertCount($lebar, $sheet['GPP'][2]);
+        // Nilai rujukan terstruktur lintas sheet mengikuti kalkulator apa adanya (acuan), tidak ditetapkan di sini.
+        $this->assertSamaDenganAcuan($acuan, $sheet);
+        $this->assertArrayHasKey('TK!M2', $acuan);
+    }
+
+    /**
+     * Sel judul tabel berumus berat: rumus lain yang merujuk tabel itu tidak boleh memicu hitungnya sebelum anggaran
+     * diperiksa (dulu `=SUM(GPP!J2:J1048576)` di sel judul dihitung saat menaksir rumus GPP, lalu waktu habis).
+     */
+    public function testJudulTabelBerumusBeratDitolakTanpaDihitung(): void
+    {
+        $buku = self::bukuSah();
+        $gpp  = $buku->getSheetByName(KolomGaji::SHEET_GPP);
+        $tk   = $buku->getSheetByName(KolomGaji::SHEET_TK);
+        $this->assertNotNull($gpp);
+        $this->assertNotNull($tk);
+
+        $tk->setCellValue('M1', 'jumlah');
+        $tk->addTable(new Table('A1:M2', 'TabelTk'));
+        $gpp->setCellValue('AB2', '=SUM(TabelTk[jumlah])+E2');
+
+        $path = $this->temp('.xlsx');
+        IOFactory::createWriter($buku, 'Xlsx')->save($path);
+        $buku->disconnectWorksheets();
+
+        $this->ubahEntri($path, 'xl/worksheets/sheet2.xml', static function (string $xml): string {
+            $baru = preg_replace('~<c r="M1"[^>]*>.*?</c>~s', '<c r="M1"><f>SUM(GPP!J2:J1048576)</f></c>', $xml, 1, $jumlah);
+            self::assertSame(1, $jumlah);
+
+            return (string) $baru;
+        });
+
+        $this->assertDitolak($path);
     }
 
     /**
@@ -483,6 +787,19 @@ final class PembacaExcelSlipAnggaranRumusTest extends CIUnitTestCase
         XlsxMentah::tulisEntri($path, $entri);
 
         return $path;
+    }
+
+    /**
+     * @param callable(string): string $ubah
+     */
+    private function ubahEntri(string $path, string $entri, callable $ubah): void
+    {
+        $zip = new ZipArchive();
+        $this->assertTrue($zip->open($path));
+        $isi = $zip->getFromName($entri);
+        $this->assertIsString($isi);
+        $zip->addFromString($entri, $ubah($isi));
+        $zip->close();
     }
 
     private static function sheetGpp(): string

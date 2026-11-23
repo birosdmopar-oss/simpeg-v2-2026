@@ -150,7 +150,16 @@ final class PembacaExcelSlip
         }
 
         try {
-            // Sebelum ada sel yang dihitung. Sesudah langkah ini pembacaan berjalan persis seperti sebelum CR-181.
+            // Sebelum ada sel yang dihitung: ukuran GPP lalu TK (pesan baris/kolom tetap menang atas pesan rumus, seperti
+            // sebelum CR-181), baru anggaran rumus. Sesudah itu pembacaan berjalan persis seperti sebelum CR-181.
+            foreach ($nama as $namaAsli) {
+                $l = $buku->getSheetByName($namaAsli);
+
+                if ($l !== null) {
+                    $this->periksaUkuran([[$l->getHighestDataRow(), Coordinate::columnIndexFromString($l->getHighestDataColumn())]]);
+                }
+            }
+
             $this->periksaRumus($buku, array_values($nama));
 
             $hasil = [];
@@ -296,12 +305,16 @@ final class PembacaExcelSlip
                     continue;
                 }
 
+                // Penaksiran berhenti sendiri begitu melewati batas per sel atau sisa anggaran.
                 $penaksir ??= new PenaksirBebanRumus($buku);
-                $beban = $penaksir->beban($s);
+                $batas = min($this->maksBebanPerRumus, $this->maksBebanRumus - $total);
+                $beban = $penaksir->beban($s, $batas);
 
-                if ($beban > $this->maksBebanPerRumus || ($total += $beban) > $this->maksBebanRumus) {
+                if ($beban > $batas) {
                     throw new BerkasImporDitolak(self::PESAN_RUMUS);
                 }
+
+                $total += $beban;
             }
         }
     }

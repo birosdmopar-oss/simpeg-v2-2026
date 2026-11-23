@@ -221,15 +221,19 @@ MAKE-052 merged + MAKE-054.
   BB-1..BB-11. Test:
   `tests/unit/Presensi/Slip/PembacaExcelSlipBatasBacaTest.php`, `tests/Presensi/Slip/ImporSlipBatasBacaTest.php`.
 - **CR-181 (23-11-2026):** impor slip tidak lagi 500/timeout karena menghitung rumus. Sel rumus GPP/TK tetap dihitung
-  ulang (legacy, AC-D10.9; nilai tersimpan tidak dipakai); yang ditambahkan hanya taksiran beban dari teks rumus sebelum
-  dihitung (`Slip/PenaksirBebanRumus`, memakai pengurai kalkulator PhpSpreadsheet): beban sel = 10 + panjang teks + luas
-  tiap rentang (baris × kolom + baris² / 15.000); `INDIRECT`/`OFFSET`/pembangkit larik, ujung rentang hasil hitung,
-  rujukan 3D, dan rumus tidak terurai dianggap tak terbatas. Batas `Config\Presensi`: 400.000 per sel rumus, 1.500.000
+  ulang (legacy, AC-D10.9; nilai tersimpan tidak dipakai); yang ditambahkan hanya taksiran beban dari teks rumus sesudah
+  batas baris/kolom dan sebelum ada sel yang dihitung (`Slip/PenaksirBebanRumus`, memakai pengurai kalkulator
+  PhpSpreadsheet pada kalkulator tersendiri; tidak menghitung, membuat, atau mengubah sel). Beban sel = 18 + panjang teks
+  + panjang² / 3.000 + tiap rentang (20 + baris × kolom + baris² / 6.000; sebagai argumen fungsi selain `SUM`/`COUNT`/
+  `AVERAGE` dkk. baris² / 900; fungsi berkriteria luas × 10) + biaya pindai `J:J` (sel sheet / 200) + byte hasil `REPT`
+  literal / 4. Tak terbatas (ditolak): rumus > 8.192 karakter, `INDIRECT`, `OFFSET`, `ANCHORARRAY` (`#`), `SINGLE` (`@`),
+  `SEQUENCE`/`RANDARRAY`/`MUNIT`/`EXPAND`, `REPT` berjumlah ulang bukan literal, ujung rentang hasil hitung, rujukan 3D,
+  rumus tidak terurai, nama terdefinisi berputar/terlalu dalam. Batas `Config\Presensi`: 400.000 per sel rumus, 3.000.000
   untuk GPP + TK; lewat batas → 422 `errors.berkas` "Rumus di sheet GPP/TK terlalu berat untuk dihitung. …". Perubahan
-  perilaku yang disengaja: berkas seperti itu dulu 500/timeout (atau "Berkas tidak dapat dibaca" untuk rujukan 3D).
-  Nilai berkas yang diterima identik. Ukur: templat penuh + 20.000 sel rumus dibaca 13,9 detik. Rincian dan tabel ukur:
-  README `Libraries/Presensi` BB-12. Test: `tests/unit/Presensi/Slip/PembacaExcelSlipAnggaranRumusTest.php`,
-  `tests/Presensi/Slip/ImporSlipBatasBacaTest.php`.
+  perilaku yang disengaja: berkas seperti itu dulu 500/timeout (atau "Berkas tidak dapat dibaca" untuk rujukan 3D);
+  `INDIRECT`/`OFFSET` kecil dan rentang raksasa di cabang `IF` tak terpakai ikut ditolak. Nilai berkas yang diterima
+  identik. Rincian, tabel ukur, dan sisa risiko: README `Libraries/Presensi` BB-12 dan BB-11 (j). Test:
+  `tests/unit/Presensi/Slip/PembacaExcelSlipAnggaranRumusTest.php`, `tests/Presensi/Slip/ImporSlipBatasBacaTest.php`.
 - **Catatan perilaku:** berkas tanpa ekstensi ditolak "Isi berkas tidak sesuai dengan ekstensinya." dan isi ber-jenis lain
   (mis. PDF bernama `.xlsx`) "Format berkas harus .xlsx atau .xls." — sama dengan aturan `ValidasiBerkas` jalur lampiran
   (CR-054); galat filter periode dipetakan ke `errors.filter_bulan` + `code`.

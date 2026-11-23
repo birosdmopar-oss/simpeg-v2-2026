@@ -90,30 +90,58 @@ class Presensi extends BaseConfig
 
     // --- Anggaran beban hitung rumus impor Slip Gaji (CR-181) ---
     // Sel rumus GPP/TK tetap dihitung ulang (legacy, AC-D10.9); yang dibatasi adalah perkiraan kerjanya, ditaksir dari teks
-    // rumus sebelum dihitung (`App\Libraries\Presensi\Slip\PenaksirBebanRumus`). Satu satuan beban ±5–10 mikrodetik hitung
-    // di mesin ukur. Tabel ukur dan alasan angka: README `Libraries/Presensi` BB-12.
-
-    /** Beban tetap satu sel rumus; ditambah panjang teks rumusnya (rumus `=A2+B2` terukur ±150 mikrodetik). */
-    public const BEBAN_DASAR_RUMUS_IMPOR = 10;
+    // rumus sebelum dihitung (`App\Libraries\Presensi\Slip\PenaksirBebanRumus`). Satu satuan beban ±5 mikrodetik hitung di
+    // mesin ukur saat tenang (±2× saat sibuk). Tabel ukur dan alasan angka: README `Libraries/Presensi` BB-12.
 
     /**
-     * Beban satu rentang = baris × kolom + baris² / nilai ini. Kalkulator menjabarkan rentang menjadi daftar sel dan
-     * biayanya tumbuh kuadratik menurut jumlah baris: satu kolom 10.000 baris ±7–19 mikrodetik per sel, 100.000 baris
-     * ±50–70.
+     * Beban tetap satu sel rumus; beban dasar sel = nilai ini + panjang teks rumus + panjang² / pembagi di bawah (rumus
+     * `=C2-D2` terukur ±115 mikrodetik, `=ROUND(IF(…),0)` 42 karakter ±380 mikrodetik).
      */
-    public const PEMBAGI_KUADRAT_BARIS_RUMUS_IMPOR = 15_000;
+    public const BEBAN_DASAR_RUMUS_IMPOR = 18;
+
+    /**
+     * Bagian kuadratik beban dasar = panjang² / nilai ini: biaya urai kalkulator tumbuh kuadratik menurut panjang teks
+     * (1.750 karakter ±16 ms, 8.050 karakter ±76 ms), dan penaksir mengurai rumus berentang sekali lagi.
+     */
+    public const PEMBAGI_KUADRAT_PANJANG_RUMUS_IMPOR = 3_000;
+
+    /** Panjang teks rumus terbesar = batas Excel; lebih panjang hanya bisa berasal dari berkas buatan → ditolak. */
+    public const MAKS_PANJANG_RUMUS_IMPOR = 8_192;
+
+    /** Beban tetap tiap rentang yang dijabarkan (operator `:` terukur ±100 mikrodetik walau rentangnya kecil). */
+    public const BEBAN_TETAP_RENTANG_RUMUS_IMPOR = 20;
+
+    /**
+     * Beban satu rentang = beban tetap + baris × kolom + baris² / nilai ini. Kalkulator menjabarkan rentang menjadi daftar
+     * sel dan biayanya tumbuh kuadratik menurut jumlah baris (`SUM` satu kolom: 2.500 baris 24 ms, 5.000 baris 63 ms,
+     * 10.000 baris 179 ms).
+     */
+    public const PEMBAGI_KUADRAT_BARIS_RUMUS_IMPOR = 6_000;
+
+    /**
+     * Pembagi suku kuadratik untuk rentang yang menjadi argumen fungsi selain yang terukur murah (`SUM`, `COUNT`,
+     * `AVERAGE`, …): `MAX`, `MATCH`, `VLOOKUP`, `COUNTIF` dan kebanyakan fungsi lain meratakan rentang dengan biaya
+     * kuadratik ±7× lebih besar (`MAX` satu kolom: 2.500 baris 70 ms, 5.000 baris 217 ms, 10.000 baris 797 ms).
+     */
+    public const PEMBAGI_KUADRAT_BARIS_UMUM_RUMUS_IMPOR = 900;
 
     /** Sel sheet rujukan per satuan beban untuk memangkas rentang kolom/baris penuh (`J:J`): kalkulator memindai indeks sel sheet itu. */
     public const SEL_PER_BEBAN_PINDAI_RUMUS_IMPOR = 200;
 
+    /** Byte teks hasil `REPT` per satuan beban (tiap hasil disimpan ±3 salinan sampai impor selesai). */
+    public const BYTE_PER_BEBAN_TEKS_RUMUS_IMPOR = 4;
+
+    /** Panjang teks yang dianggap untuk argumen `REPT` yang bukan literal teks (rujukan sel, hasil fungsi). */
+    public const BYTE_TEKS_ANGGAPAN_RUMUS_IMPOR = 32;
+
     /**
      * Batas beban SATU sel rumus: membatasi memori penjabaran satu rentang (±0,55 KB per baris rentang) dan waktu satu
-     * sel (±2–4 detik). Cukup untuk `VLOOKUP` ke seluruh GPP 10.001 baris × 26 kolom (±267 ribu).
+     * sel (±2–4 detik). Cukup untuk menjumlah atau `INDEX` seluruh GPP 10.001 baris × 26 kolom (±267 ribu).
      */
     public const MAKS_BEBAN_PER_RUMUS_IMPOR = 400_000;
 
-    /** Batas jumlah beban semua sel rumus GPP + TK (±6–14 detik hitung di mesin ukur; batas waktu request impor 60 detik). */
-    public const MAKS_BEBAN_RUMUS_IMPOR = 1_500_000;
+    /** Batas jumlah beban semua sel rumus GPP + TK (batas waktu request impor 60 detik; lihat tabel ukur BB-12). */
+    public const MAKS_BEBAN_RUMUS_IMPOR = 3_000_000;
 
     /** Masa berlaku pratinjau impor dalam detik (Q5A-05 default 30 menit). */
     public int $ttlPratinjauDetik = 1800;

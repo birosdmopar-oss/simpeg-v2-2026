@@ -194,8 +194,8 @@ rumus sebelum ada sel rumus yang dihitung (BB-12).
 | BB-8 | Pra-cek `.xls` | `listWorksheetInfo` reader Xls untuk sheet GPP dan TK (memindai rekaman sel yang sama dengan pemuat): batas baris, kolom, dan baris × kolom kedua sheet ≤ batas sel. Batas isi/bobot/definisi kolom tidak berlaku (bukan ZIP/XML) |
 | BB-9 | Read filter | **Tidak dipasang, jangan ditambahkan.** Begitu ada read filter, reader Xlsx memanggilnya untuk setiap kolom `<cols>` × setiap baris (`Xlsx/ColumnAndRowAttributes`): berkas 51 KB dengan `<cols>` lebar dan 10.001 baris dimuat 28,4 detik (tanpa filter 0,2 detik); `<cols>` sampai 1025 seperti tulisan LibreOffice 2,0 detik (tanpa filter 0,2 detik). Dijaga test `testDefinisiKolomLebarDiterimaDalamWaktuWajar` |
 | BB-10 | Kebutuhan server | **`memory_limit` ≥ 512M dan RAM bebas ±1 GB per impor yang berjalan bersamaan** (README-deploy §1). Template penuh berangka: puncak memori PHP +214 MB, puncak RSS proses ±612 MB (pohon XML libxml di luar `memory_limit`). Kasus sah terberat yang masih lolos anggaran, 390.039 sel **teks pendek** (`t="s"`): PHP +258 MB (fatal pada 256M), RSS ±925 MB |
-| BB-11 | Sisa risiko (dicatat, tidak ditutup) | (a) **Tertutup CR-181 (BB-12):** sel rumus dengan rentang raksasa (mis. `SUM(A1:XFD1048576)`) ditolak sebelum dihitung. (b) Shared string panjang pada `.xls` (tabel SST): batas salinan teks hanya untuk `.xlsx`. (c) Faktor bobot 8 dan kolom rumus: template penuh dengan ±10 kolom rumus (`<f>` menambah elemen dan atribut per sel) bisa ditolak dengan pesan struktur; bagian waktu **tertutup CR-181 (BB-12):** 22 kolom rumus IF/ROUND yang dulu lolos dan dibaca ±150 detik kini ditolak lewat anggaran jumlah beban rumus. Jalan keluarnya tempel sebagai nilai (Paste Values), sudah disebut di pesan. (d) Teks shared lebih dari ±3,3 KB yang diulang di 10.000 baris melewati batas salinan 32 MB dan ditolak dengan pesan struktur. (e) Template penuh ditambah sheet referensi besar melewati batas sel; pesannya sudah menuntun (hapus sheet/kolom yang tidak dipakai). (f) Bagian `externalLinks` dan `pivotCache` ikut dihitung dalam anggaran; berkas yang ditolak karenanya perlu Break Links atau disimpan ulang tanpa pivot. (g) 50 `<tablePart>` (tepat di batas) dengan relasi sheet sangat panjang masih dibaca ±59 detik. (h) Part tanpa `<sheetData>` yang dipakai bersama oleh GPP dan TK tetap diurai untuk tiap sheet (yang ditolak `PemuatXlsxSlip` hanya part ber-`<sheetData>` yang sama); terukur RSS 827 MB menjadi 1.213 MB pada berkas buatan, sama seperti sebelum CR-177. (i) Pola baru sejenis (berkas buatan yang membuat PhpSpreadsheet membangun lebih banyak daripada yang dihitung pemindai) dicatat di sini, tidak ditutup satu per satu. (j) Sisa sesudah CR-181: fungsi yang kerjanya superlinear terhadap rentang yang masih di dalam anggaran (mis. `MMULT` pada dua rentang besar), dan rantai rumus yang sangat dalam ke arah bawah, tidak ditaksir khusus. Impor hanya untuk admin (role 1/3) |
-| BB-12 | Anggaran beban hitung rumus (CR-181) | Sel rumus GPP/TK **tetap dihitung ulang** (`getCalculatedValue`, sama dengan legacy `toArray(null, true, …)` dan AC-D10.9); nilai tersimpan di berkas tidak dipakai. Yang baru: sesudah muat dan SEBELUM ada sel yang dihitung, beban semua sel rumus GPP + TK ditaksir dari **teks rumusnya** (`Slip/PenaksirBebanRumus`). Beban satu sel = 10 + panjang teks rumus + untuk tiap rentang yang dijabarkan kalkulator: baris × kolom + baris² / 15.000. `J:J` / `2:2` dipangkas ke data sheet rujukan seperti kalkulator; nama terdefinisi, nama tabel, dan rujukan terstruktur ditaksir dari isinya; `INDIRECT`, `OFFSET`, `SEQUENCE`/`RANDARRAY`/`MUNIT`/`EXPAND`, operator `#`, ujung rentang hasil hitung (`A1:INDEX(…)`), rujukan 3D, rumus yang tidak terurai, dan nama terdefinisi berputar dianggap tak terbatas. Batas: satu sel ≤ 400.000 (`MAKS_BEBAN_PER_RUMUS_IMPOR`), jumlah ≤ 1.500.000 (`MAKS_BEBAN_RUMUS_IMPOR`). Lewat batas → 422 "Rumus di sheet GPP/TK terlalu berat untuk dihitung. Tempel sebagai nilai (Paste Values), lalu unggah ulang." Teks rumus diurai dengan pengurai kalkulator sendiri (`Calculation::parseFormula`) supaya taksiran tidak menyimpang dari yang akan dikerjakan. **Perubahan perilaku yang disengaja (pagar masukan, bukan perubahan nilai):** berkas yang rumusnya melewati anggaran kini 422; sebelumnya berakhir 500/timeout di server berbatas 60 detik (legacy berbatas 300 detik mungkin sempat menghitungnya). Termasuk yang ditolak walau murah dihitung: rentang raksasa di cabang `IF` yang tidak terpakai (taksiran menghitung semua cabang), `INDIRECT`/`OFFSET` kecil, dan rujukan 3D / rumus tidak terurai (dulu "Berkas tidak dapat dibaca", sekarang pesan rumus). Berkas yang diterima: nilainya identik dengan sebelum CR-181 (dijaga `PembacaExcelSlipAnggaranRumusTest`, dibandingkan dengan kalkulator langsung) |
+| BB-11 | Sisa risiko (dicatat, tidak ditutup) | (a) **Tertutup CR-181 (BB-12):** sel rumus dengan rentang raksasa (mis. `SUM(A1:XFD1048576)`) ditolak sebelum dihitung. (b) Shared string panjang pada `.xls` (tabel SST): batas salinan teks hanya untuk `.xlsx`. (c) Faktor bobot 8 dan kolom rumus: template penuh dengan ±10 kolom rumus (`<f>` menambah elemen dan atribut per sel) bisa ditolak dengan pesan struktur; bagian waktu **tertutup CR-181 (BB-12):** 22 kolom rumus IF/ROUND yang dulu lolos dan dibaca ±150 detik kini ditolak lewat anggaran jumlah beban rumus. Jalan keluarnya tempel sebagai nilai (Paste Values), sudah disebut di pesan. (d) Teks shared lebih dari ±3,3 KB yang diulang di 10.000 baris melewati batas salinan 32 MB dan ditolak dengan pesan struktur. (e) Template penuh ditambah sheet referensi besar melewati batas sel; pesannya sudah menuntun (hapus sheet/kolom yang tidak dipakai). (f) Bagian `externalLinks` dan `pivotCache` ikut dihitung dalam anggaran; berkas yang ditolak karenanya perlu Break Links atau disimpan ulang tanpa pivot. (g) 50 `<tablePart>` (tepat di batas) dengan relasi sheet sangat panjang masih dibaca ±59 detik. (h) Part tanpa `<sheetData>` yang dipakai bersama oleh GPP dan TK tetap diurai untuk tiap sheet (yang ditolak `PemuatXlsxSlip` hanya part ber-`<sheetData>` yang sama); terukur RSS 827 MB menjadi 1.213 MB pada berkas buatan, sama seperti sebelum CR-177. (i) Pola baru sejenis (berkas buatan yang membuat PhpSpreadsheet membangun lebih banyak daripada yang dihitung pemindai) dicatat di sini, tidak ditutup satu per satu. (j) Sisa sesudah CR-181 (dicatat, tidak ditutup): fungsi yang kerjanya superlinear terhadap rentang yang masih di dalam anggaran (mis. `MMULT` pada dua rentang besar); fungsi basis data (`DSUM` dkk.) memakai pengali 20 yang belum diukur pada kriteria nyata; penghasil teks besar selain `REPT` berargumen literal (`CONCAT`/`TEXTJOIN` atas rentang, operator `&` berantai) tidak ditaksir dari ukuran hasilnya; rantai rumus mundur (sel merujuk sel rumus di bawahnya, berantai ±20–30 ribu tingkat) membuat kalkulator memanggil dirinya sedalam itu dan fatal memori pada 512M, padahal beban tiap selnya kecil. Impor hanya untuk admin (role 1/3) |
+| BB-12 | Anggaran beban hitung rumus (CR-181) | Sel rumus GPP/TK **tetap dihitung ulang** (`getCalculatedValue`, sama dengan legacy `toArray(null, true, …)` dan AC-D10.9); nilai tersimpan di berkas tidak dipakai. Yang baru: sesudah muat dan batas baris/kolom, SEBELUM ada sel yang dihitung, beban semua sel rumus GPP + TK ditaksir dari **teks rumusnya** (`Slip/PenaksirBebanRumus`). Penaksir tidak menghitung, membuat, atau mengubah sel dan tidak menyentuh kalkulator workbook. **Rumus beban** (1 satuan ≈ 3–7 mikrodetik hitung): beban dasar sel = 18 + panjang teks + panjang² / 3.000; tiap rentang yang dijabarkan = 20 + baris × kolom + baris² / 6.000; bila rentang itu argumen fungsi selain `SUM`/`COUNT`/`COUNTA`/`AVERAGE`/`HLOOKUP`/`INDEX`/`ROWS`/`COLUMNS`/`ROW`/`COLUMN`/`AND`/`OR`, suku kuadratiknya baris² / 900; bila argumen fungsi berkriteria (`COUNTIF(S)`, `SUMIF(S)`, `AVERAGEIF(S)`, `MAXIFS`, `MINIFS`), luasnya × 10 (fungsi basis data `D…` × 20); `J:J` / `2:2` dipangkas ke data sheet rujukan seperti kalkulator, ditambah jumlah sel sheet itu / 200 (biaya pindai indeks sel); nama terdefinisi ditaksir dari isinya setiap kali dipakai; nama tabel dan rujukan terstruktur = seluruh rentang tabel + jumlah kolomnya; `REPT` berargumen literal = byte hasil / 4. **Dianggap tak terbatas (selalu ditolak):** teks rumus lebih dari 8.192 karakter (batas Excel), `INDIRECT`, `OFFSET`, `ANCHORARRAY` (operator `#`), `SINGLE` (operator `@`), `SEQUENCE`/`RANDARRAY`/`MUNIT`/`EXPAND`, `REPT` dengan jumlah ulang bukan literal, ujung rentang hasil hitung (`A1:INDEX(…)`, `A1:(5)`), rujukan 3D, rumus yang tidak terurai, dan nama terdefinisi berputar atau lebih dalam dari 8 tingkat. **Batas:** satu sel ≤ 400.000 (`MAKS_BEBAN_PER_RUMUS_IMPOR`), jumlah ≤ 3.000.000 (`MAKS_BEBAN_RUMUS_IMPOR`); penaksiran berhenti begitu batas terlewati. Lewat batas → 422 "Rumus di sheet GPP/TK terlalu berat untuk dihitung. Tempel sebagai nilai (Paste Values), lalu unggah ulang." Pesan baris/kolom tetap menang atas pesan rumus (urutan seperti sebelum CR-181). Teks rumus diurai dengan pengurai kalkulator sendiri (`Calculation::parseFormula` pada kalkulator tersendiri) supaya taksiran tidak menyimpang dari yang akan dikerjakan. **Perubahan perilaku yang disengaja (pagar masukan, bukan perubahan nilai):** berkas yang rumusnya melewati anggaran kini 422; sebelumnya berakhir 500/timeout di server berbatas 60 detik (legacy berbatas 300 detik mungkin sempat menghitungnya). **Yang ditolak walau murah dihitung — admin harus menempel sebagai nilai:** `INDIRECT`/`OFFSET` sekecil apa pun, `A1:INDEX(…)`, `REPT` dengan jumlah ulang dari sel (mis. `REPT("0",18-LEN(A2))`), dan rentang raksasa di cabang `IF` yang tidak terpakai (taksiran menghitung semua cabang). Rujukan 3D dan rumus tidak terurai dulu mendapat "Berkas tidak dapat dibaca", sekarang pesan rumus. Berkas yang diterima: nilainya identik dengan sebelum CR-181 (dijaga `PembacaExcelSlipAnggaranRumusTest`, dibandingkan dengan kalkulator langsung) |
 
 Angka ukur (PHP 8.4, PhpSpreadsheet 5.10, berkas uji sintetis; "PHP" = kenaikan puncak `memory_get_peak_usage`, "RSS" = puncak
 `ru_maxrss` proses yang hanya memuat berkas itu):
@@ -215,40 +215,52 @@ Angka ukur (PHP 8.4, PhpSpreadsheet 5.10, berkas uji sintetis; "PHP" = kenaikan 
 | Satu shared string 10.000 huruf dirujuk 5.000 sel (berkas belasan KB) | diterima, 50 MB salinan; versi 32.767 huruf × 400 ribu sel +1,4 GB | ditolak (struktur) |
 | Rumus shared 10.000 huruf × 5.000 sel turunan | diterima; versi besar fatal saat muat | ditolak (struktur) |
 | 1.000 `<col min="1" max="16383">` (berkas 7 KB) | dimuat 16,5 detik | ditolak (struktur) |
-
-Angka ukur anggaran rumus BB-12 (PHP 8.4, PhpSpreadsheet 5.10, mesin dev saat tenang; saat mesin sibuk waktu hitung
-terukur sampai ±2× lebih lama, jadi satu satuan beban ±5–10 mikrodetik):
-
-| Rumus (jumlah sel rumus) | Beban taksiran | Waktu hitung | Per satuan beban | Hasil |
-|---|---|---|---|---|
-| `=A2+B2` (10.000) | 208.930 | 0,8 detik | 4,0 µs | diterima |
-| `=ROUND(IF(A2>0,A2*0.05,0),0)` (10.000) | 428.930 | 1,8 detik | 4,3 µs | diterima |
-| `=SUM(A2:D2)` (10.000) | 298.930 | 2,1 detik | 7,0 µs | diterima |
-| Rumus IF/ROUND/MIN/MAX 154 karakter (10.000) | 1.562.510 | 6,5 detik | 4,2 µs | ditolak (jumlah) |
-| `=SUM(GPP!A1:A10)` (20.000) | 720.000 | 3,2 detik | 4,4 µs | diterima |
-| `=SUM(GPP!A1:A10000)` (20) | 333.900 | 2,5 detik | 7,3 µs | diterima |
-| `=SUM(GPP!A1:Z384)` (20) | 200.400 | 0,9 detik | 4,4 µs | diterima |
-| `=SUM(GPP!A1:A68000)` (1) | 376.295 | 1,9 detik, PHP +43 MB | 5,1 µs | diterima (dekat batas per sel) |
-| `=SUM(GPP!A1:IV1560)` (1) | 399.551 | 2,3 detik, PHP +71 MB | 5,6 µs | diterima (dekat batas per sel) |
-| `=VLOOKUP(A2,GPP!$A$1:$Z$10001,5,0)` (5) | 1.333.690 | 8,2 detik | 6,1 µs | diterima |
-| `=SUM(GPP!J:J)`, GPP 10.001 × 26 (20) | 359.840 | 3,4 detik | 9,3 µs | diterima |
-| Templat 10.000 baris + 3 kolom `ROUND(IF(…))` (30.000) | 1.313.388 | 6,8 detik | 5,1 µs | diterima |
-| Templat 10.000 baris + 6 kolom `=E2+F2` (60.000) | 1.306.776 | 5,6 detik | 4,3 µs | diterima |
-| Templat 10.000 baris + 22 kolom `ROUND(IF(…))` (220.000) | 9.631.512 | (±110–150 detik sebelum CR-181) | | ditolak (jumlah) |
-| `=VLOOKUP(…GPP!$A$1:$Z$10001…)` di 2.000 baris TK | 533.480.893 | (±1,3 detik per sel sebelum CR-181) | | ditolak (jumlah) |
-| `=SUM(GPP!J2:J1048576)` (1) | 74.349.241 | (313 detik lalu fatal memori sebelum CR-181) | | ditolak (per sel), < 0,1 detik |
-
-Ujung ke ujung lewat `PembacaExcelSlip` (uji opt-in `RUN_VOLUME_TEST=1`,
-`testTemplatPenuhDenganKolomRumusDiBawahAnggaran`): templat penuh 10.000 baris + 20.000 sel rumus `SUM` (beban ±936 ribu)
-dibaca **13,9 detik**, puncak memori PHP +245 MB. Biaya taksiran sendiri: ±0,3–0,5 detik untuk menyisir sel templat penuh
-tanpa rumus, ditambah ±35–100 mikrodetik per sel rumus yang perlu diurai (rumus tanpa `:`, nama, atau fungsi dinamis
-tidak diurai). Alasan angka batas: jumlah 1.500.000 ≈ 6–14 detik hitung, sehingga muat (±8 detik) + taksir + hitung templat
-penuh tetap ±20–30 detik, jauh di bawah batas request 60 detik (README-deploy §1); batas per sel 400.000 menahan memori
-penjabaran satu rentang (±0,55 KB per baris rentang satu kolom, ±0,18 KB per sel rentang lebar) di bawah ±75 MB, masih
-di dalam `memory_limit` 512M bersama puncak muat, dan cukup untuk satu `VLOOKUP` ke seluruh GPP (±267 ribu). Pembagi
-15.000 berasal dari pertumbuhan kuadratik penjabaran rentang menurut jumlah baris (satu kolom 10.000 baris ±7–19 µs per
-sel, 100.000 baris ±50–70 µs per sel).
 | `<col min="5" max="2">` | perulangan pemuat tidak berhenti → fatal memori | ditolak (struktur) |
+
+Angka ukur anggaran rumus BB-12 (PHP 8.4, PhpSpreadsheet 5.10; mesin dev, satu proses ukur, tanpa beban lain yang
+disengaja; di mesin yang sedang menjalankan gate lain waktu hitung terukur sampai ±2× lebih lama). "Waktu hitung" = hanya
+`getCalculatedValue` semua sel rumus itu; rentang merujuk sheet GPP 10.000 baris × 26 kolom:
+
+| Rumus (jumlah sel rumus) | Beban taksiran | Per sel | Waktu hitung | Per satuan beban |
+|---|---|---|---|---|
+| `=C2-D2` (10.000) | 297.788 | 32 | 1,3 detik | 4,5 µs |
+| `=ROUND(IF(C2>0,C2*0.05+D2*0.1-E2,0),0)` (10.000) | 675.576 | 72 | 4,2 detik | 6,2 µs |
+| PPh progresif `ROUND(IF(…IF(…IF(…))),0)` 169 karakter (10.000) | 1.872.151 | 196 | 5,6 detik | 3,0 µs |
+| `=SUM(C2:F2)` (10.000) | 587.788 | 61 | 2,0 detik | 3,4 µs |
+| `=ROUNDUP(SUM(C2:F2),-2)-SUM(C2:F2)` (10.000) | 1.115.576 | 116 | 4,5 detik | 4,0 µs |
+| `=MAX(C2:F2)-MIN(C2:F2)` (10.000) | 995.576 | 104 | 4,5 detik | 4,5 µs |
+| `=VLOOKUP(F2,GPP!$A$1:$B$18,2,0)` (10.000) | 1.078.894 | 109 | 5,8 detik | 5,3 µs |
+| `=COUNTIF(GPP!$C$1:$C$20,C2)` (3.000) | 802.893 | 268 | 3,4 detik | 4,2 µs |
+| `=SUM(GPP!$C$1:$C$10000)` (50) | 1.336.350 | 26.727 | 9,2 detik | 6,9 µs |
+| `=MAX(GPP!$C$1:$C$10000)` (20) | 2.423.440 | 121.172 | 16,1 detik | 6,6 µs |
+| `=MATCH(A2,GPP!$A$1:$A$10000,0)` (20) | 2.423.591 | 121.180 | 16,2 detik | 6,7 µs |
+| `=COUNTIF(GPP!$C$1:$C$10000,">5")` (10) | 2.111.810 | 211.181 | 14,3 detik | 6,8 µs |
+| `=SUMIF(GPP!$C$1:$C$5000,"*5*",GPP!$D$1:$D$5000)` (10) | 1.556.590 | 155.659 | 7,9 detik | 5,1 µs |
+| `=COUNTIFS(` dua rentang 5.000 baris `)` (8) | 1.245.344 | 155.668 | 8,4 detik | 6,7 µs |
+| `=VLOOKUP(A2,GPP!$A$1:$Z$10000,5,0)` (7) | 2.598.281 | 371.183 | 19,6 detik, PHP +38 MB | 7,5 µs |
+| `=SUM(GPP!$C$1:$C$40000)` (2) | 613.454 | 306.727 | 2,6 detik, PHP +23 MB | 4,2 µs |
+| Rumus 1.750 karakter (250 suku) (1.000) | 2.732.763 | 3.351 | 13,6 detik | 5,0 µs |
+| Rumus 8.050 karakter (1.150 suku) (110) | 2.528.360 | 29.668 | 7,6 detik | 3,0 µs |
+| Rumus 7.700 karakter berisi 550 rentang (60) | 2.125.020 | 36.308 | 5,2 detik (+2,7 detik taksir) | 2,5 µs |
+| `=COUNTIFS(` tiga rentang 10.000 baris `)` (29) | 18.371.297 | 633.493 | (141 detik sebelum anggaran ini) | ditolak (per sel) |
+| `=MATCH(…,GPP!$C$1:$C$10000,0)` (85) | 10.300.716 | 121.184 | (lewat 60 detik sebelum anggaran ini) | ditolak (jumlah) |
+| Templat 10.000 baris + 22 kolom `ROUND(IF(…))` (220.000) | ±15,8 juta | 72 | (±110–150 detik sebelum CR-181) | ditolak (jumlah) |
+| `=SUM(GPP!J2:J1048576)` (1) | lewat batas per sel | | (313 detik lalu fatal memori sebelum CR-181) | ditolak < 0,1 detik |
+
+Dasar ukur suku kuadratik (satu pemanggilan, nilai terkecil dari tiga putaran, satu kolom 2.500 / 5.000 / 10.000 baris):
+`SUM` 24 / 63 / 179 ms; `MAX` 70 / 217 / 797 ms (`MEDIAN`, `STDEV`, `MATCH`, `VLOOKUP`, `CONCAT` serupa); `COUNTIF` 154 /
+402 / 1.058 ms; `COUNTIFS` dua rentang 408 / 948 / 2.454 ms. Bagian linear ±7 µs per sel untuk semuanya (±55 µs untuk
+fungsi berkriteria); yang berbeda adalah suku kuadratik menurut jumlah baris.
+
+Alasan angka batas: pada 3.000.000 satuan, hitung rumus ±9–22 detik di mesin ukur, sehingga muat templat penuh (±8–13
+detik) + taksir + hitung ±30–40 detik, di bawah batas request 60 detik (README-deploy §1). Batas per sel 400.000 menahan
+memori penjabaran satu rentang (±0,55 KB per baris rentang satu kolom, ±0,15 KB per sel rentang lebar) di bawah ±75 MB,
+masih di dalam `memory_limit` 512M bersama puncak muat, dan cukup untuk satu `VLOOKUP` ke seluruh GPP (±371 ribu) atau
+satu `COUNTIF` atas 10.000 baris (±211 ribu). Biaya taksiran sendiri: ±0,3–0,5 detik untuk menyisir sel templat penuh
+tanpa rumus, ditambah ±35–130 mikrodetik per sel rumus yang perlu diurai (rumus tanpa `:`, nama, `REPT`, atau fungsi
+dinamis tidak diurai). Ujung ke ujung lewat `PembacaExcelSlip` (uji opt-in `RUN_VOLUME_TEST=1`,
+`testTemplatPenuhDenganKolomRumusDiBawahAnggaran`): templat penuh 10.000 baris + 20.000 sel rumus `SUM` (beban ±1,3 juta)
+dibaca 13,9–19,3 detik (dua kali ukur, yang kedua saat mesin dipakai proses lain), puncak memori PHP +245 MB.
 
 PDF slip (`Slip/PdfSlipGaji`, view `pdf/slip_gaji`, port `print/cetak.php` @771f8b4, bagian TK @0cf7e67) — keputusan reviewer CR 20-10:
 
