@@ -303,7 +303,7 @@ legacy `0cf7e67` [K].
 | Lingkup | `Laporan/CakupanLaporan`, `Laporan/LingkupLaporan` | `unit_satker` `0`/unit/`sat_<id>`; role 3 dipaksa satker akun (unit bila tanpa satker, 403 bila keduanya kosong) — dipakai juga laporan Tukin M5 |
 | Data | `Laporan/DataRekapBulan` | 3 SELECT per batch 500 NIP (cuti status 1, konket `V` semua `affect_tukin`, `dh_online`) + TB Fase 4 massal + libur aktif; presensi hanya dibaca untuk pegawai yang sudah ada sebelum bulan itu (Q5B-26) |
 | Uang makan | `Laporan/RekapUangMakanService` | `UangMakanSlipPresensi::hariDibayarBanyak` (aturan slip F5B-2) → baris `{nip, tgl_absen}` |
-| Ekspor | `Laporan/EksporRekapXlsx` | PhpSpreadsheet; NIP & tanggal teks eksplisit |
+| Ekspor | `Laporan/EksporRekapXlsx` (ringkas, harian); `Kepegawaian/Pegawai/EksporTabel` (uang makan) | Ringkas & harian: PhpSpreadsheet; NIP & tanggal teks eksplisit. **Uang makan (CR-183):** dua kolom teks tanpa gaya ditulis `EksporTabel::xlsx` (XML langsung lewat `ZipArchive`, sel `inlineStr`), keluar dari PhpSpreadsheet mengikuti preseden ekspor tabel Kepegawaian (ADR-032; lihat juga `docs/progress/04-Layanan.md`), tanpa ADR baru. Isi berkas sama (sheet "Rekap Uang Makan", header `NIP \| TGL_ABSEN`, baris seurut JSON). Uji volume opt-in `RekapUangMakanVolumeTest`, lingkup kementerian 5.000 pegawai × 22 hari = 110.000 baris: sebelum 14,6 detik / puncak 294 MB (di atas target 256 MB ADR-035), sesudah 3,1 detik / 160 MB; 15.000 pegawai (330.000 baris) sesudah 9,4 detik / 396 MB, masih di atas target — sisa memori ada di susunan baris dan XML sheet yang dibangun utuh, belum dipecah per batch |
 
 **[CATAT] MAKE-042 — rekap kehadiran & uang makan v2 vs legacy**
 
