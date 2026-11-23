@@ -7,6 +7,10 @@ namespace Tests\Database\HaloSimpeg\Chatbot;
 use App\Exceptions\ValidationException;
 use App\Libraries\HaloSimpeg\Chatbot\ImporQna;
 use CodeIgniter\HTTP\Files\UploadedFile;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx as XlsxWriter;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Support\DatabaseTestCase;
 use Tests\Support\HaloSimpeg\Chatbot\ChatbotFixtureTrait;
 use ZipArchive;
@@ -18,6 +22,7 @@ use ZipArchive;
  * Sebelum CR-182 (9554054a): `<col min="5" max="1">` membuat `Reader\Xlsx\ColumnAndRowAttributes::readColumnAttributes`
  * (PhpSpreadsheet 5.10) berputar tanpa akhir sampai fatal memori (500 di luar envelope 422), dan `<col>` selebar lembar
  * dengan baris ber-`r` acak lolos pra-cek `listWorksheetInfo` (totalRows = `r` baris TERAKHIR) lalu dimuat lambat.
+ * Putaran R1: bom dekompresi `_rels/.rels` (canRead), `<col>` × baris kosong (read filter), LO banyak sheet, pesan baris.
  *
  * @internal
  */
@@ -26,6 +31,9 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
     use ChatbotFixtureTrait;
 
     private const RUSAK = 'Berkas Excel rusak atau tidak dapat dibaca.';
+
+    /** Batas waktu test berbasis waktu: target ±2 s di mesin pengembang, ruang aman untuk runner CI yang lebih lambat. */
+    private const DETIK_CI = 6.0;
 
     /** @var list<string> */
     private array $tmp = [];
@@ -55,9 +63,11 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
         }
     }
 
-    public function testColSelebarLembarDenganBarisAcakDitolakCepat(): void
+    public function testColSelebarLembarDenganBarisAcakCepatDanBarisLebihTetapTidakIkut(): void
     {
         // Baris 3..1.502 diacak lalu baris 3 terakhir: listWorksheetInfo melihat totalRows 3, padahal ada 1.500 baris.
+        // Sebelum CR-182 dimuat ±8 detik (readCell per kolom × baris karena read filter). Sekarang muat tanpa filter
+        // (R1-3) sehingga cepat. Baris di atas 1.001 tetap tidak ikut diimpor, sama seperti sebelumnya (catatan review b).
         $nomor = range(4, 1502);
         mt_srand(182);
         shuffle($nomor);
@@ -72,25 +82,213 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
         $berkas = $this->rakit('<cols><col min="1" max="16383" width="10" customWidth="1"/></cols>', $baris);
 
         $mulai = hrtime(true);
-        $this->assertGalatBerkas(self::RUSAK, $berkas);
-        $this->assertLessThan(1.5, (hrtime(true) - $mulai) / 1e9, 'ditolak sebelum dimuat');
+        $hasil = (new ImporQna($this->db))->impor($this->unggah($berkas));
+        $this->assertLessThan(self::DETIK_CI, (hrtime(true) - $mulai) / 1e9);
+        $this->assertSame([1000, []], [$hasil['ditambah'], $hasil['galat']], 'baris 2..1.001 saja');
+    }
+
+    /**
+     * `<col 1..2048>` + baris kosong ber-`r` (verifikator R1-3): sebelum R1 varian 20 ribu baris dimuat ±16 detik dan
+     * varian 130 ribu baris fatal max_execution_time. Dijalankan di proses anak supaya PHPUnit tidak ikut berhenti. Baris
+     * contoh template diganti baris tanpa kategori → galat baris, transaksi dibatalkan (tidak ada yang tersimpan).
+     */
+    #[DataProvider('barisKosongBanyak')]
+    public function testColLebarDenganBarisKosongBanyakCepatTanpaFatal(int $jumlah): void
+    {
+        $baris = '';
+
+        for ($i = 0; $i < $jumlah; $i++) {
+            $baris .= '<row r="' . (1003 + $i) . '"/>';
+        }
+
+        $berkas = $this->rakit('<cols><col min="1" max="2048" width="9"/></cols>', $baris . '<row r="3"/>', [], '', true);
+
+        $hasil = $this->jalankanWorker($berkas, '256M', 30);
+        $this->assertSame(200, $hasil['status'] ?? null, 'tanpa fatal: ' . json_encode($hasil));
+        $this->assertLessThan(self::DETIK_CI, $hasil['detik'] ?? INF);
         $this->assertSame(0, $this->db->table('qna')->countAllResults());
+    }
+
+    /**
+     * @return iterable<string, array{int}>
+     */
+    public static function barisKosongBanyak(): iterable
+    {
+        yield '20 ribu baris' => [20_000];
+
+        yield '130 ribu baris' => [130_000];
+    }
+
+    /**
+     * Template bergaya LibreOffice ≤ 7.3 (`<col max="1025">` di setiap sheet) dengan 2 dan 3 sheet: langkah `<col>`
+     * dijumlah dari semua sheet (2.050 / 3.075) dan dulu ditolak "rusak" oleh batas 2.048 (R1-2).
+     */
+    #[DataProvider('jumlahSheetLibreOffice')]
+    public function testLibreOfficeBanyakSheetDiterima(int $sheet): void
+    {
+        $buku = new Spreadsheet();
+        $buku->getActiveSheet()->fromArray([ImporQna::JUDUL_KOLOM, ImporQna::CONTOH], null, 'A1');
+
+        for ($i = 2; $i <= $sheet; $i++) {
+            $buku->createSheet()->setCellValue('A1', "Petunjuk {$i}");
+        }
+
+        $path        = (string) tempnam(sys_get_temp_dir(), 'cbl');
+        $this->tmp[] = $path;
+        (new XlsxWriter($buku))->save($path);
+        $buku->disconnectWorksheets();
+
+        $zip = new ZipArchive();
+        $this->assertTrue($zip->open($path));
+
+        for ($i = 1; $i <= $sheet; $i++) {
+            $nama = "xl/worksheets/sheet{$i}.xml";
+            $xml  = (string) preg_replace('~<cols>.*?</cols>~s', '', (string) $zip->getFromName($nama));
+            $zip->addFromString($nama, str_replace('<sheetData', '<cols><col min="1" max="1025" width="11.52" style="0"/></cols><sheetData', $xml));
+        }
+
+        $zip->close();
+
+        $hasil = (new ImporQna($this->db))->impor($this->unggah($path));
+        $this->assertSame([1, []], [$hasil['ditambah'], $hasil['galat']]);
+    }
+
+    /**
+     * @return iterable<string, array{int}>
+     */
+    public static function jumlahSheetLibreOffice(): iterable
+    {
+        yield '2 sheet' => [2];
+
+        yield '3 sheet' => [3];
+    }
+
+    /**
+     * Kasus terburuk yang masih lolos batas sel (RUANG_SEL 10, tabel ukur di docblock ImporQna): 1.000 baris × 50 kolom
+     * teks = ±50 ribu sel sheet 1, semuanya dibangun karena muat tanpa read filter. Terukur ±1,8 s, puncak PHP 41 MB.
+     */
+    public function testKasusTerburukLolosTetapCepat(): void
+    {
+        $baris = '';
+
+        for ($r = 3; $r <= 1001; $r++) {
+            $baris .= "<row r=\"{$r}\"><c r=\"A{$r}\" t=\"inlineStr\"><is><t>P{$r}?</t></is></c><c r=\"B{$r}\" t=\"inlineStr\"><is><t>J</t></is></c>";
+
+            for ($k = 5; $k <= 50; $k++) {
+                $baris .= '<c r="' . Coordinate::stringFromColumnIndex($k) . $r . "\" t=\"inlineStr\"><is><t>isi{$r}</t></is></c>";
+            }
+
+            $baris .= '</row>';
+        }
+
+        $berkas = $this->rakit('', $baris, [], '', true);
+
+        memory_reset_peak_usage();
+        $awal  = memory_get_peak_usage();
+        $mulai = hrtime(true);
+        $hasil = (new ImporQna($this->db))->impor($this->unggah($berkas));
+        $this->assertLessThan(self::DETIK_CI, (hrtime(true) - $mulai) / 1e9);
+        $this->assertLessThan(128 * 1024 * 1024, memory_get_peak_usage() - $awal);
+        $this->assertCount(1000, $hasil['galat'], 'kategori kosong di semua baris: galat, tidak tersimpan');
+        $this->assertSame(0, $this->db->table('qna')->countAllResults());
+    }
+
+    /**
+     * Isi data identik dengan saat masih memakai read filter (R1-3 syarat 2): `rangeToArray` tidak menghitung rumus, jadi
+     * rumus di A-D yang merujuk kolom di luar A-D (yang dulu tidak dimuat) tetap terbaca sebagai teks rumusnya.
+     */
+    public function testRumusMerujukLuarAdTetapTeksRumus(): void
+    {
+        $buku  = new Spreadsheet();
+        $sheet = $buku->getActiveSheet();
+        $sheet->fromArray(ImporQna::JUDUL_KOLOM, null, 'A1');
+        $sheet->setCellValue('F2', 'dari F');
+        $sheet->setCellValue('G2', 'jawab');
+        $sheet->setCellValue('A2', '=F2&"?"');
+        $sheet->setCellValue('B2', '=UPPER(G2)');
+        $sheet->setCellValue('C2', 'Cuti');
+
+        $path        = (string) tempnam(sys_get_temp_dir(), 'cbf');
+        $this->tmp[] = $path;
+        (new XlsxWriter($buku))->save($path);
+        $buku->disconnectWorksheets();
+
+        $hasil = (new ImporQna($this->db))->impor($this->unggah($path));
+        $this->assertSame([1, []], [$hasil['ditambah'], $hasil['galat']]);
+        $q = $this->db->table('qna')->get()->getRowArray();
+        $this->assertSame('=F2&"?"', $q['pertanyaan'] ?? null);
+        $this->assertStringContainsString('UPPER(G2)', (string) ($q['jawaban'] ?? ''));
     }
 
     public function testBerkasGayaExcelDanLibreOfficeTetapDiterima(): void
     {
         // Bentuk <col> yang lazim ditulis Excel 365 (sisa lembar sampai 16.384) dan LibreOffice lama (sampai 1.025), VML
-        // komentar dengan <br> tanpa penutup, serta relasi hyperlink: harus tetap diterima (pelajaran regresi CR-177).
-        $vml    = '<xml xmlns:v="urn:schemas-microsoft-com:vml"><v:shape><v:textbox><div>baris1<br>baris2</div></v:textbox></v:shape></xml>';
+        // komentar dengan <br> tanpa penutup dan kata "sheetData" di teksnya, serta relasi hyperlink yang URL-nya memuat
+        // "sheetData": harus tetap diterima (pagar regresi CR-177).
+        $vml  = '<xml xmlns:v="urn:schemas-microsoft-com:vml"><v:shape><v:textbox><div>lihat sheetData<br>baris2</div></v:textbox></v:shape></xml>';
+        $rels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            . '<Relationship Id="rIdH1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink"'
+            . ' Target="https://contoh.example/panduan?bagian=sheetData" TargetMode="External"/></Relationships>';
         $berkas = $this->rakit(
             '<cols><col min="1" max="2" width="40" customWidth="1"/><col min="3" max="4" width="20" customWidth="1"/>'
             . '<col min="5" max="1025" width="11.52" style="0"/><col min="1026" max="16384" width="9"/></cols>',
             '',
-            ['xl/drawings/vmlDrawing1.vml' => $vml],
+            ['xl/drawings/vmlDrawing1.vml' => $vml, 'xl/worksheets/_rels/sheet1.xml.rels' => $rels],
+            '<hyperlinks xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><hyperlink ref="A2" r:id="rIdH1"/></hyperlinks>',
         );
 
         $hasil = (new ImporQna($this->db))->impor($this->unggah($berkas));
         $this->assertSame([1, []], [$hasil['ditambah'], $hasil['galat']], 'baris contoh template diimpor');
+    }
+
+    public function testBomDekompresiRelsDitolakSebelumReaderVendor(): void
+    {
+        // `_rels/.rels` 96 MB (terkompresi ±100 KB): `canRead` vendor mendekompresinya utuh dua kali, jadi sebelum R1-1
+        // proses anak 64M fatal memori di canRead. Sekarang ditolak dari direktori ZIP sebelum vendor menyentuh berkas.
+        $isi         = (string) tempnam(sys_get_temp_dir(), 'cbr');
+        $this->tmp[] = $isi;
+        $h           = fopen($isi, 'wb');
+        $this->assertIsResource($h);
+        $blok = str_repeat(' ', 1 << 20);
+
+        for ($i = 0; $i < 96; $i++) {
+            fwrite($h, $blok);
+        }
+
+        fclose($h);
+        $berkas = $this->simpan(ImporQna::template());
+        $zip    = new ZipArchive();
+        $this->assertTrue($zip->open($berkas));
+        $zip->addFile($isi, '_rels/.rels');
+        $zip->setCompressionName('_rels/.rels', ZipArchive::CM_DEFLATE, 9);
+        $zip->close();
+        $this->assertLessThan(2 * 1024 * 1024, (int) filesize($berkas), 'di bawah batas unggah 2 MB');
+
+        $hasil = $this->jalankanWorker($berkas, '64M');
+        $this->assertSame(422, $hasil['status'] ?? null, 'harus 422, bukan fatal: ' . json_encode($hasil));
+        $this->assertSame(['berkas' => [self::RUSAK]], $hasil['errors']);
+    }
+
+    public function testBerkasSahTerlaluBanyakBarisTetapPesanBaris(): void
+    {
+        // Berkas sah yang barisnya terlalu banyak tetap mendapat pesan kontrak lama, bukan "rusak" (R1-4): 13.000 baris
+        // (52.004 sel, di atas ruang sel putaran pertama) dan 55.000 baris (220.004 sel, di atas batas sel sekarang).
+        foreach ([13_001, 55_001] as $akhir) {
+            $this->assertGalatBerkas('Jumlah baris data maksimal 1000.', $this->rakit('', $this->barisData(3, $akhir)));
+        }
+    }
+
+    private function barisData(int $awal, int $akhir): string
+    {
+        $baris = '';
+
+        for ($r = $awal; $r <= $akhir; $r++) {
+            $baris .= "<row r=\"{$r}\"><c r=\"A{$r}\" t=\"inlineStr\"><is><t>P{$r}?</t></is></c><c r=\"B{$r}\" t=\"inlineStr\"><is><t>J</t></is></c>"
+                . "<c r=\"C{$r}\" t=\"inlineStr\"><is><t>Cuti</t></is></c><c r=\"D{$r}\" t=\"inlineStr\"><is><t>t</t></is></c></row>";
+        }
+
+        return $baris;
     }
 
     public function testTemplateResmiTetapDiterima(): void
@@ -102,11 +300,12 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
     }
 
     /**
-     * Template resmi dengan `<cols>` diganti `$cols`, baris tambahan sebelum `</sheetData>`, dan entri ZIP tambahan.
+     * Template resmi dengan `<cols>` diganti `$cols`, baris tambahan sebelum `</sheetData>`, elemen sesudah
+     * `</sheetData>`, entri ZIP tambahan, dan (opsional) baris contoh diganti baris tanpa kategori.
      *
      * @param array<string, string> $entri
      */
-    private function rakit(string $cols, string $baris = '', array $entri = []): string
+    private function rakit(string $cols, string $baris = '', array $entri = [], string $sesudahData = '', bool $tanpaKategori = false): string
     {
         $path = $this->simpan(ImporQna::template());
         $zip  = new ZipArchive();
@@ -115,7 +314,12 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
         $sheet = (string) $zip->getFromName($nama);
         $sheet = (string) preg_replace('~<cols>.*?</cols>~s', '', $sheet);
         $sheet = str_replace('<sheetData>', $cols . '<sheetData>', $sheet);
-        $sheet = str_replace('</sheetData>', $baris . '</sheetData>', $sheet);
+        $sheet = str_replace('</sheetData>', $baris . '</sheetData>' . $sesudahData, $sheet);
+
+        if ($tanpaKategori) {
+            // Baris contoh template tanpa kategori → galat baris: impor dibatalkan, tidak ada yang tersimpan.
+            $sheet = (string) preg_replace('~<row r="2">.*?</row>~s', '<row r="2"><c r="A2" t="inlineStr"><is><t>Contoh?</t></is></c><c r="B2" t="inlineStr"><is><t>J</t></is></c></row>', $sheet);
+        }
         $zip->addFromString($nama, $sheet);
 
         foreach ($entri as $n => $isi) {
@@ -152,16 +356,16 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
     }
 
     /**
-     * @return array{status?: int, errors?: mixed, puncak: int, rss: int|null}
+     * @return array{status?: int, errors?: mixed, puncak: int, rss: int|null, detik?: float, exit?: int, keluaran?: string}
      */
-    private function jalankanWorker(string $berkas, string $memori): array
+    private function jalankanWorker(string $berkas, string $memori, int $detik = 60): array
     {
         $env = array_merge(getenv(), [
             'CI_ENVIRONMENT'          => 'testing',
             'database.tests.database' => $this->db->getDatabase(),
         ]);
         $proses = proc_open(
-            [PHP_BINARY, '-d', "memory_limit={$memori}", '-d', 'max_execution_time=60', SUPPORTPATH . 'Scripts' . DIRECTORY_SEPARATOR . 'impor_qna_worker.php', $berkas],
+            [PHP_BINARY, '-d', "memory_limit={$memori}", '-d', "max_execution_time={$detik}", SUPPORTPATH . 'Scripts' . DIRECTORY_SEPARATOR . 'impor_qna_worker.php', $berkas],
             [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
             $pipes,
             ROOTPATH,
