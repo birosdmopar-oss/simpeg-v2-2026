@@ -21,7 +21,9 @@ Sesi NIP basi (CR-175): access token dan refresh token membawa claim `nip`. Bila
 `password_change_required`. `POST /auth/refresh` dengan claim seperti itu → 401 "tidak dikenal", baris token dihapus dan
 cookie refresh dihapus; klien lalu login ulang (dengan NIP baru). `POST /auth/logout` dengan access token basi → 401 dari
 filter, sama seperti access token kedaluwarsa. Satu kueri tambahan per request hanya untuk token ber-NIP; token akun tanpa
-NIP tidak menambah kueri. Akun dihapus/nonaktif/ganti role belum ikut dicek di sini (QA-21).
+NIP tidak menambah kueri. Akun dihapus/nonaktif/ganti role belum ikut dicek di sini (QA-21). Request yang lolos filter
+sesaat sebelum koreksi/hapus di-commit lalu kena FK 1452 ber-NIP lama → 401 dengan body yang sama (jaring terpusat
+`ApiController::_remap`, CR-185).
 
 Identitas akun (DBV-010/CR-013 ✅, di main `6bb29b5`): akun role 1/3/4/5/8 boleh tanpa NIP (K2), jadi identitas akun = `id_pengguna`.
 - Claims JWT: `sub` = id_pengguna (string bilangan bulat), `nip` = NIP akun (null untuk akun tanpa NIP), `ver` = 2,

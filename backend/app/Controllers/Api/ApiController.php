@@ -8,6 +8,7 @@ use App\Controllers\BaseController;
 use App\Exceptions\ApiException;
 use App\Exceptions\BadRequestException;
 use App\Exceptions\ValidationException;
+use App\Filters\JwtAuthFilter;
 use App\Libraries\ApiExceptionHandler;
 use CodeIgniter\Database\Exceptions\DatabaseException;
 use CodeIgniter\Exceptions\PageNotFoundException;
@@ -27,6 +28,12 @@ use CodeIgniter\HTTP\ResponseInterface;
  * sebelum menyentuh DB, dan error data MySQL (ApiExceptionHandler::DATA_ERROR_CODES) diterjemahkan ke 422 generik
  * dengan detail hanya di log. Segmen URL non-UTF-8 biasanya sudah ditolak Router CI4 lebih dulu (400 lewat
  * ApiExceptionHandler); cek parameter route di sini lapis cadangan.
+ *
+ * CR-185 (jaring terpusat sesi NIP basi): cek `masihMemegangNip` di JwtAuthFilter berupa SELECT biasa, jadi request yang
+ * datang selama transaksi koreksi NIP / hapus pegawai belum commit tetap lolos, lalu INSERT ber-NIP lama kena FK 1452
+ * sesudah commit. Galat 1452 yang sesinya TERBUKTI basi ({@see JwtAuthFilter::sesiNipTerbuktiBasi()}) dijawab 401 dengan
+ * body yang sama persis dengan filter; 1452 dengan sesi masih sah / token tanpa NIP tetap 500 (bug FK sungguhan tetap
+ * terlihat). Jaring khusus FaqService (403) dan TiketService (422) tidak berubah karena dilempar sebagai ApiException.
  */
 abstract class ApiController extends BaseController
 {
@@ -44,6 +51,9 @@ abstract class ApiController extends BaseController
      * (mis. master data: kode '01' tidak boleh berubah jadi 1).
      */
     protected bool $castNumericParams = true;
+
+    /** MySQL ER_NO_REFERENCED_ROW_2: INSERT/UPDATE anak tanpa induk FK (CR-185). */
+    private const ER_FK_TANPA_INDUK = 1452;
 
     /**
      * @param mixed ...$params parameter route (string) yang diteruskan ke method
@@ -68,6 +78,14 @@ abstract class ApiController extends BaseController
 
             return $this->response->setStatusCode($status)->setJSON($body);
         } catch (DatabaseException $e) {
+            if ($e->getCode() === self::ER_FK_TANPA_INDUK && JwtAuthFilter::sesiNipTerbuktiBasi(service('authContext'))) {
+                // Galat asli hanya di log, tanpa NIP / pesan MySQL (nama constraint cukup dari kode + kelas).
+                log_message('warning', 'FK 1452 pada sesi NIP basi diterjemahkan ke 401: [{code}] {class}.', ['code' => $e->getCode(), 'class' => $e::class]);
+                service('authContext')->clear();
+
+                return $this->response->setStatusCode(401)->setJSON(JwtAuthFilter::BODY_UNAUTHORIZED);
+            }
+
             // Hanya error data (nilai tidak muat/tidak sesuai kolom di koneksi strict) yang menjadi 422; error DB lain
             // (1062 yang tidak ditangani service, lock wait, deadlock, koneksi) tetap dilempar ke handler global (500).
             if (! ApiExceptionHandler::isDataError($e)) {
