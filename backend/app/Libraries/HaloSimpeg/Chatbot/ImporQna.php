@@ -7,6 +7,7 @@ namespace App\Libraries\HaloSimpeg\Chatbot;
 use App\Exceptions\ValidationException;
 use App\Libraries\Html\HtmlSanitizer;
 use App\Libraries\Kepegawaian\Pegawai\EksporTabel;
+use App\Libraries\Presensi\Slip\PemindaiXlsx;
 use App\Models\AuditLogModel;
 use App\Models\HaloSimpeg\Chatbot\QnaKategoriModel;
 use App\Models\HaloSimpeg\Chatbot\QnaModel;
@@ -15,6 +16,7 @@ use CodeIgniter\Database\BaseConnection;
 use CodeIgniter\Database\Exceptions\DatabaseException;
 use CodeIgniter\HTTP\Files\UploadedFile;
 use Config\Chatbot;
+use Config\Presensi;
 use PhpOffice\PhpSpreadsheet\Reader\IReadFilter;
 use PhpOffice\PhpSpreadsheet\Reader\Xlsx;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -24,7 +26,8 @@ use Throwable;
  * Impor QnA dari Excel template (PRD Fase 8 F8-37, AC-E10.15; `dev:libraries/hr/L_chatbot.php:405-468`).
  *
  * - Hanya `.xlsx` (diperiksa PhpSpreadsheet, bukan MIME browser), maks 2 MB dan 1.000 baris data; judul kolom harus sama
- *   dengan template (4 kolom, urutan sama) → selain itu 422 `errors.berkas` tanpa memproses baris.
+ *   dengan template (4 kolom, urutan sama) → selain itu 422 `errors.berkas` tanpa memproses baris. Struktur XML dipindai
+ *   dulu dengan `Presensi\Slip\PemindaiXlsx` (ketergantungan lintas modul, CR-182) sebelum PhpSpreadsheet memuat berkas.
  * - Satu transaksi semua-atau-tidak: ada galat baris → tidak ada yang tersimpan, laporan per baris (nomor baris Excel).
  * - Baris tanpa pertanyaan atau jawaban dilewati dan dilaporkan; baris tanpa kategori → galat; kategori/tag dicocokkan menurut
  *   judul (trim, perbandingan kolom `_ci`) di antara status 1/2, termasuk yang baru dibuat baris sebelumnya; cocok dengan
@@ -36,6 +39,27 @@ final class ImporQna
     public const JUDUL_KOLOM = ['Pertanyaan', 'Jawaban', 'Kategori', 'Tag (Pisahkan dengan koma)'];
 
     public const CONTOH = ['Bagaimana cara mengajukan cuti?', '<p>Ajukan lewat menu Layanan lalu pilih Cuti.</p>', 'Cuti', 'cuti, layanan'];
+
+    /** Kolom yang dibaca read filter: A-D semua baris + E1 (review CR V-2). */
+    private const KOLOM_DIBACA = 5;
+
+    /**
+     * Pengali ruang sel untuk pemindaian struktur: sel kosong bergaya dan kolom di luar A-E tetap ada di XML sheet. 10 →
+     * bawaan 50.050 sel (template ber-border sampai baris 1.500 = ±6.000 sel).
+     */
+    private const RUANG_SEL = 10;
+
+    /**
+     * Batas langkah perulangan `<col min max>`. Excel menulis sisa lembar sebagai `max="16384"` (1 langkah); LibreOffice
+     * lama sampai `max="1025"` (±1.021 langkah). `<col>` selebar 16.383 dengan 1.000 baris terukur ±2,9 detik saat dimuat.
+     */
+    private const MAKS_ITERASI_KOLOM = 2_048;
+
+    /** Batas isi terdekompresi dan byte teks yang disalin pemuat; berkas unggahan sendiri maks 2 MB. */
+    private const MAKS_BYTE_ISI = 32 * 1024 * 1024;
+
+    /** Batas `<tablePart>`: pemuat mengurai ulang relasi sheet untuk setiap tabel. Template tanpa tabel. */
+    private const MAKS_TABEL = 10;
 
     private readonly BaseConnection $db;
 
@@ -198,12 +222,14 @@ final class ImporQna
 
         // Ukuran sheet diperiksa SEBELUM memuat: xlsx kecil dengan satu sel di baris 1.048.576 tidak boleh dimuat penuh ke
         // memori. listWorksheetInfo memindai XML sheet tanpa membangun sel, tetapi isi part tetap ditampung utuh sebagai
-        // string dan `totalRows` = atribut `r` baris TERAKHIR (bukan maksimum). Impor slip memakai pemindai sendiri
-        // (`Presensi\Slip\PemindaiXlsx`, CR-177) karena itu; di sini berkas dibatasi 2 MB dan muatan dibatasi read filter.
+        // string dan `totalRows` = atribut `r` baris TERAKHIR (bukan maksimum). Karena itu struktur berkas dipindai dulu
+        // dengan pemindai impor slip (periksaStruktur, CR-182); muatan sel tetap dibatasi read filter.
         try {
             if (! $reader->canRead($path)) {
                 throw ValidationException::forField('berkas', 'Berkas harus berformat .xlsx.');
             }
+
+            $this->periksaStruktur($path);
 
             // Sel kosong yang hanya bergaya (mis. border template sampai baris 1.500) tidak dihitung (review CR V-1).
             $reader->setReadEmptyCells(false);
@@ -323,6 +349,37 @@ final class ImporQna
         $kat ? $this->kategoriBaru++ : $this->tagBaru++;
 
         return $id;
+    }
+
+    /**
+     * Pindai struktur `.xlsx` SEBELUM `listWorksheetInfo`/`load()` (CR-182) dengan {@see PemindaiXlsx} milik impor slip
+     * (CR-177), dipanggil apa adanya. Ketergantungan lintas modul: perubahan anggaran atau hitungan di pemindai itu ikut
+     * memengaruhi impor QnA (test `ImporQnaPemindaiTest`).
+     *
+     * Batas diturunkan dari `imporMaksBaris` dan 5 kolom yang dibaca (A-D + E1), dengan ruang untuk sel kosong bergaya
+     * (border template, review CR V-1) dan kolom lain di luar A-E; anggaran bobot per sel sama dengan impor slip
+     * (`Presensi::BOBOT_PER_SEL_IMPOR`). Yang ditolak: `<col>` tidak sah (`max` < `min` membuat
+     * `Reader\Xlsx\ColumnAndRowAttributes::readColumnAttributes` PhpSpreadsheet 5.10 berputar tanpa akhir walau
+     * readDataOnly), definisi kolom yang terlalu lebar diulang (biaya muat naik linear × jumlah baris), isi terdekompresi
+     * atau salinan teks terlalu besar, terlalu banyak tabel, dan berkas yang tidak bisa dipindai. Semuanya → 422 dengan
+     * pesan "rusak" yang sudah ada; tidak ada pesan baru.
+     */
+    private function periksaStruktur(string $path): void
+    {
+        $maksSel = ($this->config->imporMaksBaris + 1) * self::KOLOM_DIBACA * self::RUANG_SEL;
+        $bobot   = $maksSel * Presensi::BOBOT_PER_SEL_IMPOR;
+
+        try {
+            $ukuran = PemindaiXlsx::pindai($path, self::MAKS_BYTE_ISI, $bobot);
+        } catch (Throwable) {
+            throw ValidationException::forField('berkas', 'Berkas Excel rusak atau tidak dapat dibaca.');
+        }
+
+        if ($ukuran['byte'] > self::MAKS_BYTE_ISI || $ukuran['sel'] > $maksSel || $ukuran['bobot'] > $bobot
+            || $ukuran['iterasi_kolom'] > self::MAKS_ITERASI_KOLOM || $ukuran['tabel'] > self::MAKS_TABEL
+            || $ukuran['salinan'] > self::MAKS_BYTE_ISI) {
+            throw ValidationException::forField('berkas', 'Berkas Excel rusak atau tidak dapat dibaca.');
+        }
     }
 
     private static function teks(mixed $v): string

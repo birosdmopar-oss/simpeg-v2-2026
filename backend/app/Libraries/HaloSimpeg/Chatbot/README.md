@@ -13,7 +13,7 @@ atau model helpdesk.
 | `TokenFeedback` | Token HMAC-SHA256 kepemilikan penilaian (F8-35) |
 | `MasterChatbotService` | CRUD kategori/tag, judul unik status 1/2 (F8-40, catatan DBV N2), hapus = status 10 |
 | `QnaService` | CRUD QnA + set tag atomik, sanitasi jawaban, status induk F8-49, audit relasi manual (`entity = qna_has_tag`) |
-| `ImporQna` | Impor `.xlsx` template (F8-37) dalam satu transaksi + template (F8-47) |
+| `ImporQna` | Impor `.xlsx` template (F8-37) dalam satu transaksi + template (F8-47). Sebelum dimuat, struktur berkas dipindai dengan `Presensi\Slip\PemindaiXlsx` milik impor slip (CR-182, ketergantungan lintas modul: ubah pemindai itu → jalankan juga `ImporQnaPemindaiTest`); `<col>` tidak sah atau melewati batas → 422 "Berkas Excel rusak atau tidak dapat dibaca." |
 | `StatistikChatbot` | Statistik/riwayat (F8-42) + ekspor tag xlsx (F8-47) |
 
 **`ChatbotService` (widget):**
