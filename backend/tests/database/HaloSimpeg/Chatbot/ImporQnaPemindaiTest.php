@@ -208,10 +208,127 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
         $berkas = $this->rakit('', '<row r="3">' . str_repeat('<c/>', 7_500_000) . '</row>', [], '', true);
         $this->assertLessThan(100 * 1024, (int) filesize($berkas), 'unggahan kecil');
 
-        // Ditolak sebelum reader vendor dibuka (terukur < 0,2 s); listWorksheetInfo pada sheet ini saja ±4 s.
-        $mulai = hrtime(true);
-        $this->assertGalatBerkas(self::RUSAK, $berkas);
-        $this->assertLessThan(2.5, (hrtime(true) - $mulai) / 1e9);
+        // Ditolak sebelum reader vendor dibuka (terukur 1,1-1,4 s, hampir seluruhnya biaya pemindai); listWorksheetInfo
+        // pada sheet ini menampung part 30 MB.
+        $this->assertDitolakTanpaMembukaSheet($berkas);
+    }
+
+    /**
+     * Varian R2-1/R3-2: part sheet raksasa di luar `xl/worksheets/` (Target relasi workbook menunjuk path lain, atau nama
+     * entri ber-backslash). listWorksheetInfo tetap membacanya, jadi batas ukuran berlaku untuk entri mana pun.
+     */
+    #[DataProvider('letakSheetLain')]
+    public function testPadatDenganSheetRaksasaDiPathLainDitolakCepat(string $entri, string $target): void
+    {
+        $berkas = $this->rakit('', '<row r="3">' . str_repeat('<c/>', 7_500_000) . '</row>', [], '', true);
+        $zip    = new ZipArchive();
+        $this->assertTrue($zip->open($berkas));
+        $sheet = (string) $zip->getFromName('xl/worksheets/sheet1.xml');
+        $zip->deleteName('xl/worksheets/sheet1.xml');
+        $zip->addFromString($entri, $sheet);
+
+        foreach (['xl/_rels/workbook.xml.rels' => ['"worksheets/sheet1.xml"', '"' . $target . '"'], '[Content_Types].xml' => ['/xl/worksheets/sheet1.xml', '/' . str_replace('\\', '/', $entri)]] as $nama => [$lama, $baru]) {
+            $isi = (string) $zip->getFromName($nama);
+            $this->assertStringContainsString($lama, $isi);
+            $zip->addFromString($nama, str_replace($lama, $baru, $isi));
+        }
+
+        $zip->close();
+
+        $this->assertDitolakTanpaMembukaSheet($berkas);
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function letakSheetLain(): iterable
+    {
+        yield 'xl/lain/data.xml' => ['xl/lain/data.xml', 'lain/data.xml'];
+
+        yield 'Target data/s.xml' => ['xl/data/s.xml', 'data/s.xml'];
+
+        yield 'entri ber-backslash' => ['xl\\worksheets\\sheet1.xml', 'worksheets/sheet1.xml'];
+    }
+
+    /**
+     * R3-1: listWorksheetInfo mengurai part untuk SETIAP `<sheet>` di workbook, termasuk rujukan berulang ke part yang
+     * sama. Jalur padat: 20 / 100 `<sheet>` → satu part ±7,9 MB `<row/>` (di 19ffcb0d: 31 s / fatal 60 s).
+     */
+    #[DataProvider('rujukanBerulangPadat')]
+    public function testRujukanSheetBerulangPadatDitolakCepat(int $jumlah): void
+    {
+        $berkas = $this->rakit('', str_repeat('<row/>', 1_300_000), [], '', true);
+        $this->rujukSheetBerulang($berkas, $jumlah);
+
+        $this->assertDitolakTanpaMembukaSheet($berkas);
+    }
+
+    /**
+     * @return iterable<string, array{int}>
+     */
+    public static function rujukanBerulangPadat(): iterable
+    {
+        yield '20 rujukan' => [20];
+
+        yield '100 rujukan' => [100];
+    }
+
+    /**
+     * R3-1 jalur TIDAK padat (sudah ada di main): 50 / 500 `<sheet>` → satu part 28 MB berisi spasi (sel/bobot kecil;
+     * unggahan ±35 KB). Di 19ffcb0d dan main: 10-13 s / fatal 60 s.
+     */
+    #[DataProvider('rujukanBerulangTidakPadat')]
+    public function testRujukanSheetBerulangTidakPadatDitolakCepat(int $jumlah): void
+    {
+        $berkas = $this->rakit('', str_repeat(' ', 28 * 1024 * 1024), [], '', true);
+        $this->rujukSheetBerulang($berkas, $jumlah);
+
+        $this->assertDitolakTanpaMembukaSheet($berkas);
+    }
+
+    /**
+     * @return iterable<string, array{int}>
+     */
+    public static function rujukanBerulangTidakPadat(): iterable
+    {
+        yield '50 rujukan' => [50];
+
+        yield '500 rujukan' => [500];
+    }
+
+    /**
+     * Varian R2-1 banyak sheet, masing-masing di bawah 8 MB (4 × ±7,8 MB `<row/>`): listWorksheetInfo membaca SEMUA sheet
+     * (terukur 6,3 s), jadi jalur padat dibatasi jumlah isi semua entri, bukan entri terbesar.
+     */
+    public function testPadatBanyakSheetMasingMasingKecilDitolakCepat(): void
+    {
+        $buku = new Spreadsheet();
+        $buku->getActiveSheet()->fromArray(ImporQna::JUDUL_KOLOM, null, 'A1');
+
+        for ($i = 2; $i <= 4; $i++) {
+            $buku->createSheet();
+        }
+
+        $path        = (string) tempnam(sys_get_temp_dir(), 'cbs');
+        $this->tmp[] = $path;
+        (new XlsxWriter($buku))->save($path);
+        $buku->disconnectWorksheets();
+
+        $zip = new ZipArchive();
+        $this->assertTrue($zip->open($path));
+        $baris = str_repeat('<row/>', 1_300_000);
+
+        for ($i = 1; $i <= 4; $i++) {
+            $nama = "xl/worksheets/sheet{$i}.xml";
+            $xml  = (string) $zip->getFromName($nama);
+            $xml  = str_contains($xml, '<sheetData/>') ? str_replace('<sheetData/>', "<sheetData>{$baris}</sheetData>", $xml) : str_replace('</sheetData>', "{$baris}</sheetData>", $xml);
+            $zip->addFromString($nama, $xml);
+        }
+
+        $zip->close();
+        $this->assertLessThan(100 * 1024, (int) filesize($path));
+
+        $this->assertDitolakTanpaMembukaSheet($path);
     }
 
     /**
@@ -384,7 +501,7 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
     public function testBerkasSahTerlaluBanyakBarisTetapPesanBaris(): void
     {
         // Berkas sah yang barisnya terlalu banyak tetap mendapat pesan kontrak lama, bukan "rusak" (R1-4): 13.000 baris
-        // (52.004 sel) dan 25.000 baris (100.004 sel); keduanya padat dengan part sheet di bawah MAKS_BYTE_SHEET_PADAT.
+        // (52.004 sel) dan 25.000 baris (100.004 sel); keduanya padat dengan isi ZIP di bawah MAKS_BYTE_ISI_PADAT.
         foreach ([13_001, 25_001] as $akhir) {
             $this->assertGalatBerkas('Jumlah baris data maksimal 1000.', $this->rakit('', $this->barisData(3, $akhir)));
         }
@@ -440,6 +557,40 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
         $zip->close();
 
         return $path;
+    }
+
+    /**
+     * Workbook template diganti `$jumlah` elemen `<sheet>` yang semuanya merujuk `rId1` (part sheet yang sama).
+     */
+    private function rujukSheetBerulang(string $berkas, int $jumlah): void
+    {
+        $zip = new ZipArchive();
+        $this->assertTrue($zip->open($berkas));
+        $wb = (string) $zip->getFromName('xl/workbook.xml');
+        $this->assertSame(1, preg_match('~<sheets>.*</sheets>~s', $wb));
+        $sheet = '';
+
+        for ($i = 1; $i <= $jumlah; $i++) {
+            $sheet .= "<sheet name=\"S{$i}\" sheetId=\"{$i}\" r:id=\"rId1\"/>";
+        }
+
+        $zip->addFromString('xl/workbook.xml', (string) preg_replace('~<sheets>.*</sheets>~s', "<sheets>{$sheet}</sheets>", $wb));
+        $zip->close();
+        $this->assertLessThan(200 * 1024, (int) filesize($berkas), 'unggahan kecil');
+    }
+
+    /**
+     * Asersi utama deterministik (R3-3): ditolak "rusak" dengan kenaikan puncak memori kecil, artinya part sheet tidak
+     * pernah ditampung reader vendor (listWorksheetInfo menampung part utuh: ±7,8-30 MB di kasus ini; terukur ±1,7 MB bila ditolak lebih dulu). Waktu hanya pagar longgar.
+     */
+    private function assertDitolakTanpaMembukaSheet(string $path): void
+    {
+        memory_reset_peak_usage();
+        $awal  = memory_get_peak_usage();
+        $mulai = hrtime(true);
+        $this->assertGalatBerkas(self::RUSAK, $path);
+        $this->assertLessThan(6 * 1024 * 1024, memory_get_peak_usage() - $awal, 'part sheet tidak dibuka');
+        $this->assertLessThan(self::DETIK_CI, (hrtime(true) - $mulai) / 1e9);
     }
 
     private function simpan(string $isi): string
