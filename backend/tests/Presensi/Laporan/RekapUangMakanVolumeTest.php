@@ -16,8 +16,12 @@ use ZipArchive;
 /**
  * Uji volume ekspor XLSX Rekap Uang Makan (CR-183, pola {@see RekapTukinVolumeTest}; target ADR-035): PNS sintetis ×
  * presensi setiap hari kerja September 2026 (22 hari; insertBatch di bingkai transaksi uji), lingkup kementerian.
- * Bawaan 5.000 pegawai = 110.000 baris; env `VOLUME_PEGAWAI` mengganti jumlahnya (mis. 15000). Target: XLSX ≤ 60 detik
- * dan ≤ 256 MB. Memori puncak per permintaan (`memory_reset_peak_usage()`). Di-skip kecuali env `RUN_VOLUME_TEST=1`.
+ * Bawaan 5.000 pegawai = 110.000 baris; env `VOLUME_PEGAWAI` mengganti jumlahnya. Target: XLSX ≤ 60 detik dan ≤ 256 MB.
+ * Memori puncak per permintaan (`memory_reset_peak_usage()`). Di-skip kecuali env `RUN_VOLUME_TEST=1`.
+ *
+ * Terukur CR-183: 5.000 pegawai 3,1 detik / 160 MB (sebelumnya 14,6 detik / 294 MB lewat PhpSpreadsheet).
+ * `VOLUME_PEGAWAI=15000` (330.000 baris) DIKETAHUI melewati target memori (9,4 detik / 396 MB), jadi test ini merah di
+ * sana dan itu memang diharapkan sampai penulis sheet bertahap dikerjakan (kandidat CR lanjutan; README Presensi).
  *
  * @internal
  */

@@ -19,7 +19,7 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
  * di browser untuk ringkas; `.xls` Excel 97 untuk harian). NIP & tanggal ditulis sebagai teks eksplisit (NIP 18 digit
  * tidak menjadi angka ilmiah); semua nilai teks ditulis sebagai string (tidak pernah dievaluasi sebagai rumus).
  *
- * Rekap uang makan TIDAK ditulis di sini sejak CR-183: dua kolom teks tanpa gaya itu ditulis
+ * Rekap uang makan TIDAK ditulis di sini sejak CR-183: dua kolom teks itu (hanya header tebal) ditulis
  * `Kepegawaian\Pegawai\EksporTabel::xlsx()` dari {@see RekapUangMakanService::xlsx()} (±110.000 baris lewat
  * PhpSpreadsheet melewati target memori ADR-035).
  */
