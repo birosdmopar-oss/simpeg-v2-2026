@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filters;
 
 use App\Exceptions\AuthException;
+use App\Libraries\Auth\AuthContext;
 use App\Models\Auth\PenggunaModel;
 use CodeIgniter\Filters\FilterInterface;
 use CodeIgniter\HTTP\IncomingRequest;
@@ -30,6 +31,14 @@ class JwtAuthFilter implements FilterInterface
     public const ARG_GANTI_PASSWORD = 'ganti_password';
 
     public const CODE_PASSWORD_CHANGE_REQUIRED = 'password_change_required';
+
+    /**
+     * Body 401 generik — dipakai bersama filter ini dan jaring 1452 sesi NIP basi di `ApiController::_remap` (CR-185), supaya
+     * klien tidak bisa membedakan asal penolakan.
+     *
+     * @var array{status: string, message: string}
+     */
+    public const BODY_UNAUTHORIZED = ['status' => 'error', 'message' => 'Unauthorized'];
 
     /**
      * @param list<string>|null $arguments
@@ -96,6 +105,19 @@ class JwtAuthFilter implements FilterInterface
         return $id !== null && model(PenggunaModel::class)->masihMemegangNip($id, $nip);
     }
 
+    /**
+     * CR-185: sesi request ini TERBUKTI basi — klaim `nip` ada, `sub` ada, dan akun itu kini tidak memegang NIP tersebut
+     * (koreksi NIP / hapus pegawai yang commit SESUDAH filter ini lolos). Token tanpa klaim NIP / tanpa `sub` → false (tidak
+     * terbukti). Dipanggil hanya di jalur galat (1452), jadi tidak menambah kueri request sukses.
+     */
+    public static function sesiNipTerbuktiBasi(AuthContext $auth): bool
+    {
+        $nip = $auth->nip();
+        $id  = $auth->idPengguna();
+
+        return $nip !== null && $id !== null && ! model(PenggunaModel::class)->masihMemegangNip($id, $nip);
+    }
+
     private function extractToken(RequestInterface $request): ?string
     {
         if ($request instanceof IncomingRequest) {
@@ -120,6 +142,6 @@ class JwtAuthFilter implements FilterInterface
         // Pesan generik — tidak membocorkan alasan detail (Tech Spec Bagian 9).
         return service('response')
             ->setStatusCode(401)
-            ->setJSON(['status' => 'error', 'message' => 'Unauthorized']);
+            ->setJSON(self::BODY_UNAUTHORIZED);
     }
 }

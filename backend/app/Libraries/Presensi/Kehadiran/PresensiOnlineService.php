@@ -60,6 +60,9 @@ final class PresensiOnlineService
     /** Deadlock: InnoDB sudah memilih transaksi ini sebagai korban dan melepas kuncinya, jadi mengulang langsung masuk akal. */
     private const ER_LOCK_DEADLOCK = 1213;
 
+    /** MySQL ER_NO_REFERENCED_ROW_2 (FK tanpa induk), CR-185. */
+    private const ER_FK_TANPA_INDUK = 1452;
+
     private readonly Presensi $config;
 
     /** @var Closure(): DateTimeInterface */
@@ -389,7 +392,9 @@ final class PresensiOnlineService
                 throw new DuplikatPresensi();
             }
 
-            if (in_array($kode, self::GALAT_KUNCI, true)) {
+            // CR-185: 1452 (FK `fk_nip_dh_to_pegawai`, NIP dikoreksi/dihapus di sela filter dan tulis) dibawa sebagai DatabaseException
+            // berkode supaya jaring sesi NIP basi di ApiController::_remap mengenalinya (401); galat lain tetap seperti sebelumnya.
+            if (in_array($kode, [...self::GALAT_KUNCI, self::ER_FK_TANPA_INDUK], true)) {
                 throw self::galatKueri($db, 'Tulis dh_online gagal');
             }
 

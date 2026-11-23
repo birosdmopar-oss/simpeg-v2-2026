@@ -105,7 +105,7 @@ opsional envelope).
 |---|---|---|
 | `GET api/v1/presensi/saya/hari-ini` | 2, 6, 7 | `{tanggal_lokal, jam_lokal, zonasi_menit, jendela {masuk: [mulai, selesai], pulang: [...]}, boleh_masuk, boleh_pulang, presensi {jam_masuk, jam_pulang}\|null, wajib_geofence, lokasi[] {id_lokasi_presensi, nama_lokasi, latitude, longitude, radius}}` |
 | `POST api/v1/presensi/cek-lokasi` (JSON `{latitude, longitude, akurasi?}`) | 2, 6, 7 | `{wajib_geofence, dalam_radius, lokasi_terdekat {id, nama, radius, jarak_m}\|null}` — penilaian sama dengan rekam, tidak menulis |
-| `POST api/v1/presensi/masuk` (JSON `{latitude?, longitude?, akurasi?}`) | 2, 6, 7 | 201 baris baru / 200 baris diperbarui: `{tgl, jam_masuk, jam_pulang, id_lokasi_masuk, jarak_m}` (first-wins) |
+| `POST api/v1/presensi/masuk` (JSON `{latitude?, longitude?, akurasi?}`) | 2, 6, 7 | 201 baris baru / 200 baris diperbarui: `{tgl, jam_masuk, jam_pulang, id_lokasi_masuk, jarak_m}` (first-wins). CR-185: NIP dikoreksi/dihapus di sela filter dan tulis (FK `fk_nip_dh_to_pegawai` 1452) → 401 `Unauthorized` tanpa baris/audit, bukan 500 (berlaku juga untuk `pulang`) |
 | `POST api/v1/presensi/pulang` (body sama) | 2, 6, 7 | 201/200 `{tgl, jam_masuk, jam_pulang, id_lokasi_pulang, jarak_m}` (last-wins, menimpa jam & koordinat pulang) |
 | `GET api/v1/presensi/saya?bulan=YYYY-MM&page=&per_page=` | 2, 6, 7 | `{bulan, items[] {tgl, jam_masuk, jam_pulang, sumber}, total, page, per_page}`; bawaan bulan lokal berjalan, urut `tgl` turun |
 | `GET api/v1/presensi/pegawai?search=&id_unit=&id_satker=&page=&per_page=` | 1, 3, 4, 5 | `{items[] {nip, nama, unit, satker}, total, page, per_page, can_kelola_manual}`; role 3 lingkup satker (`PegawaiScope`) |
