@@ -227,6 +227,42 @@ final class RingkasanBerandaTest extends DatabaseTestCase
         $this->assertSame(0, $data['total_aktif']);
     }
 
+    /**
+     * CR-184 (sisa CR-178): klaim `id_satker` tidak kanonik — `"12\n"` (regex `$` lama meloloskannya jadi 12), `"0"`, `"012"`
+     * — → lingkup kosong, semua tile 0, tanpa kunci cache satker itu; `"12"` kanonik tetap dihitung.
+     */
+    public function testRole3SatkerTidakKanonikBarisBaruNolDepanLingkupKosongTanpaCache(): void
+    {
+        config(Dashboard::class)->ttlRingkasanDetik = 900;
+        $unit                                       = $this->buatUnit();
+        $satker                                     = $this->buatSatker($unit);
+        $nip                                        = $this->pegawai($satker, 1);
+        $this->tb($nip, '2026-01-01', '2026-12-31');
+        $this->dh($nip, self::HARI_INI);
+
+        foreach (["{$satker}\n", '0', '0' . $satker] as $i => $nilai) {
+            $mock = new MockCache();
+            $akun = $this->buatAkunTanpaNip('admin.rusak' . $i, Role::ADMIN_SATKER, ['id_unit' => (string) $unit, 'id_satker' => $nilai]);
+            $data = (new RingkasanBeranda($this->db, config(Dashboard::class), new CacheService($mock), self::HARI_INI))
+                ->ringkasan($this->authUntukAkun((int) $akun['id_pengguna']));
+            $label = json_encode($nilai);
+
+            $this->assertSame(['jenis' => 'satker', 'id' => null], $data['lingkup'], (string) $label);
+            $this->assertSame(0, $data['total_aktif'], (string) $label);
+            $this->assertSame([0], array_values(array_unique(array_column($data['tile'], 'jumlah'))), "semua tile 0: {$label}");
+            $this->assertSame([], array_values(array_filter($mock->getCacheInfo(), static fn (string $k): bool => str_contains($k, "_satker_{$satker}_"))), "tanpa kunci cache satker {$label}");
+        }
+
+        $mock = new MockCache();
+        $akun = $this->buatAkunTanpaNip('admin.kanonik', Role::ADMIN_SATKER, ['id_unit' => (string) $unit, 'id_satker' => (string) $satker]);
+        $data = (new RingkasanBeranda($this->db, config(Dashboard::class), new CacheService($mock), self::HARI_INI))
+            ->ringkasan($this->authUntukAkun((int) $akun['id_pengguna']));
+
+        $this->assertSame(['jenis' => 'satker', 'id' => $satker], $data['lingkup']);
+        $this->assertSame([1, 1, 1, 1], [$data['total_aktif'], $this->tile($data, 'pns')['jumlah'], $this->tile($data, 'tb')['jumlah'], $this->tile($data, 'presensi_online')['jumlah']]);
+        $this->assertNotSame([], array_filter($mock->getCacheInfo(), static fn (string $k): bool => str_contains($k, "_satker_{$satker}_")), 'kanonik tetap di-cache');
+    }
+
     public function testSaklarTampilanKomposisiAngkaDataSama(): void
     {
         $this->pegawai($this->buatSatker(), 1);

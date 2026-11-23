@@ -15,6 +15,7 @@ use App\Libraries\Kepegawaian\Kalkulasi\TanggalBisnis;
 use App\Libraries\Kepegawaian\Lampiran\KolomBerkas;
 use App\Libraries\Kepegawaian\Riwayat\AturanLampiran;
 use App\Libraries\Kepegawaian\Struktur\StrukturService;
+use App\Libraries\ListQuery;
 use App\Models\Kepegawaian\KonketModel;
 use CodeIgniter\Database\BaseBuilder;
 use CodeIgniter\Database\BaseConnection;
@@ -95,8 +96,10 @@ final class KonketService implements KonketServiceInterface
     public function daftar(AuthContext $auth, array $filter = []): array
     {
         $this->wajibRole($auth, self::ROLE_LIHAT);
-        $page    = max(1, (int) ($filter['page'] ?? 1));
-        $perPage = min(100, max(1, (int) ($filter['per_page'] ?? 20)));
+        // CR-184: parameter daftar lewat ListQuery (array → 422 per key, page 1..PAGE_MAX, ADR-001); per_page tetap dijepit 1..100.
+        $query   = ListQuery::from($filter, ['page', 'per_page', 'search', 'status']);
+        $page    = $query->page();
+        $perPage = $query->perPage(20, 100);
         $admin   = $this->adalahAdmin($auth) || $this->pengamat($auth);
         $builder = $this->query();
 
@@ -109,15 +112,15 @@ final class KonketService implements KonketServiceInterface
             $this->scope()->terapkanKeQuery($builder, $auth, 'a.nip');
             $urut = 'a.updated_at';
 
-            $search = trim((string) ($filter['search'] ?? ''));
-
-            if ($search !== '') {
-                $builder->groupStart()->like('p.nama', $search)->orLike('a.nip', $search)->groupEnd();
+            if ($query->filled('search')) {
+                // CR-184: `%`, `_`, dan `!` dari masukan dicari sebagai teks biasa, bukan wildcard LIKE (pola CR-174).
+                $s = ListQuery::likeLiteral($this->db(), $query->string('search'));
+                $builder->groupStart()->like('p.nama', $s)->orLike('a.nip', $s)->groupEnd();
             }
         }
 
-        if (in_array((string) ($filter['status'] ?? ''), [self::W, self::V, self::X], true)) {
-            $builder->where('a.status', (string) $filter['status']);
+        if (in_array($query->string('status'), [self::W, self::V, self::X], true)) {
+            $builder->where('a.status', $query->string('status'));
         }
 
         $total = $builder->countAllResults(false);

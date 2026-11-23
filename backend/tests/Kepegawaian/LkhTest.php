@@ -372,6 +372,56 @@ final class LkhTest extends DatabaseTestCase
         $this->asUser($akun)->get("api/v1/lkh/rekap/{$this->nip}?bulan=2026-10")->assertStatus(200);
     }
 
+    /**
+     * CR-184: parameter daftar LKH lewat ListQuery — `lkh` (page raksasa) dan `lkh/verifikasi` (`search[]`/`status[]`/page) → 422
+     * per key. Jebakan dijaga: `status` tidak dikirim = Menunggu, `status=` kosong = semua, di luar 0..3 = semua (tanpa 422).
+     */
+    public function testDaftarVerifikasiParameterListQueryDanJebakanStatus(): void
+    {
+        $akunAtasan  = $this->db->table('pengguna')->where('nip', $this->nipAtasan)->get()->getRowArray();
+        $akunPegawai = $this->db->table('pengguna')->where('nip', $this->nip)->get()->getRowArray();
+
+        $this->assert422ListQuery($this->asUser($akunAtasan)->get('api/v1/lkh/verifikasi?search[]=a'), ['search']);
+        $this->assert422ListQuery($this->asUser($akunAtasan)->get('api/v1/lkh/verifikasi?status[]=1'), ['status']);
+
+        foreach (['99999999999999999999', '0', 'abc'] as $page) {
+            $this->assert422ListQuery($this->asUser($akunAtasan)->get('api/v1/lkh/verifikasi?page=' . $page), ['page']);
+            $this->assert422ListQuery($this->asUser($akunPegawai)->get('api/v1/lkh?page=' . $page), ['page']);
+        }
+
+        $menunggu = $this->tambah($this->pegawai, '2026-10-12')['id'];
+        $setuju   = $this->tambah($this->pegawai, '2026-10-09')['id'];
+        $this->svc()->proses($this->atasan, $setuju, 'setujui', null);
+        $antrean = fn (array $filter): array => array_column($this->svc()->verifikasi($this->atasan, $filter)['items'], 'id');
+
+        $this->assertSame([$menunggu], $antrean([]), 'status tidak dikirim = Menunggu');
+        $this->assertSame([$setuju, $menunggu], $antrean(['status' => '']), 'status= kosong = semua');
+        $this->assertSame([$setuju], $antrean(['status' => '1']));
+        $this->assertSame([$setuju, $menunggu], $antrean(['status' => '7']), 'di luar 0..3 = semua (perilaku lama, tanpa 422)');
+        $this->assertSame([$setuju], $antrean(['status' => ' 1']), 'nilai dipangkas spasi (ListQuery): " 1" dibaca 1');
+        $this->assertSame(20, $this->svc()->verifikasi($this->atasan, ['per_page' => ' '])['meta']['per_page'], 'per_page kosong/spasi = bawaan 20');
+
+        $res = $this->asUser($akunAtasan)->get('api/v1/lkh/verifikasi');
+        $res->assertStatus(200);
+        $this->assertSame([$menunggu], array_column(json_decode($res->getJSON(), true)['data']['items'], 'id'), 'HTTP tanpa status = Menunggu');
+        $res = $this->asUser($akunAtasan)->get('api/v1/lkh/verifikasi?status=');
+        $this->assertSame([$setuju, $menunggu], array_column(json_decode($res->getJSON(), true)['data']['items'], 'id'), 'HTTP status= = semua');
+
+        $this->assertSame(100, $this->svc()->daftar($this->pegawai, ['per_page' => '1000'])['meta']['per_page'], 'per_page dijepit 100');
+    }
+
+
+    /**
+     * CR-184: 422 dengan `errors` tepat pada key itu (ADR-001).
+     *
+     * @param list<string> $keys
+     */
+    private function assert422ListQuery(\CodeIgniter\Test\TestResponse $res, array $keys): void
+    {
+        $res->assertStatus(422);
+        $this->assertSame($keys, array_keys((array) (json_decode($res->getJSON(), true)['errors'] ?? [])), (string) $res->getJSON());
+    }
+
     public function testEndpointPdf(): void
     {
         $row = $this->tambah($this->pegawai, '2026-10-12');
