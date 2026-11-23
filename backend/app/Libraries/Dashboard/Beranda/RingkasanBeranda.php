@@ -324,8 +324,17 @@ final class RingkasanBeranda
         return $this->cache->remember($kunci, $ttl, $hitung(...));
     }
 
+    /**
+     * Angka kanonik POSITIF (tanpa nol di depan, tanpa spasi, bukan `'0'`, bukan berakhiran baris baru) → int; selain itu null — sama dengan
+     * `PegawaiScope::keInt` dan `StatistikCache::keInt` (fail-closed, CR-178; sisa yang terlewat ditutup CR-184). Null → lingkup kosong (semua tile 0).
+     */
     private static function keInt(?string $nilai): ?int
     {
-        return $nilai !== null && preg_match('/^[1-9]\d*$/', $nilai) === 1 ? (int) $nilai : null;
+        // Tanpa regex `$` (yang menerima "12\n"): ctype_digit + round-trip kanonik + > 0 (CR-178).
+        if ($nilai === null || $nilai === '' || ! ctype_digit($nilai) || (string) (int) $nilai !== $nilai || (int) $nilai <= 0) {
+            return null;
+        }
+
+        return (int) $nilai;
     }
 }
