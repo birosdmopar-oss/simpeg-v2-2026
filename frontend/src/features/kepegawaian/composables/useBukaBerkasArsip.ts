@@ -13,8 +13,9 @@
  *    dicabut saat popup ditutup (diperiksa berkala), dipakai ulang untuk berkas lain, halaman di-unmount, atau logout.
  *  - `privat` + `unduh`: tanpa popup; `ambilBerkas` lalu `simpanBerkas` (nama dari `Content-Disposition`).
  * Semua galat menutup popup. 429/404/403 tampil sebagai pesan di halaman (`galat`), bukan JSON mentah. 401 sesudah refresh
- * gagal ditangani interceptor (login) tanpa pesan tambahan. 403 `password_change_required` pada unduhan blob tidak memicu
- * handler interceptor (body masih Blob saat `code` dibaca), jadi pesan server / cadangan ditampilkan di halaman.
+ * gagal ditangani interceptor (login) tanpa pesan tambahan. 403 `password_change_required` pada unduhan blob memicu
+ * handler interceptor (CR-186: body Blob JSON diurai sebelum `code` dibaca), yang mengarahkan ke ganti password; pesan
+ * server / cadangan tetap ditampilkan di halaman sebagai jaring pengaman (mis. handler belum terpasang).
  */
 import { onBeforeUnmount, ref } from 'vue'
 

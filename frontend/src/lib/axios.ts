@@ -13,6 +13,8 @@
  *                               refresh) tidak memicunya, sehingga tidak ada loop. Request yang diulang setelah
  *                               auto-refresh juga lewat jalur ini, jadi claim `must_change_password` pada token baru
  *                               (mis. password kedaluwarsa) langsung memperbarui store tanpa muat ulang halaman.
+ *                               Untuk `responseType: 'blob'` body 403 masih berupa Blob; Blob ber-tipe JSON diurai dulu
+ *                               (CR-186) sehingga `code` terbaca dan pesan/`errors` server ikut ternormalisasi.
  *
  * Seluruh feature WAJIB memakai `api` dari file ini — jangan membuat axios instance lain.
  */
@@ -78,6 +80,21 @@ function isPasswordChangeRequired(error: AxiosError, config: InternalAxiosReques
   if (body?.code !== PASSWORD_CHANGE_REQUIRED_CODE) return false
   const path = (config.url ?? '').split('?')[0] ?? ''
   return !PASSWORD_CHANGE_OPEN_PATHS.some((open) => path.endsWith(open))
+}
+
+/**
+ * CR-186: unduhan `responseType: 'blob'` menerima body galat 403 sebagai Blob, sehingga `code` tidak terbaca. Blob
+ * ber-tipe JSON diurai dan menggantikan `response.data` (pemanggil yang mengurai Blob sendiri tetap aman karena data
+ * sudah bukan Blob). Hanya 403: Blob 2xx (berkas) tidak pernah dibaca, Blob non-JSON dibiarkan, dan galat urai diabaikan.
+ */
+async function uraiBodyBlob403(error: AxiosError): Promise<void> {
+  const response = error.response
+  if (response?.status !== 403 || !(response.data instanceof Blob) || !response.data.type.toLowerCase().includes('json')) return
+  try {
+    response.data = JSON.parse(await response.data.text()) as unknown
+  } catch {
+    // Body bukan JSON yang sah: biarkan Blob aslinya.
+  }
 }
 
 /** Jalankan handler sekali untuk semua 403 yang bersamaan; kegagalan handler tidak menutupi error aslinya. */
@@ -211,6 +228,8 @@ export function createApiClient(options: CreateApiClientOptions = {}): AxiosInst
       // Refresh endpoint sendiri menjawab 401 → refresh token invalid/expired/reused.
       // Redirect ditangani oleh pemanggil refreshOnce() lewat catch di atas.
     }
+
+    await uraiBodyBlob403(error)
 
     if (isPasswordChangeRequired(error, config)) {
       await runPasswordChangeHandler()
