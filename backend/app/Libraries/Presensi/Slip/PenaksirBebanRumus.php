@@ -25,23 +25,35 @@ use Throwable;
  * Karena itu fungsi vendor yang memanggil `Worksheet::getCell()` atau `Cell::getCalculatedValue()` (mis.
  * `StructuredReference::parse`) tidak boleh dipakai di sini (dijaga `PembacaExcelSlipAnggaranRumusTest`).
  *
- * Satuan beban ±5 mikrodetik hitung di mesin ukur saat tenang (tabel di README `Libraries/Presensi` BB-12):
+ * Satuan beban ±5 mikrodetik hitung di mesin ukur saat tenang (tabel per kelas di README `Libraries/Presensi` BB-12):
  *
- * - beban dasar sel = `BEBAN_DASAR_RUMUS_IMPOR` + panjang teks + panjang² /
- *   `PEMBAGI_KUADRAT_PANJANG_RUMUS_IMPOR` (biaya urai kalkulator tumbuh kuadratik menurut panjang teks); teks lebih
- *   panjang dari `MAKS_PANJANG_RUMUS_IMPOR` (batas Excel) langsung {@see self::TAK_HINGGA};
- * - tiap rentang yang dijabarkan kalkulator = `BEBAN_TETAP_RENTANG_RUMUS_IMPOR` + baris × kolom + baris² /
- *   `PEMBAGI_KUADRAT_BARIS_RUMUS_IMPOR` (kalkulator menjabarkan rentang menjadi daftar sel, dan biayanya tumbuh
- *   kuadratik menurut jumlah baris);
- * - rentang yang menjadi argumen fungsi: suku kuadratiknya menjadi baris² / `PEMBAGI_KUADRAT_BARIS_UMUM_RUMUS_IMPOR`
- *   kecuali untuk {@see self::FUNGSI_MURAH} (terukur: hanya `SUM`, `COUNT`, `AVERAGE`, dan beberapa lain yang meratakan
- *   rentang secara linear); untuk fungsi berkriteria ({@see self::PENGALI_LUAS}) luasnya dikalikan, karena kriteria
- *   dievaluasi lewat kalkulator untuk tiap sel;
+ * - beban dasar sel = `BEBAN_DASAR_RUMUS_IMPOR` + rujukan sel × `BEBAN_RUJUKAN_RUMUS_IMPOR` + operator ×
+ *   `BEBAN_OPERATOR_RUMUS_IMPOR` + kurung buka × `BEBAN_FUNGSI_RUMUS_IMPOR` + pemisah argumen ×
+ *   `BEBAN_ARGUMEN_RUMUS_IMPOR` (dihitung dari karakter teks, tanpa mengurai; panjang angka dan teks literal tidak
+ *   menambah beban) + panjang² / `PEMBAGI_KUADRAT_PANJANG_RUMUS_IMPOR` (biaya urai kalkulator tumbuh kuadratik menurut
+ *   panjang teks); teks lebih panjang dari `MAKS_PANJANG_RUMUS_IMPOR` (batas Excel) langsung {@see self::TAK_HINGGA};
+ * - tiap rentang yang dijabarkan kalkulator = `BEBAN_TETAP_RENTANG_RUMUS_IMPOR` + baris × kolom + baris² × (kolom + 1)
+ *   / (2 × `PEMBAGI_KUADRAT_BARIS_RUMUS_IMPOR`): kalkulator menjabarkan rentang menjadi daftar sel, dan biayanya
+ *   tumbuh kuadratik menurut jumlah baris;
+ * - larik yang menjadi argumen fungsi: pembagi suku kuadratiknya menurut kelas fungsi, yaitu
+ *   {@see self::FUNGSI_MURAH} dan fungsi per elemen ({@see self::FUNGSI_ELEMEN}) tetap,
+ *   {@see self::FUNGSI_SEDANG} `PEMBAGI_KUADRAT_BARIS_SEDANG_RUMUS_IMPOR`, fungsi LAIN
+ *   `PEMBAGI_KUADRAT_BARIS_UMUM_RUMUS_IMPOR`; untuk fungsi berkriteria dan sejenisnya luasnya dikalikan
+ *   ({@see self::PENGALI_LUAS});
+ * - LARIK HASIL: tiap operand membawa ukuran lariknya (baris × kolom). Operator atas larik menagih satu satuan per
+ *   elemen hasil dan meneruskan ukuran itu; ukuran hasil = baris terbesar × kolom terbesar kedua operand (kalkulator
+ *   memperluas keduanya, jadi kolom × baris menjadi matriks penuh). Fungsi per elemen dan fungsi yang tidak dikenal
+ *   berlaku sama; `TRANSPOSE` menukar ukuran; fungsi agregat ({@see self::FUNGSI_SKALAR}) menghasilkan satu nilai;
+ * - fungsi pencarian ({@see self::FUNGSI_PENCARIAN}) dengan nilai cari berupa larik dipanggil kalkulator sekali per
+ *   elemen: biaya rentang tabelnya dikalikan jumlah elemen itu. Fungsi tidak dikenal dengan dua larik atau lebih
+ *   ditaksir sama (terburuk);
  * - rentang kolom/baris penuh (`J:J`, `2:2`) dipangkas ke baris/kolom data tertinggi sheet rujukan, sama seperti
  *   kalkulator, ditambah jumlah sel sheet itu / `SEL_PER_BEBAN_PINDAI_RUMUS_IMPOR` (kalkulator memindai indeks sel);
  * - nama terdefinisi, nama tabel, dan rujukan terstruktur ditaksir dari isinya / rentang tabelnya (berulang, paling
  *   dalam `MAKS_KEDALAMAN_NAMA`);
- * - `REPT` berargumen literal = byte hasil / `BYTE_PER_BEBAN_TEKS_RUMUS_IMPOR`;
+ * - teks: `REPT` berargumen literal = byte hasil / `BYTE_PER_BEBAN_TEKS_RUMUS_IMPOR`; operator `&` = elemen hasil ×
+ *   taksiran byte tiap elemen / `BYTE_PER_BEBAN_TEKS_LARIK_RUMUS_IMPOR` (hasil `REPT` literal yang disalin ke tiap
+ *   elemen larik);
  * - {@see self::TAK_HINGGA} untuk rumus yang kerjanya baru diketahui saat dihitung: `INDIRECT`, `OFFSET`, `ANCHORARRAY`
  *   (operator `#`), `SINGLE` (operator `@`), pembangkit larik (`SEQUENCE`, `RANDARRAY`, `MUNIT`, `EXPAND`), `REPT`
  *   berjumlah ulang bukan literal, operator `:` dengan operand hasil hitung, rujukan 3D, rumus yang tidak terurai, dan
@@ -49,14 +61,16 @@ use Throwable;
  *
  * Supaya tidak menyimpang dari kalkulator, teks rumus diurai dengan pengurai kalkulator itu sendiri
  * (`Calculation::parseFormula` pada kalkulator TERSENDIRI, diperiksa pada PhpSpreadsheet 5.10.0), lalu daftar tokennya
- * dijalankan secara abstrak: yang dilacak hanya rujukan tiap operand, mengikuti aturan
+ * dijalankan secara abstrak: yang dilacak hanya rujukan dan ukuran larik tiap operand, mengikuti aturan
  * `Calculation::processTokenStack`. Semua cabang `IF` dihitung (kalkulator bisa melewati cabang yang tidak terpakai),
  * jadi taksiran rentang tidak pernah di bawah kerja kalkulator. Pengurai dipanggil tanpa sel, sehingga dua hal yang
  * bergantung pada sel ditiru di sini: sheet bawaan rujukan tanpa nama sheet, dan pemangkasan rentang kolom/baris penuh.
  *
- * Rumus tanpa `:`, `[`, `#`, nama terdefinisi, nama tabel, dan fungsi berat tidak mungkin menjabarkan rentang, jadi
+ * Rumus tanpa `:`, `[`, `#`, `{`, nama terdefinisi, nama tabel, dan fungsi berat tidak mungkin memuat larik, jadi
  * tidak diurai sama sekali (jalur cepat). Penaksiran berhenti begitu beban berjalan melewati batas yang diberikan
  * pemanggil, jadi penaksir sendiri tidak bisa dibuat bekerja lama.
+ *
+ * @phpstan-type Operand array{koordinat: list<string>|null, sheet: string|null, nama: string|null, galat: bool, nilai: mixed, baris: int, kolom: int, byte: int, rentang: bool, fungsi: string|null}
  */
 final class PenaksirBebanRumus
 {
@@ -65,6 +79,12 @@ final class PenaksirBebanRumus
     private const MAKS_KEDALAMAN_NAMA = 8;
     private const BARIS_LEMBAR        = 1_048_576;
     private const KOLOM_LEMBAR        = 'XFD';
+
+    /** Sisi larik terbesar yang masih dihitung tanpa meluap; lebih besar langsung {@see self::TAK_HINGGA}. */
+    private const MAKS_SISI_LARIK = 4_000_000;
+
+    /** Karakter (kode ASCII) yang dihitung sebagai operator pada beban dasar: `+ - * / ^ & < > = %` dan spasi. */
+    private const KODE_OPERATOR = [43, 45, 42, 47, 94, 38, 60, 62, 61, 37, 32];
 
     /**
      * Fungsi yang kerjanya ditentukan nilai saat dihitung, bukan teks rumus.
@@ -81,25 +101,74 @@ final class PenaksirBebanRumus
     ];
 
     /**
-     * Fungsi (huruf besar) yang biaya kuadratik rentang argumennya sama dengan penjabaran biasa. Fungsi LAIN memakai
-     * `PEMBAGI_KUADRAT_BARIS_UMUM_RUMUS_IMPOR` (README BB-12: `MAX` atas satu kolom 10.000 baris ±4,5× `SUM`).
+     * Fungsi (huruf besar) yang biaya kuadratik larik argumennya sama dengan penjabaran biasa (terukur).
      */
     private const FUNGSI_MURAH = [
         'SUM'      => true, 'COUNT' => true, 'COUNTA' => true, 'AVERAGE' => true, 'HLOOKUP' => true, 'INDEX' => true,
         'ROWS'     => true, 'COLUMNS' => true, 'ROW' => true, 'COLUMN' => true, 'AND' => true, 'OR' => true,
-        'MKMATRIX' => true,
+        'MKMATRIX' => true, 'TRANSPOSE' => true, 'VLOOKUP' => true,
     ];
 
     /**
-     * Pengali luas rentang argumen fungsi berkriteria (huruf besar), terukur ±8× `SUM` per sel; fungsi basis data
-     * (`D…`) menyusun ulang tabelnya per baris.
+     * Fungsi yang biaya kuadratiknya di antara {@see self::FUNGSI_MURAH} dan fungsi lain (README BB-12: `SUBTOTAL` atas
+     * satu kolom 10.000 baris ±2,4× `SUM`, `MAX` ±4,5×).
+     */
+    private const FUNGSI_SEDANG = ['SUBTOTAL' => true];
+
+    /**
+     * Pengali luas larik argumen (terukur per elemen terhadap `SUM`): fungsi berkriteria mengevaluasi kriterianya lewat
+     * kalkulator untuk tiap sel; fungsi basis data (`D…`, belum diukur) menyusun ulang tabelnya per baris.
      */
     private const PENGALI_LUAS = [
-        'COUNTIF'  => 10, 'COUNTIFS' => 10, 'SUMIF' => 10, 'SUMIFS' => 10, 'AVERAGEIF' => 10, 'AVERAGEIFS' => 10,
-        'MAXIFS'   => 10, 'MINIFS' => 10,
+        'COUNTIF'  => 6, 'COUNTIFS' => 6, 'SUMIFS' => 6, 'AVERAGEIFS' => 6, 'MAXIFS' => 6, 'MINIFS' => 6,
+        'SUMIF'    => 4, 'AVERAGEIF' => 4, 'SUBTOTAL' => 2,
         'DAVERAGE' => 20, 'DCOUNT' => 20, 'DCOUNTA' => 20, 'DGET' => 20, 'DMAX' => 20, 'DMIN' => 20, 'DPRODUCT' => 20,
         'DSTDEV'   => 20, 'DSTDEVP' => 20, 'DSUM' => 20, 'DVAR' => 20, 'DVARP' => 20,
     ];
+
+    /**
+     * Fungsi agregat: seluruh larik argumennya diserap dalam satu panggilan dan hasilnya satu nilai (terukur untuk yang
+     * berkriteria, `LARGE`, dan `RANK`: argumen kedua berupa larik tidak memperbanyak panggilan).
+     */
+    private const FUNGSI_SKALAR = [
+        'SUM'        => true, 'SUMSQ' => true, 'PRODUCT' => true, 'COUNT' => true, 'COUNTA' => true, 'COUNTBLANK' => true,
+        'AVERAGE'    => true, 'AVERAGEA' => true, 'MAX' => true, 'MAXA' => true, 'MIN' => true, 'MINA' => true,
+        'MEDIAN'     => true, 'MODE' => true, 'STDEV' => true, 'STDEVP' => true, 'VAR' => true, 'VARP' => true,
+        'SUMPRODUCT' => true, 'SUBTOTAL' => true, 'AND' => true, 'OR' => true, 'XOR' => true, 'ROWS' => true,
+        'COLUMNS'    => true, 'COUNTIF' => true, 'COUNTIFS' => true, 'SUMIF' => true, 'SUMIFS' => true,
+        'AVERAGEIF'  => true, 'AVERAGEIFS' => true, 'MAXIFS' => true, 'MINIFS' => true, 'LARGE' => true, 'SMALL' => true,
+        'RANK'       => true, 'DAVERAGE' => true, 'DCOUNT' => true, 'DCOUNTA' => true, 'DGET' => true, 'DMAX' => true,
+        'DMIN'       => true, 'DPRODUCT' => true, 'DSTDEV' => true, 'DSTDEVP' => true, 'DSUM' => true, 'DVAR' => true,
+        'DVARP'      => true,
+    ];
+
+    /**
+     * Fungsi pencarian: argumen pertama (nilai cari) berupa larik membuat kalkulator memanggil fungsinya sekali per
+     * elemen, tiap kali menelusuri larik argumen lainnya (`MATCH` 1.000 nilai ke 1.000 baris ±8 detik).
+     */
+    private const FUNGSI_PENCARIAN = [
+        'MATCH' => true, 'VLOOKUP' => true, 'HLOOKUP' => true, 'LOOKUP' => true, 'XLOOKUP' => true, 'XMATCH' => true,
+    ];
+
+    /**
+     * Fungsi yang dihitung per elemen larik argumennya tanpa menelusuri larik lain (terukur ±1 satuan per elemen, tanpa
+     * suku kuadratik). Fungsi di luar semua daftar diperlakukan sama bila larik argumennya satu, dan terburuk (tiap
+     * elemen menelusuri semua larik) bila dua atau lebih.
+     */
+    private const FUNGSI_ELEMEN = [
+        'IF'       => true, 'IFERROR' => true, 'IFNA' => true, 'CHOOSE' => true, 'NOT' => true, 'ROUND' => true,
+        'ROUNDUP'  => true, 'ROUNDDOWN' => true, 'INT' => true, 'TRUNC' => true, 'ABS' => true, 'MOD' => true,
+        'SIGN'     => true, 'SQRT' => true, 'POWER' => true, 'CEILING' => true, 'FLOOR' => true, 'MROUND' => true,
+        'LEN'      => true, 'LEFT' => true, 'RIGHT' => true, 'MID' => true, 'TEXT' => true, 'VALUE' => true,
+        'UPPER'    => true, 'LOWER' => true, 'PROPER' => true, 'TRIM' => true, 'SUBSTITUTE' => true, 'REPLACE' => true,
+        'FIND'     => true, 'SEARCH' => true, 'EXACT' => true, 'N' => true, 'T' => true, 'REPT' => true,
+        'ISNUMBER' => true, 'ISTEXT' => true, 'ISBLANK' => true, 'ISERROR' => true, 'ISERR' => true, 'ISNA' => true,
+        'DATE'     => true, 'YEAR' => true, 'MONTH' => true, 'DAY' => true, 'DATEDIF' => true, 'EDATE' => true,
+        'EOMONTH'  => true,
+    ];
+
+    /** Fungsi penggabung teks: byte hasil = jumlah byte semua elemen argumennya. */
+    private const FUNGSI_GABUNG = ['CONCATENATE' => true, 'CONCAT' => true, 'TEXTJOIN' => true];
 
     private const OPERATOR_BINER = [
         '+' => true, '-' => true, '*' => true, '/' => true, '^' => true, '&' => true, '>' => true, '<' => true,
@@ -139,11 +208,11 @@ final class PenaksirBebanRumus
     private int $batas = self::TAK_HINGGA;
 
     /**
-     * [luas, baris] rentang terbesar yang dicatat di tingkat nama terdefinisi yang sedang dijalankan.
+     * [baris, kolom] rentang terluas yang dicatat di tingkat nama terdefinisi yang sedang dijalankan.
      *
      * @var array{0: int, 1: int}
      */
-    private array $terbesar = [0, 0];
+    private array $terbesar = [1, 1];
 
     public function __construct(private readonly Spreadsheet $buku)
     {
@@ -175,7 +244,7 @@ final class PenaksirBebanRumus
 
         $this->berjalan = 0;
         $this->batas    = $batas;
-        $this->terbesar = [0, 0];
+        $this->terbesar = [1, 1];
 
         try {
             $this->pakai(self::bebanDasar($rumus));
@@ -192,7 +261,7 @@ final class PenaksirBebanRumus
     }
 
     /**
-     * Beban dasar satu teks rumus (sel atau isi nama terdefinisi).
+     * Beban dasar satu teks rumus (sel atau isi nama terdefinisi), dihitung dari karakternya tanpa mengurai.
      *
      * @throws RuntimeException teks lebih panjang dari batas Excel
      */
@@ -204,7 +273,20 @@ final class PenaksirBebanRumus
             throw new RuntimeException('Rumus terlalu panjang.');
         }
 
-        return Presensi::BEBAN_DASAR_RUMUS_IMPOR + $panjang + intdiv($panjang * $panjang, Presensi::PEMBAGI_KUADRAT_PANJANG_RUMUS_IMPOR);
+        /** @var array<int, int> $hitung */
+        $hitung   = count_chars($rumus, 1);
+        $operator = 0;
+
+        foreach (self::KODE_OPERATOR as $kode) {
+            $operator += $hitung[$kode] ?? 0;
+        }
+
+        return Presensi::BEBAN_DASAR_RUMUS_IMPOR
+            + Presensi::BEBAN_RUJUKAN_RUMUS_IMPOR * (int) preg_match_all('/[A-Za-z]\$?\d/', $rumus)
+            + Presensi::BEBAN_OPERATOR_RUMUS_IMPOR * $operator
+            + Presensi::BEBAN_FUNGSI_RUMUS_IMPOR * ($hitung[40] ?? 0)
+            + Presensi::BEBAN_ARGUMEN_RUMUS_IMPOR * (($hitung[44] ?? 0) + ($hitung[59] ?? 0))
+            + intdiv($panjang * $panjang, Presensi::PEMBAGI_KUADRAT_PANJANG_RUMUS_IMPOR);
     }
 
     /**
@@ -219,9 +301,29 @@ final class PenaksirBebanRumus
         }
     }
 
+    /**
+     * Perkalian dua bilangan tak negatif yang berhenti di {@see self::TAK_HINGGA}.
+     */
+    private static function kali(int $a, int $b): int
+    {
+        return $a > 0 && $b > intdiv(self::TAK_HINGGA, $a) ? self::TAK_HINGGA : $a * $b;
+    }
+
+    /**
+     * Suku kuadratik larik `$baris` × `$kolom` untuk pembagi kelas `$pembagi`.
+     */
+    private static function kuadrat(int $baris, int $kolom, int $pembagi): int
+    {
+        if ($baris > self::MAKS_SISI_LARIK || $kolom > self::MAKS_SISI_LARIK) {
+            return self::TAK_HINGGA;
+        }
+
+        return intdiv(self::kali($baris * $baris, $kolom + 1), 2 * $pembagi);
+    }
+
     private function perluDiurai(string $rumus): bool
     {
-        if (strpbrk($rumus, ':[#') !== false) {
+        if (strpbrk($rumus, ':[#{') !== false) {
             return true;
         }
 
@@ -243,11 +345,15 @@ final class PenaksirBebanRumus
 
     /**
      * Menjalankan token `$rumus` secara abstrak di sheet `$konteks` dan mencatat beban semua rentang yang akan dijabarkan
-     * kalkulator ({@see self::pakai()}).
+     * kalkulator serta semua larik yang dihasilkan operator dan fungsi ({@see self::pakai()}).
+     *
+     * @return array<string, mixed>|null operand hasil rumus; `null` bila kalkulator berhenti dengan galat di tengah jalan
+     *
+     * @phpstan-return Operand|null
      *
      * @throws Throwable rumus tidak terurai, kerjanya tidak bisa dibatasi, atau beban melewati batas
      */
-    private function jalankan(string $rumus, Worksheet $konteks, ?Cell $sel, int $kedalaman): void
+    private function jalankan(string $rumus, Worksheet $konteks, ?Cell $sel, int $kedalaman): ?array
     {
         $token = $this->pengurai->parseFormula($rumus);
 
@@ -274,20 +380,22 @@ final class PenaksirBebanRumus
 
                 // Kalkulator berhenti dengan galat di sini; yang sudah dijabarkan sebelumnya tetap tercatat.
                 if ($kanan === null || $kiri === null) {
-                    return;
+                    return null;
                 }
 
-                $tumpukan[] = $nilai === ':' ? $this->rentang($kiri, $kanan, $konteks) : self::operand(null);
+                $tumpukan[] = $nilai === ':' ? $this->rentang($kiri, $kanan, $konteks) : $this->operator($nilai, $kiri, $kanan);
 
                 continue;
             }
 
             if ($nilai === '~' || $nilai === '%') {
-                if (array_pop($tumpukan) === null) {
-                    return;
+                $operand = array_pop($tumpukan);
+
+                if ($operand === null) {
+                    return null;
                 }
 
-                $tumpukan[] = self::operand(null);
+                $tumpukan[] = $this->operator($nilai, $operand, $operand);
 
                 continue;
             }
@@ -297,7 +405,7 @@ final class PenaksirBebanRumus
 
                 // Rujukan ke workbook lain: kalkulator berhenti di token ini.
                 if (str_contains($sheet, '[') || str_contains($sheet, ']')) {
-                    return;
+                    return null;
                 }
 
                 $kolom = strtoupper($m[6]);
@@ -336,7 +444,7 @@ final class PenaksirBebanRumus
                 $jumlah = array_pop($tumpukan)['nilai'] ?? null;
 
                 if (! is_int($jumlah)) {
-                    return;
+                    return null;
                 }
 
                 $argumen = [];
@@ -345,14 +453,13 @@ final class PenaksirBebanRumus
                     $x = array_pop($tumpukan);
 
                     if ($x === null) {
-                        return;
+                        return null;
                     }
 
                     $argumen[] = $x;
                 }
 
-                $this->fungsi($fungsi, array_reverse($argumen));
-                $tumpukan[] = self::operand(null);
+                $tumpukan[] = $this->fungsi($fungsi, array_reverse($argumen));
 
                 continue;
             }
@@ -361,7 +468,7 @@ final class PenaksirBebanRumus
                 && $nilai[0] !== '"' && $nilai[0] !== '#' && preg_match(self::POLA_NAMA, $nilai, $m) === 1) {
                 // Kalkulator mengembalikan nilai tersimpan untuk nama `_xleta…` tanpa melanjutkan.
                 if (str_starts_with($m[6], '_xleta')) {
-                    return;
+                    return null;
                 }
 
                 $tumpukan[] = $this->nama($m[6], trim($m[2], "'"), $konteks, $kedalaman);
@@ -370,33 +477,135 @@ final class PenaksirBebanRumus
             }
 
             // Angka, teks, konstanta, galat, argumen kosong, dan jumlah argumen fungsi.
-            $rujukan    = is_string($t['reference'] ?? null) ? [$t['reference']] : null;
-            $tumpukan[] = ['koordinat' => $rujukan, 'sheet' => null, 'nama' => null, 'galat' => false, 'nilai' => $nilai, 'luas' => 0, 'baris' => 0];
+            $literal          = self::operand(is_string($t['reference'] ?? null) ? [$t['reference']] : null);
+            $literal['nilai'] = $nilai;
+            $literal['byte']  = is_string($nilai) && str_starts_with($nilai, '"') ? max(1, strlen($nilai) - 2) : Presensi::BYTE_TEKS_ANGGAPAN_RUMUS_IMPOR;
+            $tumpukan[]       = $literal;
         }
+
+        return array_pop($tumpukan);
     }
 
     /**
-     * Biaya tambahan pemanggilan fungsi atas rentang yang menjadi argumennya (suku kuadratik fungsi umum, pengali luas
-     * fungsi berkriteria), dan ukuran teks hasil `REPT`.
+     * Operator selain `:` (`executeNumericBinaryOperation`, perbandingan, `&`, negasi, persen): bila salah satu operand
+     * berupa larik, kalkulator memperluas keduanya ke baris terbesar × kolom terbesar lalu mengulang tiap elemen.
      *
-     * @param list<array{koordinat: list<string>|null, sheet: string|null, nama: string|null, galat: bool, nilai: mixed, luas: int, baris: int}> $argumen
+     * @param array<string, mixed> $kiri
+     * @param array<string, mixed> $kanan
+     *
+     * @phpstan-param Operand $kiri
+     * @phpstan-param Operand $kanan
+     *
+     * @return array<string, mixed>
+     *
+     * @phpstan-return Operand
      */
-    private function fungsi(string $fungsi, array $argumen): void
+    private function operator(string $operator, array $kiri, array $kanan): array
     {
-        $umum    = ! isset(self::FUNGSI_MURAH[$fungsi]);
-        $pengali = self::PENGALI_LUAS[$fungsi] ?? 1;
+        // Gabungan (`,` di dalam rujukan): isi kedua operand disatukan.
+        $baris  = $operator === '∪' ? $kiri['baris'] + $kanan['baris'] : max($kiri['baris'], $kanan['baris']);
+        $kolom  = max($kiri['kolom'], $kanan['kolom']);
+        $elemen = self::elemen($baris, $kolom);
+        $byte   = Presensi::BYTE_TEKS_ANGGAPAN_RUMUS_IMPOR;
+
+        if ($elemen > 1) {
+            $this->pakai($elemen);
+        }
+
+        if ($operator === '&') {
+            $byte = self::tambah($kiri['byte'], $kanan['byte']);
+            $this->pakai(self::kali($elemen, intdiv($byte, Presensi::BYTE_PER_BEBAN_TEKS_LARIK_RUMUS_IMPOR)));
+        }
+
+        return self::larik($baris, $kolom, $byte);
+    }
+
+    /**
+     * Pemanggilan fungsi: biaya tambahan atas larik argumennya menurut kelas fungsi, jumlah panggilan bila kalkulator
+     * memanggilnya per elemen, ukuran teks hasil `REPT`, dan ukuran larik hasilnya.
+     *
+     * @param list<array<string, mixed>> $argumen
+     *
+     * @phpstan-param list<Operand> $argumen
+     *
+     * @return array<string, mixed>
+     *
+     * @phpstan-return Operand
+     */
+    private function fungsi(string $fungsi, array $argumen): array
+    {
+        $perElemen = isset(self::FUNGSI_ELEMEN[$fungsi]);
+        $pengali   = self::PENGALI_LUAS[$fungsi] ?? 1;
+        $pembagi   = match (true) {
+            isset(self::FUNGSI_MURAH[$fungsi]) || $perElemen => Presensi::PEMBAGI_KUADRAT_BARIS_RUMUS_IMPOR,
+            isset(self::FUNGSI_SEDANG[$fungsi])              => Presensi::PEMBAGI_KUADRAT_BARIS_SEDANG_RUMUS_IMPOR,
+            default                                          => Presensi::PEMBAGI_KUADRAT_BARIS_UMUM_RUMUS_IMPOR,
+        };
+
+        // [baris, kolom] larik hasil, dan argumen yang ditelusuri ulang pada tiap panggilan per elemen.
+        $hasil     = [1, 1];
+        $ditelusur = [];
+        $sekali    = true;
+        $larik     = array_values(array_filter($argumen, static fn (array $a): bool => self::elemen($a['baris'], $a['kolom']) > 1));
+
+        if (isset(self::FUNGSI_SKALAR[$fungsi])) {
+            // Satu panggilan, satu nilai.
+        } elseif (isset(self::FUNGSI_PENCARIAN[$fungsi])) {
+            $cari      = $argumen[0] ?? null;
+            $hasil     = $cari === null ? [1, 1] : [$cari['baris'], $cari['kolom']];
+            $ditelusur = array_slice($argumen, 1);
+            $sekali    = false;
+        } elseif ($fungsi === 'INDEX') {
+            $hasil = self::ukuranIndex($argumen);
+        } elseif ($fungsi === 'TRANSPOSE') {
+            $hasil = isset($argumen[0]) ? [$argumen[0]['kolom'], $argumen[0]['baris']] : [1, 1];
+        } elseif ($fungsi === 'MMULT' && count($argumen) === 2) {
+            $hasil = [$argumen[0]['baris'], $argumen[1]['kolom']];
+            $this->pakai(self::kali(self::elemen($argumen[0]['baris'], $argumen[0]['kolom']), $argumen[1]['kolom']));
+        } elseif ($fungsi === 'MKMATRIX') {
+            // Larik literal `{1,2;3,4}` = MKMATRIX(MKMATRIX(1,2),MKMATRIX(3,4)): yang luar berisi baris-barisnya.
+            $luar  = $argumen !== [] && array_filter($argumen, static fn (array $a): bool => $a['fungsi'] !== 'MKMATRIX') === [];
+            $hasil = $luar ? [count($argumen), max(array_column($argumen, 'kolom'))] : [1, max(1, count($argumen))];
+        } else {
+            $hasil     = self::siaran($argumen);
+            $ditelusur = $perElemen || count($larik) < 2 ? [] : $larik;
+            $sekali    = false;
+        }
+
+        $panggilan = $sekali ? 1 : self::elemen($hasil[0], $hasil[1]);
+
+        foreach ($larik as $a) {
+            $kuadrat = self::kuadrat($a['baris'], $a['kolom'], $pembagi);
+
+            // Rentang biasa sudah ditagih suku kuadratik kelas murah saat dijabarkan.
+            if ($a['rentang']) {
+                $kuadrat = max(0, $kuadrat - self::kuadrat($a['baris'], $a['kolom'], Presensi::PEMBAGI_KUADRAT_BARIS_RUMUS_IMPOR));
+            } elseif ($perElemen) {
+                $kuadrat = 0;
+            }
+
+            $this->pakai($kuadrat);
+            $this->pakai(self::kali($pengali - 1, self::elemen($a['baris'], $a['kolom'])));
+        }
+
+        if ($panggilan > 1) {
+            $this->pakai($panggilan);
+
+            foreach ($ditelusur as $a) {
+                $luas = self::elemen($a['baris'], $a['kolom']);
+
+                if ($luas > 1) {
+                    $this->pakai(self::kali($panggilan - 1, self::tambah(self::kali($luas, $pengali), self::kuadrat($a['baris'], $a['kolom'], $pembagi))));
+                }
+            }
+        }
+
+        $byte = Presensi::BYTE_TEKS_ANGGAPAN_RUMUS_IMPOR;
 
         foreach ($argumen as $a) {
-            if ($a['luas'] === 0) {
-                continue;
-            }
-
-            if ($umum) {
-                $kuadrat = $a['baris'] * $a['baris'];
-                $this->pakai(intdiv($kuadrat, Presensi::PEMBAGI_KUADRAT_BARIS_UMUM_RUMUS_IMPOR) - intdiv($kuadrat, Presensi::PEMBAGI_KUADRAT_BARIS_RUMUS_IMPOR));
-            }
-
-            $this->pakai(($pengali - 1) * $a['luas']);
+            $byte = isset(self::FUNGSI_GABUNG[$fungsi])
+                ? self::tambah($byte, self::kali($a['byte'], self::elemen($a['baris'], $a['kolom'])))
+                : max($byte, $a['byte']);
         }
 
         // `REPT` memanggil `str_repeat` sebelum memeriksa panjang hasil: jumlah ulang yang bukan literal tidak terbatas.
@@ -407,22 +616,102 @@ final class PenaksirBebanRumus
                 throw new RuntimeException('REPT berjumlah ulang bukan literal.');
             }
 
-            $teks  = $argumen[0]['nilai'];
-            $byte  = is_string($teks) && str_starts_with($teks, '"') ? max(1, strlen($teks) - 2) : Presensi::BYTE_TEKS_ANGGAPAN_RUMUS_IMPOR;
-            $hasil = max(0.0, (float) $ulang) * $byte;
+            $teks    = $argumen[0]['nilai'];
+            $satu    = is_string($teks) && str_starts_with($teks, '"') ? max(1, strlen($teks) - 2) : Presensi::BYTE_TEKS_ANGGAPAN_RUMUS_IMPOR;
+            $panjang = max(0.0, (float) $ulang) * $satu;
+            $byte    = $panjang >= (float) self::TAK_HINGGA ? self::TAK_HINGGA : (int) $panjang;
 
-            $this->pakai($hasil >= (float) self::TAK_HINGGA ? self::TAK_HINGGA : intdiv((int) $hasil, Presensi::BYTE_PER_BEBAN_TEKS_RUMUS_IMPOR));
+            $this->pakai(self::kali($panggilan, intdiv($byte, Presensi::BYTE_PER_BEBAN_TEKS_RUMUS_IMPOR)));
         }
+
+        $operand           = self::larik($hasil[0], $hasil[1], $byte);
+        $operand['fungsi'] = $fungsi;
+
+        return $operand;
+    }
+
+    /**
+     * Ukuran hasil `INDEX(larik, baris, kolom)`: satu nilai hanya bila semua nomor yang diberikan pasti bukan nol
+     * (angka literal atau hasil `MATCH`) dan mencukupi untuk larik itu; selain itu sebesar lariknya (nomor 0 atau kosong
+     * mengembalikan seluruh baris/kolom).
+     *
+     * @param list<array<string, mixed>> $argumen
+     *
+     * @phpstan-param list<Operand> $argumen
+     *
+     * @return array{0: int, 1: int}
+     */
+    private static function ukuranIndex(array $argumen): array
+    {
+        $sumber = $argumen[0] ?? null;
+        $nomor  = array_slice($argumen, 1);
+        $ukuran = self::siaran($nomor);
+
+        if ($sumber === null) {
+            return $ukuran;
+        }
+
+        $pasti = $nomor !== [];
+
+        foreach ($nomor as $n) {
+            $angka = $n['nilai'];
+
+            if ($n['fungsi'] !== 'MATCH' && ! ((is_int($angka) || is_float($angka)) && (float) $angka !== 0.0)) {
+                $pasti = false;
+            }
+        }
+
+        if ($pasti && (count($nomor) >= 2 || $sumber['baris'] === 1 || $sumber['kolom'] === 1)) {
+            return $ukuran;
+        }
+
+        return [max($ukuran[0], $sumber['baris']), max($ukuran[1], $sumber['kolom'])];
+    }
+
+    /**
+     * Ukuran larik hasil siaran (broadcast) semua operand: baris terbesar × kolom terbesar.
+     *
+     * @param list<array<string, mixed>> $operand
+     *
+     * @phpstan-param list<Operand> $operand
+     *
+     * @return array{0: int, 1: int}
+     */
+    private static function siaran(array $operand): array
+    {
+        $baris = $kolom = 1;
+
+        foreach ($operand as $o) {
+            $baris = max($baris, $o['baris']);
+            $kolom = max($kolom, $o['kolom']);
+        }
+
+        return [$baris, $kolom];
+    }
+
+    private static function elemen(int $baris, int $kolom): int
+    {
+        return $baris > self::MAKS_SISI_LARIK || $kolom > self::MAKS_SISI_LARIK ? self::TAK_HINGGA : $baris * $kolom;
+    }
+
+    private static function tambah(int $a, int $b): int
+    {
+        return $a > self::TAK_HINGGA - $b ? self::TAK_HINGGA : $a + $b;
     }
 
     /**
      * Operator `:` (`Calculation::processTokenStack`): kotak pembatas semua koordinat kedua operand, dijabarkan di sheet
      * operand kiri.
      *
-     * @param array{koordinat: list<string>|null, sheet: string|null, nama: string|null, galat: bool, nilai: mixed, luas: int, baris: int} $kiri
-     * @param array{koordinat: list<string>|null, sheet: string|null, nama: string|null, galat: bool, nilai: mixed, luas: int, baris: int} $kanan
+     * @param array<string, mixed> $kiri
+     * @param array<string, mixed> $kanan
      *
-     * @return array{koordinat: list<string>|null, sheet: string|null, nama: string|null, galat: bool, nilai: mixed, luas: int, baris: int}
+     * @phpstan-param Operand $kiri
+     * @phpstan-param Operand $kanan
+     *
+     * @return array<string, mixed>
+     *
+     * @phpstan-return Operand
      */
     private function rentang(array $kiri, array $kanan, Worksheet $konteks): array
     {
@@ -466,7 +755,7 @@ final class PenaksirBebanRumus
             }
         }
 
-        $tinggi = $lebar = 0;
+        $tinggi = $lebar = 1;
 
         if ($this->buku->getSheetByName($sheetKiri) !== null) {
             $tinggi = max($baris) - min($baris) + 1;
@@ -478,8 +767,9 @@ final class PenaksirBebanRumus
             [Coordinate::stringFromColumnIndex(min($kolom)) . min($baris), Coordinate::stringFromColumnIndex(max($kolom)) . max($baris)],
             $sheetKiri,
             null,
-            $tinggi * $lebar,
             $tinggi,
+            $lebar,
+            true,
         );
     }
 
@@ -487,7 +777,9 @@ final class PenaksirBebanRumus
      * Nama terdefinisi atau nama tabel (`Calculation::processTokenStack` + `evaluateDefinedName`): isinya dihitung ulang
      * setiap kali dipakai.
      *
-     * @return array{koordinat: list<string>|null, sheet: string|null, nama: string|null, galat: bool, nilai: mixed, luas: int, baris: int}
+     * @return array<string, mixed>
+     *
+     * @phpstan-return Operand
      */
     private function nama(string $nama, string $sheet, Worksheet $konteks, int $kedalaman): array
     {
@@ -503,7 +795,7 @@ final class PenaksirBebanRumus
             // Kalkulator membuang baris judul/total; taksiran memakai seluruh rentang tabel.
             [$tinggi, $lebar] = $this->catatTabel($tabel);
 
-            return self::operand([$nama], null, $nama, $tinggi * $lebar, $tinggi);
+            return self::operand([$nama], null, $nama, $tinggi, $lebar, true);
         }
 
         $cakupan = $terdefinisi->getScope();
@@ -531,21 +823,29 @@ final class PenaksirBebanRumus
             throw new RuntimeException('Nama terdefinisi terlalu dalam.');
         }
 
-        // Rentang terbesar di dalam isi nama menjadi ukuran operand ini (untuk fungsi yang menerimanya sebagai argumen).
+        // Ukuran operand ini = yang terbesar antara rentang di dalam isi nama dan larik hasil isinya.
         $luar           = $this->terbesar;
-        $this->terbesar = [0, 0];
+        $this->terbesar = [1, 1];
 
         $isi = str_starts_with($isi, '=') ? $isi : '=' . $isi;
         $this->pakai(self::bebanDasar($isi));
-        $this->jalankan($isi, $sheetHitung, null, $kedalaman + 1);
+        $hasil = $this->jalankan($isi, $sheetHitung, null, $kedalaman + 1);
 
-        [$luas, $tinggi] = $this->terbesar;
-        $this->terbesar  = [max($luar[0], $luas), max($luar[1], $tinggi)];
+        [$tinggi, $lebar] = $this->terbesar;
+        $this->terbesar   = self::elemen($luar[0], $luar[1]) >= self::elemen($tinggi, $lebar) ? $luar : [$tinggi, $lebar];
+        $rentang          = $hasil === null || $hasil['rentang'];
+
+        if ($hasil !== null) {
+            $tinggi = max($tinggi, $hasil['baris']);
+            $lebar  = max($lebar, $hasil['kolom']);
+        }
 
         // Rujukan operand hasil nama = namanya sendiri (bukan koordinat), persis seperti kalkulator.
-        $rujukan = $terdefinisi->getLocalOnly() && $lembarNama !== null ? "'" . $lembarNama->getTitle() . "'!" . $terdefinisi->getName() : $terdefinisi->getName();
+        $rujukan         = $terdefinisi->getLocalOnly() && $lembarNama !== null ? "'" . $lembarNama->getTitle() . "'!" . $terdefinisi->getName() : $terdefinisi->getName();
+        $operand         = self::operand([$rujukan], null, $rujukan, $tinggi, $lebar, $rentang);
+        $operand['byte'] = $hasil['byte'] ?? Presensi::BYTE_TEKS_ANGGAPAN_RUMUS_IMPOR;
 
-        return self::operand([$rujukan], null, $rujukan, $luas, $tinggi);
+        return $operand;
     }
 
     /**
@@ -553,7 +853,9 @@ final class PenaksirBebanRumus
      * menghitung rentang itu. Ditaksir sebagai seluruh rentang tabel, TANPA `StructuredReference::parse` (yang membuat
      * sel dan menghitung sel judul tabel lewat kalkulator workbook).
      *
-     * @return array{koordinat: list<string>|null, sheet: string|null, nama: string|null, galat: bool, nilai: mixed, luas: int, baris: int}
+     * @return array<string, mixed>
+     *
+     * @phpstan-return Operand
      */
     private function rujukanTerstruktur(string $teks, Worksheet $konteks, ?Cell $sel): array
     {
@@ -582,7 +884,7 @@ final class PenaksirBebanRumus
 
         [$tinggi, $lebar] = $this->catatTabel($tabel);
 
-        return self::operand(null, null, null, $tinggi * $lebar, $tinggi);
+        return self::operand(null, null, null, $tinggi, $lebar, true);
     }
 
     /**
@@ -608,8 +910,11 @@ final class PenaksirBebanRumus
      */
     private function catatRentang(int $baris, int $kolom): void
     {
-        $this->terbesar = [max($this->terbesar[0], $baris * $kolom), max($this->terbesar[1], $baris)];
-        $this->pakai(Presensi::BEBAN_TETAP_RENTANG_RUMUS_IMPOR + $baris * $kolom + intdiv($baris * $baris, Presensi::PEMBAGI_KUADRAT_BARIS_RUMUS_IMPOR));
+        if ($baris * $kolom > self::elemen($this->terbesar[0], $this->terbesar[1])) {
+            $this->terbesar = [$baris, $kolom];
+        }
+
+        $this->pakai(Presensi::BEBAN_TETAP_RENTANG_RUMUS_IMPOR + $baris * $kolom + self::kuadrat($baris, $kolom, Presensi::PEMBAGI_KUADRAT_BARIS_RUMUS_IMPOR));
     }
 
     /**
@@ -645,20 +950,48 @@ final class PenaksirBebanRumus
     }
 
     /**
+     * Operand berujukan (sel, rentang, nama); `$baris` × `$kolom` = ukuran lariknya, `$rentang` = sudah ditagih sebagai
+     * rentang yang dijabarkan.
+     *
      * @param list<string>|null $koordinat
      *
-     * @return array{koordinat: list<string>|null, sheet: string|null, nama: string|null, galat: bool, nilai: mixed, luas: int, baris: int}
+     * @return array<string, mixed>
+     *
+     * @phpstan-return Operand
      */
-    private static function operand(?array $koordinat, ?string $sheet = null, ?string $nama = null, int $luas = 0, int $baris = 0): array
+    private static function operand(?array $koordinat, ?string $sheet = null, ?string $nama = null, int $baris = 1, int $kolom = 1, bool $rentang = false): array
     {
-        return ['koordinat' => $koordinat, 'sheet' => $sheet, 'nama' => $nama, 'galat' => false, 'nilai' => null, 'luas' => $luas, 'baris' => $baris];
+        return [
+            'koordinat' => $koordinat, 'sheet' => $sheet, 'nama' => $nama, 'galat' => false, 'nilai' => null,
+            'baris'     => $baris, 'kolom' => $kolom, 'byte' => Presensi::BYTE_TEKS_ANGGAPAN_RUMUS_IMPOR, 'rentang' => $rentang, 'fungsi' => null,
+        ];
     }
 
     /**
-     * @return array{koordinat: list<string>|null, sheet: string|null, nama: string|null, galat: bool, nilai: mixed, luas: int, baris: int}
+     * Operand hasil hitung (operator atau fungsi) berukuran `$baris` × `$kolom`.
+     *
+     * @return array<string, mixed>
+     *
+     * @phpstan-return Operand
+     */
+    private static function larik(int $baris, int $kolom, int $byte): array
+    {
+        $operand         = self::operand(null, null, null, $baris, $kolom);
+        $operand['byte'] = $byte;
+
+        return $operand;
+    }
+
+    /**
+     * @return array<string, mixed>
+     *
+     * @phpstan-return Operand
      */
     private static function galat(): array
     {
-        return ['koordinat' => null, 'sheet' => null, 'nama' => null, 'galat' => true, 'nilai' => null, 'luas' => 0, 'baris' => 0];
+        $operand          = self::operand(null);
+        $operand['galat'] = true;
+
+        return $operand;
     }
 }

@@ -129,6 +129,22 @@ final class PembacaExcelSlipAnggaranRumusTest extends CIUnitTestCase
         yield 'REPT berjumlah ulang raksasa' => $gpp('=REPT("x",2000000000)');
         yield 'REPT berjumlah ulang bukan literal' => $gpp('=REPT("0",18-LEN(A2))');
         yield 'COUNTIFS tiga rentang 10.000 baris' => $tk('=COUNTIFS(GPP!$C$2:$C$10001,">5",GPP!$A$2:$A$10001,">5",GPP!$C$2:$C$10001,"<90")');
+
+        // Larik hasil operator dan fungsi: tiap operand membawa ukuran lariknya (review R1 K3). Sebelumnya operator atas
+        // rentang tidak ditagih, sehingga satu sel berbeban < 2% anggaran dihitung lebih dari 60 detik atau menghabiskan
+        // memori.
+        yield 'operator berantai atas rentang' => $tk('=SUM(GPP!$C$2:$C$10001' . str_repeat('*1', 400) . ')');
+        yield 'negasi berantai atas rentang' => $tk('=SUM(' . str_repeat('-', 400) . 'GPP!$C$2:$C$10001)');
+        yield 'perbandingan berantai atas rentang' => $tk('=SUM(' . str_repeat('(', 150) . 'GPP!$C$2:$C$10001' . str_repeat('>0)*1', 150) . ')');
+        yield 'perkalian luar kolom kali baris' => $tk('=SUMPRODUCT(GPP!$C$2:$C$3001*TRANSPOSE(GPP!$C$2:$C$3001))');
+        yield 'penjumlahan luar di dalam MAX' => $tk('=MAX(GPP!$C$2:$C$3801+TRANSPOSE(GPP!$C$2:$C$3801))');
+        yield 'larik literal baris kali larik literal kolom' => $gpp('=SUM({' . implode(',', array_fill(0, 1500, '1')) . '}*{' . implode(';', array_fill(0, 1500, '1')) . '})');
+        yield 'fungsi per elemen menyiarkan dua larik' => $tk('=SUM(ROUND(GPP!$C$2:$C$3001,TRANSPOSE(GPP!$C$2:$C$3001)))');
+        yield 'operator & antara rentang dan REPT literal' => $tk('=SUMPRODUCT(LEN(GPP!$B$2:$B$10001&REPT("x",30000)&""))');
+        yield 'MATCH bernilai cari larik' => $tk('=SUM(MATCH(GPP!$A$2:$A$1001,GPP!$A$2:$A$1001,0))');
+        yield 'VLOOKUP bernilai cari larik' => $tk('=SUM(VLOOKUP(GPP!$A$2:$A$1001,GPP!$A$2:$C$1001,3,0))');
+        yield 'larik hasil operator lewat nama terdefinisi' => [...$tk('=SUM(LUAS*TRANSPOSE(LUAS))'), ['LUAS' => 'GPP!$C$2:$C$3001*1']];
+        yield 'MAX atas 24 kolom kali 10.000 baris' => $tk('=MAX(GPP!$C$2:$Z$10001)');
     }
 
     /**
@@ -170,57 +186,59 @@ final class PembacaExcelSlipAnggaranRumusTest extends CIUnitTestCase
     }
 
     /**
-     * Batas jumlah beban juga menangkap "terlalu banyak sel rumus ringan" (mis. 22 kolom rumus × 10.000 baris): tiap sel
-     * rumus berbeban paling sedikit beban dasar + panjang teksnya.
+     * Batas jumlah beban juga menangkap "terlalu banyak sel rumus ringan" (mis. 26 kolom rumus × 10.000 baris): tiap sel
+     * rumus berbeban paling sedikit beban dasar ditambah beban rujukan dan operatornya.
      */
     public function testBanyakSelRumusRinganDitolakLewatJumlahAnggaran(): void
     {
         $sel = [];
 
-        // 40 sel "=E2+1": beban 40 × (beban dasar + 5 karakter); suku kuadratik panjangnya nol.
+        // 40 sel "=E2+1": beban dasar + satu rujukan + dua operator (`=` dan `+`); suku kuadratik panjangnya nol.
         for ($c = 28; $c < 68; $c++) {
             $sel[] = XlsxMentah::rumus(XlsxMentah::kolom($c) . '2', '=E2+1');
         }
 
         $path  = $this->xlsx($sel);
-        $beban = 40 * (Presensi::BEBAN_DASAR_RUMUS_IMPOR + strlen('=E2+1'));
+        $beban = 40 * (Presensi::BEBAN_DASAR_RUMUS_IMPOR + Presensi::BEBAN_RUJUKAN_RUMUS_IMPOR + 2 * Presensi::BEBAN_OPERATOR_RUMUS_IMPOR);
 
         $this->assertDitolak($path, new PembacaExcelSlip(10000, maksBebanRumus: $beban - 1));
         $this->assertDiterima($path, new PembacaExcelSlip(10000, maksBebanRumus: $beban));
     }
 
     /**
-     * Satuan beban satu rentang: beban tetap + baris × kolom + baris² / pembagi, ditambah beban dasar sel (beban tetap +
-     * panjang teks). Rentang yang menjadi argumen fungsi selain yang terukur murah (`SUM`, `COUNT`, `AVERAGE`, …)
-     * memakai pembagi kuadratik yang lebih kecil; argumen fungsi berkriteria luasnya dikalikan 10.
-     *
-     * @param callable(int, int): int $rentang beban rentang dari (baris, kolom)
+     * Satuan beban, dihitung tangan untuk rentang 600 baris × 10 kolom (dan 600 × 1): beban dasar sel (8 + rujukan × 6 +
+     * operator × 2 + kurung × 7 + pemisah × 4) + tiap rentang (20 + baris × kolom + baris² × (kolom + 1) / 12.000).
+     * Sebagai argumen fungsi, suku kuadratiknya memakai pembagi kelas fungsi (`SUBTOTAL` 2 × 2.000, fungsi lain 2 × 900)
+     * dan luasnya dikalikan untuk fungsi berkriteria; operator atas larik menagih satu satuan per elemen hasil; nilai
+     * cari berupa larik mengalikan biaya larik yang ditelusuri.
      */
     #[DataProvider('bebanRentang')]
-    public function testBebanRentangDihitungDariLuasBarisDanFungsi(string $rumus, callable $rentang, int $harapan): void
+    public function testBebanRentangDihitungDariLuasBarisDanFungsi(string $rumus, int $beban): void
     {
-        $path  = $this->xlsx([XlsxMentah::rumus('AB2', $rumus)]);
-        $beban = Presensi::BEBAN_DASAR_RUMUS_IMPOR + strlen($rumus) + Presensi::BEBAN_TETAP_RENTANG_RUMUS_IMPOR + $rentang(600, 10);
+        $path = $this->xlsx([XlsxMentah::rumus('AB2', $rumus)]);
 
-        $this->assertSame($harapan, $beban);
         $this->assertDitolak($path, new PembacaExcelSlip(10000, maksBebanPerRumus: $beban - 1));
         $this->assertDiterima($path, new PembacaExcelSlip(10000, maksBebanPerRumus: $beban));
     }
 
     /**
-     * @return iterable<string, array{0: string, 1: callable(int, int): int, 2: int}>
+     * @return iterable<string, array{0: string, 1: int}>
      */
     public static function bebanRentang(): iterable
     {
-        $murah = static fn (int $baris, int $kolom): int => $baris * $kolom + intdiv($baris * $baris, Presensi::PEMBAGI_KUADRAT_BARIS_RUMUS_IMPOR);
-        $umum  = static fn (int $baris, int $kolom): int => $baris * $kolom + intdiv($baris * $baris, Presensi::PEMBAGI_KUADRAT_BARIS_UMUM_RUMUS_IMPOR);
-
-        yield 'SUM (murah)' => ['=SUM(A1:J600)', $murah, 18 + 13 + 20 + 6000 + 60];
-        yield 'rentang tanpa fungsi' => ['=A1:J600', $murah, 18 + 8 + 20 + 6000 + 60];
-        yield 'MAX (umum)' => ['=MAX(A1:J600)', $umum, 18 + 13 + 20 + 6000 + 400];
-        yield 'VLOOKUP (umum)' => ['=VLOOKUP(1,A1:J600,2,0)', $umum, 18 + 23 + 20 + 6000 + 400];
-        yield 'COUNTIF (berkriteria)' => ['=COUNTIF(A1:J600,1)', static fn (int $baris, int $kolom): int => $umum($baris, $kolom) + 9 * $baris * $kolom, 18 + 19 + 20 + 60000 + 400];
-        yield 'rentang di dalam fungsi di dalam fungsi' => ['=ROUND(MAX(A1:J600),0)', $umum, 18 + 22 + 20 + 6000 + 400];
+        // Rentang A1:J600 = 20 + 6.000 + 330; A1:A600 = 20 + 600 + 60.
+        yield 'SUM (murah)' => ['=SUM(A1:J600)', 29 + 6350];
+        yield 'rentang tanpa fungsi' => ['=A1:J600', 22 + 6350];
+        yield 'VLOOKUP (murah)' => ['=VLOOKUP(1,A1:J600,2,0)', 41 + 6350];
+        yield 'SUBTOTAL (sedang, luas × 2)' => ['=SUBTOTAL(9,A1:J600)', 33 + 6350 + (990 - 330) + 6000];
+        yield 'MAX (umum)' => ['=MAX(A1:J600)', 29 + 6350 + (2200 - 330)];
+        yield 'COUNTIF (berkriteria, luas × 6)' => ['=COUNTIF(A1:J600,1)', 33 + 6350 + (2200 - 330) + 5 * 6000];
+        yield 'rentang di dalam fungsi di dalam fungsi' => ['=ROUND(MAX(A1:J600),0)', 40 + 6350 + (2200 - 330)];
+        yield 'operator atas rentang' => ['=SUM(A1:J600*2)', 31 + 6350 + 6000 + 330];
+        yield 'operator atas rentang lalu fungsi umum' => ['=MAX(A1:J600*2)', 31 + 6350 + 6000 + 2200];
+        yield 'fungsi per elemen atas rentang' => ['=SUM(ROUND(A1:J600,0))', 40 + 6350 + 6000 + 330];
+        yield 'perkalian luar 600 × 600' => ['=SUM(A1:A600*TRANSPOSE(A1:A600))', 50 + 2 * 680 + 360_000 + 18_030];
+        yield 'MATCH bernilai cari larik' => ['=SUM(MATCH(A1:A600,A1:A600,0))', 56 + 2 * 680 + 2 * (400 - 60) + 600 + 599 * (600 + 400) + 60];
     }
 
     /**
@@ -231,7 +249,8 @@ final class PembacaExcelSlipAnggaranRumusTest extends CIUnitTestCase
     {
         $rumus = '=REPT("ab",500)';
         $path  = $this->xlsx([XlsxMentah::rumus('AB2', $rumus)]);
-        $beban = Presensi::BEBAN_DASAR_RUMUS_IMPOR + strlen($rumus) + intdiv(2 * 500, Presensi::BYTE_PER_BEBAN_TEKS_RUMUS_IMPOR);
+        $dasar = Presensi::BEBAN_DASAR_RUMUS_IMPOR + Presensi::BEBAN_OPERATOR_RUMUS_IMPOR + Presensi::BEBAN_FUNGSI_RUMUS_IMPOR + Presensi::BEBAN_ARGUMEN_RUMUS_IMPOR;
+        $beban = $dasar + intdiv(2 * 500, Presensi::BYTE_PER_BEBAN_TEKS_RUMUS_IMPOR);
 
         $this->assertDitolak($path, new PembacaExcelSlip(10000, maksBebanPerRumus: $beban - 1));
         $sheet = $this->assertDiterima($path, new PembacaExcelSlip(10000, maksBebanPerRumus: $beban));
@@ -250,8 +269,8 @@ final class PembacaExcelSlipAnggaranRumusTest extends CIUnitTestCase
     }
 
     /**
-     * 29 sel `COUNTIFS` dua rentang 10.000 baris: tiap sel masih di bawah batas per rumus. Sebelum pengali fungsi
-     * berkriteria, berkas ini lolos taksiran lalu dihitung 141 detik.
+     * 59 sel `COUNTIFS` dua rentang 5.000 baris: tiap sel masih di bawah batas per rumus (±116 ribu), jumlahnya tidak.
+     * Sebelum pengali fungsi berkriteria, berkas seperti ini lolos taksiran lalu dihitung lebih dari satu menit.
      */
     public function testFungsiBerkriteriaAtasRentangBesarDitolakLewatJumlahAnggaran(): void
     {
@@ -263,7 +282,7 @@ final class PembacaExcelSlipAnggaranRumusTest extends CIUnitTestCase
 
         $tk = XlsxMentah::baris(1, self::headerTk());
 
-        for ($r = 2; $r <= 30; $r++) {
+        for ($r = 2; $r <= 60; $r++) {
             $tk .= '<row r="' . $r . '">' . XlsxMentah::sel('A' . $r, self::NIP) . XlsxMentah::rumus('M' . $r, '=COUNTIFS(GPP!$E$2:$E$5001,">5",GPP!$E$5002:$E$10001,"<90")') . '</row>';
         }
 
@@ -321,37 +340,53 @@ final class PembacaExcelSlipAnggaranRumusTest extends CIUnitTestCase
     }
 
     /**
-     * Kalibrasi: templat 10.000 baris dengan beberapa kolom rumus wajar harus masuk anggaran (diterima cepat sebelum
-     * CR-181). Dihitung dari taksiran satu baris × 10.000, tanpa menghitung berkasnya.
+     * Kalibrasi: templat dengan beberapa kolom rumus wajar harus masuk anggaran (diterima sebelum CR-181, selesai di
+     * bawah ±40 detik di mesin ukur; README BB-12). Beban dijumlahkan per baris NYATA: teks rumus tiap baris memuat
+     * nomor barisnya sendiri (`C10001` lebih panjang dari `C2`), persis seperti di berkas, tanpa menghitung satu sel pun.
      *
-     * @param list<string> $rumus rumus kolom-kolom satu baris
+     * @param list<string> $rumus rumus kolom-kolom baris 2 (nomor baris 2 diganti nomor baris sebenarnya)
+     * @param list<string> $total rumus baris total (satu sel masing-masing)
      */
     #[DataProvider('templatWajar')]
-    public function testTemplatBerumusWajarMasukAnggaran(array $rumus, int $baris): void
+    public function testTemplatBerumusWajarMasukAnggaran(array $rumus, int $baris, array $total = []): void
     {
         $buku = self::bukuSah();
         $gpp  = $buku->getSheetByName(KolomGaji::SHEET_GPP);
         $this->assertNotNull($gpp);
         $penaksir = new PenaksirBebanRumus($buku);
         $beban    = 0;
+        $terbesar = 0;
 
-        foreach ($rumus as $i => $r) {
+        foreach ([...$rumus, ...$total] as $i => $r) {
             $sel = $gpp->getCell(XlsxMentah::kolom(40 + $i) . '2');
-            $sel->setValue($r);
-            $beban += $penaksir->beban($sel);
+
+            for ($b = 2, $akhir = $i < count($rumus) ? $baris + 1 : 2; $b <= $akhir; $b++) {
+                $sel->setValue((string) preg_replace('/(?<=[A-Z])2\b/', (string) $b, $r));
+                $satu = $penaksir->beban($sel);
+                $beban += $satu;
+                $terbesar = max($terbesar, $satu);
+            }
         }
 
         $buku->disconnectWorksheets();
 
-        $this->assertLessThanOrEqual(Presensi::MAKS_BEBAN_RUMUS_IMPOR, $beban * $baris, 'beban per baris ' . $beban);
+        $this->assertLessThanOrEqual(Presensi::MAKS_BEBAN_PER_RUMUS_IMPOR, $terbesar);
+        $this->assertLessThanOrEqual(Presensi::MAKS_BEBAN_RUMUS_IMPOR, $beban, 'beban berkas ' . $beban);
     }
 
     /**
-     * @return iterable<string, array{0: list<string>, 1: int}>
+     * @return iterable<string, array{0: list<string>, 1: int, 2?: list<string>}>
      */
     public static function templatWajar(): iterable
     {
-        $pph = '=ROUND(IF(G2<=5000000,G2*5%,IF(G2<=20000000,250000+(G2-5000000)*15%,IF(G2<=40000000,2500000+(G2-20000000)*25%,7500000+(G2-40000000)*30%))),0)';
+        $pph    = '=ROUND(IF(G2<=5000000,G2*5%,IF(G2<=20000000,250000+(G2-5000000)*15%,IF(G2<=40000000,2500000+(G2-20000000)*25%,7500000+(G2-40000000)*30%))),0)';
+        $ringan = ['=SUM(E2:Q2)-SUM(R2:Y2)', '=E2-F2', '=G2+I2-H2'];
+        $enam   = [
+            '=ROUND(2%*(E2+F2+G2),0)', '=ROUND(10%*(E2+F2+G2),0)', '=ROUNDUP(SUM(E2:N2),-2)-SUM(E2:N2)', '=IF(E2>0,ROUND(E2*5%,0),0)',
+            '=SUM(E2:Q2)-SUM(R2:Y2)', '=E2-F2',
+        ];
+        // Baris total di bawah 9.999 baris data: 26 kolom GPP + 10 kolom TK.
+        $jumlah = array_fill(0, 36, '=SUM(E$2:E$10000)');
 
         yield '10.000 baris, 3 kolom ROUND(IF)' => [array_fill(0, 3, '=ROUND(IF(C2>0,C2*0.05+D2*0.1-E2,0),0)'), 10000];
         yield '10.000 baris, satu kolom PPh progresif' => [[$pph], 10000];
@@ -361,6 +396,12 @@ final class PembacaExcelSlipAnggaranRumusTest extends CIUnitTestCase
             '=ROUND(2%*(E2+F2+G2),0)', '=ROUND(10%*(E2+F2+G2),0)', '=ROUNDUP(SUM(E2:N2),-2)-SUM(E2:N2)', '=SUM(E2:Q2)-SUM(R2:Y2)',
             '=VLOOKUP(K2,$N$2:$O$18,2,0)', '=ROUND(E2*L2,0)', '=E2-F2', $pph, '=H2', '=G2+I2-H2',
         ], 3000];
+        // Review R1 K1: dua templat lazim yang dulu ditolak batas 3 juta padahal main menyelesaikannya ±30 detik.
+        yield '10.000 baris, 6 kolom ROUND/IF/SUM' => [$enam, 10000];
+        yield '9.999 baris, 3 kolom + PPh + baris total' => [[...$ringan, $pph], 9999, $jumlah];
+        yield '5.000 baris, 6 kolom + PPh + VLOOKUP 20 baris + baris total' => [[...$enam, $pph, '=IFERROR(VLOOKUP(K2,$N$2:$O$21,2,FALSE),0)'], 5000, array_fill(0, 36, '=SUM(E$2:E$5001)')];
+        yield '10.000 baris, MATCH ke referensi 200 baris' => [['=MATCH(K2,$N$2:$N$201,0)'], 10000];
+        yield '9.999 baris, baris total SUBTOTAL' => [[], 9999, array_fill(0, 28, '=SUBTOTAL(9,E$2:E$10000)')];
     }
 
     // ------------------------------------------------------------------------------------------------------------------
@@ -566,6 +607,38 @@ final class PembacaExcelSlipAnggaranRumusTest extends CIUnitTestCase
         $this->assertEquals(1023, $sheet['TK'][2][16], 'TK!Q2 = SUM(DAFTAR)');
         $this->assertEquals(50, $sheet['TK'][2][17], 'TK!R2 = PAJAK');
         $this->assertEquals(3023, $sheet['TK'][2][21], 'TK!V2 = GPP!AB2+M2');
+    }
+
+    /**
+     * Larik kecil hasil operator dan fungsi (idiom `SUMPRODUCT((rentang>0)*1)` per baris, larik literal) tetap diterima
+     * walau batas per rumus kecil, dan nilainya sama dengan kalkulator.
+     */
+    public function testLarikKecilHasilOperatorDiterimaDenganNilaiSama(): void
+    {
+        $gpp = [
+            'AB2' => '=SUMPRODUCT((E2:G2>0)*1)',
+            'AC2' => '=SUM(E2:G2*2)',
+            'AD2' => '=SUM(IF(E2:G2>5,1,0))',
+            'AE2' => '=INDEX(E2:G2,MATCH(20,E2:G2,0))*2',
+            'AF2' => '=SUM({1,2;3,4}*2)',
+            'AG2' => '=SUM(TRANSPOSE(E2:G2)*E2:G2)',
+            'AH2' => '=E2&"-"&F2',
+            'AI2' => '=SUM(-E2:G2)',
+            'AJ2' => '=SUM(MATCH(E2:G2,E2:G2,0))',
+            'AK2' => '=LEN(REPT("ab",20)&D2)',
+        ];
+        $path = $this->xlsx(array_map(XlsxMentah::rumus(...), array_keys($gpp), $gpp));
+
+        $acuan = $this->nilaiKalkulator($path);
+        $sheet = $this->assertDiterima($path, new PembacaExcelSlip(10000, maksBebanPerRumus: 200));
+
+        $this->assertCount(count($gpp), $acuan);
+        $this->assertSamaDenganAcuan($acuan, $sheet);
+        $this->assertEquals(3, $sheet['GPP'][2][27], 'GPP!AB2 = SUMPRODUCT((E2:G2>0)*1)');
+        $this->assertEquals(2046, $sheet['GPP'][2][28], 'GPP!AC2 = SUM(E2:G2*2)');
+        $this->assertEquals(40, $sheet['GPP'][2][30], 'GPP!AE2 = INDEX(…,MATCH(…))*2');
+        $this->assertEquals(20, $sheet['GPP'][2][31], 'GPP!AF2 = SUM({1,2;3,4}*2)');
+        $this->assertSame('1000-20', $sheet['GPP'][2][33]);
     }
 
     /**

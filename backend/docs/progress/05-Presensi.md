@@ -223,16 +223,18 @@ MAKE-052 merged + MAKE-054.
 - **CR-181 (23-11-2026):** impor slip tidak lagi 500/timeout karena menghitung rumus. Sel rumus GPP/TK tetap dihitung
   ulang (legacy, AC-D10.9; nilai tersimpan tidak dipakai); yang ditambahkan hanya taksiran beban dari teks rumus sesudah
   batas baris/kolom dan sebelum ada sel yang dihitung (`Slip/PenaksirBebanRumus`, memakai pengurai kalkulator
-  PhpSpreadsheet pada kalkulator tersendiri; tidak menghitung, membuat, atau mengubah sel). Beban sel = 18 + panjang teks
-  + panjang² / 3.000 + tiap rentang (20 + baris × kolom + baris² / 6.000; sebagai argumen fungsi selain `SUM`/`COUNT`/
-  `AVERAGE` dkk. baris² / 900; fungsi berkriteria luas × 10) + biaya pindai `J:J` (sel sheet / 200) + byte hasil `REPT`
-  literal / 4. Tak terbatas (ditolak): rumus > 8.192 karakter, `INDIRECT`, `OFFSET`, `ANCHORARRAY` (`#`), `SINGLE` (`@`),
+  PhpSpreadsheet pada kalkulator tersendiri; tidak menghitung, membuat, atau mengubah sel). Beban sel = 8 + rujukan
+  sel × 6 + operator × 2 + kurung × 7 + pemisah × 4 + panjang² / 3.000 + tiap rentang (20 + baris × kolom + baris² ×
+  (kolom + 1) / 12.000; sebagai argumen fungsi pembaginya menurut kelas: `SUBTOTAL` 4.000, fungsi selain
+  `SUM`/`COUNT`/`AVERAGE`/`VLOOKUP` dkk. 1.800; fungsi berkriteria luas × 4–6) + larik hasil operator dan fungsi per
+  elemen (1 per elemen; kolom × baris = matriks penuh; pencarian bernilai cari larik × jumlah elemen) + biaya pindai
+  `J:J` (sel sheet / 200) + byte hasil `REPT` literal / 4 + teks hasil `&` atas larik / 256. Tak terbatas (ditolak): rumus > 8.192 karakter, `INDIRECT`, `OFFSET`, `ANCHORARRAY` (`#`), `SINGLE` (`@`),
   `SEQUENCE`/`RANDARRAY`/`MUNIT`/`EXPAND`, `REPT` berjumlah ulang bukan literal, ujung rentang hasil hitung, rujukan 3D,
-  rumus tidak terurai, nama terdefinisi berputar/terlalu dalam. Batas `Config\Presensi`: 400.000 per sel rumus, 3.000.000
-  untuk GPP + TK; lewat batas → 422 `errors.berkas` "Rumus di sheet GPP/TK terlalu berat untuk dihitung. …". Perubahan
+  rumus tidak terurai, nama terdefinisi berputar/terlalu dalam. Batas `Config\Presensi`: 500.000 per sel rumus, 4.500.000
+  untuk GPP + TK (templat lazim 10.000 baris dengan ±6 kolom rumus baris selesai ±30–40 detik di mesin ukur); lewat batas → 422 `errors.berkas` "Rumus di sheet GPP/TK terlalu berat untuk dihitung. …". Perubahan
   perilaku yang disengaja: berkas seperti itu dulu 500/timeout (atau "Berkas tidak dapat dibaca" untuk rujukan 3D);
   `INDIRECT`/`OFFSET` kecil dan rentang raksasa di cabang `IF` tak terpakai ikut ditolak. Nilai berkas yang diterima
-  identik. Rincian, tabel ukur, dan sisa risiko: README `Libraries/Presensi` BB-12 dan BB-11 (j). Test:
+  identik. Rincian, tabel ukur per kelas, dan sisa risiko: README `Libraries/Presensi` BB-12 dan BB-11 (j), (k). Test:
   `tests/unit/Presensi/Slip/PembacaExcelSlipAnggaranRumusTest.php`, `tests/Presensi/Slip/ImporSlipBatasBacaTest.php`.
 - **Catatan perilaku:** berkas tanpa ekstensi ditolak "Isi berkas tidak sesuai dengan ekstensinya." dan isi ber-jenis lain
   (mis. PDF bernama `.xlsx`) "Format berkas harus .xlsx atau .xls." — sama dengan aturan `ValidasiBerkas` jalur lampiran

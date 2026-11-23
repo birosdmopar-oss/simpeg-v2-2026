@@ -94,10 +94,24 @@ class Presensi extends BaseConfig
     // mesin ukur saat tenang (±2× saat sibuk). Tabel ukur dan alasan angka: README `Libraries/Presensi` BB-12.
 
     /**
-     * Beban tetap satu sel rumus; beban dasar sel = nilai ini + panjang teks rumus + panjang² / pembagi di bawah (rumus
-     * `=C2-D2` terukur ±115 mikrodetik, `=ROUND(IF(…),0)` 42 karakter ±380 mikrodetik).
+     * Beban tetap satu sel rumus. Beban dasar sel = nilai ini + rujukan sel × `BEBAN_RUJUKAN…` + operator ×
+     * `BEBAN_OPERATOR…` + kurung buka × `BEBAN_FUNGSI…` + pemisah argumen × `BEBAN_ARGUMEN…` + panjang² / pembagi di
+     * bawah, semuanya dihitung dari karakter teks rumus (`=C2` terukur ±56 mikrodetik, `=C2-D2` ±87,
+     * `=ROUND(IF(C2>0,C2*0.05+D2*0.1-E2,0),0)` ±330, PPh progresif 154 karakter ±600; tabel README BB-12).
      */
-    public const BEBAN_DASAR_RUMUS_IMPOR = 18;
+    public const BEBAN_DASAR_RUMUS_IMPOR = 8;
+
+    /** Beban tiap rujukan sel di teks rumus (huruf diikuti angka; mengambil nilai sel ±30 mikrodetik). */
+    public const BEBAN_RUJUKAN_RUMUS_IMPOR = 6;
+
+    /** Beban tiap karakter operator (`+ - * / ^ & < > = %` dan spasi) di teks rumus. */
+    public const BEBAN_OPERATOR_RUMUS_IMPOR = 2;
+
+    /** Beban tiap kurung buka (pemanggilan fungsi) di teks rumus. */
+    public const BEBAN_FUNGSI_RUMUS_IMPOR = 7;
+
+    /** Beban tiap pemisah argumen (`,` dan `;`) di teks rumus. */
+    public const BEBAN_ARGUMEN_RUMUS_IMPOR = 4;
 
     /**
      * Bagian kuadratik beban dasar = panjang² / nilai ini: biaya urai kalkulator tumbuh kuadratik menurut panjang teks
@@ -112,16 +126,19 @@ class Presensi extends BaseConfig
     public const BEBAN_TETAP_RENTANG_RUMUS_IMPOR = 20;
 
     /**
-     * Beban satu rentang = beban tetap + baris × kolom + baris² / nilai ini. Kalkulator menjabarkan rentang menjadi daftar
-     * sel dan biayanya tumbuh kuadratik menurut jumlah baris (`SUM` satu kolom: 2.500 baris 24 ms, 5.000 baris 63 ms,
-     * 10.000 baris 179 ms).
+     * Beban satu rentang = beban tetap + baris × kolom + baris² × (kolom + 1) / (2 × nilai ini). Kalkulator menjabarkan
+     * rentang menjadi daftar sel dan biayanya tumbuh kuadratik menurut jumlah baris (`SUM` satu kolom: 2.500 baris
+     * 21 ms, 5.000 baris 55 ms, 10.000 baris 146 ms; 24 kolom × 10.000 baris 2,1 detik).
      */
     public const PEMBAGI_KUADRAT_BARIS_RUMUS_IMPOR = 6_000;
 
+    /** Pembagi suku kuadratik larik argumen `SUBTOTAL` (satu kolom: 2.500 baris 36 ms, 5.000 baris 128 ms, 10.000 baris 350 ms). */
+    public const PEMBAGI_KUADRAT_BARIS_SEDANG_RUMUS_IMPOR = 2_000;
+
     /**
-     * Pembagi suku kuadratik untuk rentang yang menjadi argumen fungsi selain yang terukur murah (`SUM`, `COUNT`,
-     * `AVERAGE`, …): `MAX`, `MATCH`, `VLOOKUP`, `COUNTIF` dan kebanyakan fungsi lain meratakan rentang dengan biaya
-     * kuadratik ±7× lebih besar (`MAX` satu kolom: 2.500 baris 70 ms, 5.000 baris 217 ms, 10.000 baris 797 ms).
+     * Pembagi suku kuadratik larik argumen fungsi selain yang terukur lebih murah: `MAX`, `MATCH`, `COUNTIF`,
+     * `SUMPRODUCT` dan kebanyakan fungsi lain meratakan lariknya dengan biaya kuadratik ±7× `SUM` (`MAX` satu kolom:
+     * 2.500 baris 42 ms, 5.000 baris 169 ms, 10.000 baris 653 ms; 24 kolom × 10.000 baris 5,9 detik).
      */
     public const PEMBAGI_KUADRAT_BARIS_UMUM_RUMUS_IMPOR = 900;
 
@@ -131,17 +148,24 @@ class Presensi extends BaseConfig
     /** Byte teks hasil `REPT` per satuan beban (tiap hasil disimpan ±3 salinan sampai impor selesai). */
     public const BYTE_PER_BEBAN_TEKS_RUMUS_IMPOR = 4;
 
-    /** Panjang teks yang dianggap untuk argumen `REPT` yang bukan literal teks (rujukan sel, hasil fungsi). */
+    /** Panjang teks yang dianggap untuk operand yang bukan literal teks (rujukan sel, hasil fungsi). */
     public const BYTE_TEKS_ANGGAPAN_RUMUS_IMPOR = 32;
 
     /**
-     * Batas beban SATU sel rumus: membatasi memori penjabaran satu rentang (±0,55 KB per baris rentang) dan waktu satu
-     * sel (±2–4 detik). Cukup untuk menjumlah atau `INDEX` seluruh GPP 10.001 baris × 26 kolom (±267 ribu).
+     * Byte teks per satuan beban untuk hasil operator `&` (teks sementara, dikalikan jumlah elemen bila operandnya
+     * larik): batas per sel × nilai ini = ±128 MB teks.
      */
-    public const MAKS_BEBAN_PER_RUMUS_IMPOR = 400_000;
+    public const BYTE_PER_BEBAN_TEKS_LARIK_RUMUS_IMPOR = 256;
+
+    /**
+     * Batas beban SATU sel rumus: membatasi memori satu larik (±0,1 KB per elemen hasil operator, ±0,55 KB per baris
+     * rentang) dan waktu satu sel (±2–3 detik). Cukup untuk menjumlah atau `INDEX` seluruh GPP 10.001 baris × 26 kolom
+     * (±485 ribu).
+     */
+    public const MAKS_BEBAN_PER_RUMUS_IMPOR = 500_000;
 
     /** Batas jumlah beban semua sel rumus GPP + TK (batas waktu request impor 60 detik; lihat tabel ukur BB-12). */
-    public const MAKS_BEBAN_RUMUS_IMPOR = 3_000_000;
+    public const MAKS_BEBAN_RUMUS_IMPOR = 4_500_000;
 
     /** Masa berlaku pratinjau impor dalam detik (Q5A-05 default 30 menit). */
     public int $ttlPratinjauDetik = 1800;
