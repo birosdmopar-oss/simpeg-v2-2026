@@ -85,6 +85,9 @@ final class PembacaExcelSlip
      */
     public function baca(string $path): HasilSlip
     {
+        // Sebelum reader vendor menyentuh berkas (CR-188): mengenali jenis berkas saja sudah menampung entri ZIP utuh.
+        $this->praCekArsip($path);
+
         try {
             $reader = IOFactory::createReaderForFile($path, self::READER);
             $xlsx   = $reader instanceof Xlsx;
@@ -169,6 +172,30 @@ final class PembacaExcelSlip
     }
 
     /**
+     * Ukuran isi arsip sebelum APA PUN dibaca darinya (CR-188). `IOFactory::createReaderForFile` menjalankan
+     * `Xlsx::canRead`, yang mendekompresi `_rels/.rels` utuh ke memori (dua kali), dan `listWorksheetNames` berikutnya
+     * menampung `[Content_Types].xml`, relasi workbook, dan `xl/workbook.xml`; semuanya terjadi sebelum
+     * {@see PemindaiXlsx::pindai()}. Entri 700 MB di salah satunya (berkas < 1 MB) dulu berakhir fatal memori (500), bukan
+     * 422. Jumlah ukuran SEMUA entri menurut direktori pusat ZIP dibandingkan dengan batas isi yang sama dengan
+     * {@see self::praCekXlsx()}, tanpa mendekompresi apa pun. Berkas yang bukan ZIP (`.xls`) tidak diperiksa di sini.
+     *
+     * @throws BerkasImporDitolak
+     */
+    private function praCekArsip(string $path): void
+    {
+        $byte = PemindaiXlsx::ukuranTerdekompresi($path);
+
+        if ($byte !== null && $byte > $this->maksByteIsi) {
+            throw $this->isiTerlaluBesar();
+        }
+    }
+
+    private function isiTerlaluBesar(): BerkasImporDitolak
+    {
+        return new BerkasImporDitolak('Isi berkas terlalu besar sesudah dibuka (maksimal ' . number_format($this->maksByteIsi / 1048576, 0, ',', '.') . ' MB).');
+    }
+
+    /**
      * Anggaran seluruh berkas `.xlsx` (lihat {@see PemindaiXlsx} dan docblock konstanta `Config\Presensi`). Urutan: ukuran
      * isi, jumlah sel, lalu struktur (satu pesan): bobot elemen, iterasi `<col>`, jumlah `<tablePart>`, dan byte teks yang
      * disalin pemuat per sel (shared string dan rumus shared; batasnya sama dengan batas ukuran isi).
@@ -184,7 +211,7 @@ final class PembacaExcelSlip
         }
 
         if ($ukuran['byte'] > $this->maksByteIsi) {
-            throw new BerkasImporDitolak('Isi berkas terlalu besar sesudah dibuka (maksimal ' . number_format($this->maksByteIsi / 1048576, 0, ',', '.') . ' MB).');
+            throw $this->isiTerlaluBesar();
         }
 
         $this->periksaSel($ukuran['sel']);

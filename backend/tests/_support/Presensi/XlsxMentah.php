@@ -96,6 +96,61 @@ final class XlsxMentah
     }
 
     /**
+     * Seperti {@see self::tulisEntri()}, tetapi entri `$nama` ditambah spasi sampai `$byte` byte sesudah dekompresi (dibuat
+     * bila belum ada). Arsip ditulis sebagai aliran (deflate bertahap), jadi entri ratusan MB tidak pernah ditampung di
+     * memori dan berkasnya tetap kecil; XML yang diberi spasi di ujungnya tetap sah.
+     *
+     * @param array<string, string> $entri nama entri ZIP => isi
+     */
+    public static function tulisMengembang(string $path, array $entri, string $nama, int $byte): void
+    {
+        $berkas = fopen($path, 'wb');
+
+        if ($berkas === false) {
+            throw new RuntimeException('Berkas xlsx uji gagal dibuat.');
+        }
+
+        $entri += [$nama => ''];
+        $pusat = '';
+        $spasi = str_repeat(' ', 1 << 20);
+
+        foreach ($entri as $namaEntri => $isi) {
+            $awal   = (int) ftell($berkas);
+            $tambah = $namaEntri === $nama ? max(0, $byte - strlen($isi)) : 0;
+            // Kepala lokal: metode 8 (deflate), tanggal 1980-01-01; CRC dan ukuran diisi sesudah data ditulis.
+            fwrite($berkas, pack('VvvvvvVVVvv', 0x04034B50, 20, 0, 8, 0, 0x21, 0, 0, 0, strlen($namaEntri), 0) . $namaEntri);
+            $awalData = (int) ftell($berkas);
+            $kempa    = deflate_init(ZLIB_ENCODING_RAW, ['level' => 1]);
+            $crc      = hash_init('crc32b');
+
+            if ($kempa === false) {
+                throw new RuntimeException('Deflate gagal disiapkan.');
+            }
+
+            hash_update($crc, $isi);
+            fwrite($berkas, (string) deflate_add($kempa, $isi, ZLIB_NO_FLUSH));
+
+            for ($sisa = $tambah; $sisa > 0; $sisa -= strlen($potong)) {
+                $potong = $sisa >= strlen($spasi) ? $spasi : substr($spasi, 0, $sisa);
+                hash_update($crc, $potong);
+                fwrite($berkas, (string) deflate_add($kempa, $potong, ZLIB_NO_FLUSH));
+            }
+
+            fwrite($berkas, (string) deflate_add($kempa, '', ZLIB_FINISH));
+            $akhir  = (int) ftell($berkas);
+            $ukuran = pack('VVV', (int) hexdec(hash_final($crc)), $akhir - $awalData, strlen($isi) + $tambah);
+            fseek($berkas, $awal + 14);
+            fwrite($berkas, $ukuran);
+            fseek($berkas, $akhir);
+            $pusat .= pack('Vvvvvvv', 0x02014B50, 20, 20, 0, 8, 0, 0x21) . $ukuran . pack('vvvvvVV', strlen($namaEntri), 0, 0, 0, 0, 0, $awal) . $namaEntri;
+        }
+
+        $awalPusat = (int) ftell($berkas);
+        fwrite($berkas, $pusat . pack('VvvvvVVv', 0x06054B50, 0, 0, count($entri), count($entri), strlen($pusat), $awalPusat, 0));
+        fclose($berkas);
+    }
+
+    /**
      * Satu `<row>` berisi sel teks (inline string) atau angka, mulai kolom A. `null` = sel dilewati.
      *
      * @param list<float|int|string|null> $nilai
