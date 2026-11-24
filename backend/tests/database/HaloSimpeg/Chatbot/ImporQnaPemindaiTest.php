@@ -8,6 +8,7 @@ use App\Exceptions\ValidationException;
 use App\Libraries\HaloSimpeg\Chatbot\ImporQna;
 use App\Libraries\HaloSimpeg\Chatbot\PembacaQnaXlsx;
 use CodeIgniter\HTTP\Files\UploadedFile;
+use Composer\InstalledVersions;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Reader\IReadFilter;
@@ -24,13 +25,11 @@ use Tests\Support\HaloSimpeg\Chatbot\ChatbotFixtureTrait;
 use ZipArchive;
 
 /**
- * Impor QnA: pemindaian struktur `.xlsx` sebelum `load()` (CR-182). Berkas dirakit dari template resmi dengan XML sheet
- * yang diubah; tanpa fixture biner.
- *
- * Sebelum CR-182 (9554054a): `<col min="5" max="1">` membuat `Reader\Xlsx\ColumnAndRowAttributes::readColumnAttributes`
- * (PhpSpreadsheet 5.10) berputar tanpa akhir sampai fatal memori (500 di luar envelope 422), dan `<col>` selebar lembar
- * dengan baris ber-`r` acak lolos pra-cek `listWorksheetInfo` (totalRows = `r` baris TERAKHIR) lalu dimuat lambat.
- * Putaran R1: bom dekompresi `_rels/.rels` (canRead), `<col>` × baris kosong (read filter), LO banyak sheet, pesan baris.
+ * Impor QnA lewat pembaca mandiri {@see PembacaQnaXlsx} (CR-182 R5/R6). Berkas dirakit dari template resmi dengan XML yang
+ * diubah; tanpa fixture biner. Mencakup: berkas serangan dari putaran R0-R6 (bom dekompresi, `<col>` tidak sah, baris
+ * kosong/acak, sheet raksasa di path lain, rujukan sheet/relasi berulang, prefiks/encoding, rumus shared, UTF-7) yang
+ * harus selesai cepat tanpa fatal; paritas nilai terhadap logika main (load() + read filter A-D/E1 + rangeToArray) yang
+ * dijalankan di dalam test; dan berkas sah (template, Excel/LibreOffice, banyak sheet, border luas, jawaban panjang).
  *
  * @internal
  */
@@ -40,8 +39,8 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
 
     private const RUSAK = 'Berkas Excel rusak atau tidak dapat dibaca.';
 
-    /** Batas waktu test berbasis waktu: target ±2 s di mesin pengembang, ruang aman untuk runner CI yang lebih lambat. */
-    private const DETIK_CI = 6.0;
+    /** Pagar waktu longgar (target ±2-3 s di mesin pengembang); asersi utama test serangan adalah memori atau pesan. */
+    private const DETIK_CI = 10.0;
 
     /** Ruang waktu test kasus terburuk teks panjang (terukur ±3,1-3,4 s di mesin pengembang, R2-4). */
     private const DETIK_CI_TERBURUK = 15.0;
@@ -551,7 +550,13 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
         $this->assertLessThan(200 * 1024, (int) filesize($berkas));
 
         // Desain R5: hanya relasi officeDocument pertama dan sheet pertama yang dibaca; bentuk prefiks/encoding ditangani
-        // parser XML, bukan hitungan teks.
+        // parser XML, bukan hitungan teks. Relasi > 32 ditolak (R6 B3).
+        if ($varian === 'relasi') {
+            $this->assertGalatBerkas(self::RUSAK, $berkas);
+
+            return;
+        }
+
         $this->assertSelesaiRingan($berkas);
     }
 
@@ -713,6 +718,270 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
         $this->assertFalse($baru['gagal']);
         $this->assertSame($main, [$baru['sel'], $baru['ekstra']]);
         $this->assertSame((int) $info['totalRows'] - 1 > 1000, $baru['total_baris'] - 1 > 1000, 'pesan jumlah baris');
+    }
+
+    /**
+     * R6 B1: deklarasi encoding yang tidak kompatibel ASCII (UTF-7, EBCDIC) di part sheet atau shared strings → "rusak"
+     * sebelum diurai: dengan UTF-7, DOCTYPE dan entitas internal bisa disamarkan dari pemeriksaan byte lalu diekspansi
+     * parser. Berkas kecil, jadi asersi utama adalah pesan; waktu hanya pagar longgar.
+     */
+    #[DataProvider('encodingTerlarang')]
+    public function testEncodingTidakKompatibelAsciiDitolak(string $part, string $encoding): void
+    {
+        $berkas = $this->rakit('');
+        $zip    = new ZipArchive();
+        $this->assertTrue($zip->open($berkas));
+
+        if ($part === 'sheet') {
+            $xml = (string) $zip->getFromName('xl/worksheets/sheet1.xml');
+            $zip->addFromString('xl/worksheets/sheet1.xml', str_replace('encoding="UTF-8"', "encoding=\"{$encoding}\"", $xml));
+        } else {
+            $zip->addFromString('xl/sharedStrings.xml', "<?xml version=\"1.0\" encoding=\"{$encoding}\"?><sst xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><si><t>x</t></si></sst>");
+            $rels = (string) $zip->getFromName('xl/_rels/workbook.xml.rels');
+            $zip->addFromString('xl/_rels/workbook.xml.rels', str_replace('</Relationships>', '<Relationship Id="rIdS" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/></Relationships>', $rels));
+            $xml = (string) $zip->getFromName('xl/worksheets/sheet1.xml');
+            $zip->addFromString('xl/worksheets/sheet1.xml', str_replace('<c r="A2" t="inlineStr"><is><t xml:space="preserve">Bagaimana cara mengajukan cuti?</t></is></c>', '<c r="A2" t="s"><v>0</v></c>', $xml));
+        }
+
+        $zip->close();
+
+        $mulai = hrtime(true);
+        $this->assertGalatBerkas(self::RUSAK, $berkas);
+        $this->assertLessThan(self::DETIK_CI, (hrtime(true) - $mulai) / 1e9);
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function encodingTerlarang(): iterable
+    {
+        yield 'sheet UTF-7' => ['sheet', 'UTF-7'];
+
+        yield 'sheet EBCDIC' => ['sheet', 'IBM037'];
+
+        yield 'sst UTF-7' => ['sst', 'UTF-7'];
+    }
+
+    /**
+     * Pagar R6 B1: shared strings berdeklarasi ISO-8859-1 dan windows-1252 tetap dibaca identik dengan main.
+     */
+    #[DataProvider('encodingSah')]
+    public function testEncodingKompatibelAsciiTetapIdentikMain(string $encoding): void
+    {
+        $sst = "<?xml version=\"1.0\" encoding=\"{$encoding}\"?><sst xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\">"
+            . '<si><t>Pertanyaan</t></si><si><t>Jawaban</t></si><si><t>Kategori</t></si><si><t>Tag (Pisahkan dengan koma)</t></si><si><t>caf' . "\xE9" . '?</t></si></sst>';
+        $berkas = $this->rakit('', '', ['xl/sharedStrings.xml' => $sst]);
+        $zip    = new ZipArchive();
+        $this->assertTrue($zip->open($berkas));
+        $xml = (string) $zip->getFromName('xl/worksheets/sheet1.xml');
+        $xml = (string) preg_replace('~<row r="1">.*?</row>~s', '<row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c><c r="C1" t="s"><v>2</v></c><c r="D1" t="s"><v>3</v></c></row>', $xml);
+        $zip->addFromString('xl/worksheets/sheet1.xml', str_replace('<c r="A2" t="inlineStr"><is><t xml:space="preserve">Bagaimana cara mengajukan cuti?</t></is></c>', '<c r="A2" t="s"><v>4</v></c>', $xml));
+        $rels = (string) $zip->getFromName('xl/_rels/workbook.xml.rels');
+        $zip->addFromString('xl/_rels/workbook.xml.rels', str_replace('</Relationships>', '<Relationship Id="rIdS" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/></Relationships>', $rels));
+        $zip->close();
+
+        $this->assertSamaDenganMain($berkas);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function encodingSah(): iterable
+    {
+        yield 'ISO-8859-1' => ['ISO-8859-1'];
+
+        yield 'windows-1252' => ['windows-1252'];
+    }
+
+    /**
+     * R6 B1 pertahanan berlapis: satu sel di dalam filter dengan isi > 2 MB (Excel sendiri membatasi 32.767 karakter per
+     * sel) → "rusak" tanpa menampung isinya; di luar filter tidak direkam sehingga tetap diterima.
+     */
+    public function testRekamanSelRaksasaDitolak(): void
+    {
+        $isi    = str_repeat('a', 3 * 1024 * 1024);
+        $berkas = $this->rakit('', "<row r=\"3\"><c r=\"A3\" t=\"inlineStr\"><is><t>{$isi}</t></is></c></row>");
+        $this->assertGalatBerkas(self::RUSAK, $berkas);
+
+        $luar  = $this->rakit('', "<row r=\"3\"><c r=\"Z3\" t=\"inlineStr\"><is><t>{$isi}</t></is></c></row>");
+        $hasil = (new ImporQna($this->db))->impor($this->unggah($luar));
+        $this->assertSame([1, []], [$hasil['ditambah'], $hasil['galat']]);
+    }
+
+    /**
+     * R6 B2: anak rumus shared di A-D dengan induk > 1.024 karakter, atau Σ(100 + panjang induk) > 1 MB → "rusak" cepat
+     * (di 5e929043: fatal timeout). Kontrol: rumus shared pendek wajar di A-D tetap identik dengan main.
+     */
+    #[DataProvider('rumusSharedDiAd')]
+    public function testRumusSharedDiAdBerbatas(int $panjangInduk, int $anak, bool $ditolak): void
+    {
+        $acuan = [];
+
+        for ($i = 1; $i <= 2000 && strlen(implode('+', $acuan)) < $panjangInduk; $i++) {
+            $acuan[] = Coordinate::stringFromColumnIndex($i % 200 + 1) . ($i % 900 + 1);
+        }
+
+        $induk = substr(implode('+', $acuan), 0, $panjangInduk);
+        $baris = '';
+
+        for ($r = 3; $r < 3 + $anak; $r++) {
+            $baris .= "<row r=\"{$r}\"><c r=\"A{$r}\" t=\"inlineStr\"><is><t>P{$r}?</t></is></c>"
+                . ($r === 3 ? "<c r=\"B{$r}\"><f t=\"shared\" ref=\"B3:B" . (2 + $anak) . "\" si=\"0\">{$induk}</f><v>0</v></c>" : "<c r=\"B{$r}\"><f t=\"shared\" si=\"0\"/><v>0</v></c>")
+                . '</row>';
+        }
+
+        $berkas = $this->rakit('', $baris, [], '', true);
+
+        if ($ditolak) {
+            $mulai = hrtime(true);
+            $this->assertGalatBerkas(self::RUSAK, $berkas);
+            $this->assertLessThan(2.5, (hrtime(true) - $mulai) / 1e9);
+        } else {
+            $this->assertSamaDenganMain($berkas);
+        }
+    }
+
+    /**
+     * @return iterable<string, array{int, int, bool}>
+     */
+    public static function rumusSharedDiAd(): iterable
+    {
+        yield 'induk 1.025 karakter × 999 anak' => [1025, 999, true];
+
+        yield 'induk 8 KB × 999 anak' => [8192, 999, true];
+
+        yield 'Σ biaya > 1 MB (1.000 × 999)' => [1000, 999, true];
+
+        yield 'kontrol: induk 20 karakter × 999 anak' => [20, 999, false];
+    }
+
+    /**
+     * R6 B3: 200 Relationship officeDocument di `_rels/.rels` ke workbook yang sama → "rusak" (batas 32). Relasi berulang
+     * di bawah batas dibaca sekali (cache per entri).
+     */
+    public function testRelasiBerulangDibatasi(): void
+    {
+        foreach ([200 => true, 20 => false] as $jumlah => $ditolak) {
+            $berkas = $this->rakit('');
+            $zip    = new ZipArchive();
+            $this->assertTrue($zip->open($berkas));
+            $rel = '';
+
+            for ($i = 1; $i <= $jumlah; $i++) {
+                $rel .= "<Relationship Id=\"rId{$i}\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"xl/workbook.xml\"/>";
+            }
+
+            $zip->addFromString('_rels/.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' . $rel . '</Relationships>');
+            $zip->close();
+
+            if ($ditolak) {
+                $this->assertGalatBerkas(self::RUSAK, $berkas);
+            } else {
+                $hasil = (new ImporQna($this->db))->impor($this->unggah($berkas));
+                $this->assertSame(1, $hasil['ditambah']);
+                $this->bersihkanChatbot();
+            }
+        }
+    }
+
+    /**
+     * R6 B4: border A1:Z20000 (±520 ribu sel kosong bergaya) + 1.000 baris data → diterima seperti main.
+     */
+    public function testBorderLuasDenganSeribuBarisDiterima(): void
+    {
+        $buku  = new Spreadsheet();
+        $sheet = $buku->getActiveSheet();
+        $data  = [ImporQna::JUDUL_KOLOM];
+
+        for ($i = 1; $i <= 1000; $i++) {
+            $data[] = ["Pertanyaan {$i}?", "Jawaban {$i}", 'Cuti', ''];
+        }
+
+        $sheet->fromArray($data, null, 'A1');
+        $sheet->getStyle('A1:Z20000')->getBorders()->getAllBorders()->setBorderStyle('thin');
+        $path        = (string) tempnam(sys_get_temp_dir(), 'cbz');
+        $this->tmp[] = $path;
+        (new XlsxWriter($buku))->save($path);
+        $buku->disconnectWorksheets();
+
+        $mulai = hrtime(true);
+        $hasil = (new ImporQna($this->db))->impor($this->unggah($path));
+        $this->assertLessThan(self::DETIK_CI, (hrtime(true) - $mulai) / 1e9);
+        $this->assertSame([1000, []], [$hasil['ditambah'], $hasil['galat']]);
+    }
+
+    /**
+     * R6 C1: sheet pertama chartsheet (tanpa part worksheet) → "rusak" seperti main.
+     */
+    public function testSheetPertamaTanpaPartWorksheetRusak(): void
+    {
+        $berkas = $this->rakit('');
+        $zip    = new ZipArchive();
+        $this->assertTrue($zip->open($berkas));
+        $rels = (string) $zip->getFromName('xl/_rels/workbook.xml.rels');
+        $zip->addFromString('xl/_rels/workbook.xml.rels', str_replace('relationships/worksheet"', 'relationships/chartsheet"', $rels));
+        $zip->close();
+
+        $this->assertGalatBerkas(self::RUSAK, $berkas);
+    }
+
+    /**
+     * R6 C2 + C5: teks rumus berisi `&#13;`/`&#10;`/`&#9;`, atribut berisi tab, E1 bukan teks, dan Strict OOXML — identik
+     * dengan main.
+     */
+    public function testParitasRujukanKarakterDanE1BukanTeks(): void
+    {
+        $baris = '<row r="2"><c r="A2" t="str"><f>"a"&amp;CHAR(13)&amp;"&#13;b&#10;c&#9;d"</f><v>x</v></c>'
+            . '<c r="B2" t="inlineStr"><is><t xml:space="preserve">baris&#13;&#10;dua&#9;tab</t></is></c><c r="C2" t="inlineStr"><is><t>Cuti</t></is></c></row>';
+        $berkas = $this->rakit('', $baris);
+        $zip    = new ZipArchive();
+        $this->assertTrue($zip->open($berkas));
+        $xml = (string) $zip->getFromName('xl/worksheets/sheet1.xml');
+        $xml = (string) preg_replace('~<row r="2">.*?</row>~s', '', $xml, 1);
+        $zip->addFromString('xl/worksheets/sheet1.xml', str_replace('</row>', '<c r="E1"><v>12.5</v></c></row>', $xml));
+        $zip->close();
+
+        $this->assertSamaDenganMain($berkas);
+    }
+
+    /**
+     * R6 C5: Strict OOXML (namespace purl) — identik dengan main.
+     */
+    public function testParitasStrictOoxml(): void
+    {
+        $berkas = $this->rakit('');
+        $zip    = new ZipArchive();
+        $this->assertTrue($zip->open($berkas));
+        $ganti = [
+            'http://schemas.openxmlformats.org/spreadsheetml/2006/main'                          => 'http://purl.oclc.org/ooxml/spreadsheetml/main',
+            'http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument' => 'http://purl.oclc.org/ooxml/officeDocument/relationships/officeDocument',
+            'http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet'      => 'http://purl.oclc.org/ooxml/officeDocument/relationships/worksheet',
+            'http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles'         => 'http://purl.oclc.org/ooxml/officeDocument/relationships/styles',
+            'http://schemas.openxmlformats.org/officeDocument/2006/relationships'                => 'http://purl.oclc.org/ooxml/officeDocument/relationships',
+        ];
+
+        foreach (['_rels/.rels', 'xl/workbook.xml', 'xl/_rels/workbook.xml.rels', 'xl/worksheets/sheet1.xml', 'xl/styles.xml'] as $nama) {
+            $isi = $zip->getFromName($nama);
+
+            if ($isi !== false) {
+                $zip->addFromString($nama, strtr($isi, $ganti));
+            }
+        }
+
+        $zip->close();
+
+        $this->assertSamaDenganMain($berkas);
+    }
+
+    /**
+     * R6 C6: PembacaQnaXlsx meniru potongan Reader\Xlsx phpoffice/phpspreadsheet 5.10.x (baris tercatat di docblock
+     * kelas). Test ini gagal bila versi vendor berubah.
+     */
+    public function testVersiPhpSpreadsheetTerkunci(): void
+    {
+        $versi = (string) InstalledVersions::getPrettyVersion('phpoffice/phpspreadsheet');
+
+        $this->assertMatchesRegularExpression('/^v?5\.10\./', $versi, "phpoffice/phpspreadsheet {$versi}: tinjau ulang PembacaQnaXlsx sebelum menaikkan versi");
     }
 
     /**

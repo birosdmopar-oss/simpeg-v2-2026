@@ -38,7 +38,7 @@ final class ImporQna
 
     public const CONTOH = ['Bagaimana cara mengajukan cuti?', '<p>Ajukan lewat menu Layanan lalu pilih Cuti.</p>', 'Cuti', 'cuti, layanan'];
 
-    /** Batas isi terdekompresi semua entri (sebenarnya terbaca); berkas unggahan sendiri maks 2 MB. */
+    /** Batas jumlah ukuran sesudah dekompresi semua entri menurut direktori ZIP; berkas unggahan sendiri maks 2 MB. */
     private const MAKS_BYTE_ISI = 32 * 1024 * 1024;
 
     private readonly BaseConnection $db;
@@ -210,7 +210,6 @@ final class ImporQna
                 throw ValidationException::forField('berkas', 'Berkas harus berformat .xlsx.');
             }
 
-            // Sel kosong yang hanya bergaya (mis. border template sampai baris 1.500) tidak dihitung (review CR V-1).
             $hasil = (new PembacaQnaXlsx())->bacaQna($path, $maks);
         } catch (ValidationException $e) {
             throw $e;
@@ -222,7 +221,7 @@ final class ImporQna
             throw ValidationException::forField('berkas', 'Berkas harus berformat .xlsx.');
         }
 
-        // `totalRows` dengan aturan listWorksheetInfo: `r` baris terakhir (urutan berkas) yang memuat sel tidak kosong.
+        // Ada sel berisi di baris > maks+1 (pembaca berhenti di situ; termasuk urutan `r` acak).
         if ($hasil['total_baris'] - 1 > $maks) {
             throw ValidationException::forField('berkas', "Jumlah baris data maksimal {$maks}.");
         }
@@ -231,7 +230,6 @@ final class ImporQna
             throw ValidationException::forField('berkas', 'Berkas Excel rusak atau tidak dapat dibaca.');
         }
 
-        // Baris di atas maks+1 (mis. urutan `r` acak yang menipu totalRows) tidak ikut, sama seperti main.
         $sel    = $hasil['sel'];
         $ekstra = trim(self::teks($hasil['ekstra']));
 
@@ -316,18 +314,12 @@ final class ImporQna
 
     /**
      * Pemeriksaan ZIP sebelum reader vendor menyentuh berkas (R1-1): jumlah ukuran sesudah dekompresi semua entri menurut
-     * direktori ZIP (`statIndex`, tanpa dekompresi) dan ukuran entri terbesar (batas atas part sheet di path mana pun:
-     * Target relasi, `../`, `//`, entri ber-backslash, akar ZIP).
+     * direktori ZIP (`statIndex`, tanpa dekompresi) ≤ {@see self::MAKS_BYTE_ISI}.
      *
      * Bukan ZIP: pesan format hanya bila `canRead` juga menolak (perilaku lama). `canRead` untuk berkas bukan ZIP hanya
      * membaca header, jadi aman; xlsx bersandi (paket OLE terenkripsi) lolos `canRead` → "rusak" seperti main (R2-3).
-     * Trade-off (R3-4, kasus langka, pesannya tetap pesan lama): arsip ZIP bukan-xlsx yang isinya > 32 MB, entri
-     * berdeklarasi encoding selain UTF-8, atau entri terenkripsi AES kini mendapat "rusak", padahal main memberi pesan
-     * format.
-     *
-     * @return array{isi: int, terbesar: int}
      */
-    private function periksaUkuranZip(string $path, Xlsx $reader): array
+    private function periksaUkuranZip(string $path, Xlsx $reader): void
     {
         $zip = new ZipArchive();
 
@@ -340,21 +332,16 @@ final class ImporQna
         }
 
         try {
-            $byte     = 0;
-            $terbesar = 0;
+            $byte = 0;
 
             for ($i = 0; $i < $zip->numFiles; $i++) {
-                $stat   = $zip->statIndex($i);
-                $ukuran = $stat === false ? PHP_INT_MAX >> 1 : (int) $stat['size'];
-                $byte += $ukuran;
-                $terbesar = max($terbesar, $ukuran);
+                $stat = $zip->statIndex($i);
+                $byte += $stat === false ? PHP_INT_MAX >> 1 : (int) $stat['size'];
 
                 if ($byte > self::MAKS_BYTE_ISI) {
                     throw ValidationException::forField('berkas', 'Berkas Excel rusak atau tidak dapat dibaca.');
                 }
             }
-
-            return ['isi' => $byte, 'terbesar' => $terbesar];
         } finally {
             $zip->close();
         }

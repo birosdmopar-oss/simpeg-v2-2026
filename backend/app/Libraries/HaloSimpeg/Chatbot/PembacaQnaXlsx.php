@@ -19,14 +19,20 @@ use SimpleXMLElement;
 use ZipArchive;
 
 /**
- * Pembaca impor QnA mandiri (review CR-182 R5): membaca HANYA sheet pertama, sel A1:D(maks+1) dan E1, tanpa
- * `Reader\Xlsx::load()`/`listWorksheetInfo()` PhpSpreadsheet 5.10.
+ * Pembaca impor QnA mandiri (review CR-182 R5/R6): membaca HANYA sheet pertama, sel A1:D(maks+1) dan E1, tanpa
+ * `Reader\Xlsx::load()`/`listWorksheetInfo()`.
+ *
+ * Ditulis terhadap phpoffice/phpspreadsheet **5.10.0** persis; potongan yang ditiru dari `Reader/Xlsx.php` versi itu:
+ * `getWorkbookBaseName` (:2639-2663), `load()` resolusi relasi/workbook/sharedStrings/richData/sheet (:667-1012),
+ * `loadSheetData` (:2062-2252), `parseRichText` (teks saja, :2254), `castTo*`/`castToFormula` (diwarisi, :449-505),
+ * `REL_TO_MAIN` (:259) dan `boolean` (:2449), serta `listWorksheetInfo` (:329-447, nama sheet pertama). Test
+ * `ImporQnaPemindaiTest::testVersiPhpSpreadsheetTerkunci` gagal bila versi vendor berubah: tinjau ulang kelas ini dulu.
  *
  * Kenapa: sejak R1 setiap pagar yang meniru perilaku `load()` tanpa read filter (relasi, nama sheet, rumus shared,
  * kolom, `<col>`) membuka celah baru, karena `load()` membangun SELURUH workbook (semua sheet bernama sama, semua sel,
  * definisi kolom, terjemahan rumus shared per sel). Pembaca ini biayanya linear terhadap byte part sheet dan shared
- * strings yang dialirkan (parser SAX ext-xml di atas aliran `zip://`, potongan 64 KB), dan memorinya dibatasi jumlah sel yang dipakai (≤ 5 ×
- * baris maks + E1) serta shared string yang dirujuk sel-sel itu.
+ * strings yang dialirkan (parser SAX ext-xml di atas aliran `zip://`, potongan 64 KB), dan memorinya dibatasi jumlah
+ * sel yang dipakai (≤ 4 × (baris maks + 1) + E1) serta shared string yang dirujuk sel-sel itu.
  *
  * Paritas nilai dengan main (read filter A-D/E1 + `rangeToArray(A1:D(maks+1), null, false, false, false)`):
  *
@@ -73,6 +79,8 @@ final class PembacaQnaXlsx extends Xlsx
         $this->elemen       = 0;
         $this->byteBaca     = 0;
         $this->terlaluBesar = false;
+        $this->cacheMuat    = [];
+        $this->biayaShared  = 0;
 
         try {
             [$basename, $nsBase] = $this->namaWorkbook($zip);
@@ -89,8 +97,9 @@ final class PembacaQnaXlsx extends Xlsx
             }
 
             if ($lokasi === null) {
-                // Ada nama sheet tetapi tidak ada part yang dimuat: main memuat sheet kosong.
-                return ['total_baris' => 0, 'sel' => [[null, null, null, null]], 'ekstra' => null, 'gagal' => false];
+                // Ada nama sheet tetapi tidak ada part worksheet yang bisa dibaca (mis. sheet pertama chartsheet, part
+                // hilang): main menolak "rusak" (review CR-182 R6 C1).
+                throw new RuntimeException('Part sheet pertama tidak ada.');
             }
 
             [$entriSheet, $entriSst, $mainNs, $tanggal1904] = $lokasi;
@@ -172,6 +181,8 @@ final class PembacaQnaXlsx extends Xlsx
         $nama = null;
 
         // listWorksheetInfo: setiap relasi selain thumbnail; nama = elemen sheet pertama yang ditemukan.
+        self::batasiRelasi($rels);
+
         foreach ($rels->Relationship as $relx) {
             $rel = self::getAttributes($relx);
 
@@ -301,6 +312,10 @@ final class PembacaQnaXlsx extends Xlsx
         $useFormula      = isset($c->f)
             && ((string) $c->f !== '' || (isset($c->f->attributes()['t']) && strtolower((string) $c->f->attributes()['t']) === 'shared'));
 
+        if ($useFormula) {
+            $this->periksaBiayaShared($c);
+        }
+
         switch ($cellDataType) {
             case DataType::TYPE_STRING:
                 if ((string) $c->v != '') {
@@ -383,6 +398,38 @@ final class PembacaQnaXlsx extends Xlsx
     }
 
     /**
+     * Anak rumus shared di A-D diterjemahkan vendor (`ReferenceHelper::updateFormulaReferences`, O(rujukan × panjang)
+     * per anak). Penyimpangan paritas yang disetujui reviewer (R6 B2), hanya mengenai berkas yang tidak realistis untuk
+     * QnA: induk > {@see self::MAKS_PANJANG_INDUK} karakter, atau Σ(100 + panjang induk) atas anak > 1 MB → "rusak".
+     */
+    private function periksaBiayaShared(SimpleXMLElement $c): void
+    {
+        $attr = $c->f->attributes();
+
+        if (! isset($attr['t']) || strtolower((string) $attr['t']) !== 'shared') {
+            return;
+        }
+
+        $induk = $this->sharedFormulae[(string) $attr['si']] ?? null;
+
+        if ($induk === null) {
+            return; // sel ini induknya sendiri: tidak diterjemahkan
+        }
+
+        $panjang = mb_strlen($induk->formula());
+
+        if ($panjang > self::MAKS_PANJANG_INDUK) {
+            throw new RuntimeException('Induk rumus shared terlalu panjang.');
+        }
+
+        $this->biayaShared += 100 + $panjang;
+
+        if ($this->biayaShared > self::MAKS_BIAYA_SHARED) {
+            throw new RuntimeException('Biaya rumus shared terlalu besar.');
+        }
+    }
+
+    /**
      * Penulisan sel seperti `loadSheetData` (readEmptyCells false, readDataOnly).
      */
     private function tulisSel(Worksheet $sheet, string $r, string $cellDataType, mixed $value, mixed $calculatedValue, bool $numerikAsli): void
@@ -438,11 +485,10 @@ final class PembacaQnaXlsx extends Xlsx
     private const POTONG = 65536;
 
     /**
-     * Anggaran elemen XML part sheet yang dialirkan. Terukur ±1,6 µs per `<row/>` dan ±3,5 µs per
-     * `<c/>` (sel memerlukan pemeriksaan koordinat); 400 ribu `<c/>` ±1,4 s. Berkas QnA sah 1.000 baris ber-border sampai
-     * baris 13.000 ±60 ribu elemen; 1.000 baris × 300 sel bergaya ±300 ribu. Melewati → "rusak".
+     * Anggaran elemen XML part sheet yang dialirkan (R6 B4): border A1:Z20000 + 1.000 baris data (±540 ribu elemen, ±2,0 s)
+     * lolos seperti main; ±4 µs per `<c/>`, jadi penolakan di batas ±2,3-2,6 s. Angka terukur di README Chatbot.
      */
-    public const MAKS_ELEMEN = 400_000;
+    public const MAKS_ELEMEN = 700_000;
 
     /**
      * Anggaran elemen shared strings (terpisah): `<si>` yang tidak dirujuk hanya dilewati (±1,6 µs per elemen). Rich text
@@ -451,6 +497,26 @@ final class PembacaQnaXlsx extends Xlsx
     public const MAKS_ELEMEN_SST = 1_000_000;
 
     private int $anggaran = self::MAKS_ELEMEN;
+
+    /** Batas panjang teks induk rumus shared yang anaknya diterjemahkan di A-D (karakter, R6 B2). */
+    public const MAKS_PANJANG_INDUK = 1024;
+
+    /** Batas Σ(100 + panjang induk) atas anak rumus shared di A-D (R6 B2). */
+    public const MAKS_BIAYA_SHARED = 1024 * 1024;
+
+    /** Batas panjang rekaman XML satu sel/`<si>` (sesudah dekode dan escape ulang), R6 B1 pertahanan berlapis. */
+    public const MAKS_REKAMAN = 2 * 1024 * 1024;
+
+    /** Batas Relationship `_rels/.rels` yang diproses (R6 B3). Excel/LibreOffice menulis 3-4. */
+    public const MAKS_RELASI = 32;
+
+    private int $biayaShared = 0;
+
+    /** Nama SAX `uri\x1Fc` untuk jalur cepat sel. */
+    private string $namaC = '';
+
+    /** @var array<string, SimpleXMLElement> hasil muat() per nama entri + namespace (R6 B3) */
+    private array $cacheMuat = [];
 
     /** Batas byte terdekompresi yang benar-benar dibaca per berkas (ukuran di header ZIP bisa palsu). */
     public const MAKS_BYTE = 32 * 1024 * 1024;
@@ -513,6 +579,7 @@ final class PembacaQnaXlsx extends Xlsx
         $this->elemen         = 0;
         $this->anggaran       = self::MAKS_ELEMEN;
         $this->mainNs         = $mainNs;
+        $this->namaC          = "{$mainNs}\x1Fc";
         $this->maksBaris      = $maksBaris;
         $this->modeSst        = false;
         $this->dalam          = 0;
@@ -560,7 +627,8 @@ final class PembacaQnaXlsx extends Xlsx
             throw new RuntimeException('Part xlsx tidak dapat dibuka.');
         }
 
-        $parser = xml_parser_create_ns(null, "\x1F");
+        $awalPart = true;
+        $parser   = xml_parser_create_ns(null, "\x1F");
         xml_parser_set_option($parser, XML_OPTION_CASE_FOLDING, false);
         xml_set_element_handler($parser, $this->buka(...), $this->tutup(...));
         xml_set_character_data_handler($parser, $this->teks(...));
@@ -572,6 +640,11 @@ final class PembacaQnaXlsx extends Xlsx
 
                 if ($potong === false || $potong === '') {
                     break;
+                }
+
+                if ($awalPart) {
+                    self::periksaEncoding($potong);
+                    $awalPart = false;
                 }
 
                 // Seperti XmlScanner vendor: DOCTYPE (byte nol diabaikan) ditolak.
@@ -619,6 +692,13 @@ final class PembacaQnaXlsx extends Xlsx
         if (++$this->elemen > $this->anggaran) {
             $this->terlaluBesar = true;
             $this->henti        = true;
+
+            return;
+        }
+
+        if ($nama === $this->namaC && $this->dalam === 4 && $this->diRow && $this->sdPertama === true
+            && $this->rekam === null && $this->dalamSel === 0) {
+            $this->mulaiSel($atribut);
 
             return;
         }
@@ -794,8 +874,16 @@ final class PembacaQnaXlsx extends Xlsx
 
         if ($this->rekam !== null) {
             $this->rekam .= self::esc($data);
+
+            if (strlen($this->rekam) > self::MAKS_REKAMAN) {
+                throw new RuntimeException('Isi satu sel xlsx terlalu besar.');
+            }
         } elseif ($this->rekamF !== null) {
             $this->rekamF .= self::esc($data);
+
+            if (strlen($this->rekamF) > self::MAKS_REKAMAN) {
+                throw new RuntimeException('Isi satu sel xlsx terlalu besar.');
+            }
         }
     }
 
@@ -862,9 +950,54 @@ final class PembacaQnaXlsx extends Xlsx
         return $p === false ? ['', $nama] : [substr($nama, 0, $p), substr($nama, $p + 1)];
     }
 
+    /**
+     * Escape ulang teks/atribut hasil SAX. CR, LF, dan TAB ditulis sebagai rujukan karakter supaya tidak dinormalkan saat
+     * diurai ulang (CR dalam teks, dan ketiganya dalam nilai atribut), sehingga nilainya sama dengan yang diurai vendor
+     * dari XML asli (R6 C2).
+     */
     private static function esc(string $s): string
     {
-        return htmlspecialchars($s, ENT_XML1 | ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        return strtr(htmlspecialchars($s, ENT_XML1 | ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'), ["\r" => '&#13;', "\n" => '&#10;', "\t" => '&#9;']);
+    }
+
+    /**
+     * Encoding part yang dialirkan (R6 B1): hanya UTF-8/UTF-16/UTF-32 dan keluarga yang kompatibel ASCII (US-ASCII,
+     * ISO-8859-*, windows-125x). Encoding lain (UTF-7, EBCDIC, …) membuat DOCTYPE bisa disamarkan dari pemeriksaan byte,
+     * lalu entitas internal diekspansi parser → "rusak". Deklarasi dibaca dari potongan pertama sesudah BOM, dengan byte nol
+     * dibuang (UTF-16/32 tanpa BOM tetap terbaca); awal dokumen selain `<` juga ditolak.
+     */
+    private static function periksaEncoding(string $potong): void
+    {
+        $awal = substr($potong, 0, 1024);
+
+        foreach (["\xEF\xBB\xBF", "\x00\x00\xFE\xFF", "\xFF\xFE\x00\x00", "\xFE\xFF", "\xFF\xFE"] as $bom) {
+            if (str_starts_with($awal, $bom)) {
+                $awal = substr($awal, strlen($bom));
+
+                break;
+            }
+        }
+
+        $awal = ltrim(str_replace("\0", '', $awal), " \t\r\n");
+
+        if ($awal === '' || $awal[0] !== '<') {
+            throw new RuntimeException('Awal part xlsx tidak dikenal.');
+        }
+
+        if (! str_starts_with($awal, '<?xml')) {
+            return;
+        }
+
+        $akhir = strpos($awal, '?>');
+        $dekl  = $akhir === false ? $awal : substr($awal, 0, $akhir);
+
+        if (preg_match('/\sencoding\s*=\s*["\']([^"\']*)["\']/i', $dekl, $m) !== 1) {
+            return;
+        }
+
+        if (preg_match('/^(utf-?8|utf-?16(le|be)?|utf-?32(le|be)?|us-ascii|ascii|iso-8859-[0-9]{1,2}|iso8859-[0-9]{1,2}|latin-?1|windows-125[0-8]|cp125[0-8])$/i', trim($m[1])) !== 1) {
+            throw new RuntimeException('Encoding part xlsx tidak diizinkan.');
+        }
     }
 
     private function simpul(string $xml): SimpleXMLElement
@@ -908,10 +1041,31 @@ final class PembacaQnaXlsx extends Xlsx
      */
     private function muat(ZipArchive $zip, string $nama, string $ns = ''): SimpleXMLElement
     {
+        // Cache per entri sebenarnya (R6 B3): relasi berulang ke part besar tidak dibaca berulang kali; byte setiap bacaan
+        // masuk anggaran yang sama dengan aliran.
+        $kunci = ($this->namaEntri($zip, $nama) ?? "?{$nama}") . "\x1F{$ns}";
+
+        if (isset($this->cacheMuat[$kunci])) {
+            return $this->cacheMuat[$kunci];
+        }
+
         $isi = $this->getFromZipArchive($zip, $nama);
+        $this->byteBaca += strlen($isi);
+
+        if ($this->byteBaca > self::MAKS_BYTE) {
+            throw new RuntimeException('Isi xlsx terlalu besar.');
+        }
+
         $xml = @simplexml_load_string($this->getSecurityScannerOrThrow()->scan($isi), SimpleXMLElement::class, 0, $ns);
 
-        return self::testSimpleXml($xml);
+        return $this->cacheMuat[$kunci] = self::testSimpleXml($xml);
+    }
+
+    private static function batasiRelasi(SimpleXMLElement $rels): void
+    {
+        if (count($rels->Relationship) > self::MAKS_RELASI) {
+            throw new RuntimeException('Relasi xlsx terlalu banyak.');
+        }
     }
 
     /** Sama dengan `Reader\Xlsx::boolean` (privat). */
