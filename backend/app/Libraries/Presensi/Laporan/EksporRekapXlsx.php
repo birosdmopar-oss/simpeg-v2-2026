@@ -15,9 +15,13 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 /**
- * Penulis XLSX rekap D-09b (PhpSpreadsheet, ADR-032), dibangun server [V2] (legacy: ekspor DataTables di browser untuk
- * ringkas & uang makan; `.xls` Excel 97 untuk harian). NIP & tanggal ditulis sebagai teks eksplisit (NIP 18 digit tidak
- * menjadi angka ilmiah); semua nilai teks ditulis sebagai string (tidak pernah dievaluasi sebagai rumus).
+ * Penulis XLSX rekap D-09b ringkas dan harian (PhpSpreadsheet, ADR-032), dibangun server [V2] (legacy: ekspor DataTables
+ * di browser untuk ringkas; `.xls` Excel 97 untuk harian). NIP & tanggal ditulis sebagai teks eksplisit (NIP 18 digit
+ * tidak menjadi angka ilmiah); semua nilai teks ditulis sebagai string (tidak pernah dievaluasi sebagai rumus).
+ *
+ * Rekap uang makan TIDAK ditulis di sini sejak CR-183: dua kolom teks itu (hanya header tebal) ditulis
+ * `Kepegawaian\Pegawai\EksporTabel::xlsx()` dari {@see RekapUangMakanService::xlsx()} (±110.000 baris lewat
+ * PhpSpreadsheet melewati target memori ADR-035).
  */
 final class EksporRekapXlsx
 {
@@ -134,27 +138,6 @@ final class EksporRekapXlsx
         }
 
         $sheet->getPageSetup()->setOrientation(PageSetup::ORIENTATION_LANDSCAPE)->setPaperSize(PageSetup::PAPERSIZE_A4)->setFitToWidth(1)->setFitToHeight(0);
-
-        return self::tulis($buku);
-    }
-
-    /**
-     * Uang makan [K `V/rekap_uma.php:89-104`]: dua kolom `NIP | TGL_ABSEN`, tanpa judul.
-     *
-     * @param list<array{nip: string, tgl_absen: string}> $baris
-     */
-    public static function uangMakan(array $baris): string
-    {
-        $buku  = new Spreadsheet();
-        $sheet = $buku->getActiveSheet()->setTitle('Rekap Uang Makan');
-        self::teks($sheet, 1, 1, 'NIP');
-        self::teks($sheet, 2, 1, 'TGL_ABSEN');
-        $sheet->getStyle([1, 1, 2, 1])->getFont()->setBold(true);
-
-        foreach ($baris as $i => $b) {
-            self::teks($sheet, 1, $i + 2, $b['nip']);
-            self::teks($sheet, 2, $i + 2, $b['tgl_absen']);
-        }
 
         return self::tulis($buku);
     }

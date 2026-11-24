@@ -6,6 +6,7 @@ namespace App\Libraries\Presensi\Laporan;
 
 use App\Libraries\Auth\AuthContext;
 use App\Libraries\Kepegawaian\Kalkulasi\TanggalBisnis;
+use App\Libraries\Kepegawaian\Pegawai\EksporTabel;
 use App\Libraries\MasterData\HariLiburService;
 use App\Libraries\MasterData\WebConfigService;
 use App\Libraries\Presensi\Slip\UangMakanSlipPresensi;
@@ -100,7 +101,13 @@ final class RekapUangMakanService
     }
 
     /**
-     * `GET presensi/uang-makan/rekap/xlsx` (atau `rekap-il/xlsx`).
+     * `GET presensi/uang-makan/rekap/xlsx` (atau `rekap-il/xlsx`): dua kolom `NIP | TGL_ABSEN` tanpa judul [K
+     * `V/rekap_uma.php:89-104`], satu baris per hari dibayar, urut populasi lalu tanggal.
+     *
+     * Ditulis {@see EksporTabel::xlsx()} (XML langsung lewat `ZipArchive`, semua sel teks), bukan PhpSpreadsheet (CR-183):
+     * lingkup kementerian ±110.000 baris dulu 14,6 detik dan puncak 294 MB lewat PhpSpreadsheet, di atas target 256 MB
+     * ADR-035. Iterasi atas `$nip` populasi (bukan kunci `$hari`), sama dengan JSON {@see self::daftar()}: jumlah dan
+     * urutan baris kedua keluaran selalu sama, termasuk bila populasi memuat satu NIP lebih dari sekali.
      *
      * @param array<string, mixed> $query
      *
@@ -113,14 +120,14 @@ final class RekapUangMakanService
 
         foreach ($nip as $n) {
             foreach ($hari[$n] ?? [] as $t) {
-                $baris[] = ['nip' => $n, 'tgl_absen' => $t];
+                $baris[] = [$n, $t];
             }
         }
 
         unset($hari, $nip);
 
         return [
-            'isi'  => EksporRekapXlsx::uangMakan($baris),
+            'isi'  => EksporTabel::xlsx(['NIP', 'TGL_ABSEN'], $baris, 'Rekap Uang Makan'),
             'nama' => sprintf('rekap_uang_makan_%s_%s.xlsx', $il ? 'il' : $lingkup->kode(), $p->kunci()),
             'mime' => EksporRekapXlsx::MIME,
         ];
