@@ -124,6 +124,46 @@ final class PemindaiXlsx
     }
 
     /**
+     * Jumlah ukuran sesudah dekompresi SEMUA entri arsip ZIP menurut direktori pusatnya (`statIndex`), tanpa mendekompresi
+     * satu byte pun. `null` bila berkas bukan arsip ZIP yang bisa dibuka (mis. `.xls` biner).
+     *
+     * Dipakai SEBELUM reader vendor menyentuh berkas (CR-188): mengenali jenis berkas saja sudah membuat reader Xlsx
+     * menampung `_rels/.rels` utuh di memori (dua kali, lewat `Xlsx::canRead`), jadi entri itu yang mengembang ratusan MB
+     * menghabiskan `memory_limit` sebelum {@see self::pindai()} sempat berjalan. Hanya entri itu yang ditampung utuh
+     * sebelum pemindai; jumlah SEMUA entri dipakai sebagai pagar umum, supaya tidak bergantung pada entri mana yang
+     * dibaca reader versi berikutnya. `ZipArchive` membaca paling banyak sebesar ukuran yang tertulis di direktori pusat,
+     * jadi jumlah ini batas atas byte yang bisa ditampung pembaca mana pun dari arsip itu.
+     *
+     * Entri yang tidak bisa diperiksa dihitung tak terbatas (`PHP_INT_MAX`): ukurannya tidak bisa dipercaya.
+     */
+    public static function ukuranTerdekompresi(string $path): ?int
+    {
+        $zip = new ZipArchive();
+
+        if ($zip->open($path, ZipArchive::RDONLY) !== true) {
+            return null;
+        }
+
+        try {
+            $byte = 0;
+
+            for ($i = 0; $i < $zip->numFiles; $i++) {
+                $stat = $zip->statIndex($i);
+
+                if ($stat === false || (int) $stat['size'] < 0 || $byte > PHP_INT_MAX - (int) $stat['size']) {
+                    return PHP_INT_MAX;
+                }
+
+                $byte += (int) $stat['size'];
+            }
+
+            return $byte;
+        } finally {
+            $zip->close();
+        }
+    }
+
+    /**
      * Pemindaian berhenti lebih awal begitu `byte` melewati `$maksByte` atau `bobot` melewati `$maksBobot`; nilai yang
      * dikembalikan saat itu sudah melewati batasnya.
      *
