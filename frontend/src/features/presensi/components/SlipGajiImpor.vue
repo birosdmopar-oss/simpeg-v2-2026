@@ -5,11 +5,17 @@
  * server: Valid / Duplikat / Galat; baris galat ditandai warna + daftar pesan; ringkasan) + kotak centang "Timpa data
  * yang sudah ada" (bawaan dari server, tercentang, F5-5) → "Simpan ke Database" lewat `ConfirmDialog` → hasil commit.
  * Validasi impor seluruhnya di server (ADR-025); 409 (data berubah oleh proses lain) ditampilkan dengan ajakan unggah ulang.
+ *
+ * CR-186: server menghapus token pratinjau untuk SEMUA hasil commit sesudah pratinjau dimuat (PRD 5A AC-D10.7), jadi
+ * sesudah commit gagal 404/409/410/422/≥500 tombol Simpan tidak ditawarkan lagi (klik berikutnya pasti 404); Batal
+ * tetap ada untuk unggah ulang. 500 ber-envelope menampilkan pesan server. Jawaban ≥500 tanpa envelope backend (mis.
+ * 502/504 dari proxy) tidak boleh mengklaim "tidak ada data yang disimpan": commit mungkin sudah sukses, jadi admin
+ * diminta memeriksa data slip dulu. 401 (interceptor), 403, dan galat jaringan (status null) mempertahankan pratinjau.
  */
 import { Upload } from 'lucide-vue-next'
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 
-import { isApiError } from '@/lib/axios'
+import { isApiError, type ApiError } from '@/lib/axios'
 import ConfirmDialog from '@/shared/components/ConfirmDialog.vue'
 import { UiBadge, UiButton, UiCheckbox, UiFileField, UiMonthPicker, UiNotice, UiStatTile } from '@/shared/ui'
 
@@ -29,6 +35,19 @@ const memproses = ref(false)
 const failure = ref<string | null>(null)
 const galatField = ref<Record<string, string>>({})
 const konflik = ref(false)
+/** Token pratinjau sudah dihapus server (commit gagal sesudah dimuat): Simpan tidak ditawarkan lagi. */
+const tokenHabis = ref(false)
+const batalEl = ref<{ $el?: HTMLElement } | null>(null)
+
+/**
+ * Tombol Simpan diganti keterangan; fokus dipindah ke Batal agar fokus keyboard tidak lepas ke body. Ditunda satu
+ * tick timer sesudah render, karena ConfirmDialog (radix) mengembalikan fokus ke pemicunya (Simpan, sudah hilang) lewat
+ * `setTimeout` saat ditutup.
+ */
+async function fokusKeBatal(): Promise<void> {
+  await nextTick()
+  setTimeout(() => batalEl.value?.$el?.focus(), 0)
+}
 const konfirmasi = ref(false)
 const kunciUnggah = ref(0)
 
@@ -77,6 +96,7 @@ async function validasi(): Promise<void> {
   failure.value = null
   galatField.value = {}
   konflik.value = false
+  tokenHabis.value = false
   hasil.value = null
   try {
     pratinjau.value = await slipGajiAdminService.pratinjau(berkas.value, filter.value || null)
@@ -92,9 +112,23 @@ async function validasi(): Promise<void> {
   }
 }
 
+const PESAN_COMMIT_TAK_PASTI =
+  'Server tidak memberi jawaban yang jelas, sehingga data mungkin sudah tersimpan. Periksa data slip gaji periode ini lebih dulu sebelum mengunggah ulang berkas.'
+
+/** Status commit gagal yang membuat server menghapus token pratinjau (CR-186). 409 tetap di sini sampai putusan QB-15. */
+function tokenDihapus(status: number | null): boolean {
+  return status !== null && (status === 404 || status === 409 || status === 410 || status === 422 || status >= 500)
+}
+
+/** Body galat berbentuk envelope backend `{status:'error', message}` (bukan halaman galat proxy). */
+function berEnvelope(err: ApiError): boolean {
+  const body = err.original?.response?.data as { status?: unknown; message?: unknown } | undefined
+  return typeof body === 'object' && body !== null && body.status === 'error' && typeof body.message === 'string' && body.message !== ''
+}
+
 async function simpan(): Promise<void> {
   const p = pratinjau.value
-  if (!p) return
+  if (!p || tokenHabis.value) return
   memproses.value = true
   failure.value = null
   try {
@@ -105,8 +139,16 @@ async function simpan(): Promise<void> {
     emit('selesai', periodeHasil)
   } catch (err) {
     konfirmasi.value = false
-    konflik.value = isApiError(err) && (err.status === 409 || err.status === 410 || err.status === 404)
-    failure.value = isApiError(err) && err.message && err.status !== null && err.status < 500 ? err.message : describeApiError(err).message
+    if (isApiError(err) && tokenDihapus(err.status)) {
+      tokenHabis.value = true
+      const tanpaEnvelope = err.status !== null && err.status >= 500 && !berEnvelope(err)
+      konflik.value = !tanpaEnvelope
+      failure.value = tanpaEnvelope ? PESAN_COMMIT_TAK_PASTI : err.message || describeApiError(err).message
+      void fokusKeBatal()
+    } else {
+      konflik.value = false
+      failure.value = isApiError(err) && err.message && err.status !== null && err.status < 500 ? err.message : describeApiError(err).message
+    }
   } finally {
     memproses.value = false
   }
@@ -118,6 +160,7 @@ function ulang(): void {
   berkas.value = null
   failure.value = null
   konflik.value = false
+  tokenHabis.value = false
   galatField.value = {}
   kunciUnggah.value += 1
 }
@@ -167,7 +210,7 @@ function ulang(): void {
         <h2 id="impor-langkah-2" class="text-h5 text-slate-900">
           Langkah 2: Pratinjau &amp; Validasi<template v-if="pratinjau.filter"> · {{ labelPeriode(pratinjau.filter) }}</template>
         </h2>
-        <UiButton variant="secondary" appearance="outline" size="sm" :disabled="memproses" data-testid="impor-batal" @click="ulang">Batal</UiButton>
+        <UiButton ref="batalEl" variant="secondary" appearance="outline" size="sm" :disabled="memproses" data-testid="impor-batal" @click="ulang">Batal</UiButton>
       </div>
       <div class="grid grid-cols-2 gap-3 sm:grid-cols-4" data-testid="impor-ringkasan">
         <UiStatTile label="Total Baris" :value="pratinjau.baris.length" />
@@ -229,7 +272,10 @@ function ulang(): void {
         </p>
       </div>
 
-      <div class="flex justify-end">
+      <p v-if="tokenHabis" class="text-right text-body2 text-slate-600" data-testid="impor-token-habis">
+        Pratinjau ini tidak berlaku lagi. Gunakan Batal untuk mengunggah ulang berkas.
+      </p>
+      <div v-else class="flex justify-end">
         <UiButton :disabled="akanDisimpan === 0" :loading="memproses" data-testid="impor-simpan" @click="konfirmasi = true">Simpan ke Database</UiButton>
       </div>
     </section>

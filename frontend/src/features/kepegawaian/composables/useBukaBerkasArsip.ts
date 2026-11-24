@@ -13,8 +13,9 @@
  *    dicabut saat popup ditutup (diperiksa berkala), dipakai ulang untuk berkas lain, halaman di-unmount, atau logout.
  *  - `privat` + `unduh`: tanpa popup; `ambilBerkas` lalu `simpanBerkas` (nama dari `Content-Disposition`).
  * Semua galat menutup popup. 429/404/403 tampil sebagai pesan di halaman (`galat`), bukan JSON mentah. 401 sesudah refresh
- * gagal ditangani interceptor (login) tanpa pesan tambahan. 403 `password_change_required` pada unduhan blob tidak memicu
- * handler interceptor (body masih Blob saat `code` dibaca), jadi pesan server / cadangan ditampilkan di halaman.
+ * gagal ditangani interceptor (login) tanpa pesan tambahan. 403 `password_change_required` pada unduhan blob memicu
+ * handler interceptor (CR-186: body Blob JSON diurai sebelum `code` dibaca), yang mengarahkan ke ganti password; pesan
+ * server / cadangan tetap ditampilkan di halaman sebagai jaring pengaman (mis. handler belum terpasang).
  */
 import { onBeforeUnmount, ref } from 'vue'
 
@@ -68,8 +69,8 @@ function pesanGalat(error: unknown): string | null {
   const dikenal = badan !== undefined && badan !== null && typeof badan === 'object'
   // Body JSON yang terbaca (diurai `ambilBerkas`) membawa pesan server; bila tidak terbaca pakai pesan baku.
   const dariServer = dikenal && typeof badan.message === 'string' ? badan.message : ''
-  // Interceptor membaca `code` saat body masih Blob, jadi handler ganti password tidak jalan untuk unduhan blob:
-  // tampilkan pesannya agar klik Buka tidak diam.
+  // CR-186: interceptor sudah mengurai body Blob JSON 403 dan memicu handler ganti password; pesannya tetap ditampilkan
+  // sebagai jaring pengaman (mis. handler belum terpasang) agar klik Buka tidak diam.
   if (error.status === 403 && dikenal && badan.code === PASSWORD_CHANGE_REQUIRED_CODE) return dariServer !== '' ? dariServer : PESAN_GANTI_PASSWORD
   if (dariServer !== '') return dariServer
   return error.status === 429 ? PESAN_TERLALU_BANYAK : describeApiError(error).message
