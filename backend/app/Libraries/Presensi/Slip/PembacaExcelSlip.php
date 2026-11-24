@@ -87,6 +87,8 @@ final class PembacaExcelSlip
     {
         // Sebelum reader vendor menyentuh berkas (CR-188): mengenali jenis berkas saja sudah menampung entri ZIP utuh.
         $this->praCekArsip($path);
+        // Berkas CFB (.xls): struktur header divalidasi terhadap ukuran berkas sebelum OLERead dibuka (CR-189).
+        $this->praCekOle($path);
 
         try {
             $reader = IOFactory::createReaderForFile($path, self::READER);
@@ -180,8 +182,7 @@ final class PembacaExcelSlip
      * umum, jumlah ukuran SEMUA entri menurut direktori pusat ZIP dibandingkan dengan batas isi yang sama dengan
      * {@see self::praCekXlsx()}, tanpa mendekompresi apa pun.
      *
-     * Berkas yang bukan ZIP (`.xls`) tidak diperiksa di sini, dan tahap pengenalan reader untuk `.xls` BELUM dipagari:
-     * berkas berkepala OLE palsu masih bisa fatal memori di `Xls::canRead` (lihat README BB-2).
+     * Berkas yang bukan ZIP (`.xls`) tidak diperiksa di sini: struktur OLE-nya dipagari {@see self::praCekOle()} (CR-189).
      *
      * @throws BerkasImporDitolak
      */
@@ -191,6 +192,24 @@ final class PembacaExcelSlip
 
         if ($byte !== null && $byte > $this->maksByteIsi) {
             throw $this->isiTerlaluBesar();
+        }
+    }
+
+    /**
+     * Struktur berkas OLE/CFB (`.xls`) sebelum reader vendor dibuka (CR-189). `Xls::canRead` menjalankan
+     * `Shared\OLERead::read()`, yang memercayai field header (jumlah dan indeks sektor BBD/MSAT/SBD/direktori, blok awal
+     * aliran) dan mengganjal string dengan nol sampai posisi indeks itu: `.xls` ±150 KB berheader palsu dulu meminta
+     * alokasi 8 GB (fatal memori, 500) sebelum {@see self::praCekXls()} berjalan. {@see PemeriksaOle} menolak berkas CFB
+     * yang indeksnya di luar berkas, rantainya putus atau melingkar, atau bagiannya terpotong, dengan pesan yang sudah ada
+     * ({@see self::PESAN_TIDAK_TERBACA}, 422). Berkas yang lolos dibaca vendor persis seperti sebelumnya; berkas yang
+     * bukan CFB tidak disentuh.
+     *
+     * @throws BerkasImporDitolak
+     */
+    private function praCekOle(string $path): void
+    {
+        if (! PemeriksaOle::lolos($path)) {
+            throw self::tidakTerbaca(new BerkasImporDitolak('Struktur OLE tidak sah.'));
         }
     }
 
