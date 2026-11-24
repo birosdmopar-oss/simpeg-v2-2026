@@ -422,6 +422,196 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
     }
 
     /**
+     * R4 B1: berkas QnA sah dengan beberapa sheet yang di R3 salah ditolak (sel/bobot dikalikan jumlah sheet) dan di main
+     * diterima: 1.000 baris ber-border A-T + 2 sheet petunjuk, 10 sheet polos, dan sheet Referensi 15.000 baris.
+     */
+    #[DataProvider('banyakSheetSah')]
+    public function testBerkasSahBanyakSheetDiterima(int $sheet, string $kolomBorder, int $barisReferensi): void
+    {
+        $buku = new Spreadsheet();
+        $data = [ImporQna::JUDUL_KOLOM];
+
+        for ($i = 1; $i <= 1000; $i++) {
+            $data[] = ["Pertanyaan {$i}?", "Jawaban {$i}", 'Cuti', ''];
+        }
+
+        $buku->getActiveSheet()->fromArray($data, null, 'A1');
+
+        if ($kolomBorder !== '') {
+            $buku->getActiveSheet()->getStyle("A1:{$kolomBorder}1001")->getBorders()->getAllBorders()->setBorderStyle('thin');
+        }
+
+        for ($i = 2; $i <= $sheet; $i++) {
+            $lain = $buku->createSheet();
+            $lain->setTitle($i === 2 && $barisReferensi > 0 ? 'Referensi' : "Petunjuk {$i}");
+            $lain->setCellValue('A1', 'Petunjuk');
+
+            if ($i === 2 && $barisReferensi > 0) {
+                $ref = [];
+
+                for ($r = 1; $r <= $barisReferensi; $r++) {
+                    $ref[] = ["Kode {$r}", "Nama {$r}"];
+                }
+
+                $lain->fromArray($ref, null, 'A2');
+            }
+
+        }
+
+        $path        = (string) tempnam(sys_get_temp_dir(), 'cbm');
+        $this->tmp[] = $path;
+        (new XlsxWriter($buku))->save($path);
+        $buku->disconnectWorksheets();
+
+        $hasil = (new ImporQna($this->db))->impor($this->unggah($path));
+        $this->assertSame([1000, []], [$hasil['ditambah'], $hasil['galat']]);
+        $this->assertSame('Pertanyaan 1000?', $this->db->table('qna')->orderBy('id_qna', 'DESC')->get(1)->getRow('pertanyaan'));
+    }
+
+    /**
+     * @return iterable<string, array{int, string, int}>
+     */
+    public static function banyakSheetSah(): iterable
+    {
+        yield '3 sheet + border A-T' => [3, 'T', 0];
+
+        yield '10 sheet polos' => [10, '', 0];
+
+        yield 'sheet Referensi 15.000 baris' => [2, '', 15_000];
+    }
+
+    /**
+     * R4 B1: nama sheet ganda (tanpa peka huruf) membuat pemuat memuat part yang sama lebih dari sekali lewat
+     * setLoadSheetsOnly → "rusak". Excel/LibreOffice/Google tidak menulis nama ganda.
+     */
+    public function testNamaSheetGandaDitolak(): void
+    {
+        $berkas = $this->rakit('');
+        $this->gantiWorkbook($berkas, '<sheet name="Template QnA" sheetId="1" r:id="rId1"/><sheet name="template qna" sheetId="2" r:id="rId1"/>');
+
+        $this->assertGalatBerkas(self::RUSAK, $berkas);
+    }
+
+    /**
+     * R4 B2: bentuk yang mengelabui hitungan `<sheet>` berbasis regex di R3. Semua → 422 tanpa membuka part 28 MB:
+     * (a) `_rels/.rels` dengan 100 relasi officeDocument ke workbook yang sama (vendor mengurai workbook dan sheet untuk
+     * SETIAP relasi); (b) prefiks namespace non-ASCII; (c) workbook UTF-16 ber-BOM; (d) prefiks > 64 byte.
+     */
+    #[DataProvider('pengelabuHitunganSheet')]
+    public function testPengelabuHitunganSheetDitolakCepat(string $varian): void
+    {
+        $berkas = $this->rakit('', str_repeat(' ', 28 * 1024 * 1024), [], '', true);
+        $sheet  = '';
+
+        for ($i = 1; $i <= 500; $i++) {
+            $sheet .= "<P:sheet name=\"S{$i}\" sheetId=\"{$i}\" r:id=\"rId1\"/>";
+        }
+
+        $wb = static fn (string $p): string => '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            . "<{$p}:workbook xmlns:{$p}=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\""
+            . ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+            . "<{$p}:sheets>" . str_replace('P:', "{$p}:", $sheet) . "</{$p}:sheets></{$p}:workbook>";
+
+        $zip = new ZipArchive();
+        $this->assertTrue($zip->open($berkas));
+
+        if ($varian === 'relasi') {
+            $rel = '';
+
+            for ($i = 1; $i <= 100; $i++) {
+                $rel .= "<Relationship Id=\"rId{$i}\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"xl/workbook.xml\"/>";
+            }
+
+            $zip->addFromString('_rels/.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' . $rel . '</Relationships>');
+        } elseif ($varian === 'nonascii') {
+            $zip->addFromString('xl/workbook.xml', $wb('ä'));
+        } elseif ($varian === 'utf16') {
+            $xml = str_replace('encoding="UTF-8"', 'encoding="UTF-16"', $wb('x'));
+            $zip->addFromString('xl/workbook.xml', "\xFF\xFE" . mb_convert_encoding($xml, 'UTF-16LE', 'UTF-8'));
+        } else {
+            $zip->addFromString('xl/workbook.xml', $wb(str_repeat('p', 100)));
+        }
+
+        $zip->close();
+        $this->assertLessThan(200 * 1024, (int) filesize($berkas));
+
+        $this->assertDitolakTanpaMembukaSheet($berkas);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function pengelabuHitunganSheet(): iterable
+    {
+        yield '(a) 100 relasi officeDocument' => ['relasi'];
+
+        yield '(b) prefiks non-ASCII' => ['nonascii'];
+
+        yield '(c) workbook UTF-16 ber-BOM' => ['utf16'];
+
+        yield '(d) prefiks 100 byte' => ['panjang'];
+    }
+
+    /**
+     * R4 B3: rumus shared panjang di luar A-D (induk 700 byte berisi 100-an acuan sel × ±40 ribu sel anak di kolom F-AS, mirip sharedf3, tidak padat). Vendor menerjemahkan
+     * rumus induk per sel anak walau readDataOnly; dulu read filter melewati sel di luar A-D (main 0,6-1,4 s, R3 33-60 s).
+     */
+    public function testRumusSharedPanjangDiLuarAdDitolakCepat(): void
+    {
+        $acuan = [];
+
+        for ($i = 1; $i <= 400; $i++) {
+            $acuan[] = Coordinate::stringFromColumnIndex($i % 16000 + 1) . ($i % 1000 + 1);
+        }
+
+        $induk = substr(implode('+', $acuan), 0, 700);
+        $baris = '';
+
+        for ($r = 3; $r <= 1001; $r++) {
+            $baris .= "<row r=\"{$r}\">";
+
+            for ($k = 6; $k <= 45; $k++) {
+                $ref = Coordinate::stringFromColumnIndex($k) . $r;
+                $baris .= $r === 3 && $k === 6
+                    ? "<c r=\"{$ref}\"><f t=\"shared\" ref=\"F3:AS1001\" si=\"0\">{$induk}</f><v>0</v></c>"
+                    : "<c r=\"{$ref}\"><f t=\"shared\" si=\"0\"/><v>0</v></c>";
+            }
+
+            $baris .= '</row>';
+        }
+
+        $berkas = $this->rakit('', $baris, [], '', true);
+        $this->assertLessThan(2 * 1024 * 1024, (int) filesize($berkas));
+
+        $mulai = hrtime(true);
+        $this->assertGalatBerkas(self::RUSAK, $berkas);
+        $this->assertLessThan(self::DETIK_CI, (hrtime(true) - $mulai) / 1e9);
+    }
+
+    /**
+     * Pagar B3: berkas sah dengan jawaban panjang (8.000 karakter, shared strings) dan rumus biasa tetap diterima.
+     */
+    public function testJawabanPanjangDanRumusBiasaTetapDiterima(): void
+    {
+        $buku = new Spreadsheet();
+        $data = [ImporQna::JUDUL_KOLOM];
+
+        for ($i = 1; $i <= 1000; $i++) {
+            $data[] = ["Pertanyaan {$i}?", str_repeat('jawab ', 1333) . $i, 'Cuti', ''];
+        }
+
+        $buku->getActiveSheet()->fromArray($data, null, 'A1');
+        $buku->getActiveSheet()->setCellValue('F2', '=A2&"!"');
+        $path        = (string) tempnam(sys_get_temp_dir(), 'cbj');
+        $this->tmp[] = $path;
+        (new XlsxWriter($buku))->save($path);
+        $buku->disconnectWorksheets();
+
+        $hasil = (new ImporQna($this->db))->impor($this->unggah($path));
+        $this->assertSame([1000, []], [$hasil['ditambah'], $hasil['galat']]);
+    }
+
+    /**
      * Isi data identik dengan saat masih memakai read filter (R1-3 syarat 2): `rangeToArray` tidak menghitung rumus, jadi
      * rumus di A-D yang merujuk kolom di luar A-D (yang dulu tidak dimuat) tetap terbaca sebagai teks rumusnya.
      */
@@ -557,6 +747,19 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
         $zip->close();
 
         return $path;
+    }
+
+    /**
+     * Isi `<sheets>` workbook template diganti `$sheets`.
+     */
+    private function gantiWorkbook(string $berkas, string $sheets): void
+    {
+        $zip = new ZipArchive();
+        $this->assertTrue($zip->open($berkas));
+        $wb = (string) $zip->getFromName('xl/workbook.xml');
+        $this->assertSame(1, preg_match('~<sheets>.*</sheets>~s', $wb));
+        $zip->addFromString('xl/workbook.xml', (string) preg_replace('~<sheets>.*</sheets>~s', "<sheets>{$sheets}</sheets>", $wb));
+        $zip->close();
     }
 
     /**

@@ -85,8 +85,21 @@ final class ImporQna
      */
     private const MAKS_BYTE_ISI_PADAT = 8 * 1024 * 1024;
 
-    /** Batas jumlah elemen `<sheet>` di semua entri (R3-1). Template = 1; berkas sah dengan sheet petunjuk beberapa. */
+    /** Batas jumlah elemen `<sheet>` yang diproses vendor (R3-1). Template = 1; berkas sah dengan sheet petunjuk beberapa. */
     private const MAKS_SHEET = 50;
+
+    /** Batas relasi `_rels/.rels` yang diproses vendor sebagai workbook (selain thumbnail). Excel/LO menulis 3-4. */
+    private const MAKS_RELASI = 10;
+
+    /** Batas jumlah byte dokumen meta (`_rels/.rels` + workbook per relasi) yang dibaca pra-pemeriksaan (R4 B2). */
+    private const MAKS_BYTE_META = 1024 * 1024;
+
+    /**
+     * Batas biaya rumus shared: Σ per sel anak (100 + panjang teks induk) (R4 B3). Terukur tanpa read filter: 44 ribu
+     * anak rumus pendek (biaya ±4,6 MB) 5,3 s; 10 ribu anak × 450 byte (±5,5 MB) 6,3 s; sharedf3 (700 byte × ±44 ribu)
+     * 33-60 s. 1 MB ≈ 10 ribu anak rumus pendek ≈ ±1,2 s. Berkas QnA sah praktis tanpa rumus shared.
+     */
+    private const MAKS_BIAYA_RUMUS_SHARED = 1024 * 1024;
 
     /** Batas isi terdekompresi dan byte teks yang disalin pemuat; berkas unggahan sendiri maks 2 MB. */
     private const MAKS_BYTE_ISI = 32 * 1024 * 1024;
@@ -262,13 +275,14 @@ final class ImporQna
             // BARU reader vendor. `canRead` sudah mendekompresi utuh `_rels/.rels`, jadi bom dekompresi di part itu harus
             // ditolak sebelumnya; fatal memori tidak bisa ditangkap try/catch.
             $zipInfo = $this->periksaUkuranZip($path, $reader);
-            $padat   = $this->periksaStruktur($path, $zipInfo['sheet']);
+            $padat   = $this->periksaStruktur($path);
+            $jSheet  = $this->periksaWorkbook($path, $zipInfo['terbesar']);
 
             // Berkas padat (sel/bobot terlampaui) hanya dibuka listWorksheetInfo untuk memilih pesan (R1-4) bila JUMLAH isi
             // semua entrinya wajar untuk berkas sah. listWorksheetInfo menampung setiap part sheet utuh dan membaca semua node
             // di SEMUA sheet, dan part sheet bisa di path mana pun (Target relasi): satu sheet 32 MB `<c/>` 7-12 detik, sheet
             // di `xl/lain/` 6,8 detik, 4 sheet × 7,8 MB `<row/>` 6,3 detik (review CR-182 R2-1). Selain itu langsung "rusak".
-            if ($padat && ($zipInfo['isi'] > self::MAKS_BYTE_ISI_PADAT || $zipInfo['sheet'] * $zipInfo['terbesar'] > self::MAKS_BYTE_ISI_PADAT)) {
+            if ($padat && ($zipInfo['isi'] > self::MAKS_BYTE_ISI_PADAT || $jSheet * $zipInfo['terbesar'] > self::MAKS_BYTE_ISI_PADAT)) {
                 throw ValidationException::forField('berkas', 'Berkas Excel rusak atau tidak dapat dibaca.');
             }
 
@@ -418,7 +432,7 @@ final class ImporQna
      * entri itu tidak pernah dimuat (SVG di `xl/media`, `docProps`, `customXml`); di main berkas seperti ini diterima.
      * PemindaiXlsx tidak boleh diubah di CR ini.
      */
-    private function periksaStruktur(string $path, int $jumlahSheet): bool
+    private function periksaStruktur(string $path): bool
     {
         $maksSel = ($this->config->imporMaksBaris + 1) * self::KOLOM_DIBACA * self::RUANG_SEL;
         $bobot   = $maksSel * Presensi::BOBOT_PER_SEL_IMPOR;
@@ -429,9 +443,9 @@ final class ImporQna
             throw ValidationException::forField('berkas', 'Berkas Excel rusak atau tidak dapat dibaca.');
         }
 
-        // Pemindai menghitung satu part sekali, padahal pemuat bisa memproses part yang sama untuk setiap `<sheet>` (nama
-        // sheet ganda lolos setLoadSheetsOnly): hitungan dikalikan jumlah `<sheet>` sebagai batas atas (R3-1).
-        $padat = $ukuran['sel'] * $jumlahSheet > $maksSel || $ukuran['bobot'] * $jumlahSheet > $bobot;
+        // Hitungan pemindai sudah total semua entri. Pemuat hanya memuat ulang part yang sama lewat NAMA sheet ganda
+        // (setLoadSheetsOnly), dan nama ganda ditolak di periksaWorkbook (R4 B1), jadi tidak dikalikan jumlah `<sheet>`.
+        $padat = $ukuran['sel'] > $maksSel || $ukuran['bobot'] > $bobot;
 
         // Bila bobot terlampaui, pemindai berhenti lebih awal sehingga `iterasi_kolom` bisa belum lengkap; berkas itu tetap
         // tidak pernah dimuat (lihat pemanggil), jadi aman.
@@ -444,16 +458,9 @@ final class ImporQna
     }
 
     /**
-     * Pemeriksaan ZIP sebelum reader vendor menyentuh berkas (R1-1, R3-1): jumlah ukuran sesudah dekompresi semua entri
-     * menurut direktori ZIP (`statIndex`, tanpa dekompresi), ukuran entri terbesar, dan jumlah elemen `<sheet>`.
-     *
-     * `listWorksheetInfo` vendor (PhpSpreadsheet 5.10 `Reader\Xlsx::listWorksheetInfo`) mengurai part sheet untuk SETIAP
-     * `<sheet>` di workbook, termasuk rujukan berulang ke part yang sama, dan part bisa berada di path mana pun (Target
-     * relasi, `../`, `//`, entri ber-backslash, akar ZIP). Karena itu biaya dibatasi kasar TANPA meniru resolusi path:
-     * jumlah `<sheet>` × entri terbesar ≤ batas isi, dan jumlah `<sheet>` ≤ {@see self::MAKS_SHEET}. `<sheet>` dihitung
-     * dari SEMUA entri (aliran 64 KB, isi sudah dibatasi 32 MB), bukan hanya `xl/workbook.xml`; hitungan berlebih hanya
-     * membuat pemeriksaan lebih ketat. Contoh yang ditutup: 500 `<sheet>` → satu part 28 MB spasi (unggahan 35 KB) fatal
-     * 60 detik di main.
+     * Pemeriksaan ZIP sebelum reader vendor menyentuh berkas (R1-1): jumlah ukuran sesudah dekompresi semua entri menurut
+     * direktori ZIP (`statIndex`, tanpa dekompresi) dan ukuran entri terbesar (batas atas part sheet di path mana pun:
+     * Target relasi, `../`, `//`, entri ber-backslash, akar ZIP).
      *
      * Bukan ZIP: pesan format hanya bila `canRead` juga menolak (perilaku lama). `canRead` untuk berkas bukan ZIP hanya
      * membaca header, jadi aman; xlsx bersandi (paket OLE terenkripsi) lolos `canRead` → "rusak" seperti main (R2-3).
@@ -461,7 +468,7 @@ final class ImporQna
      * berdeklarasi encoding selain UTF-8, atau entri terenkripsi AES kini mendapat "rusak", padahal main memberi pesan
      * format.
      *
-     * @return array{isi: int, terbesar: int, sheet: int}
+     * @return array{isi: int, terbesar: int}
      */
     private function periksaUkuranZip(string $path, Xlsx $reader): array
     {
@@ -490,58 +497,44 @@ final class ImporQna
                 }
             }
 
-            $sheet = 0;
-
-            for ($i = 0; $i < $zip->numFiles; $i++) {
-                $sheet += self::hitungSheet($zip, $i);
-            }
-
-            $sheet = max(1, $sheet);
-
-            if ($sheet > self::MAKS_SHEET || $sheet * $terbesar > self::MAKS_BYTE_ISI) {
-                throw ValidationException::forField('berkas', 'Berkas Excel rusak atau tidak dapat dibaca.');
-            }
-
-            return ['isi' => $byte, 'terbesar' => $terbesar, 'sheet' => $sheet];
+            return ['isi' => $byte, 'terbesar' => $terbesar];
         } finally {
             $zip->close();
         }
     }
 
     /**
-     * Jumlah elemen `<sheet>` (dengan atau tanpa prefiks namespace) di satu entri, dibaca sebagai aliran.
+     * Workbook dan rumus shared (R3-1, R4 B1-B3) lewat {@see StrukturXlsx}, yang meniru langkah awal listWorksheetInfo
+     * vendor dengan parser XML (bukan regex): relasi `_rels/.rels` yang diproses (semua selain thumbnail), elemen `sheet`
+     * workbook-nya, dan nama sheet. Ditolak "rusak" bila:
+     *
+     * - relasi yang diproses > {@see self::MAKS_RELASI} atau dokumen meta (`_rels/.rels` + workbook per relasi) > 1 MB:
+     *   vendor mengurai workbook untuk SETIAP relasi itu (50-200 relasi ke workbook yang sama: 7-40 s);
+     * - `<sheet>` > {@see self::MAKS_SHEET}, atau `<sheet>` × entri terbesar > 32 MB: vendor mengurai satu part untuk setiap
+     *   `<sheet>`, termasuk rujukan berulang (500 `<sheet>` → satu part 28 MB spasi: fatal 60 s di main);
+     * - ada nama sheet ganda (dibandingkan tanpa peka huruf, sesudah entitas didekode SimpleXML): hanya lewat nama ganda
+     *   pemuat memuat ulang part yang sama (setLoadSheetsOnly). Excel/LibreOffice/Google tidak menulis nama ganda;
+     * - biaya penerjemahan rumus shared (Σ per sel anak: 100 + panjang induk) > {@see self::MAKS_BIAYA_RUMUS_SHARED}.
+     *
+     * @return int jumlah `<sheet>` (dipakai jalur padat)
      */
-    private static function hitungSheet(ZipArchive $zip, int $indeks): int
+    private function periksaWorkbook(string $path, int $terbesar): int
     {
-        $aliran = $zip->getStreamIndex($indeks);
-
-        if ($aliran === false) {
+        try {
+            $wb    = (new StrukturXlsx())->workbook($path, self::MAKS_BYTE_META);
+            $rumus = StrukturXlsx::biayaRumusShared($path);
+        } catch (Throwable) {
             throw ValidationException::forField('berkas', 'Berkas Excel rusak atau tidak dapat dibaca.');
         }
 
-        $jumlah = 0;
-        $ekor   = '';
+        $nama = array_map(static fn (string $n): string => mb_strtolower($n), $wb['nama']);
 
-        try {
-            while (! feof($aliran)) {
-                $potong = fread($aliran, 65536);
-
-                if ($potong === false || $potong === '') {
-                    break;
-                }
-
-                // Pola yang terpotong di batas potongan ketemu lewat ekor; pola utuh di ekor tidak dihitung dua kali
-                // karena ekor dipotong sesudah kemunculan terakhir.
-                $teks = $ekor . $potong;
-                $jumlah += (int) preg_match_all('/<(?:[\w.-]+:)?sheet[\s\/>]/', $teks, $m, PREG_OFFSET_CAPTURE);
-                $akhir = $m[0] === [] ? 0 : (int) end($m[0])[1] + 1;
-                $ekor  = substr($teks, max($akhir, strlen($teks) - 64));
-            }
-        } finally {
-            fclose($aliran);
+        if ($wb['relasi'] > self::MAKS_RELASI || $wb['sheet'] > self::MAKS_SHEET || $wb['sheet'] * $terbesar > self::MAKS_BYTE_ISI
+            || count(array_unique($nama)) !== count($nama) || $rumus > self::MAKS_BIAYA_RUMUS_SHARED) {
+            throw ValidationException::forField('berkas', 'Berkas Excel rusak atau tidak dapat dibaca.');
         }
 
-        return $jumlah;
+        return max(1, $wb['sheet']);
     }
 
     private static function teks(mixed $v): string
