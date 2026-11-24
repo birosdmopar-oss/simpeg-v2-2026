@@ -7,7 +7,6 @@ namespace App\Libraries\HaloSimpeg\Chatbot;
 use App\Exceptions\ValidationException;
 use App\Libraries\Html\HtmlSanitizer;
 use App\Libraries\Kepegawaian\Pegawai\EksporTabel;
-use App\Libraries\Presensi\Slip\PemindaiXlsx;
 use App\Models\AuditLogModel;
 use App\Models\HaloSimpeg\Chatbot\QnaKategoriModel;
 use App\Models\HaloSimpeg\Chatbot\QnaModel;
@@ -16,9 +15,7 @@ use CodeIgniter\Database\BaseConnection;
 use CodeIgniter\Database\Exceptions\DatabaseException;
 use CodeIgniter\HTTP\Files\UploadedFile;
 use Config\Chatbot;
-use Config\Presensi;
 use PhpOffice\PhpSpreadsheet\Reader\Xlsx;
-use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use Throwable;
 use ZipArchive;
 
@@ -26,8 +23,9 @@ use ZipArchive;
  * Impor QnA dari Excel template (PRD Fase 8 F8-37, AC-E10.15; `dev:libraries/hr/L_chatbot.php:405-468`).
  *
  * - Hanya `.xlsx` (diperiksa PhpSpreadsheet, bukan MIME browser), maks 2 MB dan 1.000 baris data; judul kolom harus sama
- *   dengan template (4 kolom, urutan sama) → selain itu 422 `errors.berkas` tanpa memproses baris. Struktur XML dipindai
- *   dulu dengan `Presensi\Slip\PemindaiXlsx` (ketergantungan lintas modul, CR-182) sebelum PhpSpreadsheet memuat berkas.
+ *   dengan template (4 kolom, urutan sama) → selain itu 422 `errors.berkas` tanpa memproses baris. Berkas dibaca dengan
+ *   {@see PembacaQnaXlsx} (hanya sheet pertama, A1:D1001 + E1, aliran XMLReader; CR-182 R5), bukan `Reader\Xlsx::load()`,
+ *   sesudah pagar ukuran direktori ZIP.
  * - Satu transaksi semua-atau-tidak: ada galat baris → tidak ada yang tersimpan, laporan per baris (nomor baris Excel).
  * - Baris tanpa pertanyaan atau jawaban dilewati dan dilaporkan; baris tanpa kategori → galat; kategori/tag dicocokkan menurut
  *   judul (trim, perbandingan kolom `_ci`) di antara status 1/2, termasuk yang baru dibuat baris sebelumnya; cocok dengan
@@ -40,72 +38,8 @@ final class ImporQna
 
     public const CONTOH = ['Bagaimana cara mengajukan cuti?', '<p>Ajukan lewat menu Layanan lalu pilih Cuti.</p>', 'Cuti', 'cuti, layanan'];
 
-    /** Kolom yang dipakai: A-D semua baris + E1 (review CR V-2). */
-    private const KOLOM_DIBACA = 5;
-
-    /**
-     * Pengali ruang sel untuk pemindaian struktur: sel kosong bergaya, kolom di luar A-E, dan sheet lain tetap ada di XML.
-     * Karena muat tanpa read filter, SEMUA sel berisi sheet 1 dibangun, jadi nilai ini ditetapkan dari kasus terburuk yang
-     * lolos (review CR-182 R1-5/R2-4). Diukur 23-11 di mesin pengembang (Windows, PHP 8.4.27 NTS, satu proses CLI,
-     * listWorksheetInfo + load + rangeToArray; beberapa kali, rentang = variasi antarjalan; angka bisa lebih lambat saat
-     * proses lain berjalan):
-     *
-     * | sheet 1 (semua lolos `totalRows` ≤ 1.001)                    | muat        | puncak PHP | puncak RSS |
-     * |--------------------------------------------------------------|-------------|------------|------------|
-     * | ±50 ribu sel teks inline ±620 byte (isi ±32 MB) ← terburuk    | 2,8-3,3 s   | 76 MB      | 259 MB     |
-     * | ±50 ribu sel rumus panjang (isi ±32 MB)                      | 1,9-2,6 s   | 70-74 MB   | 266 MB     |
-     * | 1.000 baris × 50 kolom teks pendek = 50.050 sel              | 1,3-1,8 s   | 41 MB      | 164 MB     |
-     * | 50.050 sel bergaya kosong                                    | ±1,1 s      | 8 MB       | 103 MB     |
-     * | (nilai 40) 200.200 sel teks pendek                           | ±8 s        | 136 MB     | 599 MB     |
-     *
-     * Pembanding main (read filter A-D/E1) untuk teks panjang: ±1,3 s / 40 MB (verifikator review).
-     *
-     * 10 → bawaan 50.050 sel, bobot 400.400. Trade-off: sel dihitung di SEMUA sheet, jadi border/format sampai lebih dari
-     * ±12.500 baris, sheet referensi besar, atau rich text ber-run banyak ditolak "rusak" walau di bawah 2 MB; berkas yang
-     * baris datanya > batas tetap mendapat pesan jumlah baris (R1-4).
-     */
-    private const RUANG_SEL = 10;
-
-    /**
-     * Batas langkah perulangan `<col min max>` (dijumlah di SEMUA sheet). Tanpa read filter biayanya linear (tidak dikali
-     * jumlah baris), jadi batas ini hanya menjaga perulangan itu sendiri. Excel menulis sisa lembar sebagai `max="16384"`
-     * (1 langkah); LibreOffice ≤ 7.3 sampai `max="1025"` (±1.021 langkah per sheet) → ±19 sheet bergaya LO masih lolos.
-     */
-    private const MAKS_ITERASI_KOLOM = 20_000;
-
-    /**
-     * Batas JUMLAH isi semua entri ZIP (sesudah dekompresi) agar berkas padat masih dibuka listWorksheetInfo untuk pesan
-     * baris (R2-1). Jumlah, bukan entri terbesar: part sheet bisa di path mana pun dan listWorksheetInfo membaca semua
-     * sheet. Trade-off: entri sah lain yang besar (sharedStrings, gambar) ikut dihitung, jadi berkas padat seperti itu
-     * mendapat "rusak", bukan pesan baris; penerimaan berkas yang tidak padat tidak terpengaruh. Terukur: berkas sah
-     * 13.000 baris → isi 3,8 MB (pesan baris); 55.000 baris → 16,2 MB ("rusak"); 4 sheet × 7,8 MB `<row/>` (31 MB) →
-     * listWorksheetInfo 6,3 s, jadi pada batas 8 MB ±1,6 s. Berkas sah sampai sekitar 25-37 ribu baris masih mendapat
-     * pesan baris, bergantung aplikasi penulis (isi per baris terukur: Excel 337 byte, PhpSpreadsheet 289, lainnya 229).
-     * Juga dibatasi jumlah `<sheet>` × entri terbesar ≤ 8 MB (rujukan sheet berulang, R3-1).
-     */
-    private const MAKS_BYTE_ISI_PADAT = 8 * 1024 * 1024;
-
-    /** Batas jumlah elemen `<sheet>` yang diproses vendor (R3-1). Template = 1; berkas sah dengan sheet petunjuk beberapa. */
-    private const MAKS_SHEET = 50;
-
-    /** Batas relasi `_rels/.rels` yang diproses vendor sebagai workbook (selain thumbnail). Excel/LO menulis 3-4. */
-    private const MAKS_RELASI = 10;
-
-    /** Batas jumlah byte dokumen meta (`_rels/.rels` + workbook per relasi) yang dibaca pra-pemeriksaan (R4 B2). */
-    private const MAKS_BYTE_META = 1024 * 1024;
-
-    /**
-     * Batas biaya rumus shared: Σ per sel anak (100 + panjang teks induk) (R4 B3). Terukur tanpa read filter: 44 ribu
-     * anak rumus pendek (biaya ±4,6 MB) 5,3 s; 10 ribu anak × 450 byte (±5,5 MB) 6,3 s; sharedf3 (700 byte × ±44 ribu)
-     * 33-60 s. 1 MB ≈ 10 ribu anak rumus pendek ≈ ±1,2 s. Berkas QnA sah praktis tanpa rumus shared.
-     */
-    private const MAKS_BIAYA_RUMUS_SHARED = 1024 * 1024;
-
-    /** Batas isi terdekompresi dan byte teks yang disalin pemuat; berkas unggahan sendiri maks 2 MB. */
+    /** Batas isi terdekompresi semua entri (sebenarnya terbaca); berkas unggahan sendiri maks 2 MB. */
     private const MAKS_BYTE_ISI = 32 * 1024 * 1024;
-
-    /** Batas `<tablePart>`: pemuat mengurai ulang relasi sheet untuk setiap tabel. Template tanpa tabel. */
-    private const MAKS_TABEL = 10;
 
     private readonly BaseConnection $db;
 
@@ -263,77 +197,43 @@ final class ImporQna
         $path   = $berkas->getTempName();
         $maks   = $this->config->imporMaksBaris;
         $reader = new Xlsx();
-        $buku   = null;
-        $ekstra = '';
 
-        // Ukuran sheet diperiksa SEBELUM memuat: xlsx kecil dengan satu sel di baris 1.048.576 tidak boleh dimuat penuh ke
-        // memori. listWorksheetInfo memindai XML sheet tanpa membangun sel, tetapi isi part tetap ditampung utuh sebagai
-        // string dan `totalRows` = atribut `r` baris TERAKHIR (bukan maksimum). Karena itu struktur berkas dipindai dulu
-        // dengan pemindai impor slip (periksaStruktur, CR-182), yang juga membatasi muatan sel.
+        // Desain CR-182 R5: berkas TIDAK dimuat dengan `Reader\Xlsx::load()`/`listWorksheetInfo()`. Yang dibaca hanya sheet
+        // pertama, sel A1:D(maks+1) dan E1, lewat {@see PembacaQnaXlsx} (aliran SAX berbatas byte dan elemen, henti dini;
+        // nilai identik dengan main). Urutan pagar (R1-1): ukuran isi dari direktori ZIP (tanpa dekompresi) ≤ 32 MB, BARU
+        // `canRead` vendor. `getFromName` vendor mengalokasikan sebesar ukuran di direktori ZIP (sudah dibatasi), dan aliran
+        // pembaca menghitung sendiri byte yang benar-benar terbaca, jadi PemindaiXlsx tidak diperlukan lagi.
         try {
-            // Urutan penting (review CR-182 R1-1): ukuran isi dari direktori ZIP dulu (tanpa dekompresi), lalu pemindai,
-            // BARU reader vendor. `canRead` sudah mendekompresi utuh `_rels/.rels`, jadi bom dekompresi di part itu harus
-            // ditolak sebelumnya; fatal memori tidak bisa ditangkap try/catch.
-            $zipInfo = $this->periksaUkuranZip($path, $reader);
-            $padat   = $this->periksaStruktur($path);
-            $jSheet  = $this->periksaWorkbook($path, $zipInfo['terbesar']);
-
-            // Berkas padat (sel/bobot terlampaui) hanya dibuka listWorksheetInfo untuk memilih pesan (R1-4) bila JUMLAH isi
-            // semua entrinya wajar untuk berkas sah. listWorksheetInfo menampung setiap part sheet utuh dan membaca semua node
-            // di SEMUA sheet, dan part sheet bisa di path mana pun (Target relasi): satu sheet 32 MB `<c/>` 7-12 detik, sheet
-            // di `xl/lain/` 6,8 detik, 4 sheet × 7,8 MB `<row/>` 6,3 detik (review CR-182 R2-1). Selain itu langsung "rusak".
-            if ($padat && ($zipInfo['isi'] > self::MAKS_BYTE_ISI_PADAT || $jSheet * $zipInfo['terbesar'] > self::MAKS_BYTE_ISI_PADAT)) {
-                throw ValidationException::forField('berkas', 'Berkas Excel rusak atau tidak dapat dibaca.');
-            }
+            $this->periksaUkuranZip($path, $reader);
 
             if (! $reader->canRead($path)) {
                 throw ValidationException::forField('berkas', 'Berkas harus berformat .xlsx.');
             }
 
             // Sel kosong yang hanya bergaya (mis. border template sampai baris 1.500) tidak dihitung (review CR V-1).
-            $reader->setReadEmptyCells(false);
-            $info = $reader->listWorksheetInfo($path)[0] ?? null;
-
-            if ($info === null) {
-                throw ValidationException::forField('berkas', 'Berkas Excel rusak atau tidak dapat dibaca.');
-            }
-
-            if ((int) $info['totalRows'] - 1 > $maks) {
-                throw ValidationException::forField('berkas', "Jumlah baris data maksimal {$maks}.");
-            }
-
-            // Hanya sel/bobot yang terlampaui (byte, `<col>`, tabel aman): pesan baris di atas untuk berkas sah yang barisnya
-            // terlalu banyak (R1-4), selain itu tetap "rusak". Berkas seperti ini tidak pernah dimuat.
-            if ($padat) {
-                throw ValidationException::forField('berkas', 'Berkas Excel rusak atau tidak dapat dibaca.');
-            }
-
-            $reader->setReadDataOnly(true);
-            $reader->setLoadSheetsOnly([(string) $info['worksheetName']]);
-            // TANPA read filter (review CR-182 R1-3): dengan filter, `ColumnAndRowAttributes` PhpSpreadsheet 5.10 memanggil
-            // readCell untuk setiap kolom `<col>` × setiap baris (`<col 1..2048>` + 20 ribu baris kosong: 7,5-8,6 detik terukur;
-            // 130 ribu baris: fatal max_execution_time). Biaya linear berasal dari TIDAK adanya filter: tanpa filter
-            // rowsAttributes tidak dibangun di readDataOnly. `setIgnoreRowsWithNoCells(true)` dalam kondisi ini no-op, dipasang
-            // hanya sebagai pertahanan berlapis bila filter kelak dipasang lagi. Sel yang dimuat = sel sheet 1, dibatasi
-            // `sel`/`bobot` pemindai. Isi tetap hanya A1:D(maks+1) + E1 (review CR V-2); rumus tidak dihitung
-            // (`calculateFormulas` false) sehingga teks sel sama dengan saat masih memakai filter. Baris di atas maks+1
-            // (mis. urutan `r` acak yang menipu totalRows) tetap tidak ikut, seperti sebelumnya.
-            $reader->setIgnoreRowsWithNoCells(true);
-
-            $buku   = $reader->load($path);
-            $sheet  = $buku->getSheet(0);
-            $akhir  = max(1, min($sheet->getHighestDataRow(), $maks + 1));
-            $sel    = $sheet->rangeToArray('A1:D' . $akhir, null, false, false, false);
-            $ekstra = trim(self::teks($sheet->getCell('E1')->getValue()));
+            $hasil = (new PembacaQnaXlsx())->bacaQna($path, $maks);
         } catch (ValidationException $e) {
             throw $e;
         } catch (Throwable) {
             throw ValidationException::forField('berkas', 'Berkas Excel rusak atau tidak dapat dibaca.');
-        } finally {
-            if ($buku instanceof Spreadsheet) {
-                $buku->disconnectWorksheets();
-            }
         }
+
+        if ($hasil === null) {
+            throw ValidationException::forField('berkas', 'Berkas harus berformat .xlsx.');
+        }
+
+        // `totalRows` dengan aturan listWorksheetInfo: `r` baris terakhir (urutan berkas) yang memuat sel tidak kosong.
+        if ($hasil['total_baris'] - 1 > $maks) {
+            throw ValidationException::forField('berkas', "Jumlah baris data maksimal {$maks}.");
+        }
+
+        if ($hasil['gagal']) {
+            throw ValidationException::forField('berkas', 'Berkas Excel rusak atau tidak dapat dibaca.');
+        }
+
+        // Baris di atas maks+1 (mis. urutan `r` acak yang menipu totalRows) tidak ikut, sama seperti main.
+        $sel    = $hasil['sel'];
+        $ekstra = trim(self::teks($hasil['ekstra']));
 
         $judul = array_map(static fn (mixed $v): string => trim(self::teks($v)), $sel[0] ?? []);
 
@@ -415,49 +315,6 @@ final class ImporQna
     }
 
     /**
-     * Pindai struktur `.xlsx` SEBELUM `listWorksheetInfo`/`load()` (CR-182) dengan {@see PemindaiXlsx} milik impor slip
-     * (CR-177), dipanggil apa adanya. Ketergantungan lintas modul: perubahan anggaran atau hitungan di pemindai itu ikut
-     * memengaruhi impor QnA (test `ImporQnaPemindaiTest`).
-     *
-     * Batas diturunkan dari `imporMaksBaris` dan 5 kolom yang dibaca (A-D + E1), dengan ruang untuk sel kosong bergaya
-     * (border template, review CR V-1) dan kolom lain di luar A-E; anggaran bobot per sel sama dengan impor slip
-     * (`Presensi::BOBOT_PER_SEL_IMPOR`). Yang ditolak: `<col>` tidak sah (`max` < `min` membuat
-     * `Reader\Xlsx\ColumnAndRowAttributes::readColumnAttributes` PhpSpreadsheet 5.10 berputar tanpa akhir walau
-     * readDataOnly), langkah `<col>` di atas batas (tanpa read filter biayanya linear, tidak dikali jumlah baris), isi
-     * terdekompresi atau salinan teks terlalu besar, terlalu banyak tabel, dan berkas yang tidak bisa dipindai. Semuanya
-     * → 422 dengan pesan "rusak" yang sudah ada; tidak ada pesan baru. Sel/bobot terlampaui → `true` (padat), pemanggil
-     * memilih pesan baris atau "rusak".
-     *
-     * Trade-off yang diterima reviewer (R2-6): entri ZIP yang deklarasi encoding-nya bukan UTF-8 ditolak pemindai walau
-     * entri itu tidak pernah dimuat (SVG di `xl/media`, `docProps`, `customXml`); di main berkas seperti ini diterima.
-     * PemindaiXlsx tidak boleh diubah di CR ini.
-     */
-    private function periksaStruktur(string $path): bool
-    {
-        $maksSel = ($this->config->imporMaksBaris + 1) * self::KOLOM_DIBACA * self::RUANG_SEL;
-        $bobot   = $maksSel * Presensi::BOBOT_PER_SEL_IMPOR;
-
-        try {
-            $ukuran = PemindaiXlsx::pindai($path, self::MAKS_BYTE_ISI, $bobot);
-        } catch (Throwable) {
-            throw ValidationException::forField('berkas', 'Berkas Excel rusak atau tidak dapat dibaca.');
-        }
-
-        // Hitungan pemindai sudah total semua entri. Pemuat hanya memuat ulang part yang sama lewat NAMA sheet ganda
-        // (setLoadSheetsOnly), dan nama ganda ditolak di periksaWorkbook (R4 B1), jadi tidak dikalikan jumlah `<sheet>`.
-        $padat = $ukuran['sel'] > $maksSel || $ukuran['bobot'] > $bobot;
-
-        // Bila bobot terlampaui, pemindai berhenti lebih awal sehingga `iterasi_kolom` bisa belum lengkap; berkas itu tetap
-        // tidak pernah dimuat (lihat pemanggil), jadi aman.
-        if ($ukuran['byte'] > self::MAKS_BYTE_ISI || $ukuran['iterasi_kolom'] > self::MAKS_ITERASI_KOLOM
-            || $ukuran['tabel'] > self::MAKS_TABEL || $ukuran['salinan'] > self::MAKS_BYTE_ISI) {
-            throw ValidationException::forField('berkas', 'Berkas Excel rusak atau tidak dapat dibaca.');
-        }
-
-        return $padat;
-    }
-
-    /**
      * Pemeriksaan ZIP sebelum reader vendor menyentuh berkas (R1-1): jumlah ukuran sesudah dekompresi semua entri menurut
      * direktori ZIP (`statIndex`, tanpa dekompresi) dan ukuran entri terbesar (batas atas part sheet di path mana pun:
      * Target relasi, `../`, `//`, entri ber-backslash, akar ZIP).
@@ -501,40 +358,6 @@ final class ImporQna
         } finally {
             $zip->close();
         }
-    }
-
-    /**
-     * Workbook dan rumus shared (R3-1, R4 B1-B3) lewat {@see StrukturXlsx}, yang meniru langkah awal listWorksheetInfo
-     * vendor dengan parser XML (bukan regex): relasi `_rels/.rels` yang diproses (semua selain thumbnail), elemen `sheet`
-     * workbook-nya, dan nama sheet. Ditolak "rusak" bila:
-     *
-     * - relasi yang diproses > {@see self::MAKS_RELASI} atau dokumen meta (`_rels/.rels` + workbook per relasi) > 1 MB:
-     *   vendor mengurai workbook untuk SETIAP relasi itu (50-200 relasi ke workbook yang sama: 7-40 s);
-     * - `<sheet>` > {@see self::MAKS_SHEET}, atau `<sheet>` × entri terbesar > 32 MB: vendor mengurai satu part untuk setiap
-     *   `<sheet>`, termasuk rujukan berulang (500 `<sheet>` → satu part 28 MB spasi: fatal 60 s di main);
-     * - ada nama sheet ganda (dibandingkan tanpa peka huruf, sesudah entitas didekode SimpleXML): hanya lewat nama ganda
-     *   pemuat memuat ulang part yang sama (setLoadSheetsOnly). Excel/LibreOffice/Google tidak menulis nama ganda;
-     * - biaya penerjemahan rumus shared (Σ per sel anak: 100 + panjang induk) > {@see self::MAKS_BIAYA_RUMUS_SHARED}.
-     *
-     * @return int jumlah `<sheet>` (dipakai jalur padat)
-     */
-    private function periksaWorkbook(string $path, int $terbesar): int
-    {
-        try {
-            $wb    = (new StrukturXlsx())->workbook($path, self::MAKS_BYTE_META);
-            $rumus = StrukturXlsx::biayaRumusShared($path);
-        } catch (Throwable) {
-            throw ValidationException::forField('berkas', 'Berkas Excel rusak atau tidak dapat dibaca.');
-        }
-
-        $nama = array_map(static fn (string $n): string => mb_strtolower($n), $wb['nama']);
-
-        if ($wb['relasi'] > self::MAKS_RELASI || $wb['sheet'] > self::MAKS_SHEET || $wb['sheet'] * $terbesar > self::MAKS_BYTE_ISI
-            || count(array_unique($nama)) !== count($nama) || $rumus > self::MAKS_BIAYA_RUMUS_SHARED) {
-            throw ValidationException::forField('berkas', 'Berkas Excel rusak atau tidak dapat dibaca.');
-        }
-
-        return max(1, $wb['sheet']);
     }
 
     private static function teks(mixed $v): string

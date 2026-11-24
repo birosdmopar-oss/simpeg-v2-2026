@@ -6,8 +6,13 @@ namespace Tests\Database\HaloSimpeg\Chatbot;
 
 use App\Exceptions\ValidationException;
 use App\Libraries\HaloSimpeg\Chatbot\ImporQna;
+use App\Libraries\HaloSimpeg\Chatbot\PembacaQnaXlsx;
 use CodeIgniter\HTTP\Files\UploadedFile;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
+use PhpOffice\PhpSpreadsheet\Reader\IReadFilter;
+use PhpOffice\PhpSpreadsheet\Reader\Xlsx as XlsxReader;
+use PhpOffice\PhpSpreadsheet\RichText\RichText;
 use PhpOffice\PhpSpreadsheet\Shared\OLE;
 use PhpOffice\PhpSpreadsheet\Shared\OLE\PPS\File;
 use PhpOffice\PhpSpreadsheet\Shared\OLE\PPS\Root;
@@ -53,15 +58,18 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
         parent::tearDown();
     }
 
-    public function testColMaxKurangDariMinDitolak422TanpaFatal(): void
+    /**
+     * `<col min="5" max="1">`: di main fatal memori (perulangan `ColumnAndRowAttributes` vendor tanpa akhir). Desain R5 tidak
+     * memakai `load()`, jadi definisi kolom tidak dibaca sama sekali: berkas diproses biasa (proses anak berbatas memori
+     * tetap dipakai supaya kegagalan fatal tidak memutus PHPUnit).
+     */
+    public function testColMaxKurangDariMinTidakFatal(): void
     {
-        $berkas = $this->rakit('<cols><col min="5" max="1" width="10" customWidth="1"/></cols>');
+        $berkas = $this->rakit('<cols><col min="5" max="1" width="10" customWidth="1"/></cols>', '', [], '', true);
         $this->assertLessThan(10_000, (int) filesize($berkas), 'berkas kecil');
 
-        // Di proses anak berbatas memori: sebelum CR-182 proses ini fatal (bukan 422), jadi PHPUnit sendiri tidak ikut mati.
         $hasil = $this->jalankanWorker($berkas, '128M');
-        $this->assertSame(422, $hasil['status'] ?? null, 'harus 422, bukan fatal: ' . json_encode($hasil));
-        $this->assertSame(['berkas' => [self::RUSAK]], $hasil['errors']);
+        $this->assertSame(200, $hasil['status'] ?? null, 'tanpa fatal: ' . json_encode($hasil));
         $this->assertLessThan(64 * 1024 * 1024, $hasil['puncak'], 'puncak memori PHP proses anak');
 
         if ($hasil['rss'] !== null) {
@@ -69,11 +77,10 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
         }
     }
 
-    public function testColSelebarLembarDenganBarisAcakCepatDanBarisLebihTetapTidakIkut(): void
+    public function testColSelebarLembarDenganBarisAcakCepatDanPesanBaris(): void
     {
         // Baris 3..1.502 diacak lalu baris 3 terakhir: listWorksheetInfo melihat totalRows 3, padahal ada 1.500 baris.
-        // Sebelum CR-182 dimuat lambat (readCell per kolom × baris karena read filter). Sekarang muat tanpa filter
-        // (R1-3) sehingga cepat. Baris di atas 1.001 tetap tidak ikut diimpor, sama seperti sebelumnya (catatan review b).
+        // Sebelum CR-182 dimuat lambat (readCell per kolom × baris karena read filter).
         $nomor = range(4, 1502);
         mt_srand(182);
         shuffle($nomor);
@@ -87,10 +94,12 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
 
         $berkas = $this->rakit('<cols><col min="1" max="16383" width="10" customWidth="1"/></cols>', $baris);
 
+        // Desain R5: pembacaan berhenti begitu ada sel berisi di baris > 1.001 → pesan jumlah baris (main: baris lebih
+        // dibuang diam-diam karena totalRows listWorksheetInfo tertipu urutan `r`).
         $mulai = hrtime(true);
-        $hasil = (new ImporQna($this->db))->impor($this->unggah($berkas));
+        $this->assertGalatBerkas('Jumlah baris data maksimal 1000.', $berkas);
         $this->assertLessThan(self::DETIK_CI, (hrtime(true) - $mulai) / 1e9);
-        $this->assertSame([1000, []], [$hasil['ditambah'], $hasil['galat']], 'baris 2..1.001 saja');
+        $this->assertSame(0, $this->db->table('qna')->countAllResults());
     }
 
     /**
@@ -278,12 +287,13 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
      * unggahan ±35 KB). Di 19ffcb0d dan main: 10-13 s / fatal 60 s.
      */
     #[DataProvider('rujukanBerulangTidakPadat')]
-    public function testRujukanSheetBerulangTidakPadatDitolakCepat(int $jumlah): void
+    public function testRujukanSheetBerulangTidakPadatSelesaiCepat(int $jumlah): void
     {
         $berkas = $this->rakit('', str_repeat(' ', 28 * 1024 * 1024), [], '', true);
         $this->rujukSheetBerulang($berkas, $jumlah);
 
-        $this->assertDitolakTanpaMembukaSheet($berkas);
+        // Desain R5: hanya satu part (sheet pertama) yang dialirkan, satu kali.
+        $this->assertSelesaiRingan($berkas);
     }
 
     /**
@@ -335,7 +345,7 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
      * Penjaga memori opsi A (R2-2): baris ≤ batas, tetapi sel sheet 1 melewati batas (999 baris × 62 kolom ±61 ribu sel)
      * → "rusak" tanpa memuat. Tanpa penjaga ini seluruh sel dimuat karena tidak ada read filter.
      */
-    public function testPadatBarisDalamBatasDitolakTanpaMemuat(): void
+    public function testBanyakSelDiLuarAdDiterimaDenganMemoriKecil(): void
     {
         $baris = '';
 
@@ -351,10 +361,12 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
 
         $berkas = $this->rakit('', $baris, [], '', true);
 
+        // Desain R5: hanya A-E yang dibangun, jadi berkas ini (diterima di main) diterima lagi dengan memori kecil.
         memory_reset_peak_usage();
-        $awal = memory_get_peak_usage();
-        $this->assertGalatBerkas(self::RUSAK, $berkas);
-        $this->assertLessThan(16 * 1024 * 1024, memory_get_peak_usage() - $awal, 'tidak dimuat');
+        $awal  = memory_get_peak_usage();
+        $hasil = (new ImporQna($this->db))->impor($this->unggah($berkas));
+        $this->assertLessThan(16 * 1024 * 1024, memory_get_peak_usage() - $awal);
+        $this->assertCount(999, $hasil['dilewati'], 'baris 3..1.001 tanpa jawaban');
     }
 
     /**
@@ -382,11 +394,12 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
      * Trade-off yang diterima reviewer (R2-6): entri yang tidak pernah dimuat tetapi berdeklarasi encoding selain UTF-8
      * (mis. SVG di `xl/media`) membuat PemindaiXlsx menolak berkas → "rusak". Di main berkas ini diterima.
      */
-    public function testEntriBukanUtf8DitolakTradeOff(): void
+    public function testEntriBukanUtf8YangTidakDibacaDiterimaSepertiMain(): void
     {
         $svg = '<?xml version="1.0" encoding="ISO-8859-1"?><svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>';
 
-        $this->assertGalatBerkas(self::RUSAK, $this->rakit('', '', ['xl/media/image1.svg' => $svg]));
+        $hasil = (new ImporQna($this->db))->impor($this->unggah($this->rakit('', '', ['xl/media/image1.svg' => $svg])));
+        $this->assertSame([1, []], [$hasil['ditambah'], $hasil['galat']]);
     }
 
     /**
@@ -484,12 +497,14 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
      * R4 B1: nama sheet ganda (tanpa peka huruf) membuat pemuat memuat part yang sama lebih dari sekali lewat
      * setLoadSheetsOnly → "rusak". Excel/LibreOffice/Google tidak menulis nama ganda.
      */
-    public function testNamaSheetGandaDitolak(): void
+    public function testNamaSheetNumerikSetaraDibacaSekali(): void
     {
         $berkas = $this->rakit('');
-        $this->gantiWorkbook($berkas, '<sheet name="Template QnA" sheetId="1" r:id="rId1"/><sheet name="template qna" sheetId="2" r:id="rId1"/>');
+        $this->gantiWorkbook($berkas, '<sheet name="1" sheetId="1" r:id="rId1"/><sheet name="01" sheetId="2" r:id="rId1"/><sheet name="1.0" sheetId="3" r:id="rId1"/>');
 
-        $this->assertGalatBerkas(self::RUSAK, $berkas);
+        // Desain R5: hanya part pertama yang cocok yang dibaca, satu kali (main memuat semua yang cocok secara longgar).
+        $hasil = (new ImporQna($this->db))->impor($this->unggah($berkas));
+        $this->assertSame([1, []], [$hasil['ditambah'], $hasil['galat']]);
     }
 
     /**
@@ -498,7 +513,7 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
      * SETIAP relasi); (b) prefiks namespace non-ASCII; (c) workbook UTF-16 ber-BOM; (d) prefiks > 64 byte.
      */
     #[DataProvider('pengelabuHitunganSheet')]
-    public function testPengelabuHitunganSheetDitolakCepat(string $varian): void
+    public function testPengelabuHitunganSheetSelesaiCepat(string $varian): void
     {
         $berkas = $this->rakit('', str_repeat(' ', 28 * 1024 * 1024), [], '', true);
         $sheet  = '';
@@ -535,7 +550,9 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
         $zip->close();
         $this->assertLessThan(200 * 1024, (int) filesize($berkas));
 
-        $this->assertDitolakTanpaMembukaSheet($berkas);
+        // Desain R5: hanya relasi officeDocument pertama dan sheet pertama yang dibaca; bentuk prefiks/encoding ditangani
+        // parser XML, bukan hitungan teks.
+        $this->assertSelesaiRingan($berkas);
     }
 
     /**
@@ -556,7 +573,7 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
      * R4 B3: rumus shared panjang di luar A-D (induk 700 byte berisi 100-an acuan sel × ±40 ribu sel anak di kolom F-AS, mirip sharedf3, tidak padat). Vendor menerjemahkan
      * rumus induk per sel anak walau readDataOnly; dulu read filter melewati sel di luar A-D (main 0,6-1,4 s, R3 33-60 s).
      */
-    public function testRumusSharedPanjangDiLuarAdDitolakCepat(): void
+    public function testRumusSharedPanjangDiLuarAdSelesaiCepat(): void
     {
         $acuan = [];
 
@@ -583,9 +600,8 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
         $berkas = $this->rakit('', $baris, [], '', true);
         $this->assertLessThan(2 * 1024 * 1024, (int) filesize($berkas));
 
-        $mulai = hrtime(true);
-        $this->assertGalatBerkas(self::RUSAK, $berkas);
-        $this->assertLessThan(self::DETIK_CI, (hrtime(true) - $mulai) / 1e9);
+        // Desain R5: sel di luar A-D tidak diterjemahkan (hanya induknya didaftarkan), seperti main dengan read filter.
+        $this->assertSelesaiRingan($berkas);
     }
 
     /**
@@ -609,6 +625,94 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
 
         $hasil = (new ImporQna($this->db))->impor($this->unggah($path));
         $this->assertSame([1000, []], [$hasil['ditambah'], $hasil['galat']]);
+    }
+
+    /**
+     * Paritas nilai R5: PembacaQnaXlsx vs logika main (load() dengan read filter A-D/E1 + rangeToArray(A1:D, null, false,
+     * false, false)) untuk berkas tulisan PhpSpreadsheet: rich text (shared strings ber-run), angka bulat/pecahan/notasi E,
+     * boolean, galat, tanggal serial, rumus, teks biasa, sel kosong, dan judul ekstra di E1.
+     */
+    public function testParitasNilaiBerkasTulisanPhpSpreadsheet(): void
+    {
+        $buku  = new Spreadsheet();
+        $sheet = $buku->getActiveSheet();
+        $sheet->fromArray(ImporQna::JUDUL_KOLOM, null, 'A1');
+        $kaya = new RichText();
+        $kaya->createText('Biasa ');
+        $kaya->createTextRun('tebal')->getFont()?->setBold(true);
+        $sheet->setCellValue('A2', $kaya);
+        $sheet->setCellValue('B2', 42);
+        $sheet->setCellValue('C2', 3.25);
+        $sheet->setCellValueExplicit('D2', '1E3', DataType::TYPE_NUMERIC);
+        $sheet->setCellValue('A3', true);
+        $sheet->setCellValueExplicit('B3', '#N/A', DataType::TYPE_ERROR);
+        $sheet->setCellValue('C3', 45292.5);
+        $sheet->setCellValue('D3', '=A2&"!"');
+        $sheet->setCellValue('A5', '  spasi  ');
+        $sheet->setCellValue('E1', 'Ekstra');
+        $sheet->setCellValue('F2', 'di luar');
+        $path        = (string) tempnam(sys_get_temp_dir(), 'cbp');
+        $this->tmp[] = $path;
+        (new XlsxWriter($buku))->save($path);
+        $buku->disconnectWorksheets();
+
+        $this->assertSamaDenganMain($path);
+    }
+
+    /**
+     * Paritas nilai R5 untuk XML mentah: shared string dengan fonetik `<rPh>` dan `_xHHHH_`, inlineStr ber-run, `t="str"`,
+     * `t="d"`, `t="e"`, `t="b"`, angka berspasi, sel tanpa `r`, rumus shared yang induknya di luar A-D dan anaknya di A-D
+     * (diterjemahkan seperti vendor), dan sel kosong ber-gaya.
+     */
+    public function testParitasNilaiXmlMentah(): void
+    {
+        $sst = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+            . '<si><t>Pertanyaan</t></si><si><t>Jawaban</t></si><si><t>Kategori</t></si><si><t>Tag (Pisahkan dengan koma)</t></si>'
+            . '<si><r><t>Run </t></r><r><rPr><b/></rPr><t>dua</t></r><rPh sb="0" eb="1"><t>FONETIK</t></rPh></si>'
+            . '<si><t xml:space="preserve">baris_x000D_baru</t></si><si/></sst>';
+        $baris = '<row r="2"><c r="A2" t="s"><v>4</v></c><c r="B2" t="s"><v>5</v></c><c r="C2" t="s"><v>6</v></c>'
+            . '<c r="D2" t="inlineStr"><is><r><t>in</t></r><r><t>line</t></r></is></c><c r="F2"><f t="shared" ref="F2:F4" si="0">G2*2</f><v>0</v></c></row>'
+            . '<row r="3"><c r="A3" t="str"><f>"a"&amp;"b"</f><v>ab</v></c><c r="B3" t="d"><v>2024-01-02T00:00:00</v></c>'
+            . '<c r="C3" t="e"><v>#DIV/0!</v></c><c r="D3" t="b"><v>1</v></c></row>'
+            . '<row r="4"><c><v> 12 </v></c><c t="n"><v>1.5E2</v></c><c r="C4"><f t="shared" si="0"/><v>0</v></c><c r="D4" s="1"/></row>';
+        $berkas = $this->rakit('', $baris, ['xl/sharedStrings.xml' => $sst]);
+        $zip    = new ZipArchive();
+        $this->assertTrue($zip->open($berkas));
+        $sheet = (string) $zip->getFromName('xl/worksheets/sheet1.xml');
+        $zip->addFromString('xl/worksheets/sheet1.xml', (string) preg_replace('~<row r="1">.*?</row>~s', '<row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c><c r="C1" t="s"><v>2</v></c><c r="D1" t="s"><v>3</v></c></row>', (string) preg_replace('~<row r="2">.*?</row>~s', '', $sheet, 1)));
+        $rels = (string) $zip->getFromName('xl/_rels/workbook.xml.rels');
+        $zip->addFromString('xl/_rels/workbook.xml.rels', str_replace('</Relationships>', '<Relationship Id="rIdS" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/></Relationships>', $rels));
+        $zip->close();
+
+        $this->assertSamaDenganMain($berkas);
+    }
+
+    /**
+     * Nilai (sel A1:D, E1) dan total baris PembacaQnaXlsx sama dengan logika main yang dijalankan di sini dengan vendor.
+     */
+    private function assertSamaDenganMain(string $path): void
+    {
+        $reader = new XlsxReader();
+        $reader->setReadEmptyCells(false);
+        $info = $reader->listWorksheetInfo($path)[0];
+        $reader->setReadDataOnly(true);
+        $reader->setLoadSheetsOnly([(string) $info['worksheetName']]);
+        $reader->setReadFilter(new class () implements IReadFilter {
+            public function readCell(string $columnAddress, int $row, string $worksheetName = ''): bool
+            {
+                return ($row <= 1001 && in_array($columnAddress, ['A', 'B', 'C', 'D'], true)) || ($row === 1 && $columnAddress === 'E');
+            }
+        });
+        $buku  = $reader->load($path);
+        $sheet = $buku->getSheet(0);
+        $main  = [$sheet->rangeToArray('A1:D' . max(1, min($sheet->getHighestDataRow(), 1001)), null, false, false, false), $sheet->getCell('E1')->getValue()];
+        $buku->disconnectWorksheets();
+
+        $baru = (new PembacaQnaXlsx())->bacaQna($path, 1000);
+        $this->assertNotNull($baru);
+        $this->assertFalse($baru['gagal']);
+        $this->assertSame($main, [$baru['sel'], $baru['ekstra']]);
+        $this->assertSame((int) $info['totalRows'] - 1 > 1000, $baru['total_baris'] - 1 > 1000, 'pesan jumlah baris');
     }
 
     /**
@@ -794,6 +898,20 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
         $this->assertGalatBerkas(self::RUSAK, $path);
         $this->assertLessThan(6 * 1024 * 1024, memory_get_peak_usage() - $awal, 'part sheet tidak dibuka');
         $this->assertLessThan(self::DETIK_CI, (hrtime(true) - $mulai) / 1e9);
+    }
+
+    /**
+     * Selesai tanpa galat berkas, cepat, dan memori kecil (aliran, bukan pemuatan part utuh).
+     */
+    private function assertSelesaiRingan(string $path): void
+    {
+        memory_reset_peak_usage();
+        $awal  = memory_get_peak_usage();
+        $mulai = hrtime(true);
+        (new ImporQna($this->db))->impor($this->unggah($path));
+        $this->assertLessThan(6 * 1024 * 1024, memory_get_peak_usage() - $awal, 'part tidak ditampung utuh');
+        $this->assertLessThan(self::DETIK_CI, (hrtime(true) - $mulai) / 1e9);
+        $this->assertSame(0, $this->db->table('qna')->countAllResults());
     }
 
     private function simpan(string $isi): string
