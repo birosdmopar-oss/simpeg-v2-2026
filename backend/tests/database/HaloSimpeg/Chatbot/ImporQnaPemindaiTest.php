@@ -835,7 +835,7 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
         if ($ditolak) {
             $mulai = hrtime(true);
             $this->assertGalatBerkas(self::RUSAK, $berkas);
-            $this->assertLessThan(2.5, (hrtime(true) - $mulai) / 1e9);
+            $this->assertLessThan(self::DETIK_CI, (hrtime(true) - $mulai) / 1e9);
         } else {
             $this->assertSamaDenganMain($berkas);
         }
@@ -974,14 +974,139 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
     }
 
     /**
-     * R6 C6: PembacaQnaXlsx meniru potongan Reader\Xlsx phpoffice/phpspreadsheet 5.10.x (baris tercatat di docblock
+     * R6 C6: PembacaQnaXlsx meniru potongan Reader\Xlsx phpoffice/phpspreadsheet 5.10.0 (baris tercatat di docblock
      * kelas). Test ini gagal bila versi vendor berubah.
      */
     public function testVersiPhpSpreadsheetTerkunci(): void
     {
         $versi = (string) InstalledVersions::getPrettyVersion('phpoffice/phpspreadsheet');
 
-        $this->assertMatchesRegularExpression('/^v?5\.10\./', $versi, "phpoffice/phpspreadsheet {$versi}: tinjau ulang PembacaQnaXlsx sebelum menaikkan versi");
+        $this->assertSame('5.10.0', ltrim($versi, 'v'), "phpoffice/phpspreadsheet {$versi}: tinjau ulang PembacaQnaXlsx sebelum menaikkan versi");
+    }
+
+    /**
+     * R7 K1: deklarasi XML lebih panjang dari jendela pemeriksaan (padding atribut palsu lalu `encoding="UTF-7"`) di sheet
+     * atau shared strings → "rusak". Di 8e7afc3f pemeriksaan encoding dilewati karena `?>` tidak ada di 1 KB pertama.
+     */
+    #[DataProvider('partDeklarasiPanjang')]
+    public function testDeklarasiXmlPanjangDitolak(string $part): void
+    {
+        $dekl   = '<?xml version="1.0"' . str_repeat(' ', 2000) . ' encoding="UTF-7"?>';
+        $berkas = $this->rakit('');
+        $zip    = new ZipArchive();
+        $this->assertTrue($zip->open($berkas));
+
+        if ($part === 'sheet') {
+            $xml = (string) $zip->getFromName('xl/worksheets/sheet1.xml');
+            $zip->addFromString('xl/worksheets/sheet1.xml', (string) preg_replace('~^<\?xml[^>]*\?>~', $dekl, $xml));
+        } else {
+            $zip->addFromString('xl/sharedStrings.xml', $dekl . '<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><t>x</t></si></sst>');
+            $rels = (string) $zip->getFromName('xl/_rels/workbook.xml.rels');
+            $zip->addFromString('xl/_rels/workbook.xml.rels', str_replace('</Relationships>', '<Relationship Id="rIdS" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/></Relationships>', $rels));
+            $xml = (string) $zip->getFromName('xl/worksheets/sheet1.xml');
+            $zip->addFromString('xl/worksheets/sheet1.xml', str_replace('<c r="A2" t="inlineStr"><is><t xml:space="preserve">Bagaimana cara mengajukan cuti?</t></is></c>', '<c r="A2" t="s"><v>0</v></c>', $xml));
+        }
+
+        $zip->close();
+
+        $this->assertGalatBerkas(self::RUSAK, $berkas);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function partDeklarasiPanjang(): iterable
+    {
+        yield 'sheet' => ['sheet'];
+
+        yield 'sharedStrings' => ['sst'];
+    }
+
+    /**
+     * R7 K2: URI namespace 1 MB (unggahan beberapa KB). Di 8e7afc3f mode namespace ext-xml menyalin URI ke setiap nama
+     * elemen/atribut: elemen di luar filter → timeout, di A2 → fatal memori, 2.000 atribut ber-prefiks → fatal di
+     * xml_parse. Sekarang deklarasi > 256 byte → "rusak" cepat dengan memori kecil.
+     */
+    #[DataProvider('namespacePanjang')]
+    public function testUriNamespacePanjangDitolakCepat(string $varian): void
+    {
+        $uri = 'urn:x:' . str_repeat('a', 1024 * 1024);
+        $isi = match ($varian) {
+            'luar'  => '<row r="3">' . str_repeat('<p:z/>', 2000) . '</row>',
+            'a2'    => '<row r="3"><c r="A3" t="inlineStr"><is><t>P?</t>' . str_repeat('<p:z/>', 300) . '</is></c></row>',
+            default => '<row r="3"><c r="Z3"' . implode('', array_map(static fn (int $i): string => " p:x{$i}=\"1\"", range(1, 2000))) . '/></row>',
+        };
+        $berkas = $this->rakit('', $isi, [], '', true);
+        $zip    = new ZipArchive();
+        $this->assertTrue($zip->open($berkas));
+        $xml = (string) $zip->getFromName('xl/worksheets/sheet1.xml');
+        $zip->addFromString('xl/worksheets/sheet1.xml', (string) preg_replace('~<worksheet ~', "<worksheet xmlns:p=\"{$uri}\" ", $xml, 1));
+        $zip->close();
+        $this->assertLessThan(100 * 1024, (int) filesize($berkas));
+
+        memory_reset_peak_usage();
+        $awal  = memory_get_peak_usage();
+        $mulai = hrtime(true);
+        $this->assertGalatBerkas(self::RUSAK, $berkas);
+        $this->assertLessThan(16 * 1024 * 1024, memory_get_peak_usage() - $awal);
+        $this->assertLessThan(self::DETIK_CI, (hrtime(true) - $mulai) / 1e9);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function namespacePanjang(): iterable
+    {
+        yield 'elemen p:z di luar filter' => ['luar'];
+
+        yield 'elemen p:z di dalam A3' => ['a2'];
+
+        yield '2.000 atribut p:xN' => ['atribut'];
+    }
+
+    /**
+     * Pagar R7 K2: prefiks `x:` untuk namespace utama (bukan default) tetap identik dengan main.
+     */
+    public function testParitasPrefiksNamespaceUtama(): void
+    {
+        $berkas = $this->rakit('');
+        $zip    = new ZipArchive();
+        $this->assertTrue($zip->open($berkas));
+        $xml = (string) $zip->getFromName('xl/worksheets/sheet1.xml');
+        $xml = str_replace('<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"', '<x:worksheet xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main"', $xml);
+        $xml = (string) preg_replace('~<(/?)(sheetData|row|c|is|t|v)([ >/])~', '<$1x:$2$3', $xml);
+        $zip->addFromString('xl/worksheets/sheet1.xml', str_replace('</worksheet>', '</x:worksheet>', $xml));
+        $zip->close();
+
+        $this->assertSamaDenganMain($berkas);
+    }
+
+    /**
+     * R7 K3: atribut ber-apostrof (escape → `&apos;`) pada `<rPh>` kosong di dalam A3 (3 × 3 × 350 KB) dan atribut 3 × 1 MB
+     * pada `<f>` sel di luar filter → "rusak" oleh batas rekaman 2 MB. Di 8e7afc3f atribut tidak dijumlahkan ke rekaman:
+     * varian A3 diterima dengan memori ±340 MB.
+     */
+    #[DataProvider('atributRaksasa')]
+    public function testAtributRaksasaDalamRekamanDitolak(string $varian): void
+    {
+        $nilai = str_repeat("'", 350 * 1024);
+        $rph   = str_repeat("<rPh sb=\"0\" eb=\"1\" x=\"{$nilai}\" y=\"{$nilai}\" z=\"{$nilai}\"/>", 3);
+        $isi   = $varian === 'a3'
+            ? "<row r=\"3\"><c r=\"A3\" t=\"inlineStr\"><is><t>P?</t>{$rph}</is></c></row>"
+            : "<row r=\"3\"><c r=\"Z3\"><f t=\"shared\" ref=\"Z3:Z4\" si=\"0\" x=\"{$nilai}\" y=\"{$nilai}\" z=\"{$nilai}\">1+1</f><v>2</v></c></row>";
+        $berkas = $this->rakit('', $isi, [], '', true);
+
+        $this->assertGalatBerkas(self::RUSAK, $berkas);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function atributRaksasa(): iterable
+    {
+        yield 'atribut di sel A3' => ['a3'];
+
+        yield 'atribut di <f> sel Z3' => ['f'];
     }
 
     /**
