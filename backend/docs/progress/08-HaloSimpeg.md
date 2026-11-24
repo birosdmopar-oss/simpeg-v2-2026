@@ -172,7 +172,15 @@ helpdesk secara aditif (BE: Handling Case; FE: Worker Muse; T12b: ReadOne). Kont
 | Helper satker | CR-139 | DONE (main `ccb90f78`) | `WebConfigService::satkerKepegawaian()` dipakai `PetugasLayananService` dan `HaloSimpeg\PetugasService` |
 | Temuan QA T-B1 (BE) | CR-143 | DONE (main `4d06a8c6`) | `message` sukses legacy "Berhasil menambahkan data halo simpeg." pada 201 buat tiket |
 | Temuan QA T-B4, T-B3, T-B1 (FE) | CR-142 | DONE (main `8bc6c509`) | ruang bawah halaman + `scroll-padding` agar launcher Vanya tidak menutupi "Kirim"; kolom Aksi sticky kanan; notice sukses tiket baru dari `message` |
-| QA Lapis 1 + laporan akhir | CR-132, CR-144 | DONE (main `d8020fc3`); QA selesai 18-11-2026; SIGN-OFF Horii 18-11-2026 (CR-145) | checklist terisi; T-B2 (`Cache-Control` gabungan `tanpaCache`) = kandidat CR sesudah sign-off |
+| QA Lapis 1 + laporan akhir | CR-132, CR-144 | DONE (main `d8020fc3`); QA selesai 18-11-2026; SIGN-OFF Horii 18-11-2026 (CR-145) | checklist terisi; T-B2 (`Cache-Control` gabungan `tanpaCache`) = kandidat CR sesudah sign-off, ✔ diperbaiki CR-147 + CR-151 (di bawah) |
+| Hasil §HL rilis menu CR-135 | CR-146 | DONE (main `a40fe0f5`) | sesudah sign-off; HL1–HL4 ✅ di demo |
+| T-B2 helper `tanpaCache` | CR-147 | DONE (main `e5185919`) | sesudah sign-off; `Cache-Control` persis `private, no-store` lewat helper bersama; lampiran tiket, widget, ekspor/template chatbot, pusat notifikasi |
+| Trim Unicode `msg` tiket | CR-148 | DONE (main `e93b52cb`) | sesudah sign-off; wajib-isi sesudah trim Unicode, batas 5.000 pada nilai tersimpan |
+| Test pemisahan TB/IB/PMK ↔ tiket | CR-149 | DONE (main `7f5b1f04`) | sesudah sign-off; alur TB/IB/PMK tidak menulis `disiplin_ticket(_msg)` dan sebaliknya |
+| Teks Bahasa Indonesia `shared/ui` | CR-150 | DONE (main `2cfb0c58`) | sesudah sign-off; `shared/ui`, pemilih kolom pegawai, berkas, tayangan, jejak halaman |
+| T-B2 modul lain | CR-151 | DONE (main `efd7d37f`) | sesudah sign-off; `Cache-Control` persis di Dashboard, Presensi, Kepegawaian, surat cuti publik |
+| Trim Unicode `subject` tiket | CR-152 | DONE (main `4aa5dbbf`) | sesudah sign-off; spasi Unicode ditolak, batas 250 pada nilai tersimpan |
+| Label ekspor dan placeholder riwayat | CR-153 | DONE (main `8eb2289b`) | sesudah sign-off; teks Bahasa Indonesia Daftar Pegawai dan cari riwayat |
 
 **Keputusan Horii 16-11-2026** ("ikut rekomendasi semua", diteruskan reviewer):
 - H8-14 (a): `AntrePushPesan::antreAkun(id_pengguna[])` aditif; berkas Push bersama = **CR-137**, commit terpisah di branch MAKE-072,

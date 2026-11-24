@@ -222,7 +222,7 @@ dibaca langsung dari `origin` dengan SHA yang disebut di bawah. Nomor CI, status
 | v1.3 | PRD disetujui Horii 12-11-2026 ("Setuju, boleh merge PRD F-10"): keputusan F10-01..F10-38, Plan B, Lampiran A | CR-120 | `241ef9e5` | Di `main` (G10-1 ✔) |
 | v1.4 | Angka D1 salinan dev (§10, G10-3 ✔, B10-1, §8.1, QF10-1, QF10-5 ✔) + koreksi F10-37 (6): 403 `password_change_required` pada unduhan blob menampilkan pesan, tidak memicu handler interceptor (sesuai MAKE-091) | CR-122 | `448b302c` | Di `main` (CI manual #793) |
 | v1.5 | MAKE-092 dipecah menjadi MAKE-092 BE + MAKE-096 FE (§13); §9.3 diselaraskan dengan F10-37 (6) | CR-123 | `5e46eb22` | Di `main` |
-| v1.6 | Hasil QA Lapis 1 F-10: G10-4 lewat K-12; F10-37 (3)/(5) halaman pembungkus popup privat (T-06 opsi 2); 404 + `code` jenis di luar master (T-01); CR-127 → CR-126 sebelum sign-off | CR-128 | branch `docs/cr-128-prd-f10-k12-t06` | ◻ menunggu izin merge |
+| v1.6 | Hasil QA Lapis 1 F-10: G10-4 lewat K-12; F10-37 (3)/(5) halaman pembungkus popup privat (T-06 opsi 2); 404 + `code` jenis di luar master (T-01); CR-127 → CR-126 sebelum sign-off | CR-128 | branch `docs/cr-128-prd-f10-k12-t06` | ✔ di `main` (`17119dd0`) |
 
 Rujukan baris PRD di addendum ini memakai PRD v1.5 (`5e46eb22`), kecuali yang ditandai "v1.4"; di v1.6 (CR-128) sebagian
 nomor baris bergeser karena tambahan AC1-19 dan catatan v1.6, jadi rujukan bagian (§) yang menjadi acuan.
@@ -288,7 +288,7 @@ bukan produksi, dan diverifikasi ulang di produksi saat cutover (G10-3). Folder 
 | 9 | Data uji sintetis + berkas sintetis + akun per role di lingkungan QA (checklist K-03), tanpa NIP nyata | ✔ Lokal (skrip sintetis di luar repo); server dev tidak dibutuhkan (K-12) |
 | 10 | QA Lapis 1 F-10 dengan checklist di atas (PRD §11.3; urutan PRD §13) | ✔ Selesai 15–16-11-2026, 0 butir gagal (CR-124, CR-125); temuan T-01..T-06 diputus Horii |
 | 11 | ADR-038 masuk `main` bersama MAKE-093; laporan akhir F-10 (deviasi + cara kembali, Lampiran A) | ✔ ADR-038 di `main` bersama MAKE-093 (`a0418d1f`); laporan akhir F-10 = addendum §10 ini (deviasi + cara kembali §10.5, PRD Lampiran A) |
-| 12 | Sinkron Trello QASMTASK-107 (+ butir explorer QASMTASK-110) dan Notion (PRD §11.4 `:599-608`) | ◻ Sesudah sign-off |
+| 12 | Sinkron Trello QASMTASK-107 (+ butir explorer QASMTASK-110) dan Notion (PRD §11.4 `:599-608`) | ✔ 16-11-2026 (konfirmasi reviewer 23-11) |
 | 12a | Perbaikan temuan QA: CR-127 (BE, T-01) dan CR-126 (FE, T-01 + T-06) ke `main` | ✔ CR-127 di `main` `e092c058`, CR-126 di `main` `fd9e8371` (16-11-2026); halaman pembungkus diuji ulang reviewer di Brave dan Edge lewat Nginx lokal sebelum merge; nama unduhan tombol "Unduh" = nama arsip (Edge: reviewer; Brave: dikonfirmasi Horii) |
 | 13 | **Sign-off F-10** | ✔ **Horii 16-11-2026** ("sign-off F-10"), `main` `fd9e8371` |
 
@@ -302,7 +302,7 @@ MTC-046 (banyak lampiran terindeks, satu berkas hilang ditandai) masuk fase Manu
 | L1 | QF10-2: hitungan manifest per `tabel.kolom` (berkas kolom lain di subtree `arsip/` dan `assets/upload/`) dilaporkan ke Horii sebelum rilis; pertanyaan mempersempit alias hanya bila angkanya menunjukkan berkas kolom lain (PRD `:636`, R6 `:365`) | ◻ |
 | L2 | [I] kolom `url` yang mungkin ikut terkirim di respons lampiran B-18: dicek di salinan dev; bila benar, CR terpisah menambah `url` ke `KOLOM_INTERNAL` (PRD `:72`, `:350`) | ◻ |
 | L3 | CR interceptor agar 403 `password_change_required` pada unduhan blob memicu handler ganti password (F10-37 (6) v1.4 `:140`) | ◻ CR terpisah |
-| L4 | Cabut izin [#7-WorkloadF10] (berakhir saat F-10 sign-off) dan bersih-bersih worktree/DB scratch F-10 (izin Horii per objek, pola §9) | ◻ Sesudah sign-off |
+| L4 | Cabut izin [#7-WorkloadF10] (berakhir saat F-10 sign-off) dan bersih-bersih worktree/DB scratch F-10 (izin Horii per objek, pola §9) | ✔ izin [#7-WorkloadF10] dicabut 16-11-2026 (konfirmasi reviewer 23-11); bersih-bersih worktree/DB scratch F-10 tetap menunggu izin Horii per objek |
 
 ### 10.7 Blocker deploy / cutover F-10 (bukan syarat sign-off, PRD §11.4)
 
@@ -314,4 +314,4 @@ MTC-046 (banyak lampiran terindeks, satu berkas hilang ditandai) masuk fase Manu
 3. **B10-3 Nginx `/berkas/` di server produksi** (dua pola legacy) + README-deploy §1l. Butir ini menahan rilis F-10 ke produksi (PRD
    `:48`).
 
-**Sign-off F-10: ◻ menunggu Horii.**
+**Sign-off F-10: ✔ Horii 16-11-2026 (`fd9e8371`).**

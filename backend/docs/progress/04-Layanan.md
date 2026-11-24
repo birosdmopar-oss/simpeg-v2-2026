@@ -1,6 +1,8 @@
 # Progress Fase 4 — Modul C: Layanan & Approval
 
-Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). **Acuan utama & sumber kebenaran: `docs/fase4/PRD_Fase4.md` v1.1 (26-10-2026; v1.0 18-10-2026).** Aturan proyek: `AGENTS.md`.
+Catatan progres per task (aturan `IN_PROGRESS` semula di `00-INDEX.md`, berkas itu sudah tidak ada). **Acuan utama & sumber kebenaran: `docs/fase4/PRD_Fase4.md` v1.1 (26-10-2026; v1.0 18-10-2026).** Aturan proyek: `AGENTS.md`.
+
+**FASE 4 DONE — sign-off Horii 29-10-2026** (QA Lapis 1 C-11 lolos 28-10-2026 pada `main` `6a1b7d80`; rujukan `docs/fase4/PRD_Fase4.md:1685`). Status tabel di bawah diselaraskan CR-187; isi Ringkas dan bagian M0 dst. adalah riwayat.
 
 **Terakhir diperbarui:** 27 Oktober 2026 (DBV-022 disetujui DBV; M2 berjalan di PR #29; refund saldo MAKE-022 di main 189b8d4). Sebelumnya: 26 Oktober 2026 (M2b di main 3fbf08e; PR #29 DBV-022) — **take over** (pelaksana berganti; coder sebelumnya Wahyu sampai 20-10). M1 **selesai**: dokumen DBV-022 + 9 draf migration + 1 FK ditahan di `MigrationsDitahan/` + audit #11/#12, diverifikasi di DB scratch. Branch `fase4/dbv-022-skema-layanan` di-rebase ke `main` `4d4ae92`. PR `[DBV-022]` dibuat reviewer CR dari branch ini.
 
@@ -10,18 +12,18 @@ Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). **Acuan utama & 
 
 | Task | Milestone | Key | Status | Ringkas |
 |---|---|---|---|---|
-| C-01 Migration layanan + pemisahan inbox/ticketing | M1, M2 | DBV-022 | **IN_PROGRESS** | M0 ✅ (19-10, diulang 26-10). M1 ✅ 26-10: dokumen DBV-022 (21 butir + Bagian 10 draf migration + Bagian 11 verifikasi developer) + `sql/DBV-022-audit-layanan.sql` 12 bagian + 9 draf migration & 1 FK ditahan di `app/Database/MigrationsDitahan/` (tidak jalan di CI). Bagian 7 **disetujui DBV 27-10** (PR #29). **M2 berjalan 27-10** (PR #29): 9 draf dipindah ke `Migrations/` (nama & DDL tetap), `AddFkNipLayananFase4` tetap ditahan sampai audit yatim lingkungan target = 0, registry NIP Fase 4 (`FASE` = 4, DQ-15 `ketua_tim` menunggu verifikasi delta DBV), 3 test skema — DBV-022 Bagian 12 |
-| C-02 Pengajuan cuti | M2b, M3 | MAKE-022 | **IN_PROGRESS** | M2b ✅ DI MAIN 3fbf08e (26-10): `ValidasiTanggalCuti` (murni). Sisa (M3, service DB + tumpang tindih) menunggu M2 merged |
-| C-03 Kalkulasi kuota N/N-1/N-2 + `calculate_lc` | M2b, M3 | MAKE-022 | **IN_PROGRESS** | M2b ✅ DI MAIN 3fbf08e: `HitungLamaCuti`, `PorsiTahunCuti`, `KuotaCuti`, `SaldoCuti`, `Config\Cuti` + `KuotaBoundaryTest` (K1–K21, T9, T11–T14). Sisa (M3, `KuotaCutiService` ber-DB) menunggu M2 merged; ⛔ Q-02 untuk bagian saldo tahunan. MAKE-022 refund per kolom = max(batas D8, snapshot riwayat_cuti), Q-05 v1.3 — `SnapshotSaldoCuti` + `KuotaCuti::kembalikan()` (DI MAIN 189b8d4, 27-10) |
-| C-04 Approval berjenjang cuti | M2b, M3 | MAKE-022 | **IN_PROGRESS** | M2b ✅ DI MAIN 3fbf08e: `StatusCuti`, `TransisiCuti`, `EfekFinalCuti`, `PengingatCuti` (murni; single end node diuji). Sisa (M3: AL/PyB, `CutiApprovalService`) menunggu M2 merged; ⛔ Q-07 untuk bagian tunda pengingat |
-| C-05 Penerbitan surat cuti e-sign (mock) | M4 | MAKE-023 | TODO | Menunggu M3 merged |
-| C-06 Notifikasi approval | M4 | MAKE-023 | TODO | ⛔ DILARANG mulai sebelum DBV-022 disetujui (PRD §6.1.4) |
-| C-07 Tugas Belajar | M5 | MAKE-024 | **IN_PROGRESS** | 27-10 branch `fase4/make-024-tb-ib-pmk-m5`: inti TB (CRUD, proses PIC, perpanjangan, `bebasPresensiPenuh`, surat) + route + kontrak + 6 berkas test; notifikasi lewat titik sambung no-op sampai M4 |
-| C-08 Izin Belajar | M5 | MAKE-024 | **IN_PROGRESS** | 27-10 inti IB (CRUD, proses PIC, Surat IB otomatis kode 50) + route + kontrak + 4 berkas test; notifikasi lewat titik sambung no-op sampai M4 |
-| C-09 PMK | M5 | MAKE-024 | **IN_PROGRESS** | 27-10 inti PMK (pengajuan, opsi, kalkulator, proses PIC 0→3→1/2, riwayat final + arsip SK) + route + kontrak + 5 berkas test; notifikasi lewat titik sambung no-op sampai M4 |
-| C-10 Dashboard status layanan + PIC | M6 | MAKE-025 | **IN_PROGRESS** | 27-10 `GET layanan/status` (gabungan cuti/TB/IB/PMK, lingkup PegawaiScope, tahap & PIC) + `layanan/jenis` + CRUD `layanan/petugas` (tulis role 1) + route + kontrak + 3 berkas test |
-| C-11 Frontend Modul Layanan | M7 | MAKE-026 | TODO | Per halaman setelah backend-nya merged; `ACTIVE_PHASE = 4` hanya di commit penutup |
-| C-12 Unit test & verifikasi | M8 | MAKE-027 | TODO | Menunggu M3–M7 merged |
+| C-01 Migration layanan + pemisahan inbox/ticketing | M1, M2 | DBV-022 | **DONE** (sign-off Fase 4 29-10-2026; riwayat: IN_PROGRESS) | M0 ✅ (19-10, diulang 26-10). M1 ✅ 26-10: dokumen DBV-022 (21 butir + Bagian 10 draf migration + Bagian 11 verifikasi developer) + `sql/DBV-022-audit-layanan.sql` 12 bagian + 9 draf migration & 1 FK ditahan di `app/Database/MigrationsDitahan/` (tidak jalan di CI). Bagian 7 **disetujui DBV 27-10** (PR #29). **M2 berjalan 27-10** (PR #29): 9 draf dipindah ke `Migrations/` (nama & DDL tetap), `AddFkNipLayananFase4` tetap ditahan sampai audit yatim lingkungan target = 0, registry NIP Fase 4 (`FASE` = 4, DQ-15 `ketua_tim` menunggu verifikasi delta DBV), 3 test skema — DBV-022 Bagian 12 |
+| C-02 Pengajuan cuti | M2b, M3 | MAKE-022 | **DONE** (sign-off Fase 4 29-10-2026; riwayat: IN_PROGRESS) | M2b ✅ DI MAIN 3fbf08e (26-10): `ValidasiTanggalCuti` (murni). Sisa (M3, service DB + tumpang tindih) menunggu M2 merged |
+| C-03 Kalkulasi kuota N/N-1/N-2 + `calculate_lc` | M2b, M3 | MAKE-022 | **DONE** (sign-off Fase 4 29-10-2026; riwayat: IN_PROGRESS) | M2b ✅ DI MAIN 3fbf08e: `HitungLamaCuti`, `PorsiTahunCuti`, `KuotaCuti`, `SaldoCuti`, `Config\Cuti` + `KuotaBoundaryTest` (K1–K21, T9, T11–T14). Sisa (M3, `KuotaCutiService` ber-DB) menunggu M2 merged; ⛔ Q-02 untuk bagian saldo tahunan. MAKE-022 refund per kolom = max(batas D8, snapshot riwayat_cuti), Q-05 v1.3 — `SnapshotSaldoCuti` + `KuotaCuti::kembalikan()` (DI MAIN 189b8d4, 27-10) |
+| C-04 Approval berjenjang cuti | M2b, M3 | MAKE-022 | **DONE** (sign-off Fase 4 29-10-2026; riwayat: IN_PROGRESS) | M2b ✅ DI MAIN 3fbf08e: `StatusCuti`, `TransisiCuti`, `EfekFinalCuti`, `PengingatCuti` (murni; single end node diuji). Sisa (M3: AL/PyB, `CutiApprovalService`) menunggu M2 merged; ⛔ Q-07 untuk bagian tunda pengingat |
+| C-05 Penerbitan surat cuti e-sign (mock) | M4 | MAKE-023 | **DONE** (sign-off Fase 4 29-10-2026; riwayat: TODO) | Menunggu M3 merged |
+| C-06 Notifikasi approval | M4 | MAKE-023 | **DONE** (sign-off Fase 4 29-10-2026; riwayat: TODO) | ⛔ DILARANG mulai sebelum DBV-022 disetujui (PRD §6.1.4) |
+| C-07 Tugas Belajar | M5 | MAKE-024 | **DONE** (sign-off Fase 4 29-10-2026; riwayat: IN_PROGRESS) | 27-10 branch `fase4/make-024-tb-ib-pmk-m5`: inti TB (CRUD, proses PIC, perpanjangan, `bebasPresensiPenuh`, surat) + route + kontrak + 6 berkas test; notifikasi lewat titik sambung no-op sampai M4 |
+| C-08 Izin Belajar | M5 | MAKE-024 | **DONE** (sign-off Fase 4 29-10-2026; riwayat: IN_PROGRESS) | 27-10 inti IB (CRUD, proses PIC, Surat IB otomatis kode 50) + route + kontrak + 4 berkas test; notifikasi lewat titik sambung no-op sampai M4 |
+| C-09 PMK | M5 | MAKE-024 | **DONE** (sign-off Fase 4 29-10-2026; riwayat: IN_PROGRESS) | 27-10 inti PMK (pengajuan, opsi, kalkulator, proses PIC 0→3→1/2, riwayat final + arsip SK) + route + kontrak + 5 berkas test; notifikasi lewat titik sambung no-op sampai M4 |
+| C-10 Dashboard status layanan + PIC | M6 | MAKE-025 | **DONE** (sign-off Fase 4 29-10-2026; riwayat: IN_PROGRESS) | 27-10 `GET layanan/status` (gabungan cuti/TB/IB/PMK, lingkup PegawaiScope, tahap & PIC) + `layanan/jenis` + CRUD `layanan/petugas` (tulis role 1) + route + kontrak + 3 berkas test |
+| C-11 Frontend Modul Layanan | M7 | MAKE-026 | **DONE** (sign-off Fase 4 29-10-2026; riwayat: TODO) | Per halaman setelah backend-nya merged; `ACTIVE_PHASE = 4` hanya di commit penutup |
+| C-12 Unit test & verifikasi | M8 | MAKE-027 | **DONE** (sign-off Fase 4 29-10-2026; riwayat: TODO) | Menunggu M3–M7 merged |
 
 ---
 

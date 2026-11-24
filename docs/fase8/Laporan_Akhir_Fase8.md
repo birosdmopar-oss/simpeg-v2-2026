@@ -12,7 +12,7 @@ temuan QA sudah di `main`). Setiap SHA di laporan ini dicek dengan `git` terhada
 > `quality-gate` #906 hijau; sign-off dicatat CR-145). QA Lapis 1 Fase 8 selesai 18-11-2026; penutup seluruh development (PRD §11).
 > E-01..E-10 di `main`; DBV-028 dan DBV-033 disetujui DB Validator; QA Lapis 1 selesai pada `main` `e4392507` (bagian B) dengan
 > verifikasi perbaikan pada `8bc6c509`: 300 butir sign-off, **0 ❌ terbuka**. Temuan T-01..T-03 (chatbot) dan T-B1, T-B3, T-B4 (helpdesk)
-> diperbaiki (CR-134, CR-143, CR-142) dan diuji ulang; T-B2 menjadi kandidat CR sesudah sign-off. Rilis menu (CR-135) sesudah
+> diperbaiki (CR-134, CR-143, CR-142) dan diuji ulang; T-B2 menjadi kandidat CR sesudah sign-off (sesudahnya ✔ diperbaiki CR-147 (`e5185919`) + CR-151 (`efd7d37f`)). Rilis menu (CR-135) sesudah
 > sign-off, ⛔ izin Horii. Blocker deploy di §8 bukan syarat sign-off.
 
 ## 1. Laporan
@@ -20,7 +20,8 @@ temuan QA sudah di `main`). Setiap SHA di laporan ini dicek dengan `git` terhada
 ```
 Status: E-01..E-10 DONE di main (E-10 = DBV-033 + MAKE-094 + MAKE-095, AC-E10.1..29; AC-E10.30/C4 di luar DoD)
         QA Lapis 1 Fase 8 SELESAI (300 butir sign-off: ✅ / ✅ sebagian / [test-otomatis] / [mock-terbatas] / — beralasan; 0 ❌ terbuka;
-        temuan T-01..T-03, T-B1, T-B3, T-B4 diperbaiki & diuji ulang; T-B2 sesudah sign-off)
+        temuan T-01..T-03, T-B1, T-B3, T-B4 diperbaiki & diuji ulang; T-B2 sesudah sign-off:
+        ✔ CR-147 e5185919 + CR-151 efd7d37f)
 Branch/SHA/CI: main 8bc6c509 (CR-142, perbaikan QA terakhir); CI `quality-gate` `main` #905 hijau pada SHA ini
                SHA QA bagian B = main e4392507 (seluruh kode Fase 8) — CI quality-gate #899 hijau
                CR-143 @403d19c6 CI #900 hijau, CR-142 @564ebaa5 CI #904 hijau (branch, sebelum merge)
@@ -137,7 +138,7 @@ HBB14; butir gerbang AM9, HG2, HG3, HG5, HM9 (CI #899). Sisi BE T-B1 (HP3) dan `
 | T-B4 | Launcher Vanya menutupi sebagian tombol "Kirim" form balas (AC HP24 gagal) | **Diperbaiki CR-142** `8bc6c509` (ruang bawah halaman + `scroll-padding` fokus, WCAG 2.4.11); ruang bawah diverifikasi di demo pada CR-142 @`f49f075e` (desktop); `scroll-padding` (`a2f1e894`) dikunci test `564ebaa5` + CI #904, belum diverifikasi di demo; HP24 ✅ sebagian |
 | T-B3 | Kolom Aksi ⋮ tabel daftar tiket terpotong saat sidebar terbuka (1536 px) | **Diperbaiki CR-142** `8bc6c509` (sel Aksi sticky kanan); diverifikasi di demo ✅ |
 | T-B1 | Pesan sukses legacy "Berhasil menambahkan data halo simpeg." tidak ada (HP3) | **Diperbaiki CR-143** `4d06a8c6` (BE `message`) + **CR-142** `8bc6c509` (notice `role=status`, teks cadangan legacy); notice FE diverifikasi di demo dengan teks cadangan (BE demo belum CR-143); sisi BE `message` lewat test otomatis (CI #900) |
-| T-B2 | `Cache-Control` gabungan pada unduhan lampiran dan endpoint lain yang memakai helper `tanpaCache` (HP13); tetap `no-store` | ◻ Kandidat CR sesudah sign-off (helper bersama); tidak menahan sign-off |
+| T-B2 | `Cache-Control` gabungan pada unduhan lampiran dan endpoint lain yang memakai helper `tanpaCache` (HP13); tetap `no-store` | ✔ diperbaiki CR-147 (`e5185919`) + CR-151 (`efd7d37f`) sesudah sign-off (helper bersama `tanpaCache`); tidak menahan sign-off |
 
 T-B4 dinilai menahan sign-off; T-B1 dan T-B3 non-blok, tetapi diperbaiki sebelum sign-off atas keputusan Horii 18-11-2026.
 
@@ -219,10 +220,10 @@ README modul, dan progres 08. Ringkas:
 |---|---|---|
 | 1 | Merge laporan ini + checklist terisi + progres 08 + baris status PRD ke `main` (CR-144, docs saja) | ✔ di `main` `d8020fc3` (CI #906 hijau) |
 | 2 | Nomor dan hasil CI `main` pada `8bc6c509` (sesudah CR-143 + CR-142) dicatat di §5 | ✔ §5: CI `quality-gate` `main` #905 hijau |
-| 3 | Kolom Keputusan §K checklist untuk butir ◻ yang sudah dijalankan sesuai usulan (K-01, K-04, K-05, K-07, K-10..K-19) diperbarui | ◻ Reviewer CR (dokumen) |
+| 3 | Kolom Keputusan §K checklist untuk butir ◻ yang sudah dijalankan sesuai usulan (K-01, K-04, K-05, K-07, K-10..K-19) diperbarui | ◻ sebagian (CR-187): ✔ K-01, K-11, K-13, K-14, K-17 (GF4) dan K-10 (E7, §8 butir 2); tersisa ◻ K-04, K-05, K-07, K-12, K-15, K-16, K-18, K-19 |
 | 4 | Sign-off reviewer CR, lalu sign-off Horii (checklist §E E8) | ✔ Horii 18-11-2026 ("Sign-off fase 8"), `main` `d8020fc3`, sesudah laporan reviewer CR (CR-144) |
 
-Tidak ada temuan QA ❌ yang terbuka. T-B2 dan kandidat CR lain (§9) tidak menahan sign-off.
+Tidak ada temuan QA ❌ yang terbuka. T-B2 dan kandidat CR lain (§9) tidak menahan sign-off; keduanya sudah di `main` (§9).
 
 **Sign-off Fase 8: ✔ Horii 18-11-2026** pada `main` `d8020fc3` (CI `quality-gate` #906 hijau), penutup seluruh development
 (PRD §11); dicatat CR-145. Tindak lanjut sesudah sign-off di §9.
@@ -254,9 +255,13 @@ Tidak ada temuan QA ❌ yang terbuka. T-B2 dan kandidat CR lain (§9) tidak mena
   `f5e730bb` 18-11-2026; §HL HL1–HL4 ✅ di demo (dicatat CR-146); deviasi [V2]: menu tanpa halaman (E-Kinerja/E-Talenta) disembunyikan.
 - **Kandidat CR sesudah sign-off** (tidak menahan sign-off):
   - T-B2: helper `tanpaCache` membuang `Cache-Control` bawaan sebelum memasang `private, no-store`;
+    ✔ di `main`: CR-147 (`e5185919`) + CR-151 (`efd7d37f`, modul lain);
   - teks Inggris tersisa di `shared/ui` dan pemilih kolom pegawai (Horii: ditunda sampai sesudah sign-off);
+    ✔ di `main`: CR-150 (`2cfb0c58`) + CR-153 (`8eb2289b`, label ekspor dan placeholder cari riwayat);
   - test yang memastikan alur TB/IB/PMK tidak menulis `disiplin_ticket(_msg)` (belum ada, celah sejak Fase 4);
-  - validasi trim Unicode pada `msg` tiket (saran dari MAKE-072, di luar kontrak beku).
+    ✔ di `main`: CR-149 (`7f5b1f04`);
+  - validasi trim Unicode pada `msg` tiket (saran dari MAKE-072, di luar kontrak beku);
+    ✔ di `main`: CR-148 (`e93b52cb`) + CR-152 (`4aa5dbbf`, sama untuk `subject` tiket).
 - Sinkron Trello DEV-009, QASMTASK-111..118, QASMTASK-123, QASMTASK-124 dan Notion baris Fase 8 (E.1..E.6) → selesai.
   ✔ 18-11-2026: 11 kartu Done (butir "Lolos MTC" dan push real FCM tidak dicentang), komentar blocker deploy di DEPLOY-002 dan
   DEPLOY-001.1, ISSUE-001 diberi komentar realisasi prasyarat (penutupan menunggu keputusan Horii); Notion E.1..E.6 Selesai.

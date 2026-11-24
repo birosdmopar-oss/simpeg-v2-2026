@@ -452,7 +452,8 @@ terkini (legacy sp()). Keputusan user 13-10-2026: [V2] verifikator = siapa pun b
 (NIP pegawai aktif, 422 bila tidak) — bawaan tetap atasan otomatis; PDF hanya untuk LKH Disetujui (selain itu 422
 `status`; legacy file_lckh dibuat saat disetujui), dibangkitkan saat diminta, QR kode legacy (waktu WIB), kop tanpa logo;
 [V2] baris kegiatan setengah terisi 422, catatan wajib tolak/revisi, hapus status 10. Rekap LKH bawahan (legacy
-list_rekap) belum dibawa.
+list_rekap) belum dibawa *(riwayat B-12b; sudah dibuat di MAKE-014 `94f978d4`: `LkhService::rekapBawahan`, lihat
+"B-20 penutup (MAKE-014)" di bawah)*.
 
 **Struktur organisasi per bulan & PDF:** `bulan` YYYY-MM mulai **2025-01** (keputusan user 13-10-2026; legacy sejak
 2022-01, tetapi bulan sebelum 2025 memakai templat so_062023/so_before_062023 yang belum di-port — TODO
