@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Interfaces\Layanan;
 
 /**
- * Kontrak "TB penuh bebas presensi" untuk Fase 5 (D-06) — PRD Fase 4 v1.1 §6.7.5, §8, D15. Implementasi ber-DB
- * (`App\Libraries\Layanan\Tb\StatusTugasBelajar`, M5 setelah DBV-022) memuat `riwayat_tb` status 1 + `riwayat_tb_perpan`
- * milik NIP lalu mendelegasikan aturan ke `App\Libraries\Layanan\Tb\BebasPresensiTb` (murni). Didaftarkan sebagai
- * `Config\Services::statusTugasBelajar()` saat implementasi ada.
+ * Kontrak "TB penuh bebas presensi" untuk Fase 5 (D-06) — PRD Fase 4 v1.1 §6.7.5, §8, D15. Implementasi ber-DB ada di
+ * `App\Libraries\Layanan\Tb\StatusTugasBelajar` (MAKE-024 M5): memuat `riwayat_tb` status 1 + `riwayat_tb_perpan` milik
+ * NIP lalu mendelegasikan aturan ke `App\Libraries\Layanan\Tb\BebasPresensiTb` (murni). Terdaftar sebagai
+ * `Config\Services::statusTugasBelajar()`.
  */
 interface StatusTugasBelajarInterface
 {

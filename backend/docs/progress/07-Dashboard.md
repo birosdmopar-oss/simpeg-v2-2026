@@ -1,6 +1,8 @@
 # Progress Fase 7 — Modul F: Dashboard & News
 
-Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). Kontrak paket pertama: `docs/fase7/PRD_Fase7_Statistik-GeneratorDokumen.md` (F-03 + F-09, tanpa skema). Kontrak endpoint: `backend/app/Controllers/Api/Dashboard/README.md`.
+Catatan progres per task (aturan `IN_PROGRESS` semula di `00-INDEX.md`, berkas itu sudah tidak ada). Kontrak paket pertama: `docs/fase7/PRD_Fase7_Statistik-GeneratorDokumen.md` (F-03 + F-09, tanpa skema). Kontrak endpoint: `backend/app/Controllers/Api/Dashboard/README.md`.
+
+**FASE 7 DONE — sign-off Horii 11-11-2026** (`main` `0af9be4f`); **F-10 Arsip Digital sign-off Horii 16-11-2026** (`main` `fd9e8371`). Rincian dan SHA per task: `docs/fase7/Laporan_Akhir_Fase7.md` §2 dan §10. Status tabel di bawah diselaraskan CR-187; teks lain adalah riwayat.
 
 **Terakhir diperbarui:** 21 Oktober 2026 — M4 MAKE-037 frontend F-09 (halaman `/dokumen/:jenis`, branch `fase7/make-037-generator-dokumen`, menunggu review reviewer CR); M1–M3 di `main`. Fase 7 **IN_PROGRESS**: hanya paket F-03 + F-09 yang dikerjakan sekarang (PRD Fase 7 §1); F-01, F-02, F-04..F-08, F-11..F-13 sisa, dan F-10 Arsip **ditunda** (keputusan Horii 20-10-2026) belum dimulai.
 **Entry criteria paket:** PRD Fase 7 v1.0 di `main` `90362c6` (21-10-2026); Fase 3 DONE (sumber data snapshot `pegawai_*`); tidak ada ketergantungan ke Fase 4/5A.
@@ -10,9 +12,9 @@ Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). Kontrak paket pe
 | F-03 Widget Statistik Kepegawaian — backend (M1) | MAKE-036 | DONE (main `7fb3011`) | `Config/RoutesDashboard.php` (+1 entri `Routing.php`), `StatistikController`, `Libraries/Dashboard/Statistik/*` (lingkup, kueri agregat, bucket usia, urutan golongan, cache, bentuk laporan), XLSX via `EksporTabel`, audit unduhan, kontrak role di `KontrakMatriksRoleTest` (MAKE-038). Test: 3 unit + 4 feature (22 test) |
 | F-03 — frontend (M2) | MAKE-036 | DONE (main `1f76989`) | `features/laporan` (halaman `/laporan/:tipe` 7 tipe, service API, route), `shared/ui/UiBarChart` dari mockup `67fa767`, nav `laporan` + `roles` + 7 anak (tetap `phase: 7`), spec 8 test + nav spec |
 | F-09 Generator Dokumen — backend (M3) | MAKE-037 | DONE (main `6a03b19`) | DUK, Nominatif, Proyeksi Pensiun, Baperjakat: JSON/PDF/XLSX, `KopDokumen`, audit, throttle; fallback PDF F7-15 (per unit/satker, maks 1.700 baris, ADR-034); uji volume 5.000 baris |
-| F-09 — frontend (M4) | MAKE-037 | IN_PROGRESS (menunggu review) | `features/dokumen` (halaman `/dokumen/:jenis` 4 jenis, unduh PDF/XLSX + pesan fallback, Baperjakat pilih NIP + judul, ⋮ Lihat DRH), nav `dokumen` (tetap `phase: 7`), spec 10 test + nav spec |
-| F-10 Arsip Digital | — | DITUNDA | Belum ada konfigurasi server Arsip resmi (Horii 20-10-2026) |
-| F-01, F-02, F-04..F-08, F-11..F-13 | — | TODO | Paket Fase 7 berikutnya (butuh DBV / Fase 4) |
+| F-09 — frontend (M4) | MAKE-037 | DONE (main, commit terakhir `89e6b418`; riwayat: menunggu review) | `features/dokumen` (halaman `/dokumen/:jenis` 4 jenis, unduh PDF/XLSX + pesan fallback, Baperjakat pilih NIP + judul, ⋮ Lihat DRH), nav `dokumen` (tetap `phase: 7`), spec 10 test + nav spec |
+| F-10 Arsip Digital | MAKE-090, MAKE-091, MAKE-092, MAKE-093, MAKE-096 | DONE (sign-off 16-11-2026, `main` `fd9e8371`; riwayat: DITUNDA) | Belum ada konfigurasi server Arsip resmi (Horii 20-10-2026) |
+| F-01, F-02, F-04..F-08, F-11..F-13 | DBV-032, MAKE-079..087 (rinci di Laporan Akhir §2) | DONE (sign-off 11-11-2026, `main` `0af9be4f`; riwayat: TODO) | Paket Fase 7 berikutnya (butuh DBV / Fase 4) |
 
 ## M1 — MAKE-036 backend F-03 (21-10-2026)
 

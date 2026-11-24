@@ -10,7 +10,7 @@ Acuan: `docs/fase6/PRD_Fase6_Integrasi.md`. Pembagian: `docs/fase6/6_2.md` (Jalu
 **ISSUE-058 (deviasi K1) — MAKE-078, Fase 7 Jalur D** (branch `fase7/make-078-integrasi-log`): `GET api/v1/integrasi/log`
 (role 1; filter layanan/status/tanggal WIB, paginasi, 422 per parameter; kueri `Log\DaftarLogIntegrasi`) + halaman FE
 Admin → Integrasi `/integrasi` (tabel log, ⋮ "Lihat detail", tombol Tarik Ulang e-Kinerja ke `POST bkn/tarik` yang sudah
-ada). K1 (§6.2 baris 244: halaman Admin → Integrasi) **selesai di branch**; status "di main" menyusul setelah merge. QA
+ada). K1 (§6.2 baris 244: halaman Admin → Integrasi) **selesai di branch**; status "di main" menyusul setelah merge (*riwayat*; **✔ di `main` `e1a3dd89`**, CR-187). QA
 memakai butir N5/N6 `docs/fase6/Checklist_QA_Lapis1_Fase6.md`.
 
 | Task | Jalur | Key | Status |

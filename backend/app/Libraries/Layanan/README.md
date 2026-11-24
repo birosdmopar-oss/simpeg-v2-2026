@@ -99,12 +99,14 @@ Catatan keputusan coder (dicatat untuk reviewer):
    0 bl tetap diterima server [K]; peringatan "harus melebihi 1 bulan" hanya di kalkulator klien (`MasaKerjaPmk::kurangSebulan`).
 7. **`App\Interfaces\Layanan\StatusTugasBelajarInterface`** dibuat sekarang (kontrak murni, tanpa implementasi) supaya
    Fase 5B bisa mengandalkan nama dan signature PRD §6.7.5. Implementasi DB dan `Config\Services::statusTugasBelajar()`
-   menyusul di M5 setelah DBV-022.
+   menyusul di M5 setelah DBV-022. *(Riwayat bagian awal MAKE-024; sudah dibuat di M5: `Tb/StatusTugasBelajar`, lihat
+   "TB, IB, PMK — lapisan DB" di bawah.)*
 8. **Hak ubah/hapus TB/IB** (pemilik status 0 dan `tgl_mulai > hari ini`, dsb., §6.7.2) belum dibuat predikatnya; bagian itu
    bergantung pada role/lingkup dan dikerjakan di service M5.
 
-Belum ada di bagian ini (M5 setelah DBV-022 & M2): Model, controller, route, migration, berkas, PIC (`PetugasLayananService`),
-notifikasi, efek `id_jenis_status`, surat TB/IB.
+*Riwayat bagian awal MAKE-024:* belum ada di bagian ini (M5 setelah DBV-022 & M2): Model, controller, route, migration, berkas,
+PIC (`PetugasLayananService`), notifikasi, efek `id_jenis_status`, surat TB/IB. Semuanya sudah dibuat di M5; lihat "TB, IB,
+PMK — lapisan DB" di bawah.
 
 ## TB, IB, PMK — lapisan DB (MAKE-024 M5, PRD Fase 4 §6.7–§6.9)
 
@@ -117,7 +119,7 @@ Service ber-DB membungkus kelas murni di atas; DILARANG ada aturan tumpang tindi
 | `StudiApprovalService` (abstrak) | proses PIC satu langkah — `TransisiStudi`; `show_notif`/`notif_date` pengganti trigger `riwayat_*_beUpd` |
 | `PetugasLayananService` | `adalahPic(nip, jenis)`, `nipPicAktif(jenis)` (status 1, tanpa batas unit) — dipakai M5 dan M6 |
 | `PenandaTanganKabiro` | penanda tangan surat TB/IB (`id_jabatan_kabiro_kepegawaian`, `tmtsk` terbaru) + unit tujuan laporan (`id_unit_kepegawaian`), lewat `WebConfigService::value()` (Q-06(a)) |
-| `NotifikasiNoOp` | binding sementara `NotifikasiLayananInterface` (`Config\Services::notifikasiLayanan()`); diganti NotifikasiService di M4 (MAKE-023) |
+| `NotifikasiNoOp` | semula binding sementara `NotifikasiLayananInterface` (`Config\Services::notifikasiLayanan()`); sudah diganti `NotifikasiService` di M4 (MAKE-023, `9ce8c564`); kelasnya tetap ada |
 | `Tb/TbService`, `Tb/TbApprovalService`, `Tb/EfekTbTrait` | C-07; efek final `pegawai.id_jenis_status` 2 bila hari ini dalam rentang (dibalik saat hapus) |
 | `Tb/PerpanjanganTbService` | C-07 perpanjangan role 1; ringkasan `tgl_*_perpan` = `PerpanjanganTb::ringkasan` (pengganti trigger `riwayat_tb_perpan_af*`) |
 | `Tb/StatusTugasBelajar` | implementasi `StatusTugasBelajarInterface` (`Config\Services::statusTugasBelajar()`, Fase 5 D-06) — dua kueri lalu `BebasPresensiTb`; versi massal `rentangBebasPresensiBanyak(nip[], dari, sampai)` (MAKE-044, PRD Fase 5B F5B-18): per batch `BATCH_NIP` = 1000 NIP satu kueri `riwayat_tb` status 1 (WHERE IN) + satu kueri `riwayat_tb_perpan` (WHERE IN id, dilewati bila batch tanpa TB); masukan kosong → `[]` tanpa kueri; hasil per NIP identik dengan versi tunggal; metode tunggal tidak berubah |
