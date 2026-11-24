@@ -85,7 +85,7 @@ final class ImporSlipBatasBacaTest extends DatabaseTestCase
         $res        = $this->unggahSlip($admin, $this->unggahanSlip($path, 'slip_rumus.xlsx'));
 
         $res->assertStatus(422);
-        $this->assertSame(['berkas' => ['Rumus di sheet GPP/TK terlalu berat untuk dihitung. Tempel sebagai nilai (Paste Values), lalu unggah ulang.']], $this->json($res)['errors']);
+        $this->assertSame(['berkas' => ['Rumus di sheet GPP/TK terlalu berat untuk dihitung atau memakai fungsi di luar daftar yang didukung. Tempel sebagai nilai (Paste Values), lalu unggah ulang.']], $this->json($res)['errors']);
         $this->assertLessThan(5.0, microtime(true) - $awal, 'ditolak sebelum dihitung');
         $this->assertLessThan(64 * 1024 * 1024, memory_get_peak_usage() - $awalMemori, 'kenaikan puncak memori');
         $this->assertSame([], $this->isiDirPratinjau(), 'berkas pratinjau tidak tertinggal');

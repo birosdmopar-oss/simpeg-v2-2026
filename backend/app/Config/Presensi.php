@@ -148,8 +148,40 @@ class Presensi extends BaseConfig
     /** Byte teks hasil `REPT` per satuan beban (tiap hasil disimpan ±3 salinan sampai impor selesai). */
     public const BYTE_PER_BEBAN_TEKS_RUMUS_IMPOR = 4;
 
-    /** Panjang teks yang dianggap untuk operand yang bukan literal teks (rujukan sel, hasil fungsi). */
+    /**
+     * Panjang teks terkecil yang dianggap untuk operand yang bukan literal teks (rujukan sel, hasil fungsi). Yang dipakai
+     * penaksir = nilai ini atau teks terpanjang di workbook (sel bernilai teks dan literal teks di rumus), mana yang
+     * lebih besar.
+     */
     public const BYTE_TEKS_ANGGAPAN_RUMUS_IMPOR = 32;
+
+    /**
+     * Byte teks terpanjang workbook per satuan beban, ditagihkan untuk TIAP kurung buka, operator, dan elemen larik:
+     * fungsi teks, pembandingan, dan pencarian menyalin atau mengubah huruf seluruh teks operandnya (teks 32.767 huruf:
+     * `PROPER` ±1,1 ms, `=` ±0,8 ms, `UPPER` ±0,55 ms, `MATCH` ±1 ms per sel yang dibandingkan). Workbook tanpa teks
+     * 128 byte atau lebih tidak terkena.
+     */
+    public const BYTE_PER_BEBAN_TEKS_SEL_RUMUS_IMPOR = 128;
+
+    /**
+     * Batas atas byte hasil `SUBSTITUTE` (teks sumber + kemunculan × teks pengganti, ditaksir dari teks terpanjang
+     * workbook dan literal di rumus): kalkulator menyusun hasilnya dulu, baru memeriksa batas 32.767 huruf, jadi hasil
+     * sementara puluhan MB menghabiskan memori. Lebih besar dari ini → ditolak.
+     */
+    public const MAKS_BYTE_HASIL_TEKS_RUMUS_IMPOR = 4 * 1024 * 1024;
+
+    /** Beban tetap tiap sel yang dicocokkan dengan kriteria berwildcard `*` (±15 mikrodetik di atas kriteria biasa). */
+    public const BEBAN_TETAP_WILDCARD_RUMUS_IMPOR = 4;
+
+    /**
+     * Langkah penelusuran balik pencocokan wildcard per satuan beban. Kriteria ber-`*` dijadikan pola `.*` berantai;
+     * langkahnya ±panjang teks pangkat jumlah `*` / faktorial jumlah `*` (teks 30 huruf: 4 bintang ±45 mikrodetik per
+     * sel, 5 bintang ±160, 7 ke atas ±2,7 ms saat mesin PCRE berhenti di `pcre.backtrack_limit` bawaan 1.000.000).
+     */
+    public const LANGKAH_PER_BEBAN_WILDCARD_RUMUS_IMPOR = 2_000;
+
+    /** Beban terbesar pencocokan wildcard per sel (mesin PCRE berhenti di batas penelusuran balik, ±2,7 ms). */
+    public const MAKS_BEBAN_WILDCARD_RUMUS_IMPOR = 600;
 
     /**
      * Byte teks per satuan beban untuk hasil operator `&` (teks sementara, dikalikan jumlah elemen bila operandnya
@@ -159,13 +191,17 @@ class Presensi extends BaseConfig
 
     /**
      * Batas beban SATU sel rumus: membatasi memori satu larik (±0,1 KB per elemen hasil operator, ±0,55 KB per baris
-     * rentang) dan waktu satu sel (±2–3 detik). Cukup untuk menjumlah atau `INDEX` seluruh GPP 10.001 baris × 26 kolom
-     * (±485 ribu).
+     * rentang) dan waktu satu sel (±3–4 detik). Cukup untuk `INDEX(GPP!A2:Z10001,MATCH(…,GPP!A2:A10001,0),26)` (±606
+     * ribu) dan `VLOOKUP` ke GPP 10.000 baris × 40 kolom (±742 ribu); `MAX` atau `MATCH` bernilai cari larik atas seluruh
+     * GPP (1,4–2,1 juta) tetap ditolak.
      */
-    public const MAKS_BEBAN_PER_RUMUS_IMPOR = 500_000;
+    public const MAKS_BEBAN_PER_RUMUS_IMPOR = 800_000;
 
-    /** Batas jumlah beban semua sel rumus GPP + TK (batas waktu request impor 60 detik; lihat tabel ukur BB-12). */
-    public const MAKS_BEBAN_RUMUS_IMPOR = 4_500_000;
+    /**
+     * Batas jumlah beban semua sel rumus GPP + TK. Diukur saat mesin tenang (1 satuan ±3,2–5,3 mikrodetik, terburuk ±6):
+     * 6 juta ≈ 36 detik hitung + taksir ±3 detik, di bawah batas waktu request impor 60 detik (tabel ukur BB-12).
+     */
+    public const MAKS_BEBAN_RUMUS_IMPOR = 6_000_000;
 
     /** Masa berlaku pratinjau impor dalam detik (Q5A-05 default 30 menit). */
     public int $ttlPratinjauDetik = 1800;

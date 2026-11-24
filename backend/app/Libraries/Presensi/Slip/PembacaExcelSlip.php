@@ -42,8 +42,8 @@ use Throwable;
  *    muatan supaya rumus lintas sheet tetap terhitung; berkas yang kedua sheet-nya berisi part yang sama ditolak
  *    {@see PemuatXlsxSlip}.
  * 3. SEBELUM ada sel rumus yang dihitung (CR-181), anggaran beban hitung rumus GPP + TK, ditaksir dari teks rumus
- *    ({@see PenaksirBebanRumus}): batas per sel rumus dan batas jumlah (konstanta `Config\Presensi`). Lewat batas →
- *    {@see self::PESAN_RUMUS}. Ini pagar masukan saja: sel rumus berkas yang lolos tetap dihitung ulang dengan
+ *    ({@see PenaksirBebanRumus}): batas per sel rumus dan batas jumlah (konstanta `Config\Presensi`), dan hanya fungsi
+ *    di daftar putih penaksir yang boleh dipakai. Lewat batas atau memakai fungsi lain → {@see self::PESAN_RUMUS}. Ini pagar masukan saja: sel rumus berkas yang lolos tetap dihitung ulang dengan
  *    `getCalculatedValue` seperti legacy; nilai tersimpan di berkas (`<v>`) tidak pernah dipakai.
  *
  * Read filter (`IReadFilter`) SENGAJA TIDAK dipasang pada pemuat, jangan ditambahkan: begitu ada read filter kustom,
@@ -56,7 +56,7 @@ use Throwable;
 final class PembacaExcelSlip
 {
     public const PESAN_TIDAK_TERBACA = 'Berkas tidak dapat dibaca. Pastikan berkas Excel (.xlsx/.xls) yang valid.';
-    public const PESAN_RUMUS         = 'Rumus di sheet GPP/TK terlalu berat untuk dihitung. Tempel sebagai nilai (Paste Values), lalu unggah ulang.';
+    public const PESAN_RUMUS         = 'Rumus di sheet GPP/TK terlalu berat untuk dihitung atau memakai fungsi di luar daftar yang didukung. Tempel sebagai nilai (Paste Values), lalu unggah ulang.';
     public const PESAN_STRUKTUR      = 'Struktur berkas terlalu besar untuk diproses. Simpan ulang berkas hanya dengan sheet GPP dan TK, tanpa rumus (tempel sebagai nilai) atau teks sangat panjang.';
 
     /**
