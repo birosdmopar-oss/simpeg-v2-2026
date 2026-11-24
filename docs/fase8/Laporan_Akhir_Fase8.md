@@ -220,7 +220,7 @@ README modul, dan progres 08. Ringkas:
 |---|---|---|
 | 1 | Merge laporan ini + checklist terisi + progres 08 + baris status PRD ke `main` (CR-144, docs saja) | ✔ di `main` `d8020fc3` (CI #906 hijau) |
 | 2 | Nomor dan hasil CI `main` pada `8bc6c509` (sesudah CR-143 + CR-142) dicatat di §5 | ✔ §5: CI `quality-gate` `main` #905 hijau |
-| 3 | Kolom Keputusan §K checklist untuk butir ◻ yang sudah dijalankan sesuai usulan (K-01, K-04, K-05, K-07, K-10..K-19) diperbarui | ◻ Reviewer CR (dokumen). Catatan CR-187: K-10 dan K-17 ditandai ✔ di checklist (bukti GF4 dan §8 butir 2); K-01, K-04, K-05, K-07, K-11..K-16, K-18, K-19 belum diperbarui |
+| 3 | Kolom Keputusan §K checklist untuk butir ◻ yang sudah dijalankan sesuai usulan (K-01, K-04, K-05, K-07, K-10..K-19) diperbarui | ◻ sebagian (CR-187): ✔ K-01, K-11, K-13, K-14, K-17 (GF4) dan K-10 (E7, §8 butir 2); tersisa ◻ K-04, K-05, K-07, K-12, K-15, K-16, K-18, K-19 |
 | 4 | Sign-off reviewer CR, lalu sign-off Horii (checklist §E E8) | ✔ Horii 18-11-2026 ("Sign-off fase 8"), `main` `d8020fc3`, sesudah laporan reviewer CR (CR-144) |
 
 Tidak ada temuan QA ❌ yang terbuka. T-B2 dan kandidat CR lain (§9) tidak menahan sign-off; keduanya sudah di `main` (§9).

@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace App\Interfaces\Layanan;
 
 /**
- * Titik sambung notifikasi layanan TB/IB/PMK (PRD Fase 4 §6.6.1, MAKE-024 M5). Binding sementara
- * `App\Libraries\Layanan\NotifikasiNoOp`; binding diganti NotifikasiService di M4 (MAKE-023) tanpa mengubah pemanggil.
+ * Titik sambung notifikasi layanan TB/IB/PMK (PRD Fase 4 §6.6.1, MAKE-024 M5). Binding: `NotifikasiService`
+ * (`Config\Services::notifikasiLayanan()`, M4 MAKE-023), menggantikan `App\Libraries\Layanan\NotifikasiNoOp` tanpa
+ * mengubah pemanggil; kelas NoOp tetap ada.
  *
  * Pola pemanggil (§7.8): kirim() di DALAM transaksi bisnis (menulis `inbox`/`inbox_msg` v2, tidak pernah
  * `disiplin_ticket*`), lalu enqueuePush() dengan id hasilnya SESUDAH commit. Bila transaksi rollback, enqueuePush() tidak
