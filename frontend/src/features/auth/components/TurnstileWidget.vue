@@ -104,17 +104,23 @@ function onMockChange(event: Event): void {
 <template>
   <div>
     <div v-if="siteKey" ref="container" class="min-h-[65px]" data-testid="turnstile-container"></div>
-    <p v-if="siteKey && loadFailed" class="mt-1 text-xs text-red-600">
+    <p v-if="siteKey && loadFailed" class="mt-1 text-[13px] leading-5 text-v5-error-strong">
       Widget captcha gagal dimuat. Periksa koneksi lalu muat ulang halaman.
     </p>
 
+    <!-- CR-190: gaya V5 · reCAPTCHA Placeholder (area putus-putus radius 12, tinggi min 74). Perilaku tidak berubah. -->
     <label
       v-else-if="!siteKey"
-      class="flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-600"
+      class="flex min-h-[74px] cursor-pointer items-center gap-3 rounded-v5-md border border-dashed border-v5-border bg-v5-page px-3 py-3 text-[14px] leading-[22px] tracking-[-0.1px] text-v5-text"
       data-testid="captcha-mock"
     >
-      <input type="checkbox" :checked="mockChecked" class="h-4 w-4 accent-brand-primary" @change="onMockChange" />
-      <span>Saya bukan robot <span class="text-xs text-slate-400">(mode pengembangan, Turnstile belum dikonfigurasi)</span></span>
+      <input
+        type="checkbox"
+        :checked="mockChecked"
+        class="h-[18px] w-[18px] shrink-0 accent-v5-primary focus-visible:ring-2 focus-visible:ring-v5-blue focus-visible:ring-offset-2 focus-visible:ring-offset-white focus-visible:outline-none"
+        @change="onMockChange"
+      />
+      <span>Saya bukan robot <span class="block text-[11px] leading-4 text-v5-text-muted">(mode pengembangan, Turnstile belum dikonfigurasi)</span></span>
     </label>
   </div>
 </template>

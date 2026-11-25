@@ -7,14 +7,17 @@
  * - 429: banner kuning berisi pesan backend; 422: captcha → banner, field → error di field.
  * - Hanya development: kalau backend mengembalikan token (auth.exposeResetTokenInResponse), tampil kotak tautan
  *   langsung ke halaman reset supaya MTC-006/007 bisa diuji tanpa kanal email.
+ * - CR-190: tampilan Figma SIMPEG V5 A-11 (Lupa Password); teks, field, dan perilaku tetap seperti `main`.
  */
 import { toTypedSchema } from '@vee-validate/zod'
-import { MailCheck } from 'lucide-vue-next'
+import { ArrowLeft, CircleAlert } from 'lucide-vue-next'
 import { useForm } from 'vee-validate'
 import { computed, ref } from 'vue'
 
 import { isApiError } from '@/lib/axios'
 import FormField from '@/shared/components/FormField.vue'
+import UiButton from '@/shared/ui/UiButton.vue'
+import UiNotice from '@/shared/ui/UiNotice.vue'
 
 import AuthCardLayout from '../components/AuthCardLayout.vue'
 import TurnstileWidget from '../components/TurnstileWidget.vue'
@@ -36,16 +39,15 @@ const { defineField, handleSubmit, errors, setFieldValue, setFieldError, submitC
 
 const [username] = defineField('username')
 
-const bannerClass = computed(() => {
-  switch (banner.value?.kind) {
-    case 'rate-limit':
-      return 'border-amber-300 bg-amber-50 text-amber-800'
-    case 'network':
-      return 'border-slate-300 bg-slate-50 text-slate-700'
-    default:
-      return 'border-red-300 bg-red-50 text-red-700'
-  }
-})
+/**
+ * CR-190: nada Alert V5 per jenis banner: batas permintaan (429) = warning; gangguan jaringan (Figma 2130-65378),
+ * captcha, dan galat lain = error. Role tetap role="alert" untuk semua banner.
+ */
+const bannerTone = computed<'danger' | 'warning'>(() => (banner.value?.kind === 'rate-limit' ? 'warning' : 'danger'))
+
+/** CR-190: tautan "Kembali ke halaman masuk" gaya V5 (warna tautan + panah). */
+const LINK_KEMBALI =
+  'mx-auto inline-flex items-center gap-1 rounded-v5-sm text-[13px] font-medium leading-5 text-v5-link hover:underline focus-visible:ring-2 focus-visible:ring-v5-blue focus-visible:ring-offset-2 focus-visible:ring-offset-white focus-visible:outline-none'
 
 /** Token hanya dikembalikan backend di development; kotak ini tidak pernah tampil di build production. */
 const devToken = computed(() => (import.meta.env.DEV && result.value?.token ? result.value.token : null))
@@ -95,67 +97,51 @@ const onSubmit = handleSubmit(async (values) => {
 
 <template>
   <AuthCardLayout>
-    <div v-if="result" class="space-y-4 rounded-xl bg-white p-6 shadow-xl" data-testid="forgot-result">
-      <div class="flex items-start gap-3">
-        <MailCheck class="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" aria-hidden="true" />
-        <div>
-          <h2 class="text-lg font-semibold text-slate-800">Permintaan diterima</h2>
-          <p class="mt-1 text-sm text-slate-600" role="status" data-testid="forgot-message">{{ result.message }}</p>
-          <p class="mt-2 text-xs text-slate-500">
-            Tautan reset hanya berlaku sementara dan hanya bisa dipakai sekali. Jika tidak menerima tautan, hubungi
-            Admin Kepegawaian satker Anda.
-          </p>
-        </div>
-      </div>
+    <div v-if="result" class="flex flex-col gap-4" data-testid="forgot-result">
+      <h2 class="mb-2 text-[17px] font-semibold leading-[26px] tracking-[-0.25px] text-v5-text">Permintaan diterima</h2>
+
+      <!-- CR-190: pola frame Tautan Terkirim (2234-73379): Alert sukses (role="status" di root UiNotice, satu live
+           region) berisi pesan backend + catatan masa berlaku. -->
+      <UiNotice appearance="v5" tone="success">
+        <p data-testid="forgot-message">{{ result.message }}</p>
+        <p class="mt-0.5 text-[13px] font-normal leading-5 tracking-[-0.05px] text-v5-text">
+          Tautan reset hanya berlaku sementara dan hanya bisa dipakai sekali. Jika tidak menerima tautan, hubungi
+          Admin Kepegawaian satker Anda.
+        </p>
+      </UiNotice>
 
       <div
         v-if="devToken"
-        class="rounded-md border border-dashed border-amber-400 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+        class="rounded-v5-md border border-dashed border-v5-warning bg-v5-warning-subtle px-3 py-2 text-[13px] leading-5 text-v5-warning-strong"
         data-testid="forgot-dev-token"
       >
         <p class="font-semibold">Mode pengembangan</p>
         <p class="mt-1">Kanal pengiriman belum aktif; token dikembalikan backend untuk pengujian.</p>
         <RouterLink
           :to="{ name: 'reset-password', hash: `#token=${encodeURIComponent(devToken)}` }"
-          class="mt-1 inline-block font-medium text-brand-primary underline"
+          class="mt-1 inline-block font-medium text-v5-link underline"
           data-testid="forgot-dev-link"
         >
           Buka halaman reset password
         </RouterLink>
       </div>
 
-      <RouterLink
-        :to="{ name: 'login' }"
-        class="block text-center text-sm font-medium text-brand-primary hover:underline"
-        data-testid="forgot-back-login"
-      >
+      <UiButton appearance="v5" variant="secondary" block :to="{ name: 'login' }" data-testid="forgot-back-login">
         Kembali ke halaman masuk
-      </RouterLink>
+      </UiButton>
     </div>
 
-    <form
-      v-else
-      class="space-y-4 rounded-xl bg-white p-6 shadow-xl"
-      novalidate
-      data-testid="forgot-form"
-      @submit="onSubmit"
-    >
-      <div>
-        <h2 class="text-lg font-semibold text-slate-800">Lupa Password</h2>
-        <p class="mt-1 text-sm text-slate-500">
+    <form v-else class="flex flex-col gap-4" novalidate data-testid="forgot-form" @submit="onSubmit">
+      <div class="mb-2">
+        <h2 class="text-[17px] font-semibold leading-[26px] tracking-[-0.25px] text-v5-text">Lupa Password</h2>
+        <p class="mt-1 text-[13px] leading-5 tracking-[-0.05px] text-v5-text-muted">
           Masukkan username/NIP akun Anda. Jika terdaftar, tautan untuk membuat password baru akan dikirimkan.
         </p>
       </div>
 
-      <div
-        v-if="banner"
-        class="rounded-md border px-3 py-2 text-sm"
-        :class="bannerClass"
-        role="alert"
-        :data-testid="`forgot-error-${banner.kind}`"
-      >
+      <UiNotice v-if="banner" appearance="v5" :tone="bannerTone" :data-testid="`forgot-error-${banner.kind}`">
         {{ banner.message }}
-      </div>
+      </UiNotice>
 
       <FormField
         v-model="username"
@@ -164,6 +150,7 @@ const onSubmit = handleSubmit(async (values) => {
         placeholder="Masukkan username atau NIP"
         autocomplete="username"
         required
+        appearance="v5"
         :error="errors.username"
       />
 
@@ -174,24 +161,22 @@ const onSubmit = handleSubmit(async (values) => {
           @expired="onCaptchaExpired"
           @error="onCaptchaExpired"
         />
-        <p v-if="submitCount > 0 && errors.captcha_token" class="text-xs text-red-600" role="alert">
+        <p
+          v-if="submitCount > 0 && errors.captcha_token"
+          class="flex items-start gap-1 text-[13px] leading-5 tracking-[-0.05px] text-v5-error-strong"
+          role="alert"
+        >
+          <CircleAlert class="mt-[3px] h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           {{ errors.captcha_token }}
         </p>
       </div>
 
-      <button
-        type="submit"
-        class="flex w-full items-center justify-center rounded-md bg-brand-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
-        :disabled="submitting"
-        data-testid="forgot-submit"
-      >
+      <UiButton type="submit" appearance="v5" block :disabled="submitting" :loading="submitting" data-testid="forgot-submit">
         {{ submitting ? 'Memproses...' : 'Kirim Tautan Reset' }}
-      </button>
+      </UiButton>
 
-      <RouterLink
-        :to="{ name: 'login' }"
-        class="block text-center text-sm font-medium text-brand-primary hover:underline"
-      >
+      <RouterLink :to="{ name: 'login' }" :class="LINK_KEMBALI">
+        <ArrowLeft class="h-4 w-4" aria-hidden="true" />
         Kembali ke halaman masuk
       </RouterLink>
     </form>

@@ -15,7 +15,12 @@
  * CR-028: wajib ditandai `aria-required` (bukan atribut `required` native) supaya validasi tetap milik Zod/VeeValidate
  * dan browser tidak memblokir submit lebih dulu; pesan bantu pada state error memakai role="alert" agar diumumkan
  * pembaca layar; wadah input selalu `relative` supaya slot `suffix` (mis. tombol lihat password) bisa diposisikan.
+ *
+ * CR-190: `appearance="v5"` (aditif) = V5 · Input (spesifikasi §3.2): label di atas (13/20, tanda * merah), kotak tinggi
+ * 38 radius 12, border #3C3C43 16%, ring fokus 2 lapis (merah saat error), helper error dengan ikon. Atribut ARIA
+ * (aria-invalid, aria-describedby, role="alert" pada helper error) sama dengan tampilan lain.
  */
+import { CircleAlert } from 'lucide-vue-next'
 import { computed, ref, useAttrs, useId, useSlots } from 'vue'
 
 import UiCombobox from './UiCombobox.vue'
@@ -30,7 +35,7 @@ const props = withDefaults(
     label?: string
     placeholder?: string
     type?: string
-    appearance?: 'stacked' | 'outlined'
+    appearance?: 'stacked' | 'outlined' | 'v5'
     state?: 'default' | 'error' | 'success'
     helpText?: string
     required?: boolean
@@ -109,7 +114,31 @@ const tone = computed(() => {
   return { border: 'border-slate-300', label: 'text-slate-700', help: 'text-slate-500' }
 })
 
-const controlClass = computed(() => [
+const isV5 = computed(() => props.appearance === 'v5')
+
+/** CR-190: warna label/helper/border tampilan V5 (token `v5.*`). */
+const toneV5 = computed(() => {
+  if (props.disabled) {
+    return { border: 'border-v5-border', label: 'text-v5-text-disabled', help: effState.value === 'error' ? 'text-v5-error-strong' : 'text-v5-text-disabled' }
+  }
+  if (effState.value === 'error') return { border: 'border-v5-error', label: 'text-v5-text', help: 'text-v5-error-strong' }
+  if (effState.value === 'success') return { border: 'border-v5-success', label: 'text-v5-text', help: 'text-v5-success-strong' }
+  return { border: 'border-v5-border hover:border-v5-border-hover', label: 'text-v5-text', help: 'text-v5-text-muted' }
+})
+
+const controlClassV5 = computed(() => [
+  'block h-[38px] w-full rounded-v5-md border px-[14px] text-[14px] leading-[22px] tracking-[-0.1px] text-v5-text outline-none transition',
+  'placeholder:text-v5-text-muted',
+  slots.suffix ? 'pr-10' : '',
+  toneV5.value.border,
+  props.disabled
+    ? 'cursor-not-allowed bg-v5-disabled text-v5-text-disabled placeholder:text-v5-text-disabled'
+    : effState.value === 'error'
+      ? 'bg-v5-field focus:ring-2 focus:ring-v5-error focus:ring-offset-2 focus:ring-offset-white'
+      : 'bg-v5-field focus:border-v5-blue focus:ring-2 focus:ring-v5-blue focus:ring-offset-2 focus:ring-offset-white',
+])
+
+const controlClass = computed(() => isV5.value ? controlClassV5.value : [
   'block w-full rounded-lg bg-white px-3 text-body1 text-slate-900 outline-none transition',
   'placeholder:text-slate-400',
   props.appearance === 'outlined' ? 'h-12' : 'h-11',
@@ -119,13 +148,24 @@ const controlClass = computed(() => [
   effState.value === 'default' && !props.disabled ? 'focus:border-brand-tertiary focus:ring-2 focus:ring-brand-tertiary/25' : '',
   props.disabled ? 'cursor-not-allowed bg-slate-100 text-slate-400' : '',
 ])
+
+const labelClass = computed(() =>
+  isV5.value
+    ? ['mb-1 block text-[13px] leading-5 tracking-[-0.05px]', toneV5.value.label]
+    : ['mb-1 block text-body2 font-medium', tone.value.label],
+)
+const helpClass = computed(() =>
+  isV5.value
+    ? ['mt-1 flex items-start gap-1 text-[13px] leading-5 tracking-[-0.05px]', toneV5.value.help]
+    : ['mt-1 text-caption', tone.value.help],
+)
 </script>
 
 <template>
   <div :class="fullWidth ? 'w-full' : ''">
     <!-- Tampilan stacked: label di atas kotak. -->
-    <label v-if="label && appearance === 'stacked'" :for="id" class="mb-1 block text-body2 font-medium" :class="tone.label">
-      {{ label }}<span v-if="required" class="text-danger"> *</span>
+    <label v-if="label && appearance !== 'outlined'" :for="id" :class="labelClass">
+      {{ label }}<span v-if="required" :class="isV5 ? 'text-v5-error-strong' : 'text-danger'"> *</span>
     </label>
 
     <div class="relative">
@@ -184,10 +224,10 @@ const controlClass = computed(() => [
     <p
       v-if="help"
       :id="`${id}-help`"
-      class="mt-1 text-caption"
-      :class="tone.help"
+      :class="helpClass"
       :role="effState === 'error' ? 'alert' : undefined"
     >
+      <CircleAlert v-if="isV5 && effState === 'error'" class="mt-[3px] h-3.5 w-3.5 shrink-0" aria-hidden="true" />
       {{ help }}
     </p>
   </div>

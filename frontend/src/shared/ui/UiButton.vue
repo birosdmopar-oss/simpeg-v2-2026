@@ -7,6 +7,11 @@
  * Navy #1C3964 dipakai untuk elemen struktural (topbar, sidebar aktif) dan tersedia sebagai varian `brand`.
  *
  * Reusable: dipakai seluruh halaman redesign. Render sebagai <button> atau <RouterLink>/<a> lewat prop `to`/`href`.
+ *
+ * CR-190: `appearance="v5"` (aditif) = Button V5 Primary "Liquid Glass": pill tinggi 38, navy #2D3F9A + glow, ring fokus
+ * 2 lapis; state Loading tetap navy dengan spinner, Disabled abu V5. `variant="secondary"` = Button V5 Secondary (isi abu
+ * 12%, teks gelap; Batal/Kembali). Varian lain dan `size` diabaikan pada tampilan ini.
+ * Tampilan bawaan (solid) dan tampilan lain tidak berubah.
  */
 import { computed } from 'vue'
 import type { RouteLocationRaw } from 'vue-router'
@@ -14,7 +19,7 @@ import type { RouteLocationRaw } from 'vue-router'
 const props = withDefaults(
   defineProps<{
     variant?: 'primary' | 'secondary' | 'error' | 'warning' | 'info' | 'success' | 'brand'
-    appearance?: 'solid' | 'outline' | 'ghost' | 'soft'
+    appearance?: 'solid' | 'outline' | 'ghost' | 'soft' | 'v5'
     size?: 'sm' | 'md' | 'lg'
     type?: 'button' | 'submit' | 'reset'
     disabled?: boolean
@@ -83,13 +88,33 @@ const SIZES = {
   lg: 'h-12 gap-2 rounded-xl px-5 text-body1',
 } as const
 
-const classes = computed(() => [
-  'inline-flex select-none items-center justify-center font-medium transition',
-  'disabled:cursor-not-allowed disabled:opacity-50 aria-disabled:cursor-not-allowed aria-disabled:opacity-50',
-  SIZES[props.size],
-  { solid: SOLID, outline: OUTLINE, ghost: GHOST, soft: SOFT }[props.appearance][props.variant],
-  props.block ? 'w-full' : '',
-])
+/** V5 Primary (spesifikasi §3.1): pill 38, padding 20, gap 8, Body/Medium 14/22. */
+const V5_BASE =
+  'inline-flex h-[38px] select-none items-center justify-center gap-2 rounded-full px-5 text-[14px] font-medium leading-[22px] tracking-[-0.1px] transition focus-visible:ring-2 focus-visible:ring-v5-blue focus-visible:ring-offset-2 focus-visible:ring-offset-white focus-visible:outline-none'
+
+const v5State = computed(() => {
+  if (props.disabled && !props.loading) return 'cursor-not-allowed bg-v5-disabled text-v5-text-disabled'
+  // Secondary V5 (Batal, Kembali): isi surface/disabled 12%, teks gelap.
+  if (props.variant === 'secondary') {
+    return props.loading
+      ? 'cursor-progress bg-v5-disabled text-v5-text'
+      : 'bg-v5-disabled text-v5-text hover:bg-v5-secondary-hover active:bg-v5-secondary-pressed'
+  }
+  if (props.loading) return 'cursor-progress bg-v5-primary text-white shadow-v5-button'
+  return 'bg-v5-primary text-white shadow-v5-button hover:bg-v5-primary-hover active:bg-v5-primary-pressed'
+})
+
+const classes = computed(() =>
+  props.appearance === 'v5'
+    ? [V5_BASE, v5State.value, props.block ? 'w-full' : '']
+    : [
+        'inline-flex select-none items-center justify-center font-medium transition',
+        'disabled:cursor-not-allowed disabled:opacity-50 aria-disabled:cursor-not-allowed aria-disabled:opacity-50',
+        SIZES[props.size],
+        { solid: SOLID, outline: OUTLINE, ghost: GHOST, soft: SOFT }[props.appearance][props.variant],
+        props.block ? 'w-full' : '',
+      ],
+)
 
 const inert = computed(() => props.disabled || props.loading)
 </script>
