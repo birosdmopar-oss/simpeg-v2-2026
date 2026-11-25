@@ -39,8 +39,11 @@ const props = withDefaults(
     name?: string
     /** Select opsional: pilihan kosong (placeholder) bisa dipilih lagi untuk mengosongkan nilai. */
     allowEmpty?: boolean
+    /** CR-190: tampilan V5 untuk tipe text/password/number/date (UiTextField `appearance="v5"`). Aditif. */
+    appearance?: 'default' | 'v5'
   }>(),
   {
+    appearance: 'default',
     type: 'text',
     placeholder: '',
     error: '',
@@ -97,6 +100,7 @@ function onCheck(value: boolean): void {
     :disabled="disabled"
     :autocomplete="autocomplete"
     :inputmode="inputmode"
+    :appearance="appearance === 'v5' ? 'v5' : 'stacked'"
     :state="state"
     :help-text="helpText"
     @update:model-value="emit('update:modelValue', $event)"
