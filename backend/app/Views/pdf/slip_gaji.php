@@ -11,7 +11,8 @@
  * "Dibuka" ±4,5 mm di bawah label; kalimat "adalah benar
  * pegawai …", Bulan/Tahun, dan "Menurut Rincian di bawah ini :" selebar penuh di bawah identitas + QR (sebelumnya di
  * kolom kiri 68% sehingga terlipat); jarak antar-blok kepala seragam; kolom "Rp." dan nominal baris selebar penuh
- * sejajar dengan sisi potongan; potongan bernilai nol ditulis "0" seperti penghasilan nol (bukan "- 0").
+ * sejajar dengan sisi potongan (termasuk ringkasan, yang kini diapit dua garis mendatar, bukan kotak ber-padding);
+ * kolom nominal setengah halaman 22% supaya "Rp." dekat ke angka; potongan bernilai nol ditulis "0" seperti penghasilan nol (bukan "- 0").
  *
  * [CATAT] Kop seragam (keputusan Horii 24-11-2026, acuan gambar; CR-191): kop lewat `KopResmi` (logo kiri | nama
  * kementerian, unit, alamat | logo kanan, garis) — menggantikan tata letak kop legacy slip. Semua teks di-escape
@@ -57,7 +58,7 @@ $tkGroups = ['Penghasilan' => ['kotor'], 'Potongan' => ['potongan']];
 // dan uang makan berada pada satu garis tegak (CR-192).
 $lebarSisi   = 47;
 $lebarCelah  = 100 - 2 * $lebarSisi;
-$kolSetengah = [62, 9, 29];
+$kolSetengah = [70, 8, 22];
 $kolPenuh    = [
     round($lebarSisi + $lebarCelah + $lebarSisi * $kolSetengah[0] / 100, 2),
     round($lebarSisi * $kolSetengah[1] / 100, 2),
@@ -75,7 +76,7 @@ $tint = static fn (string $label, int $nilai, string $bg, float $pt, bool $neg =
     . '<td width="' . $kolPenuh[1] . '%" align="right" style="font-size: ' . $pt . 'pt;"><b>Rp.</b></td>'
     . '<td width="' . $kolPenuh[2] . '%" align="right" style="font-size: ' . $pt . 'pt;"><b>' . $nominal($nilai, $neg) . '</b></td></tr>';
 $sp = static fn (int $px): string => '<tr><td colspan="3" style="font-size: ' . $px . 'px; line-height: ' . $px . 'px;">&nbsp;</td></tr>';
-// Jarak bagian 6/6/3 px (sebelumnya 10/10/5), dan tinggi baris rincian 1,35 (sebelumnya 1,4): kolom QR kini
+// Jarak bagian 6/6/3 px (sebelumnya 10/10/5), tinggi baris rincian 1,35 (sebelumnya 1,4), dan padding kotak luar 14 px (16): kolom QR kini
 // lebih tinggi (QR ±34 mm + label + tanggal sebagai tiga kelompok), dan slip wajib tetap satu halaman.
 $section = static fn (string $judul): string => $sp(6)
     . '<tr><td colspan="3" style="border-top: 0.75px solid #777777; font-size: 1px; line-height: 1px;">&nbsp;</td></tr>'
@@ -91,6 +92,7 @@ $tintSetengah = static fn (string $label, int $nilai, bool $neg = false): string
     . '<td width="' . $kolSetengah[2] . '%" align="right" style="font-size: 7.5pt;"><b>' . $nominal($nilai, $neg) . '</b></td></tr></table>';
 $duaKolom = static fn (string $kiri, string $kanan): string => '<tr><td colspan="3"><table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>'
     . '<td width="' . $lebarSisi . '%" valign="top">' . $kiri . '</td><td width="' . $lebarCelah . '%"></td><td width="' . $lebarSisi . '%" valign="top">' . $kanan . '</td></tr></table></td></tr>';
+$garisRingkasan = '<tr><td colspan="3" style="border-top: 1.2px solid #2c3e50; font-size: 1px; line-height: 1px;">&nbsp;</td></tr>';
 // Jarak tegak seragam antar-blok kepala slip (kop → judul → identitas/QR → kalimat pengantar).
 $jarak = '<table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="font-size: 1px; line-height: 8px;">&nbsp;</td></tr></table>';
 
@@ -130,10 +132,10 @@ $identitas      = [
 <style>
     body { font-family: helvetica; font-size: 8.5pt; color: #000000; }
     .tbl-ident td { font-size: 8.5pt; line-height: 1.6; }
-    .tbl-identitas td { line-height: 1.9; }
+    .tbl-identitas td { line-height: 1.75; }
     .tbl-section td { font-size: 7.5pt; line-height: 1.35; }
 </style>
-<table width="100%" cellpadding="16" cellspacing="0" border="0" style="border: 1px solid #000000;">
+<table width="100%" cellpadding="14" cellspacing="0" border="0" style="border: 1px solid #000000;">
 <tr><td>
     <?= KopResmi::html($d->kop['nama_kementerian'], $d->kop['nama_unit'], $d->kop['alamat'], $d->logoKiri, $d->logoKanan) ?>
 
@@ -200,15 +202,17 @@ $identitas      = [
         <?= $baris($labelUm, $sen('uang_makan'), 6) ?>
 
         <?= $section('RINGKASAN PENGHASILAN') ?>
-        <tr><td colspan="3"><table width="100%" cellpadding="8" cellspacing="0" border="0" style="border: 1.2px solid #2c3e50;"><tr><td>
-            <table class="tbl-section" width="100%" cellpadding="0" cellspacing="0" border="0">
-                <?= $baris($labelGppBersih, $ringkasan['bersih_gpp']) ?>
-                <?= $baris($labelTkBersih, $ringkasan['bersih_tk']) ?>
-                <?= $baris('Uang Makan', $sen('uang_makan')) ?>
-                <?= $sp(3) ?>
-                <?= $tint(FormatSlip::labelTotal($d->periode), $ringkasan['total_penghasilan'], '#d5dbe3', 9) ?>
-            </table>
-        </td></tr></table></td></tr>
+        <?php // Ringkasan diapit dua garis mendatar (bukan kotak ber-padding): barisnya memakai kolom yang sama dengan baris di
+        // atasnya, sehingga "Rp." dan nominal segaris tegak dengan seluruh rincian (CR-192).?>
+        <?= $garisRingkasan ?>
+        <?= $sp(5) ?>
+        <?= $baris($labelGppBersih, $ringkasan['bersih_gpp']) ?>
+        <?= $baris($labelTkBersih, $ringkasan['bersih_tk']) ?>
+        <?= $baris('Uang Makan', $sen('uang_makan')) ?>
+        <?= $sp(3) ?>
+        <?= $tint(FormatSlip::labelTotal($d->periode), $ringkasan['total_penghasilan'], '#d5dbe3', 9) ?>
+        <?= $sp(5) ?>
+        <?= $garisRingkasan ?>
     </table>
 </td></tr>
 </table>

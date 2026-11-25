@@ -25,6 +25,9 @@ use RuntimeException;
  */
 final class PdfSlipGajiTest extends CIUnitTestCase
 {
+    /** Objek halaman PDF (`/Type /Page`, bukan `/Pages`). */
+    private const POLA_HALAMAN = '/\/Type\s*\/Page\b(?!s)/';
+
     public function testPdfValidDenganQrGambar(): void
     {
         $isi = PdfSlipGaji::bawaan()->render($this->data());
@@ -121,26 +124,43 @@ final class PdfSlipGajiTest extends CIUnitTestCase
         $this->assertStringNotContainsString('<td width="68%"', $html);
         $this->assertGreaterThan(0, $awalDuaKolom);
 
-        // Kolom "Rp." dan nominal: setengah halaman 62|9|29; baris penuh memakai lebar sisi kanan (53 + 47×62% = 82,14 dst.).
-        $this->assertStringContainsString('<td width="62%" align="left" style="padding-left: 16px;">Potongan Lain-lain</td><td width="9%" align="right">Rp.</td><td width="29%" align="right">0</td>', $html, 'potongan nol tanpa tanda minus, seperti penghasilan nol');
-        $this->assertStringContainsString('<td width="9%" align="right">Rp.</td><td width="29%" align="right">-&nbsp;12.345</td>', $html, 'potongan bukan-nol tetap bertanda minus');
+        // Kolom "Rp." dan nominal: setengah halaman 70|8|22 ("Rp." dekat ke angka); baris penuh memakai lebar sisi kanan
+        // (53 + 47×70% = 85,9; 47×8% = 3,76; 47×22% = 10,34) sehingga segaris tegak dengan sisi potongan.
+        $this->assertStringContainsString('<td width="70%" align="left" style="padding-left: 16px;">Potongan Lain-lain</td><td width="8%" align="right">Rp.</td><td width="22%" align="right">0</td>', $html, 'potongan nol tanpa tanda minus, seperti penghasilan nol');
+        $this->assertStringContainsString('<td width="8%" align="right">Rp.</td><td width="22%" align="right">-&nbsp;12.345</td>', $html, 'potongan bukan-nol tetap bertanda minus');
         $this->assertStringNotContainsString('-&nbsp;0<', $html);
-        $this->assertStringContainsString('<td width="4.23%" align="right">Rp.</td><td width="13.63%" align="right">500.000</td>', $html, 'uang makan: kolom sejajar sisi potongan');
-        $this->assertMatchesRegularExpression('/<td width="82\.14%"[^>]*><b>Total Penghasilan Bulan Oktober 2026<\/b><\/td><td width="4\.23%"[^>]*><b>Rp\.<\/b><\/td><td width="13\.63%"[^>]*><b>7\.500\.000<\/b>/', $html);
-        $this->assertEqualsWithDelta(100.0, 82.14 + 4.23 + 13.63, 0.001);
+        $this->assertStringContainsString('<td width="3.76%" align="right">Rp.</td><td width="10.34%" align="right">500.000</td>', $html, 'uang makan: kolom sejajar sisi potongan');
+        $this->assertMatchesRegularExpression('/<td width="85\.9%"[^>]*><b>Total Penghasilan Bulan Oktober 2026<\/b><\/td><td width="3\.76%"[^>]*><b>Rp\.<\/b><\/td><td width="10\.34%"[^>]*><b>7\.500\.000<\/b>/', $html);
+        $this->assertEqualsWithDelta(100.0, 85.9 + 3.76 + 10.34, 0.001);
+
+        // Ringkasan: diapit dua garis mendatar dan memakai kolom yang SAMA dengan baris lain (bukan kotak ber-padding yang
+        // menggeser "Rp."/nominal): tidak ada tabel bersarang di antara judul ringkasan dan total.
+        $ringkasan = substr($html, (int) strpos($html, 'RINGKASAN PENGHASILAN'));
+        $this->assertSame(2, substr_count($ringkasan, 'border-top: 1.2px solid #2c3e50'));
+        $this->assertStringNotContainsString('<table', substr($ringkasan, 0, (int) strpos($ringkasan, 'Total Penghasilan Bulan')));
+        $this->assertStringNotContainsString('cellpadding="8"', $html);
+        $this->assertSame(3, substr_count($ringkasan, '<td width="3.76%" align="right">Rp.</td><td width="10.34%" align="right">'), 'tiga baris ringkasan berkolom sama');
     }
 
     /**
-     * Slip wajib tetap SATU halaman (README Presensi PDF-6) walau kepala slip dirapikan (CR-192): kasus terpanjang —
-     * nama instansi panjang (kalimat pengantar dua baris), QR, dan baris "Dibuka".
+     * Slip wajib tetap SATU halaman (README Presensi PDF-6) walau kepala slip dirapikan (CR-192): kasus terburuk —
+     * nama instansi panjang (kalimat pengantar dua baris), QR, baris "Dibuka", dan Jabatan / Satuan Organisasi / Satuan
+     * Kerja panjang (masing-masing terlipat).
      */
     public function testSlipTetapSatuHalamanDenganNamaInstansiPanjang(): void
     {
         $panjang = 'Kementerian Pariwisata dan Ekonomi Kreatif/Badan Pariwisata dan Ekonomi Kreatif Republik Indonesia';
 
+        $terburuk = PdfSlipGaji::bawaan()->render($this->data(namaInstansi: $panjang, identitas: [
+            'jabatan' => 'Analis Sumber Daya Manusia Aparatur Ahli Muda pada Subbagian Contoh Perencanaan dan Pengembangan Karier Pegawai',
+            'unit'    => 'Deputi Bidang Contoh Pengembangan Destinasi dan Infrastruktur Pariwisata serta Ekonomi Kreatif Nasional',
+            'satker'  => 'Direktorat Contoh Tata Kelola Destinasi dan Pariwisata Berkelanjutan Wilayah Indonesia Bagian Timur',
+        ]));
+        $this->assertSame(1, preg_match_all(self::POLA_HALAMAN, $terburuk), 'satu halaman: identitas dan nama instansi panjang');
+
         foreach ([null, $panjang] as $namaInstansi) {
             $isi = PdfSlipGaji::bawaan()->render($this->data(namaInstansi: $namaInstansi));
-            $this->assertSame(1, preg_match_all('/\/Type\s*\/Page\b(?!s)/', $isi), 'satu halaman: ' . ($namaInstansi ?? 'bawaan'));
+            $this->assertSame(1, preg_match_all(self::POLA_HALAMAN, $isi), 'satu halaman: ' . ($namaInstansi ?? 'bawaan'));
         }
     }
 
@@ -208,9 +228,10 @@ final class PdfSlipGajiTest extends CIUnitTestCase
     }
 
     /**
-     * @param array<string, int> $sen
+     * @param array<string, int>    $sen
+     * @param array<string, string> $identitas pengganti sebagian identitas (mis. jabatan/unit/satker panjang)
      */
-    private function data(string $nama = 'Ana Budi', ?string $urlQr = 'https://contoh.test/verify/slip/token-rahasia', bool $dibuka = true, array $sen = [], ?string $namaInstansi = null): DataPdfSlip
+    private function data(string $nama = 'Ana Budi', ?string $urlQr = 'https://contoh.test/verify/slip/token-rahasia', bool $dibuka = true, array $sen = [], ?string $namaInstansi = null, array $identitas = []): DataPdfSlip
     {
         $tambahan = $sen;
         $sen      = array_fill_keys(KolomGaji::semuaField(), 0);
@@ -226,7 +247,7 @@ final class PdfSlipGajiTest extends CIUnitTestCase
 
         return new DataPdfSlip(
             PeriodeSlip::buat(2026, 10),
-            ['nama' => $nama, 'nip' => '199001012020121001', 'pangkat' => 'Penata / III/c', 'jabatan' => 'Analis', 'unit' => 'Biro SDM', 'satker' => 'Sekretariat'],
+            [...['nama' => $nama, 'nip' => '199001012020121001', 'pangkat' => 'Penata / III/c', 'jabatan' => 'Analis', 'unit' => 'Biro SDM', 'satker' => 'Sekretariat'], ...$identitas],
             $sen,
             '9-2026',
             ['nama_kementerian' => 'Kementerian Uji<br>', 'nama_unit' => 'Unit<br />SDM', 'alamat' => 'Jl. Contoh <a href="https://contoh.test">laman</a>'],
