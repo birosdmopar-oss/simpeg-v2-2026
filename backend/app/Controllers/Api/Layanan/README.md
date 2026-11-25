@@ -62,6 +62,11 @@ terlihat → 403 bukan pelaku → 422 (`errors.status` untuk status/tanggal yang
 | `GET tb/{id}/lampiran/{id_attachment}` | 1,2,3,6 | Hak lihat detail; lampiran harus milik baris (kode 46/47 id itu, atau 48 milik perpanjangannya), selain itu 404. `attachment`, `nosniff`, `no-store` |
 | `GET tb/{id}/surat` | 1,2,3,6 | Hak lihat detail; hanya status 1 (lain 404). SK unggahan PIC bila ada, kalau tidak PDF dirender dari `Views/pdf/surat_tb.php` (kop kementerian, penanda tangan Kabiro kepegawaian dari WebConfig) |
 
+**[CATAT] Kop seragam (keputusan Horii 24-11-2026, acuan gambar; CR-191).** Surat Cuti, Tugas Belajar, dan Izin Belajar
+memakai `KopDokumen::htmlSurat()` → `Libraries/Pdf/KopResmi.php`: berlogo (menggantikan F7-15 "tanpa logo"), baris 2 =
+`web_config` `pdf_header_nama_unit` (K2; kosong → baris dihilangkan), garis 2px. Isi surat tidak berubah. Rincian di
+`Libraries/Kepegawaian/README.md`.
+
 Contoh proses: `POST api/v1/tb/12/process` body `{"aksi": "tolak", "reason_note": "Berkas BAN PT belum ada"}` → 200 detail
 (`status` 2, `label_status` "Ditolak"). Galat: `{"status": "error", "message": "Validasi gagal.", "errors": {"reason_note": ["Alasan ditolak tidak boleh kosong."]}}`.
 

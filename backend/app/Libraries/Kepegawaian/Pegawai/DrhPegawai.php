@@ -13,6 +13,7 @@ use App\Libraries\Kepegawaian\Kalkulasi\TanggalBisnis;
 use App\Libraries\Kepegawaian\Lampiran\KolomBerkas;
 use App\Libraries\Kepegawaian\Struktur\StrukturService;
 use App\Libraries\Pdf\DokumenPdf;
+use App\Libraries\Pdf\KopResmi;
 use App\Libraries\Pdf\Pdf;
 use CodeIgniter\Database\BaseConnection;
 use CodeIgniter\I18n\Time;
@@ -26,7 +27,8 @@ use Throwable;
  * v2 → 403 untuk NIP lain), role 1/3/4/5/8 sesuai PegawaiScope lihat (role 3 lingkup; 1/4/5/8 semua). [V2] PDF saja
  * (TCPDF, ADR-033): format HTML/DOCX legacy dan `drh_generator` (ZIP massal role 1) tidak dibuat. Data riwayat hanya
  * baca (tabel WS-1/WS-2, status 1, urutan legacy). Kop = nama kementerian + unit (unit 6/7: satker) + alamat header,
- * tanpa logo (aset lokal menyusul, sama dengan PDF LKH); foto pegawai disematkan bila berkasnya tersedia.
+ * berlogo lewat `KopResmi` ([CATAT] kop seragam, keputusan Horii 24-11-2026, CR-191 — menggantikan "tanpa logo");
+ * foto pegawai disematkan bila berkasnya tersedia.
  */
 final class DrhPegawai
 {
@@ -248,11 +250,8 @@ final class DrhPegawai
             $alamat = $sumber;
         }
 
-        return '<table width="100%" cellpadding="0"><tr><td style="text-align:center;font-size:12pt;"><b>'
-            . esc(mb_strtoupper((string) ($wc['pdf_header_nama_kementerian'] ?? $wc['nama_kementerian'] ?? ''))) . '</b></td></tr>'
-            . '<tr><td style="text-align:center;font-size:9pt;"><b>' . esc(mb_strtoupper($unitPdf)) . '</b></td></tr>'
-            . '<tr><td style="text-align:center;font-size:8pt;">' . nl2br(esc($alamat)) . '</td></tr></table>'
-            . '<hr style="height:2px;" />';
+        // Kop seragam (CR-191): sumber unit/alamat di atas tidak berubah; nama lewat rantai tunggal `KopResmi::nama()`.
+        return KopResmi::html(esc(KopResmi::nama($wc)), esc($unitPdf), $alamat, ...KopResmi::logo($wc));
     }
 
     /**

@@ -94,7 +94,7 @@ final class KopSlipTest extends CIUnitTestCase
             'logo_wonderful_pdf'            => '../rahasia.png',
         ], $this->akar);
 
-        $this->assertSame(['nama_kementerian' => 'Kementerian<br>Uji', 'nama_unit' => 'Biro SDM', 'alamat' => 'Jl. Contoh'], $hasil['kop']);
+        $this->assertSame(['nama_kementerian' => 'Kementerian Uji', 'nama_unit' => 'Biro SDM', 'alamat' => 'Jl. Contoh'], $hasil['kop'], 'nama lewat KopResmi::nama(): teks polos satu baris');
         $this->assertSame(realpath($this->akar . '/kop/logo-kiri.png'), $hasil['logoKiri']);
         $this->assertNull($hasil['logoKanan']);
         $this->assertSame('Kementerian Uji', $hasil['namaInstansi']);
@@ -104,13 +104,17 @@ final class KopSlipTest extends CIUnitTestCase
     {
         $hasil = KopSlip::dariWebConfig(['nama_kementerian' => '', 'pdf_header_nama_kementerian' => null], $this->akar);
 
-        $this->assertSame(['nama_kementerian' => '', 'nama_unit' => '', 'alamat' => ''], $hasil['kop']);
+        $this->assertSame(['nama_kementerian' => KopDokumen::NAMA_INSTANSI_BAWAAN, 'nama_unit' => '', 'alamat' => ''], $hasil['kop'], 'nama kop tidak pernah kosong (rantai tunggal CR-191)');
         $this->assertNull($hasil['logoKiri']);
         $this->assertNull($hasil['logoKanan']);
         $this->assertSame(KopDokumen::NAMA_INSTANSI_BAWAAN, $hasil['namaInstansi']);
 
         $hasil = KopSlip::dariWebConfig(['nama_kementerian' => 'Kementerian Uji'], $this->akar);
         $this->assertSame('Kementerian Uji', $hasil['kop']['nama_kementerian'], 'kop jatuh ke nama_kementerian (pola PDF LKH)');
+
+        // CR-191: "kosong" dinilai pada teks polos — header hanya `<br>` juga jatuh ke nama_kementerian.
+        $hasil = KopSlip::dariWebConfig(['pdf_header_nama_kementerian' => '<br />', 'nama_kementerian' => 'Kementerian Uji'], $this->akar);
+        $this->assertSame('Kementerian Uji', $hasil['kop']['nama_kementerian']);
     }
 
     public function testDirektoriAbsolut(): void

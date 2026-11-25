@@ -16,7 +16,7 @@ use App\Libraries\Pdf\Pdf;
 /**
  * Surat TB (PRD Fase 4 §6.7.6) — `GET tb/{id}/surat`. Hak = hak lihat detail; hanya TB disetujui (status 1), selain itu
  * 404. Bila ada SK unggahan PIC (`document_attachment` kode 47, terbaru) → itu yang diunduh; bila tidak → dirender
- * on-the-fly dari templat `pdf/surat_tb` [K `Tb.php:326-473`] dengan kop kementerian (`KopDokumen::html(null, null)`)
+ * on-the-fly dari templat `pdf/surat_tb` [K `Tb.php:326-473`] dengan kop kementerian (`KopDokumen::htmlSurat()`, kop seragam CR-191)
  * dan penanda tangan Kabiro kepegawaian (`PenandaTanganKabiro`, Q-06(a)).
  */
 class SuratTbService
@@ -55,7 +55,7 @@ class SuratTbService
         $ttd    = new PenandaTanganKabiro();
         $tujuan = $ttd->unitKepegawaian() ?? 'Sekretaris ' . (string) service('webConfigService')->value('nama_kementerian');
         $html   = view('pdf/surat_tb', ['tb' => $row, 'kabiro' => $ttd->kabiro(), 'tujuan' => $tujuan]);
-        $isi    = Pdf::renderer()->render(new DokumenPdf('Surat Tugas Belajar ' . (string) $row['nama'], $html, KopDokumen::html(null, null), marginAtasKop: 42));
+        $isi    = Pdf::renderer()->render(new DokumenPdf('Surat Tugas Belajar ' . (string) $row['nama'], $html, KopDokumen::htmlSurat(), marginAtasKop: 42));
 
         return ['isi' => $isi, 'nama' => "surat_tb_{$nip}_{$id}.pdf", 'pdf' => true, 'mime' => 'application/pdf'];
     }

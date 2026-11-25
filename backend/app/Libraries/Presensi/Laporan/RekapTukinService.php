@@ -116,6 +116,15 @@ final class RekapTukinService
             throw new ApiException('Persempit lingkup atau unduh XLSX.', 422, ['unit_satker' => ['Persempit lingkup atau unduh XLSX.']]);
         }
 
+        // [CATAT] Kop seragam (keputusan Horii 24-11-2026, CR-191): rekap sebelumnya TANPA kop; kini kop lingkup
+        // unit/satker dengan aturan `KopDokumen` (sama dengan dokumen daftar F-09). Isi rekap tidak berubah.
+        $kop = \App\Libraries\Pdf\KopDokumen::html(
+            $lingkup->tipe === LingkupLaporan::UNIT ? $lingkup->id : null,
+            $lingkup->tipe === LingkupLaporan::SATKER ? $lingkup->id : null,
+            $this->db,
+            true,
+        );
+
         $html = view('pdf/rekap_tukin', [
             'judul'         => $this->judul($p, false),
             'lingkup'       => $lingkup->nama,
@@ -125,7 +134,7 @@ final class RekapTukinService
         ], ['saveData' => false]);
 
         return [
-            'isi'  => Pdf::renderer()->render(new \App\Libraries\Pdf\DokumenPdf($this->judul($p, false) . ' ' . $p->label(), $html, orientasi: 'L', marginAtasKop: 12.0, marginSisi: 10.0)),
+            'isi'  => Pdf::renderer()->render(new \App\Libraries\Pdf\DokumenPdf($this->judul($p, false) . ' ' . $p->label(), $html, kopHtml: $kop, orientasi: 'L', marginAtasKop: 40.0, marginSisi: 10.0)),
             'nama' => sprintf('laporan_tukin_%s_%s.pdf', $lingkup->kode(), $p->kunci()),
             'mime' => 'application/pdf',
         ];

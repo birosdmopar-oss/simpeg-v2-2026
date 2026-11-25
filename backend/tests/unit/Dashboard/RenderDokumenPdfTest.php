@@ -102,7 +102,7 @@ final class RenderDokumenPdfTest extends CIUnitTestCase
 
         $this->assertSame('Kementerian Pariwisata', KopDokumen::NAMA_INSTANSI_BAWAAN);
         $this->assertStringContainsString('KEMENTERIAN PARIWISATA', $kop, 'nama bawaan bila web_config kosong');
-        $this->assertStringNotContainsString('font-size:9pt', $kop, 'tanpa lingkup: baris 2 (unit/satker) dihilangkan');
+        $this->assertStringNotContainsString('font-size:11pt', $kop, 'tanpa lingkup: baris 2 (unit/satker) dihilangkan');
     }
 
     public function testHeaderDanDataBerlebarSamaPerKolomTanpaSelEkstra(): void

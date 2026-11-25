@@ -179,9 +179,35 @@ final class DokumenUnduhTest extends DatabaseTestCase
 
         $satker = KopDokumen::html(null, $this->satker['A1'], $this->db);
         $this->assertStringContainsString('SATKER A1', $satker);
-        $this->assertStringContainsString('Jl. Satker A1</td>', $satker, 'tag HTML di alamat dibuang (strip_tags) lalu di-escape');
+        $this->assertStringContainsString('Jl. Satker A1</span>', $satker, 'tag HTML di alamat dibuang (strip_tags) lalu di-escape');
         $this->assertStringNotContainsString('<b>Jl', $satker);
-        $this->assertStringNotContainsString('<img', $satker, 'tanpa logo (F7-15)');
+        // Kop seragam (CR-191, menggantikan F7-15 "tanpa logo"): baris 1 dan 2 terpisah, dua logo bawaan, garis.
+        $this->assertStringContainsString('<span style="font-size:12.5pt;"><b>KEMENTERIAN UJI</b></span><br /><span style="font-size:11pt;"><b>SATKER A1</b></span>', $satker);
+        $this->assertSame(2, substr_count($satker, '<img src="@'), 'logo kiri dan kanan bawaan');
+        $this->assertStringContainsString('border-top:2px solid #000000', $satker);
+        $this->assertStringNotContainsString('font-size:11pt', $kemen, 'lingkup kementerian: tanpa baris unit');
+    }
+
+    /** K2 (CR-191): kop surat Cuti/TB/IB — baris 2 dari `pdf_header_nama_unit`; kosong → baris dihilangkan. */
+    public function testKopSuratBaris2DariWebConfigNamaUnit(): void
+    {
+        $this->db->table('web_config')->insertBatch([
+            ['config_name' => 'pdf_header_nama_kementerian', 'config_value' => 'Kementerian Uji'],
+            ['config_name' => 'pdf_header_alamat_kementerian', 'config_value' => 'Jl. Pusat No. 1<br />Jakarta'],
+        ]);
+        $this->cacheUji->invalidate(WebConfigService::CACHE_KEY);
+
+        $tanpaUnit = KopDokumen::htmlSurat($this->db);
+        $this->assertStringContainsString('<b>KEMENTERIAN UJI</b></span><br /><span style="font-size:9pt;">Jl. Pusat No. 1<br />' . "\n" . 'Jakarta</span>', $tanpaUnit, 'nama unit kosong → baris 2 dihilangkan');
+        $this->assertStringNotContainsString('font-size:11pt', $tanpaUnit);
+
+        $this->db->table('web_config')->insert(['config_name' => 'pdf_header_nama_unit', 'config_value' => 'Sekretariat<br />Uji']);
+        $this->cacheUji->invalidate(WebConfigService::CACHE_KEY);
+
+        $surat = KopDokumen::htmlSurat($this->db);
+        $this->assertStringContainsString('<b>KEMENTERIAN UJI</b></span><br /><span style="font-size:11pt;"><b>SEKRETARIAT UJI</b></span><br /><span style="font-size:9pt;">Jl. Pusat No. 1', $surat);
+        $this->assertSame(2, substr_count($surat, '<img src="@'));
+        $this->assertStringNotContainsString('SEKRETARIAT UJI', KopDokumen::html(null, null, $this->db), 'dokumen daftar lingkup kementerian tetap tanpa baris unit');
     }
 
     public function testBaperjakatPostPdfXlsxDanValidasi(): void

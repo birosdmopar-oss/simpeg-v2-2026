@@ -69,23 +69,23 @@ class WebConfig extends BaseConfig
         // --- Kop dokumen PDF (HTML tepercaya, dirender di kop; disanitasi saat simpan) ---
         'pdf_header_nama_kementerian' => [
             'label'       => 'Kop PDF: Nama Kementerian', 'group' => self::GROUP_KOP_PDF, 'type' => T::HTML, 'default' => '',
-            'description' => 'HTML kop (boleh <br>); ditampilkan huruf kapital.',
+            'description' => 'Baris 1 kop semua PDF; <br> menjadi spasi, tag lain dibuang, ditampilkan huruf kapital. Kosong = Nama Kementerian.',
         ],
         'pdf_header_nama_unit' => [
             'label'       => 'Kop PDF: Nama Unit', 'group' => self::GROUP_KOP_PDF, 'type' => T::HTML, 'default' => '',
-            'description' => 'Baris unit di kop Slip Gaji (key baru pascabaseline legacy).',
+            'description' => 'Baris unit di kop Slip Gaji dan Surat Cuti/Tugas Belajar/Izin Belajar; kosong = baris dihilangkan.',
         ],
         'pdf_header_alamat_kementerian' => [
             'label'       => 'Kop PDF: Alamat', 'group' => self::GROUP_KOP_PDF, 'type' => T::HTML, 'default' => '',
-            'description' => 'HTML alamat kop (boleh <br> dan tautan).',
+            'description' => 'Alamat kop semua PDF; <br> dan akhir paragraf/butir daftar/baris tabel = ganti baris; tag lain (termasuk tautan) dibuang, isinya dipertahankan sebagai teks biasa.',
         ],
         'logo_kementerian_pdf' => [
             'label'       => 'Kop PDF: Logo Kiri', 'group' => self::GROUP_KOP_PDF, 'type' => T::ASSET_PATH, 'default' => '',
-            'description' => 'Path relatif berkas logo di penyimpanan aset v2; kosong = logo bawaan v2.',
+            'description' => 'Path relatif berkas logo (PNG/JPEG) di penyimpanan aset v2; kosong atau berkas tidak sah = logo bawaan v2.',
         ],
         'logo_wonderful_pdf' => [
             'label'       => 'Kop PDF: Logo Kanan', 'group' => self::GROUP_KOP_PDF, 'type' => T::ASSET_PATH, 'default' => '',
-            'description' => 'Path relatif berkas logo di penyimpanan aset v2; kosong = logo bawaan v2.',
+            'description' => 'Path relatif berkas logo (PNG/JPEG) di penyimpanan aset v2; kosong atau berkas tidak sah = logo bawaan v2.',
         ],
         'logo_kementerian_url' => [
             'label'       => 'URL Logo Kiri (pratinjau)', 'group' => self::GROUP_KOP_PDF, 'type' => T::URL, 'default' => '',

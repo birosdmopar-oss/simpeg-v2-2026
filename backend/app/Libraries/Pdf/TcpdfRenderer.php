@@ -10,7 +10,8 @@ use TCPDF;
 /**
  * Implementasi TCPDF (ADR-033; `tecnickcom/tcpdf` ^6.6, LGPL-3.0-or-later, dipasang lewat Composer — tidak disalin ke
  * repo). Meniru `PdfCreator extends TCPDF` legacy: kop HTML hanya di halaman pertama (margin atas halaman pertama
- * `marginAtasKop`, berikutnya 10 mm), kaki HTML di setiap halaman, `writeHTML` untuk badan.
+ * `marginAtasKop` — atau tepat di bawah kop bila kop lebih tinggi, CR-191 —, berikutnya 10 mm), kaki HTML di setiap
+ * halaman, `writeHTML` untuk badan.
  *
  * [V2] Font: legacy memakai `arial`/`bookos` (berkas font lokal server legacy); v2 memakai font inti `helvetica`
  * (tanpa berkas font, tanpa unduhan runtime — ADR-033 §5). Direktori cache TCPDF = `WRITEPATH/cache/tcpdf/`.
@@ -20,6 +21,9 @@ final class TcpdfRenderer implements PdfRendererInterface
     public const FONT = 'helvetica';
 
     public const PEMBUAT = 'SIMPEG v2';
+
+    /** Jarak minimum (mm) antara akhir kop dan awal badan di halaman pertama. */
+    public const JARAK_KOP_BADAN = 2.0;
 
     public function render(DokumenPdf $dokumen): string
     {
@@ -42,10 +46,17 @@ final class TcpdfRenderer implements PdfRendererInterface
                     $this->SetY(8);
                     $this->SetFont(TcpdfRenderer::FONT, '', 11);
                     $this->writeHTML($this->dok->kopHtml, false, true, false, true);
-                    $this->SetTopMargin($this->dok->marginAtasKop);
+                    // Kop lebih tinggi dari margin (mis. alamat unit berbaris banyak) → badan mulai di bawah kop,
+                    // tidak menimpanya (CR-191).
+                    $this->SetTopMargin(max($this->dok->marginAtasKop, $this->GetY() + TcpdfRenderer::JARAK_KOP_BADAN));
                 } else {
                     $this->SetTopMargin(10);
                 }
+
+                // TCPDF memulihkan margin atas dari `pagedim[halaman]['tm']` saat tabel melintasi halaman; nilai itu
+                // dicatat SEBELUM Header() (masih margin kop halaman 1), sehingga halaman lanjutan tabel tanpa <thead>
+                // ikut kosong setinggi kop. Samakan dengan margin yang baru ditetapkan (CR-191).
+                $this->pagedim[$this->page]['tm'] = $this->tMargin;
             }
 
             // phpcs:ignore -- nama method milik TCPDF

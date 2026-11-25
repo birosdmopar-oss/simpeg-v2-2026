@@ -1,11 +1,13 @@
 <?php
 /**
  * PDF slip gaji (PRD 5A §7.3.6) — port tata letak legacy `0cf7e67` `views/hr/employee/sl_gaji/print/cetak.php` [K]:
- * kotak dokumen berisi kop (logo kiri/kanan, nama kementerian & unit satu baris, alamat), judul "SLIP GAJI", identitas
- * + QR, rincian A. GPP (dua kolom penghasilan | potongan) → B. TK → C. Uang Makan → Ringkasan Penghasilan.
+ * kotak dokumen berisi kop, judul "SLIP GAJI", identitas + QR, rincian A. GPP (dua kolom penghasilan | potongan) →
+ * B. TK → C. Uang Makan → Ringkasan Penghasilan.
  *
- * Semua teks di-escape (`esc`); kop = HTML tersanitasi `web_config` (G-09) yang sengaja dirender sebagai HTML, dengan
- * tautan dibuang seperti legacy.
+ * [CATAT] Kop seragam (keputusan Horii 24-11-2026, acuan gambar; CR-191): kop lewat `KopResmi` (logo kiri | nama
+ * kementerian, unit, alamat | logo kanan, garis) — menggantikan tata letak kop legacy slip. Semua teks di-escape
+ * (`esc`); teks kop `web_config` (G-09) dijadikan teks polos oleh `KopResmi` (hanya ganti baris dipertahankan; tautan
+ * dan tag lain dibuang).
  *
  * @var App\Libraries\Presensi\Slip\DataPdfSlip                                $d
  * @var string|null                                                            $qr
@@ -15,19 +17,14 @@
  * @var string                                                                 $labelUm
  * @var string                                                                 $tglCetak
  * @var string|null                                                            $dibuka
- * @var string                                                                 $logoKiri
- * @var string                                                                 $logoKanan
  */
 
+use App\Libraries\Pdf\KopResmi;
 use App\Libraries\Presensi\SlipGaji\FormatSlip;
 use App\Libraries\Presensi\SlipGaji\NominalGaji;
 
-$satuBaris = static fn (string $html): string => trim((string) preg_replace('/\s*<br\s*\/?>\s*/i', ' ', $html));
-$namaKem   = mb_strtoupper(strip_tags($satuBaris($d->kop['nama_kementerian'])));
-$namaUnit  = mb_strtoupper(strip_tags($satuBaris($d->kop['nama_unit'])));
-$alamat    = (string) preg_replace('/<a\b[^>]*>(.*?)<\/a>/is', '$1', $d->kop['alamat']);
-$rp        = static fn (int $sen): string => NominalGaji::formatAngka($sen);
-$sen       = static fn (string $f): int => $d->sen[$f] ?? 0;
+$rp  = static fn (int $sen): string => NominalGaji::formatAngka($sen);
+$sen = static fn (string $f): int => $d->sen[$f] ?? 0;
 
 // Kelompok rincian [K print/cetak.php @771f8b4 :262-277; TK @0cf7e67 :274-277].
 $gppGroups = [
@@ -105,29 +102,14 @@ $identitas      = [
 ?>
 <style>
     body { font-family: helvetica; font-size: 8.5pt; color: #000000; }
-    .h-title { font-size: 12pt; font-weight: bold; }
-    .h-sub { font-size: 10.5pt; font-weight: bold; }
-    .h-addr { font-size: 7.5pt; color: #111111; }
     .tbl-ident td { font-size: 8.5pt; line-height: 1.52; }
     .tbl-section td { font-size: 7.5pt; line-height: 1.4; }
 </style>
 <table width="100%" cellpadding="16" cellspacing="0" border="0" style="border: 1px solid #000000;">
 <tr><td>
+    <?= KopResmi::html($d->kop['nama_kementerian'], $d->kop['nama_unit'], $d->kop['alamat'], $d->logoKiri, $d->logoKanan) ?>
+
     <table width="100%" cellpadding="0" cellspacing="0" border="0">
-        <tr>
-            <td width="15%" align="left" valign="middle"><?= $logoKiri ?></td>
-            <td width="70%" align="center" valign="middle">
-                <table width="100%" cellpadding="0" cellspacing="0" border="0">
-                    <tr><td class="h-title" align="center"><?= esc($namaKem) ?></td></tr>
-                    <tr><td class="h-sub" align="center"><?= esc($namaUnit) ?></td></tr>
-                    <tr><td class="h-addr" align="center"><?= $alamat ?></td></tr>
-                </table>
-            </td>
-            <td width="15%" align="right" valign="middle"><?= $logoKanan ?></td>
-        </tr>
-    </table>
-    <table width="100%" cellpadding="0" cellspacing="0" border="0">
-        <tr><td style="border-top: 2.5px solid #000000; font-size: 1px; line-height: 1px;">&nbsp;</td></tr>
         <tr><td style="font-size: 1px; line-height: 10px;">&nbsp;</td></tr>
         <tr><td align="center" style="font-size: 8.5pt;">SLIP GAJI</td></tr>
         <tr><td style="font-size: 1px; line-height: 10px;">&nbsp;</td></tr>

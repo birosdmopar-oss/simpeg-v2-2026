@@ -19,7 +19,7 @@ use RuntimeException;
 
 /**
  * Surat cuti (PRD Fase 4 v1.3 §6.5.2, C-05): satu generator PDF untuk semua jalur (perbaikan E10) dengan kop kementerian
- * (`KopDokumen::html(null, null)`, K1/Q-10). Versi BELUM TTE dibuat otomatis saat efek final status 1/4
+ * (`KopDokumen::htmlSurat()`, K1/Q-10; kop seragam CR-191). Versi BELUM TTE dibuat otomatis saat efek final status 1/4
  * ({@see PenerbitSuratCutiInterface}, di dalam transaksi persetujuan) dan disimpan `document_attachment` kode
  * {@see CutiService::ID_SURAT_BELUM_TTE}; versi ber-TTE disimpan terpisah dengan kode {@see CutiService::ID_SURAT_TTE}.
  */
@@ -150,7 +150,7 @@ class SuratCutiService implements PenerbitSuratCutiInterface
             'qr'       => $url === null ? '' : Pdf::qrImg($url),
         ]);
 
-        return Pdf::renderer()->render(new DokumenPdf('Surat Cuti ' . (string) $cuti['nama'], $html, KopDokumen::html(null, null, $this->db), marginAtasKop: 42));
+        return Pdf::renderer()->render(new DokumenPdf('Surat Cuti ' . (string) $cuti['nama'], $html, KopDokumen::htmlSurat($this->db), marginAtasKop: 42));
     }
 
     /**

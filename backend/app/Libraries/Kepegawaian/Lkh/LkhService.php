@@ -15,6 +15,7 @@ use App\Libraries\Kepegawaian\Kalkulasi\TanggalBisnis;
 use App\Libraries\Kepegawaian\Struktur\StrukturService;
 use App\Libraries\ListQuery;
 use App\Libraries\Pdf\DokumenPdf;
+use App\Libraries\Pdf\KopResmi;
 use App\Libraries\Pdf\Pdf;
 use App\Libraries\Waktu\StempelUtc;
 use App\Models\Kepegawaian\LkhModel;
@@ -45,7 +46,7 @@ use DateTimeImmutable;
  * [V2]: tanpa pengecualian akun pengembang (USR_SADEV/USR_SPC); baris kegiatan setengah terisi ditolak 422 (legacy
  * membuangnya diam-diam); jam HH:MM; catatan wajib saat Tolak/Revisi; hapus = status 10 (setara trigger arsip legacy,
  * keputusan user); PDF hanya untuk LKH Disetujui (legacy regenerate_pdf/file_lckh) dan dibangkitkan saat diminta — QR =
- * kode LKH legacy (waktu WIB); kop tanpa logo.
+ * kode LKH legacy (waktu WIB); kop berlogo lewat `KopResmi` ([CATAT] kop seragam, keputusan Horii 24-11-2026, CR-191).
  *
  * Rekap LKH bawahan (MAKE-014, legacy `list_rekap`/`rekap` userAuth ['2']; keputusan user 13-10-2026: untuk siapa pun
  * yang menjadi atasan langsung, role LKH): bawahan = pegawai aktif yang snapshot jabatannya menunjuk jabatan pemanggil
@@ -320,11 +321,13 @@ final class LkhService implements LkhServiceInterface
         $wc  = $this->webConfig();
         $uns = $this->db()->table('unit')->select('unit, alamat_pdf_header')->where('id_unit', $row['id_unit'])->get()->getRowArray();
 
-        $kop = '<table width="100%" cellpadding="0"><tr><td style="text-align:center;font-size:12pt;"><b>'
-            . esc(mb_strtoupper((string) ($wc['pdf_header_nama_kementerian'] ?? $wc['nama_kementerian'] ?? ''))) . '</b></td></tr>'
-            . '<tr><td style="text-align:center;font-size:9pt;"><b>' . esc(mb_strtoupper((string) ($row['unit'] ?? ''))) . '</b></td></tr>'
-            . '<tr><td style="text-align:center;font-size:8pt;">' . nl2br(esc((string) ($uns['alamat_pdf_header'] ?? $wc['pdf_header_alamat_kementerian'] ?? ''))) . '</td></tr></table>'
-            . '<hr style="height:2px;" />';
+        // Kop seragam (CR-191): sumber unit/alamat tidak berubah; nama lewat rantai tunggal `KopResmi::nama()`.
+        $kop = KopResmi::html(
+            esc(KopResmi::nama($wc)),
+            esc((string) ($row['unit'] ?? '')),
+            (string) ($uns['alamat_pdf_header'] ?? $wc['pdf_header_alamat_kementerian'] ?? ''),
+            ...KopResmi::logo($wc),
+        );
 
         // Kode legacy: id . yy(tgl_laporan) . '0' . strtotime(created_at) — legacy menyimpan jam dinding WIB; v2 menyimpan UTC (CR-086),
         // jadi epoch dihitung dari UTC (instan sama dengan jam dinding WIB legacy).

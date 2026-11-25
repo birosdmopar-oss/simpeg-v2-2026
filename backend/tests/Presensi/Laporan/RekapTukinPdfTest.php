@@ -51,6 +51,14 @@ final class RekapTukinPdfTest extends DatabaseTestCase
         $this->assertStringContainsString('TOTAL POTONGAN (%) (PRESENSI + SKP)', $this->pdfTertangkap[0]->html);
         $this->assertStringContainsString('Pejabat tidak ditemukan', $this->pdfTertangkap[0]->html, 'blok penanda tangan selalu dicetak');
 
+        // Kop seragam (CR-191): rekap kini berkop lingkup (dulu tanpa kop), isi rekap tidak berubah.
+        $kop = $this->pdfTertangkap[0]->kopHtml;
+        $this->assertMatchesRegularExpression('/<span style="font-size:11pt;"><b>SATKER FIXTURE [^<]*<\/b><\/span>/', $kop, 'baris 2 = satker lingkup');
+        $this->assertSame(2, substr_count($kop, '<img src="@'));
+        $this->assertStringContainsString('border-top:2px solid #000000', $kop);
+        $this->assertSame(40.0, $this->pdfTertangkap[0]->marginAtasKop);
+        $this->assertStringContainsString('<td width="15.5%"></td>', $kop, 'lanskap: kop dibatasi di tengah');
+
         $config                    = new Presensi();
         $config->pdfRekapMaksBaris = 1;
 

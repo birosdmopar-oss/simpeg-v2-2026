@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Presensi\Laporan;
 
+use App\Libraries\Pdf\KopResmi;
 use App\Libraries\Presensi\Laporan\KopLaporanTukin;
 use Config\Presensi;
 use Tests\Support\DatabaseTestCase;
@@ -116,7 +117,7 @@ final class KopLaporanTukinTest extends DatabaseTestCase
         $this->assertLogoKanan('won.png', $kop);
     }
 
-    /** [V2] logo satker tidak ada → jatuh ke wonderful; keduanya tidak ada → sel kosong. */
+    /** [V2] logo satker tidak ada → jatuh ke wonderful; keduanya tidak ada → logo bawaan repo (CR-191; dulu sel kosong). */
     public function testUnit6LogoSatkerTidakAdaJatuhKeWonderful(): void
     {
         [$unit, $satker]                     = $this->unitSatker('', 'Jalan Satker 3', 'tidak-ada.png');
@@ -127,7 +128,38 @@ final class KopLaporanTukinTest extends DatabaseTestCase
         $this->assertLogoKanan('won.png', $kop);
 
         $kop = KopLaporanTukin::html($this->db, $this->wc(['logo_wonderful_pdf' => 'tidak-ada.png']), $this->config, $unit, $satker);
-        $this->assertSame(1, substr_count($kop, '<img '), 'hanya logo kiri');
+        $this->assertSame(2, substr_count($kop, '<img '));
+        $this->assertStringContainsString($this->logo['kem.png'], $kop, 'logo kiri web_config');
+        $this->assertStringContainsString(base64_encode((string) file_get_contents(KopResmi::logoBawaan(KopResmi::BERKAS_LOGO_KANAN))), $kop, 'logo kanan bawaan');
+    }
+
+    /** C2 (CR-191): alamat berstruktur blok tidak menyatu — tiap paragraf/butir jadi baris sendiri; "terisi" ikut aturan sama. */
+    public function testAlamatBerblokDipisahPerBaris(): void
+    {
+        [$unit, $satker] = $this->unitSatker('<p>Jalan Unit 2</p><p>Jakarta 10000</p>', '');
+        $kop             = $this->kop($unit, $satker);
+        $this->assertStringContainsString('<span style="font-size:9pt;">Jalan Unit 2<br />' . "\n" . 'Jakarta 10000</span>', $kop);
+
+        $kop = KopLaporanTukin::html($this->db, $this->wc(['pdf_header_alamat_kementerian' => '<ul><li>Jalan Kementerian 1</li><li>Laman: contoh.test</li></ul>']), $this->config, null, null);
+        $this->assertStringContainsString('<span style="font-size:9pt;">Jalan Kementerian 1<br />' . "\n" . 'Laman: contoh.test</span>', $kop);
+
+        // Alamat unit yang hanya berisi blok kosong = tidak terisi → alamat kementerian.
+        [$unit, $satker] = $this->unitSatker('<p> </p><p><br /></p>', '');
+        $this->assertStringContainsString(self::ALAMAT_KEMENTERIAN, $this->kop($unit, $satker));
+    }
+
+    /** Kop seragam (CR-191): baris 1 nama kementerian dan baris 2 unit terpisah, alamat, satu garis hitam. */
+    public function testTataLetakKopSeragam(): void
+    {
+        [$unit, $satker] = $this->unitSatker('Jalan Unit 2<br>Jakarta', '');
+        $kop             = $this->kop($unit, $satker);
+
+        $this->assertMatchesRegularExpression(
+            '/<span style="font-size:12\.5pt;"><b>KEMENTERIAN UJI<\/b><\/span><br \/><span style="font-size:11pt;"><b>UNIT FIXTURE [^<]*<\/b><\/span><br \/><span style="font-size:9pt;">Jalan Unit 2<br \/>\nJakarta<\/span>/',
+            $kop,
+        );
+        $this->assertSame(1, substr_count($kop, 'border-top:2px solid #000000'), 'satu garis hitam');
+        $this->assertStringNotContainsString('<hr', $kop, 'dua garis legacy (putih 7px + hitam 2px) diganti');
     }
 
     /**

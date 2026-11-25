@@ -4,20 +4,23 @@ declare(strict_types=1);
 
 namespace App\Libraries\Presensi\Laporan;
 
-use App\Libraries\Pdf\KopDokumen;
+use App\Libraries\Pdf\KopResmi;
 use App\Libraries\Presensi\Slip\KopSlip;
-use App\Libraries\Presensi\Slip\PdfSlipGaji;
 use CodeIgniter\Database\BaseConnection;
 use Config\Presensi;
 
 /**
- * Kop PDF laporan Tukin per pegawai — **ikut legacy berlogo** (keputusan Horii 28-10-2026): port tata letak konstanta
- * `MY_PDF_HEADER_UNIT` legacy `0cf7e67` (`config/constants.php:257`) dan pengisiannya (`L_presensi.php:7105-7118`) [K]:
- * tabel tiga baris — logo kiri (`###LOGO_KEMENTERIAN###`, lebar 94) | nama kementerian huruf besar tebal 12pt | logo kanan
- * (`###LOGO_UNS###`); baris 2 nama unit huruf besar tebal 9pt; baris 3 alamat 9pt; dua garis (putih 7px, hitam 2px).
+ * Kop PDF laporan Tukin per pegawai — **berlogo, sumber data ikut legacy** (keputusan Horii 28-10-2026): pengisian
+ * konstanta `MY_PDF_HEADER_UNIT` legacy `0cf7e67` (`L_presensi.php:7105-7118`) [K].
+ *
+ * [CATAT] Kop seragam (keputusan Horii 24-11-2026, acuan gambar; CR-191): TATA LETAK kini lewat {@see KopResmi}
+ * (logo kiri | nama 12,5pt, unit 11pt, alamat 9pt | logo kanan, satu garis hitam) — menggantikan tata letak tiga baris
+ * `MY_PDF_HEADER_UNIT` (nama 12pt, unit 9pt, dua garis putih 7px + hitam 2px). Logo yang tidak ada/tidak sah kini jatuh
+ * ke logo bawaan repo, bukan sel kosong. Sumber nama/unit/alamat/logo kanan di bawah TIDAK berubah.
  *
  * Sumber v2 (tanpa path di-hard-code, pola CR-066 / slip gaji):
- * - nama: `web_config` `pdf_header_nama_kementerian` → `nama_kementerian` → {@see KopDokumen::NAMA_INSTANSI_BAWAAN};
+ * - nama: `web_config` `pdf_header_nama_kementerian` → `nama_kementerian` → `KopDokumen::NAMA_INSTANSI_BAWAAN`
+ *   ({@see KopResmi::nama()}, rantai tunggal semua PDF);
  * - baris unit: nama **satker** bila unit ∈ {`$unitTtdSatkerTerpilih`, `$unitTtdSatkerKepegawaian`} (legacy id 6/7, F3),
  *   selain itu nama unit;
  * - alamat & logo kanan ikut cabang legacy [K] (`L_presensi.php:6512-6521` bawaan, `:7105-7116` pengisian):
@@ -26,8 +29,8 @@ use Config\Presensi;
  *   `satker.alamat_pdf_header` terisi → alamat satker + logo kanan `satker.logo_uns`; selain itu bawaan (termasuk unit 7
  *   ber-alamat unit, dan unit 6 tanpa alamat satker). "Terisi" = teks polos setelah `<br>`/tag dibuang tidak kosong;
  * - logo kiri `web_config` `logo_kementerian_pdf`; semua ASSET_PATH relatif dari `Config\Presensi::$akarAset`
- *   ({@see KopSlip::resolveAset}), PNG/JPEG disematkan ({@see PdfSlipGaji::logo()}); `satker.logo_uns` tidak ada/tidak sah
- *   → jatuh ke logo wonderful [V2]; keduanya tidak ada → sel kosong, PDF tetap dibuat.
+ *   ({@see KopSlip::resolveAset}), PNG/JPEG disematkan {@see KopResmi}; `satker.logo_uns` tidak ada/tidak sah
+ *   → jatuh ke logo wonderful [V2]; keduanya tidak ada → logo bawaan repo (CR-191), PDF tetap dibuat.
  *
  * **[CATAT] Kop PDF laporan Tukin per pegawai (keputusan Horii 28-10-2026)**
  *
@@ -52,9 +55,7 @@ final class KopLaporanTukin
 
         $pakaiSatker = $idUnit !== null && in_array($idUnit, [$config->unitTtdSatkerTerpilih, $config->unitTtdSatkerKepegawaian], true);
 
-        $nama = self::teks($wc['pdf_header_nama_kementerian'] ?? null);
-        $nama = $nama !== '' ? $nama : self::teks($wc['nama_kementerian'] ?? null);
-        $nama = $nama !== '' ? $nama : KopDokumen::NAMA_INSTANSI_BAWAAN;
+        $nama = KopResmi::nama($wc);
 
         $namaUnit = (string) ($pakaiSatker ? ($satker['satker'] ?? '') : ($unit['unit'] ?? ''));
 
@@ -74,32 +75,16 @@ final class KopLaporanTukin
         $kiri = KopSlip::resolveAset($config->akarAset, $wc['logo_kementerian_pdf'] ?? null);
         $kanan ??= KopSlip::resolveAset($config->akarAset, $wc['logo_wonderful_pdf'] ?? null);
 
-        $logoKiri  = PdfSlipGaji::logo($kiri, 94);
-        $logoKanan = PdfSlipGaji::logo($kanan, 94);
-        $spasi     = '<div style="font-size: 7px; line-height: .5;">&nbsp;</div>';
-
-        return '<table width="100%" cellpadding="0" border="0">'
-            . '<tr><td width="14%" rowspan="3">' . $logoKiri . '</td>'
-            . '<td width="72%" style="text-align: center; font-size: 12pt; line-height: 1;"><div style="font-size: 7px; line-height: 1;">&nbsp;</div><b>' . esc(mb_strtoupper($nama)) . '</b></td>'
-            . '<td width="14%" rowspan="3" style="text-align: right;">' . $logoKanan . '</td></tr>'
-            . '<tr><td style="text-align: center; font-size: 9pt; line-height: 1;">' . $spasi . '<b>' . esc(mb_strtoupper($namaUnit)) . '</b></td></tr>'
-            . '<tr><td style="text-align: center; font-size: 9pt; line-height: 1;">' . $spasi . nl2br(esc($alamat)) . '</td></tr>'
-            . '</table>'
-            . '<hr style="height: 7px; border-color: #ffffff; color: #ffffff; background-color: #ffffff;" />'
-            . '<hr style="height: 2px; border-color: #000000; color: #000000; background-color: #000000;" />';
+        // `$alamat` sudah teks polos: di-escape lagi supaya tidak diurai ulang sebagai HTML oleh komponen kop.
+        return KopResmi::html(esc($nama), esc($namaUnit), nl2br(esc($alamat)), $kiri, $kanan);
     }
 
     /**
-     * Teks polos dari nilai `web_config`/master yang mungkin ber-HTML (`<br>` → baris baru, tag lain dibuang).
+     * Teks polos dari nilai `web_config`/master yang mungkin ber-HTML — aturan {@see KopResmi::teksAlamat()} (`<br>` dan
+     * penutup blok → baris baru, tag lain dibuang), sehingga "terisi" dan isi alamat dinilai sama dengan PDF lain.
      */
     private static function teks(mixed $nilai): string
     {
-        if (! is_string($nilai)) {
-            return '';
-        }
-
-        $polos = strip_tags((string) preg_replace('/<br\s*\/?>/i', "\n", $nilai));
-
-        return trim(html_entity_decode($polos, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        return is_string($nilai) ? KopResmi::teksAlamat($nilai) : '';
     }
 }
