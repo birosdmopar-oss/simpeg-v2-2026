@@ -29,8 +29,8 @@ final class PdfSlipGaji
 {
     public const VIEW = 'pdf/slip_gaji';
 
-    /** Tinggi gambar QR di slip, px TCPDF (1 px = 0,353 mm → ±29 mm; CR-192, sebelumnya 128 px). */
-    public const TINGGI_QR_PX = 82;
+    /** Tinggi gambar QR di slip, px TCPDF (1 px = 0,353 mm → ±34 mm; CR-192, sebelumnya 128 px = ±45 mm). */
+    public const TINGGI_QR_PX = 96;
 
     /** @var Closure(string, int): string */
     private readonly Closure $pembuatQr;
