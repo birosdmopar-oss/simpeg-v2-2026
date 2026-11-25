@@ -1116,8 +1116,9 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
 
     /**
      * R8 B1: akar worksheet dengan 62 prefiks (masih di bawah batas deklarasi) tidak lagi diperbesar ke setiap rekaman
-     * sel: tag dibangun ulang per tag. Di dc3b33e2 setiap sel direkam ulang dengan 62 deklarasi `xmlns` (varian di luar
-     * filter: FATAL timeout). Proses anak; berkas sah → diimpor.
+     * sel: tag dibangun ulang per tag. Varian 340 ribu `<f>` di luar filter: di dc3b33e2 FATAL timeout (bukti merah).
+     * Varian 1.000 baris A-D: penjaga regresi (hijau juga di dc3b33e2), nilai identik dengan main. Proses anak; berkas
+     * sah → diimpor.
      */
     #[DataProvider('amplifikasiLingkup')]
     public function testLingkupNamespaceBanyakTidakDiperbesar(string $varian): void
@@ -1153,6 +1154,11 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
         $zip->addFromString('xl/worksheets/sheet1.xml', (string) preg_replace('~<worksheet ~', "<worksheet{$dekl} ", $xml, 1));
         $zip->close();
 
+        if ($varian === 'filter') {
+            // Penjaga regresi (tidak merah di dc3b33e2): nilai identik dengan main.
+            $this->assertSamaDenganMain($berkas);
+        }
+
         $hasil = $this->jalankanWorker($berkas, '256M', 30);
         $this->assertSame(200, $hasil['status'] ?? null, 'tanpa fatal: ' . json_encode($hasil));
         $this->assertLessThan(self::DETIK_CI, $hasil['detik'] ?? INF);
@@ -1170,7 +1176,7 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
 
     /**
      * R8 B2: well-formedness namespace kembali diperiksa libxml (parser ber-namespace), sama dengan main. Di dc3b33e2
-     * semua varian ini DITERIMA (`<:si>` bahkan dengan nilai berbeda dari main).
+     * semua varian ini DITERIMA. Varian sharedStrings dipisah ke {@see testNamespaceTidakSahDiSharedStringsDitolak}.
      */
     #[DataProvider('namespaceTidakSah')]
     public function testNamespaceTidakSahDitolakSepertiMain(string $varian): void
@@ -1208,8 +1214,6 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
      */
     public static function namespaceTidakSah(): iterable
     {
-        yield '<:si> di sharedStrings' => ['sst'];
-
         yield 'prefiks tidak terikat' => ['tanpaIkatan'];
 
         yield 'nama :z' => ['titikDua'];
@@ -1230,8 +1234,8 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
         $uri = static fn (int $n): string => 'urn:' . str_repeat('u', $n - 4);
         $isi = match ($varian) {
             'uri'   => '<row r="3"><c r="Z3" xmlns:q="' . $uri($ditolak ? 257 : 256) . '"><v>1</v></c></row>',
-            'dekl'  => '<row r="3">' . implode('', array_map(static fn (int $i): string => "<c r=\"Z3\" xmlns:q{$i}=\"urn:x\"/>", range(1, $ditolak ? 257 : 250))) . '</row>',
-            default => '<row r="3"><c r="Z3"' . implode('', array_map(static fn (int $i): string => " x{$i}=\"1\"", range(1, $ditolak ? 1025 : 1000))) . '/></row>',
+            'dekl'  => '<row r="3"><c r="Z3"' . implode('', array_map(static fn (int $i): string => " xmlns:q{$i}=\"urn:x\"", range(1, $ditolak ? 257 : 256))) . '/></row>',
+            default => '<row r="3"><c r="Z3"' . implode('', array_map(static fn (int $i): string => " x{$i}=\"1\"", range(1, $ditolak ? 1024 : 1023))) . '/></row>',
         };
         $berkas = $this->rakit('', $isi);
 
@@ -1251,13 +1255,13 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
 
         yield 'URI 257 byte' => ['uri', true];
 
-        yield '250 deklarasi' => ['dekl', false];
+        yield '256 deklarasi satu tag' => ['dekl', false];
 
-        yield '257 deklarasi' => ['dekl', true];
+        yield '257 deklarasi satu tag' => ['dekl', true];
 
-        yield '1.000 atribut' => ['atribut', false];
+        yield '1.024 atribut (termasuk r)' => ['atribut', false];
 
-        yield '1.025 atribut' => ['atribut', true];
+        yield '1.025 atribut (termasuk r)' => ['atribut', true];
     }
 
     /**
@@ -1271,7 +1275,7 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
 
         $mulai = hrtime(true);
         $this->assertGalatBerkas(self::RUSAK, $berkas);
-        $this->assertLessThan(1.0, (hrtime(true) - $mulai) / 1e9);
+        $this->assertLessThan(self::DETIK_CI, (hrtime(true) - $mulai) / 1e9);
     }
 
     /**
@@ -1316,6 +1320,196 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
         $awal = memory_get_peak_usage();
         $this->assertGalatBerkas(self::RUSAK, $berkas);
         $this->assertLessThan(32 * 1024 * 1024, memory_get_peak_usage() - $awal);
+    }
+
+    /**
+     * R9 P5: salah-namespace di sharedStrings (`<:si>`) → "rusak". Trade-off tercatat di README: main MENERIMA berkas ini
+     * (SimpleXML vendor memulihkan namespace), di sini parser ber-namespace menolaknya.
+     */
+    public function testNamespaceTidakSahDiSharedStringsDitolak(): void
+    {
+        $this->testNamespaceTidakSahDitolakSepertiMain('sst');
+    }
+
+    /**
+     * R9 BLOK: part sheet/sharedStrings UTF-16/32 → "rusak" sebelum dipindai (byte ASCII pindai mentah bisa dipalsukan
+     * karakter UTF-16 seperti U+4E3C `<` / U+4E22 `"`; di dc837f20 berkas reviewer FATAL 60-70 s). Juga varian UTF-16 sah.
+     */
+    #[DataProvider('partUtf16')]
+    public function testPartUtf16Ditolak(string $varian): void
+    {
+        $berkas = $this->rakit('');
+        $zip    = new ZipArchive();
+        $this->assertTrue($zip->open($berkas));
+        $nama = $varian === 'sst' ? 'xl/sharedStrings.xml' : 'xl/worksheets/sheet1.xml';
+
+        if ($varian === 'sst') {
+            $xml  = '<?xml version="1.0" encoding="UTF-8"?><sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><t>Q2</t></si></sst>';
+            $rels = (string) $zip->getFromName('xl/_rels/workbook.xml.rels');
+            $zip->addFromString('xl/_rels/workbook.xml.rels', str_replace('</Relationships>', '<Relationship Id="rIdS" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/></Relationships>', $rels));
+            $sheet = (string) $zip->getFromName('xl/worksheets/sheet1.xml');
+            $zip->addFromString('xl/worksheets/sheet1.xml', str_replace('<c r="A2" t="inlineStr"><is><t xml:space="preserve">Bagaimana cara mengajukan cuti?</t></is></c>', '<c r="A2" t="s"><v>0</v></c>', $sheet));
+        } else {
+            $xml = (string) $zip->getFromName($nama);
+
+            if ($varian === 'atribut') {
+                $atr = implode('', array_map(static fn (int $i): string => " x{$i}=\"\u{4E3C}\"", range(1, 20_000)));
+                $xml = str_replace('</sheetData>', "<row r=\"3\"><c r=\"Z3\"{$atr}/></row></sheetData>", $xml);
+            }
+        }
+
+        $xml = (string) preg_replace('~^<\?xml[^>]*\?>~', '<?xml version="1.0" encoding="UTF-16"?>', $xml);
+        $u16 = (string) mb_convert_encoding($xml, 'UTF-16LE', 'UTF-8');
+        $zip->addFromString($nama, $varian === 'tanpaBom' ? $u16 : "\xFF\xFE" . $u16);
+        $zip->close();
+
+        $mulai = hrtime(true);
+        $this->assertGalatBerkas(self::RUSAK, $berkas);
+        $this->assertLessThan(self::DETIK_CI, (hrtime(true) - $mulai) / 1e9);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function partUtf16(): iterable
+    {
+        yield 'sheet UTF-16LE sah ber-BOM' => ['polos'];
+
+        yield 'sheet UTF-16LE tanpa BOM' => ['tanpaBom'];
+
+        yield 'sharedStrings UTF-16LE' => ['sst'];
+
+        yield '20 ribu atribut bernilai U+4E3C' => ['atribut'];
+    }
+
+    /**
+     * R9 P1: pindai mentah hanya memeriksa markup di dalam tag, jadi teks sel/HTML bebas dan extLst Excel yang sah
+     * (satu `xmlns:xm` per elemen, 300 elemen) identik dengan main. Di dc837f20 ketiganya ditolak "rusak".
+     */
+    #[DataProvider('teksBebas')]
+    public function testTeksBebasDanExtLstSahSepertiMain(string $varian): void
+    {
+        $sesudah = '';
+        $baris   = '';
+
+        if ($varian === 'extLst') {
+            $cf      = str_repeat('<x14:conditionalFormatting xmlns:xm="http://schemas.microsoft.com/office/excel/2006/main"><x14:cfRule type="expression" priority="1" id="{00000000-0000-0000-0000-000000000001}"><xm:f>TRUE</xm:f></x14:cfRule><xm:sqref>A3</xm:sqref></x14:conditionalFormatting>', 300);
+            $sesudah = '<extLst><ext uri="{78C0D931-6437-407d-A8EE-F0AAD7539E65}" xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main"><x14:conditionalFormattings>' . $cf . '</x14:conditionalFormattings></ext></extLst>';
+        } else {
+            $teks = $varian === 'xmlns'
+                ? 'xmlns="' . str_repeat('u', 300)
+                : str_repeat('&lt;span a="1" b="2"&gt;x&lt;/span&gt;', 600);
+            $baris = "<row r=\"3\"><c r=\"A3\" t=\"inlineStr\"><is><t>Apa {$teks}?</t></is></c><c r=\"B3\" t=\"inlineStr\"><is><t>{$teks}</t></is></c><c r=\"C3\" t=\"inlineStr\"><is><t>Umum</t></is></c></row>";
+        }
+
+        $this->assertSamaDenganMain($this->rakit('', $baris, [], $sesudah));
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function teksBebas(): iterable
+    {
+        yield 'teks sel memuat xmlns=" + 300 byte' => ['xmlns'];
+
+        yield 'jawaban HTML dengan 1.200 pasangan =" dalam satu sel' => ['html'];
+
+        yield 'extLst 300 conditionalFormatting x14 (xmlns:xm per elemen)' => ['extLst'];
+    }
+
+    /**
+     * R9 P2: peringatan libxml yang tidak menggagalkan `xml_parse` di part sheet → "rusak" seperti main (CI4 menjadikan
+     * peringatan exception). Di dc837f20 diterima.
+     */
+    #[DataProvider('peringatanSheet')]
+    public function testPeringatanLibxmlSheetDitolak(string $varian): void
+    {
+        $berkas = $this->rakit('');
+        $zip    = new ZipArchive();
+        $this->assertTrue($zip->open($berkas));
+        $xml = (string) $zip->getFromName('xl/worksheets/sheet1.xml');
+        $xml = match ($varian) {
+            'versi11' => (string) preg_replace('~^<\?xml version="1\.0"~', '<?xml version="1.1"', $xml),
+            default   => str_replace('<t xml:space="preserve">Bagaimana', '<t xml:space="salah">Bagaimana', $xml),
+        };
+        $this->assertNotSame((string) $zip->getFromName('xl/worksheets/sheet1.xml'), $xml);
+        $zip->addFromString('xl/worksheets/sheet1.xml', $xml);
+        $zip->close();
+
+        $this->assertGalatBerkas(self::RUSAK, $berkas);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function peringatanSheet(): iterable
+    {
+        yield 'version 1.1' => ['versi11'];
+
+        yield 'xml:space tidak sah' => ['xmlSpace'];
+    }
+
+    /**
+     * R9 P3: prefiks tidak terikat di workbook.xml (sesudah `<sheets>`) → "rusak" seperti `load()` main (dulu diredam
+     * `@`). Catatan: URI namespace relatif diterima main maupun di sini (paritas).
+     */
+    public function testPeringatanWorkbookDitolak(): void
+    {
+        $berkas = $this->rakit('');
+        $zip    = new ZipArchive();
+        $this->assertTrue($zip->open($berkas));
+        $xml = (string) $zip->getFromName('xl/workbook.xml');
+        $this->assertStringContainsString('</sheets>', $xml);
+        $zip->addFromString('xl/workbook.xml', str_replace('</sheets>', '</sheets><q:calcPr/>', $xml));
+        $zip->close();
+
+        $this->assertGalatBerkas(self::RUSAK, $berkas);
+    }
+
+    /**
+     * R9 P4: batas panjang prefiks `xmlns:` deterministik, di dalam satu potongan maupun terbelah di batas potongan
+     * 8.192 byte aliran zip://: 64 → identik dengan main, 65 → "rusak".
+     */
+    #[DataProvider('prefiksPanjang')]
+    public function testPanjangPrefiksDeterministik(int $panjang, bool $lintas): void
+    {
+        $tag    = '<c r="Z3" xmlns:' . str_repeat('p', $panjang) . '="urn:x"/>';
+        $berkas = $this->rakit('', '<row r="3">@@' . $tag . '</row>');
+        $zip    = new ZipArchive();
+        $this->assertTrue($zip->open($berkas));
+        $xml = (string) $zip->getFromName('xl/worksheets/sheet1.xml');
+        $pos = (int) strpos($xml, '@@');
+        $pad = '';
+
+        if ($lintas) {
+            // `xmlns:pp…` dimulai 20 byte sebelum batas potongan berikutnya, jadi prefiksnya terbelah.
+            $target = (intdiv($pos + 64, 8192) + 1) * 8192;
+            $pad    = '<!--' . str_repeat('k', $target - 20 - $pos - 7 - strlen('<c r="Z3" ')) . '-->';
+            $this->assertSame($target - 20, $pos + strlen($pad) + strlen('<c r="Z3" '));
+        }
+
+        $zip->addFromString('xl/worksheets/sheet1.xml', str_replace('@@', $pad, $xml));
+        $zip->close();
+
+        if ($panjang > PembacaQnaXlsx::MAKS_PANJANG_PREFIKS) {
+            $this->assertGalatBerkas(self::RUSAK, $berkas);
+        } else {
+            $this->assertSamaDenganMain($berkas);
+        }
+    }
+
+    /**
+     * @return iterable<string, array{int, bool}>
+     */
+    public static function prefiksPanjang(): iterable
+    {
+        yield '64 dalam potongan' => [64, false];
+
+        yield '65 dalam potongan' => [65, false];
+
+        yield '64 lintas potongan' => [64, true];
+
+        yield '65 lintas potongan' => [65, true];
     }
 
     /**

@@ -82,6 +82,7 @@ final class PembacaQnaXlsx extends Xlsx
         $this->byteBaca     = 0;
         $this->terlaluBesar = false;
         $this->cacheMuat    = [];
+        $this->galatMuat    = [];
         $this->biayaShared  = 0;
 
         try {
@@ -239,7 +240,7 @@ final class PembacaQnaXlsx extends Xlsx
                 }
             }
 
-            $workbook = $this->muat($zip, $relTarget, $mainNs);
+            $workbook = $this->muat($zip, $relTarget, $mainNs, true);
             $tahun    = false;
 
             // Seperti load(): relasi gambar dalam sel (richData), nama entri dicocokkan persis.
@@ -484,7 +485,8 @@ final class PembacaQnaXlsx extends Xlsx
 
     // ---- Aliran SAX (ext-xml): jauh lebih murah per elemen daripada loop XMLReader di PHP. ----
 
-    private const POTONG = 65536;
+    /** Ukuran permintaan fread; aliran zip:// nyata mengembalikan potongan 8.192 byte (R9 catatan). */
+    private const POTONG = 8192;
 
     /**
      * Anggaran elemen XML part sheet yang dialirkan (R6 B4): border A1:Z20000 + 1.000 baris data (±540 ribu elemen, ±2,0 s)
@@ -517,28 +519,41 @@ final class PembacaQnaXlsx extends Xlsx
     /** Batas panjang nilai mentah satu deklarasi `xmlns`/`xmlns:*` (R7 K2, R8). URI OOXML terpanjang < 100 byte. */
     public const MAKS_URI_NS = 256;
 
-    /** Batas jumlah deklarasi `xmlns` mentah per part (R8). Tulisan Excel ±10 di akar, sedikit lagi di `extLst`. */
+    /**
+     * Batas deklarasi `xmlns` mentah per TAG (R9 P1): Excel menulis ±10 di akar; extLst menulis satu `xmlns:xm` per
+     * elemen, jadi batas per part tidak dipakai (300 conditionalFormatting x14 sah).
+     */
     public const MAKS_DEKL_NS = 256;
 
-    /**
-     * Batas pola atribut (`=` + kutip) mentah per tag (R8 B3): pemeriksaan atribut ganda libxml tidak bisa diinterupsi
-     * `max_execution_time`. Excel menulis < 20 atribut per tag.
-     */
+    /** Batas atribut (`=` di luar nilai ber-kutip) per tag (R8 B3, R9 P1). Excel menulis < 20 atribut per tag. */
     public const MAKS_ATRIBUT_TAG = 1024;
 
-    /** Batas jumlah `<c>` di dalam filter A1:D(maks+1) + E1 yang diurai (R8 P2); unik paling banyak 4.005. */
+    /** Batas panjang prefiks pada `xmlns:prefiks` (R9 P4). Excel menulis ≤ 8 karakter. */
+    public const MAKS_PANJANG_PREFIKS = 64;
+
+    /** Batas markup tag di antara dua nilai ber-kutip (nama elemen/atribut, `=`; spasi dirapatkan), deterministik (R9 P4). */
+    public const MAKS_MARKUP = 4096;
+
+    /** Batas sel di dalam filter A1:D(maks+1) + E1 yang diurai (R8 P2); unik paling banyak 4.005. */
     public const MAKS_SEL_FILTER = 8192;
 
     private int $selFilter = 0;
 
-    // Status pindai byte mentah per part (R8).
-    private string $sisaNs       = '';
-    private int $jumlahDekl      = 0;
-    private int $atributTag      = 0;
-    private bool $ekorSamaDengan = false;
+    // Status pindai byte mentah per part (R9): 0 teks, 1 tag, 2 nilai atribut, 3 komentar, 4 CDATA, 5 PI.
+    private int $pStatus    = 0;
+    private string $pSisa   = '';
+    private string $pMarkup = '';
+    private string $pKutip  = '"';
+    private bool $pNilaiNs  = false;
+    private int $pNilaiLen  = 0;
+    private int $pAtribut   = 0;
+    private int $pDeklTag   = 0;
 
     /** Nama SAX `uri\x1Fc` untuk jalur cepat sel. */
     private string $namaC = '';
+
+    /** @var array<string, true> entri muat() yang memicu galat/peringatan libxml (R9 P3) */
+    private array $galatMuat = [];
 
     /** @var array<string, SimpleXMLElement> hasil muat() per nama entri + namespace (R6 B3) */
     private array $cacheMuat = [];
@@ -669,11 +684,15 @@ final class PembacaQnaXlsx extends Xlsx
         xml_parser_set_option($parser, XML_OPTION_CASE_FOLDING, false);
         xml_set_element_handler($parser, $this->buka(...), $this->tutup(...));
         xml_set_character_data_handler($parser, $this->teks(...));
-        $ekor                 = '';
-        $this->sisaNs         = '';
-        $this->jumlahDekl     = 0;
-        $this->atributTag     = 0;
-        $this->ekorSamaDengan = false;
+        $ekor            = '';
+        $this->pStatus   = 0;
+        $this->pSisa     = '';
+        $this->pMarkup   = '';
+        $this->pNilaiLen = 0;
+        $this->pAtribut  = 0;
+        $this->pDeklTag  = 0;
+        $galatLama       = libxml_use_internal_errors(true);
+        libxml_clear_errors();
 
         try {
             while (! $this->henti && ! feof($aliran)) {
@@ -689,8 +708,7 @@ final class PembacaQnaXlsx extends Xlsx
                 }
 
                 // Seperti XmlScanner vendor: DOCTYPE (byte nol diabaikan) ditolak.
-                $bersih  = str_contains($potong, "\0") ? str_replace("\0", '', $potong) : $potong;
-                $periksa = $ekor . $bersih;
+                $periksa = $ekor . (str_contains($potong, "\0") ? str_replace("\0", '', $potong) : $potong);
 
                 if (str_contains($periksa, '<!DOCTYPE')) {
                     throw new RuntimeException('DOCTYPE tidak diizinkan.');
@@ -703,18 +721,24 @@ final class PembacaQnaXlsx extends Xlsx
                     throw new RuntimeException('Isi xlsx terlalu besar.');
                 }
 
-                $this->pindaiMentah($bersih);
+                $this->pindaiMentah($potong);
 
                 if (xml_parse($parser, $potong, false) !== 1) {
                     throw new RuntimeException('XML part xlsx tidak sah.');
                 }
+
+                self::periksaGalatLibxml();
             }
 
             if (! $this->henti && xml_parse($parser, '', true) !== 1) {
                 throw new RuntimeException('XML part xlsx tidak sah.');
             }
+
+            self::periksaGalatLibxml();
         } finally {
             fclose($aliran);
+            libxml_clear_errors();
+            libxml_use_internal_errors($galatLama);
         }
 
         if ($this->terlaluBesar) {
@@ -732,6 +756,13 @@ final class PembacaQnaXlsx extends Xlsx
         }
 
         $this->dalam++;
+
+        // Lapis kedua, tidak bergantung pindai mentah (R9): URI nama elemen dan jumlah atribut.
+        $p = strrpos($nama, "\x1F");
+
+        if (($p !== false && $p > self::MAKS_URI_NS) || count($atribut) > self::MAKS_ATRIBUT_TAG) {
+            throw new RuntimeException('Tag xlsx tidak wajar.');
+        }
 
         if (++$this->elemen > $this->anggaran) {
             $this->terlaluBesar = true;
@@ -1008,79 +1039,174 @@ final class PembacaQnaXlsx extends Xlsx
     }
 
     /**
-     * Pindai byte mentah satu potongan SEBELUM `xml_parse` (R8): parser ber-namespace menyalin URI ke setiap nama elemen
-     * dan atribut, dan pemeriksaan atribut ganda libxml berjalan di luar jangkauan `max_execution_time`, jadi keduanya
-     * dibatasi di sini. Byte nol sudah dibuang (UTF-16/32). Menolak → "rusak":
-     * - nilai deklarasi `xmlns`/`xmlns:*` > {@see MAKS_URI_NS} byte, atau > {@see MAKS_DEKL_NS} deklarasi per part;
-     * - > {@see MAKS_ATRIBUT_TAG} pola `=` + kutip di antara dua `<` (nilai atribut tidak boleh memuat `<`).
-     * Pola di dalam teks/komentar ikut terhitung (hanya bisa membuat berkas tidak wajar ditolak, tidak meloloskan).
+     * Galat/peringatan libxml yang tidak menggagalkan `xml_parse` (mis. version 1.1, `xml:space` tidak sah, xmlns relatif)
+     * → "rusak", seperti main yang menjadikan peringatan sebagai exception (R9 P2).
+     */
+    private static function periksaGalatLibxml(): void
+    {
+        if (libxml_get_errors() !== []) {
+            libxml_clear_errors();
+
+            throw new RuntimeException('XML part xlsx tidak sah.');
+        }
+    }
+
+    /**
+     * Pindai byte mentah satu potongan SEBELUM `xml_parse` (R8, R9 P1/P4): hanya markup DI DALAM tag yang diperiksa —
+     * teks, nilai atribut biasa, komentar, CDATA, dan PI dilewati — sehingga teks sel bebas tidak bisa memicu penolakan.
+     * Part UTF-16/32 sudah ditolak di {@see periksaEncoding}, jadi byte ASCII di sini adalah karakter ASCII. Menolak →
+     * "rusak": nilai `xmlns`/`xmlns:*` > {@see MAKS_URI_NS} byte; > {@see MAKS_DEKL_NS} deklarasi atau
+     * > {@see MAKS_ATRIBUT_TAG} atribut dalam satu tag; prefiks `xmlns:` > {@see MAKS_PANJANG_PREFIKS}; markup di antara dua
+     * nilai > {@see MAKS_MARKUP} byte. Status dibawa antarpotongan, jadi hasilnya tidak bergantung posisi potongan.
      */
     private function pindaiMentah(string $potong): void
     {
-        // Atribut per tag; `=` + spasi di akhir potongan dibawa ke potongan berikutnya.
-        if ($this->ekorSamaDengan && preg_match('/^[ \t\r\n]*["\']/', $potong) === 1) {
-            $this->atributTag++;
-        }
+        $s           = $this->pSisa . $potong;
+        $this->pSisa = '';
+        $n           = strlen($s);
+        $i           = 0;
 
-        if (preg_match_all('/<|=[ \t\r\n]*["\']/', $potong, $m) > 0) {
-            foreach ($m[0] as $token) {
-                if ($token === '<') {
-                    $this->atributTag = 0;
-                } elseif (++$this->atributTag > self::MAKS_ATRIBUT_TAG) {
-                    throw new RuntimeException('Atribut satu tag xlsx terlalu banyak.');
-                }
+        while ($i < $n) {
+            switch ($this->pStatus) {
+                case 0:
+                    $j = strpos($s, '<', $i);
+
+                    if ($j === false) {
+                        return;
+                    }
+
+                    if ($n - $j < 9) {
+                        // Pembeda `<!--`, `<![CDATA[`, `<?` belum lengkap: bawa ke potongan berikutnya.
+                        $this->pSisa = substr($s, $j);
+
+                        return;
+                    }
+
+                    $c = $s[$j + 1];
+
+                    if ($c !== '!' && $c !== '?') {
+                        // Jalur cepat tag biasa (mayoritas): tanpa kutip tunggal dan jumlah kutip ganda genap → `>` pertama
+                        // adalah penutup tag; tanpa `xmlns` dan `=` (termasuk di nilai) ≤ batas → tidak ada yang perlu dicek.
+                        $k = strpos($s, '>', $j);
+
+                        if ($k !== false && $k - $j <= self::MAKS_MARKUP) {
+                            $t = substr($s, $j, $k - $j);
+
+                            if (! str_contains($t, "'") && ! str_contains($t, 'xmlns') && substr_count($t, '"') % 2 === 0
+                                && substr_count($t, '=') <= self::MAKS_ATRIBUT_TAG) {
+                                $i = $k + 1;
+
+                                break;
+                            }
+                        }
+                    }
+
+                    if (substr_compare($s, '<!--', $j, 4) === 0) {
+                        $this->pStatus = 3;
+                        $i             = $j + 4;
+                    } elseif (substr_compare($s, '<![CDATA[', $j, 9) === 0) {
+                        $this->pStatus = 4;
+                        $i             = $j + 9;
+                    } elseif ($s[$j + 1] === '?') {
+                        $this->pStatus = 5;
+                        $i             = $j + 2;
+                    } else {
+                        $this->pStatus  = 1;
+                        $this->pMarkup  = '';
+                        $this->pAtribut = 0;
+                        $this->pDeklTag = 0;
+                        $i              = $j + 1;
+                    }
+
+                    break;
+
+                case 1:
+                    $k   = strcspn($s, '"\'>', $i);
+                    $seg = substr($s, $i, $k);
+                    $this->pMarkup .= $seg;
+                    $this->pAtribut += substr_count($seg, '=');
+
+                    if (strlen($this->pMarkup) > self::MAKS_MARKUP) {
+                        // Spasi dirapatkan: yang dibatasi panjang nama/prefiks, bukan spasi sah di antara atribut.
+                        $this->pMarkup = (string) preg_replace('/[ \t\r\n]++/', ' ', $this->pMarkup);
+                    }
+
+                    if (strlen($this->pMarkup) > self::MAKS_MARKUP) {
+                        throw new RuntimeException('Markup tag xlsx terlalu panjang.');
+                    }
+
+                    if ($this->pAtribut > self::MAKS_ATRIBUT_TAG) {
+                        throw new RuntimeException('Atribut satu tag xlsx terlalu banyak.');
+                    }
+
+                    $i += $k;
+
+                    if ($i >= $n) {
+                        return;
+                    }
+
+                    if ($s[$i] === '>') {
+                        $this->pStatus = 0;
+                        $i++;
+
+                        break;
+                    }
+
+                    $this->pNilaiNs = false;
+
+                    if (str_contains($this->pMarkup, 'xmlns')
+                        && preg_match('/([^\s=\/<>]++)\s*+=\s*+$/', $this->pMarkup, $m) === 1
+                        && ($m[1] === 'xmlns' || str_starts_with($m[1], 'xmlns:'))) {
+                        if (strlen($m[1]) - 6 > self::MAKS_PANJANG_PREFIKS) {
+                            throw new RuntimeException('Prefiks namespace xlsx terlalu panjang.');
+                        }
+
+                        if (++$this->pDeklTag > self::MAKS_DEKL_NS) {
+                            throw new RuntimeException('Deklarasi namespace xlsx terlalu banyak.');
+                        }
+
+                        $this->pNilaiNs = true;
+                    }
+
+                    $this->pKutip    = $s[$i];
+                    $this->pMarkup   = '';
+                    $this->pNilaiLen = 0;
+                    $this->pStatus   = 2;
+                    $i++;
+
+                    break;
+
+                case 2:
+                    $j = strpos($s, $this->pKutip, $i);
+                    $this->pNilaiLen += ($j === false ? $n : $j) - $i;
+
+                    if ($this->pNilaiNs && $this->pNilaiLen > self::MAKS_URI_NS) {
+                        throw new RuntimeException('Deklarasi namespace xlsx terlalu panjang.');
+                    }
+
+                    if ($j === false) {
+                        return;
+                    }
+
+                    $this->pStatus = 1;
+                    $i             = $j + 1;
+
+                    break;
+
+                default:
+                    $akhir = [3 => '-->', 4 => ']]>', 5 => '?>'][$this->pStatus];
+                    $j     = strpos($s, $akhir, $i);
+
+                    if ($j === false) {
+                        $this->pSisa = substr($s, max($i, $n - strlen($akhir) + 1));
+
+                        return;
+                    }
+
+                    $this->pStatus = 0;
+                    $i             = $j + strlen($akhir);
             }
         }
-
-        $this->ekorSamaDengan = preg_match('/=[ \t\r\n]*$/', $potong) === 1
-            || ($this->ekorSamaDengan && trim($potong, " \t\r\n") === '');
-
-        // Deklarasi namespace; spasi dirapatkan supaya sisa yang dibawa antarpotongan tetap kecil.
-        $buf  = (string) preg_replace('/[ \t\r\n]+/', ' ', $this->sisaNs . $potong);
-        $pos  = 0;
-        $dari = null;
-
-        while (preg_match('/xmlns(?::[^ =\/>"\'<]*)? ?= ?(["\'])/', $buf, $mm, PREG_OFFSET_CAPTURE, $pos) === 1) {
-            $awal  = $mm[0][1];
-            $nilai = $awal + strlen($mm[0][0]);
-            $tutup = strpos($buf, $mm[1][0], $nilai);
-
-            if ($tutup === false) {
-                if (strlen($buf) - $nilai > self::MAKS_URI_NS) {
-                    throw new RuntimeException('Deklarasi namespace xlsx terlalu panjang.');
-                }
-
-                $dari = $awal;
-
-                break;
-            }
-
-            if ($tutup - $nilai > self::MAKS_URI_NS) {
-                throw new RuntimeException('Deklarasi namespace xlsx terlalu panjang.');
-            }
-
-            if (++$this->jumlahDekl > self::MAKS_DEKL_NS) {
-                throw new RuntimeException('Deklarasi namespace xlsx terlalu banyak.');
-            }
-
-            $pos = $tutup + 1;
-        }
-
-        if ($dari === null) {
-            $t = strrpos($buf, 'xmlns', $pos);
-
-            if ($t !== false && preg_match('/^xmlns(?::[^ =\/>"\'<]*)? ?(?:= ?)?$/', substr($buf, $t)) === 1) {
-                if (strlen($buf) - $t > 1024) {
-                    throw new RuntimeException('Deklarasi namespace xlsx tidak wajar.');
-                }
-
-                $dari = $t;
-            } else {
-                $dari = max($pos, strlen($buf) - 5);
-            }
-        }
-
-        $this->sisaNs = substr($buf, $dari);
     }
 
     /**
@@ -1113,15 +1239,24 @@ final class PembacaQnaXlsx extends Xlsx
     {
         $awal = substr($potong, 0, 1024);
 
-        foreach (["\xEF\xBB\xBF", "\x00\x00\xFE\xFF", "\xFF\xFE\x00\x00", "\xFE\xFF", "\xFF\xFE"] as $bom) {
+        // R9 BLOK: part yang dialirkan (sheet/sharedStrings) wajib UTF-8 atau keluarga ASCII. UTF-16/32 (BOM, byte nol,
+        // atau deklarasi) → "rusak": byte ASCII pada pindai mentah bisa dipalsukan karakter UTF-16 (mis. U+4E3C). Excel dan
+        // LibreOffice menulis UTF-8.
+        foreach (["\x00\x00\xFE\xFF", "\xFF\xFE\x00\x00", "\xFE\xFF", "\xFF\xFE"] as $bom) {
             if (str_starts_with($awal, $bom)) {
-                $awal = substr($awal, strlen($bom));
-
-                break;
+                throw new RuntimeException('Encoding part xlsx tidak diizinkan.');
             }
         }
 
-        $awal = ltrim(str_replace("\0", '', $awal), " \t\r\n");
+        if (str_starts_with($awal, "\xEF\xBB\xBF")) {
+            $awal = substr($awal, 3);
+        }
+
+        if (str_contains($awal, "\0")) {
+            throw new RuntimeException('Encoding part xlsx tidak diizinkan.');
+        }
+
+        $awal = ltrim($awal, " \t\r\n");
 
         if ($awal === '' || $awal[0] !== '<') {
             throw new RuntimeException('Awal part xlsx tidak dikenal.');
@@ -1145,7 +1280,7 @@ final class PembacaQnaXlsx extends Xlsx
             return;
         }
 
-        if (preg_match('/^(utf-?8|utf-?16(le|be)?|utf-?32(le|be)?|us-ascii|ascii|iso-8859-[0-9]{1,2}|iso8859-[0-9]{1,2}|latin-?1|windows-125[0-8]|cp125[0-8])$/i', trim($m[1])) !== 1) {
+        if (preg_match('/^(utf-?8|us-ascii|ascii|iso-8859-[0-9]{1,2}|iso8859-[0-9]{1,2}|latin-?1|windows-125[0-8]|cp125[0-8])$/i', trim($m[1])) !== 1) {
             throw new RuntimeException('Encoding part xlsx tidak diizinkan.');
         }
     }
@@ -1189,13 +1324,21 @@ final class PembacaQnaXlsx extends Xlsx
     /**
      * Seperti `Reader\Xlsx::loadZip` (privat): isi lewat `getFromZipArchive`, dipindai `XmlScanner`, lalu SimpleXML.
      */
-    private function muat(ZipArchive $zip, string $nama, string $ns = ''): SimpleXMLElement
+    /**
+     * @param bool $ketat tanpa peredam `@`: galat/peringatan libxml → "rusak", seperti `load()` main yang menjadikan
+     *                    peringatan workbook sebagai exception (R9 P3)
+     */
+    private function muat(ZipArchive $zip, string $nama, string $ns = '', bool $ketat = false): SimpleXMLElement
     {
         // Cache per entri sebenarnya (R6 B3): relasi berulang ke part besar tidak dibaca berulang kali; byte setiap bacaan
         // masuk anggaran yang sama dengan aliran.
         $kunci = ($this->namaEntri($zip, $nama) ?? "?{$nama}") . "\x1F{$ns}";
 
         if (isset($this->cacheMuat[$kunci])) {
+            if ($ketat && isset($this->galatMuat[$kunci])) {
+                throw new RuntimeException('XML part xlsx tidak sah.');
+            }
+
             return $this->cacheMuat[$kunci];
         }
 
@@ -1206,7 +1349,27 @@ final class PembacaQnaXlsx extends Xlsx
             throw new RuntimeException('Isi xlsx terlalu besar.');
         }
 
-        $xml = @simplexml_load_string($this->getSecurityScannerOrThrow()->scan($isi), SimpleXMLElement::class, 0, $ns);
+        $isi = $this->getSecurityScannerOrThrow()->scan($isi);
+
+        // Galat/peringatan libxml dicatat per entri (bukan diredam `@`): pemanggil ketat menolaknya, yang lain mengabaikannya
+        // seperti vendor; entri tetap dimuat sekali.
+        $galatLama = libxml_use_internal_errors(true);
+        libxml_clear_errors();
+
+        try {
+            $xml = simplexml_load_string($isi, SimpleXMLElement::class, 0, $ns);
+
+            if (libxml_get_errors() !== []) {
+                $this->galatMuat[$kunci] = true;
+            }
+        } finally {
+            libxml_clear_errors();
+            libxml_use_internal_errors($galatLama);
+        }
+
+        if ($ketat && isset($this->galatMuat[$kunci])) {
+            throw new RuntimeException('XML part xlsx tidak sah.');
+        }
 
         return $this->cacheMuat[$kunci] = self::testSimpleXml($xml);
     }
