@@ -8,10 +8,11 @@
  * - Font Inter (self-host, @fontsource-variable/inter) hanya berlaku di dalam layout ini (`font-v5`).
  * - Foto latar: `<picture>` AVIF → WebP → JPG; layar ≤ 1024 px memakai WebP 960 px. Foto Gunung Bromo dari Unsplash
  *   (1k7YRkRaXc0) masih aset sementara sampai ada foto resmi.
- * - Kaca: isi putih 72% (surface/card), `backdrop-filter: blur(44px) saturate(1.2)` (+ prefiks -webkit-). Fallback isi putih solid + border nyata bila
- *   backdrop-filter tidak didukung, pengguna meminta transparansi dikurangi, atau mode kontras paksa aktif.
+ * - Kaca: isi putih 72% (surface/card), `backdrop-filter: blur(44px) saturate(1.2)` (+ prefiks -webkit-). Fallback
+ *   isi putih solid + border nyata bila backdrop-filter tidak didukung, pengguna meminta transparansi dikurangi, atau mode kontras paksa aktif.
  * - Lebar < 480 px: kartu selebar layar dengan margin 16 px; footer BSrE dirapatkan (logo 73 px, teks 12 px) agar
- *   teks sertifikat tidak terlipat.
+ *   teks sertifikat tidak terlipat. Lebar < 360 px: footer bertumpuk (logo di atas, pemisah disembunyikan, teks rata
+ *   tengah).
  */
 import '@fontsource-variable/inter'
 
@@ -83,7 +84,7 @@ import logoWonderful from '@/assets/auth/logo-wonderful-indonesia.png'
         </div>
 
         <footer
-          class="flex items-center justify-center gap-2 border-t border-v5-border-subtle bg-white px-4 py-4 min-[480px]:gap-3 min-[480px]:px-10"
+          class="flex flex-col items-center justify-center gap-2 border-t border-v5-border-subtle bg-white px-4 py-4 min-[360px]:flex-row min-[480px]:gap-3 min-[480px]:px-10"
           data-testid="auth-footer"
         >
           <img
@@ -93,8 +94,8 @@ import logoWonderful from '@/assets/auth/logo-wonderful-indonesia.png'
             width="97"
             height="32"
           />
-          <span class="h-7 w-px shrink-0 bg-v5-border" aria-hidden="true" />
-          <div class="min-w-0 text-left">
+          <span class="hidden h-7 w-px shrink-0 bg-v5-border min-[360px]:block" aria-hidden="true" />
+          <div class="min-w-0 text-center min-[360px]:text-left">
             <p class="text-[12px] font-medium leading-5 tracking-[-0.05px] text-v5-text min-[480px]:text-[13px]">Tersertifikasi Sertifikat Elektronik</p>
             <p class="text-[11px] leading-4 tracking-[0.05px] text-v5-text-muted">Badan Siber dan Sandi Negara (BSSN)</p>
           </div>

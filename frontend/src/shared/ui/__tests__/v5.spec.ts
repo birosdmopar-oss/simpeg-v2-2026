@@ -4,6 +4,7 @@
  */
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
+import { createMemoryHistory, createRouter, RouterLink } from 'vue-router'
 
 import { UiButton, UiNotice, UiTextField } from '..'
 
@@ -39,11 +40,35 @@ describe('UiButton appearance="v5"', () => {
     expect(w.classes()).not.toContain('bg-v5-primary')
   })
 
-  it('variant secondary (R1): isi abu V5 12%, teks gelap, tanpa glow navy; `to` tetap merender RouterLink', () => {
+  it('variant secondary: isi abu V5 12%, teks gelap, tanpa glow navy', () => {
     const cls = mount(UiButton, { props: { appearance: 'v5', variant: 'secondary' } }).classes()
     expect(cls).toEqual(expect.arrayContaining(['h-[38px]', 'rounded-full', 'bg-v5-disabled', 'text-v5-text', 'hover:bg-v5-secondary-hover', 'focus-visible:ring-v5-blue']))
     expect(cls).not.toContain('bg-v5-primary')
     expect(cls).not.toContain('shadow-v5-button')
+  })
+
+  it('variant secondary + `to`: root RouterLink (<a href>) dengan kelas V5 secondary dan atribut pemanggil', async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/', name: 'awal', component: { render: () => null } },
+        { path: '/login', name: 'login', component: { render: () => null } },
+      ],
+    })
+    await router.push('/')
+    await router.isReady()
+    const w = mount(UiButton, {
+      props: { appearance: 'v5', variant: 'secondary', block: true, to: { name: 'login' } },
+      attrs: { 'data-testid': 'kembali' },
+      slots: { default: 'Kembali ke halaman masuk' },
+      global: { plugins: [router] },
+    })
+    expect(w.findComponent(RouterLink).exists()).toBe(true)
+    expect(w.element.tagName).toBe('A')
+    expect(w.attributes('href')).toBe('/login')
+    expect(w.attributes('data-testid')).toBe('kembali')
+    expect(w.classes()).toEqual(expect.arrayContaining(['bg-v5-disabled', 'rounded-full', 'w-full']))
+    expect(w.text()).toBe('Kembali ke halaman masuk')
   })
 
   it('tampilan bawaan tidak berubah', () => {

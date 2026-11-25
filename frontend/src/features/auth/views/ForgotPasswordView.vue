@@ -100,9 +100,10 @@ const onSubmit = handleSubmit(async (values) => {
     <div v-if="result" class="flex flex-col gap-4" data-testid="forgot-result">
       <h2 class="mb-2 text-[17px] font-semibold leading-[26px] tracking-[-0.25px] text-v5-text">Permintaan diterima</h2>
 
-      <!-- CR-190 R1: pola frame Tautan Terkirim (2234-73379): Alert sukses berisi pesan backend + catatan masa berlaku. -->
+      <!-- CR-190: pola frame Tautan Terkirim (2234-73379): Alert sukses (role="status" di root UiNotice, satu live
+           region) berisi pesan backend + catatan masa berlaku. -->
       <UiNotice appearance="v5" tone="success">
-        <p role="status" data-testid="forgot-message">{{ result.message }}</p>
+        <p data-testid="forgot-message">{{ result.message }}</p>
         <p class="mt-0.5 text-[13px] font-normal leading-5 tracking-[-0.05px] text-v5-text">
           Tautan reset hanya berlaku sementara dan hanya bisa dipakai sekali. Jika tidak menerima tautan, hubungi
           Admin Kepegawaian satker Anda.
