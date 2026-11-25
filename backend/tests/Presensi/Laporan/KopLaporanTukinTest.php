@@ -133,6 +133,21 @@ final class KopLaporanTukinTest extends DatabaseTestCase
         $this->assertStringContainsString(base64_encode((string) file_get_contents(KopResmi::logoBawaan(KopResmi::BERKAS_LOGO_KANAN))), $kop, 'logo kanan bawaan');
     }
 
+    /** C2 (CR-191): alamat berstruktur blok tidak menyatu — tiap paragraf/butir jadi baris sendiri; "terisi" ikut aturan sama. */
+    public function testAlamatBerblokDipisahPerBaris(): void
+    {
+        [$unit, $satker] = $this->unitSatker('<p>Jalan Unit 2</p><p>Jakarta 10000</p>', '');
+        $kop             = $this->kop($unit, $satker);
+        $this->assertStringContainsString('<span style="font-size:9pt;">Jalan Unit 2<br />' . "\n" . 'Jakarta 10000</span>', $kop);
+
+        $kop = KopLaporanTukin::html($this->db, $this->wc(['pdf_header_alamat_kementerian' => '<ul><li>Jalan Kementerian 1</li><li>Laman: contoh.test</li></ul>']), $this->config, null, null);
+        $this->assertStringContainsString('<span style="font-size:9pt;">Jalan Kementerian 1<br />' . "\n" . 'Laman: contoh.test</span>', $kop);
+
+        // Alamat unit yang hanya berisi blok kosong = tidak terisi → alamat kementerian.
+        [$unit, $satker] = $this->unitSatker('<p> </p><p><br /></p>', '');
+        $this->assertStringContainsString(self::ALAMAT_KEMENTERIAN, $this->kop($unit, $satker));
+    }
+
     /** Kop seragam (CR-191): baris 1 nama kementerian dan baris 2 unit terpisah, alamat, satu garis hitam. */
     public function testTataLetakKopSeragam(): void
     {

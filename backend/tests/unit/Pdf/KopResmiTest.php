@@ -122,6 +122,10 @@ final class KopResmiTest extends CIUnitTestCase
         }
 
         $this->assertStringContainsString('<b>KEMENTERIAN UJI</b>', KopResmi::html('<p>Kementerian</p><p>Uji</p>', '', ''), 'baris 1: blok → spasi');
+
+        // Sel tabel bersebelahan dipisah spasi (tidak menyatu), baris tabel tetap jadi baris sendiri.
+        $this->assertSame("Jalan Uji 1 Jakarta\nTelepon 000", KopResmi::teksAlamat('<table><tr><th>Jalan Uji 1</th><td>Jakarta</td></tr><tr><td>Telepon</td><td>000</td></tr></table>'));
+        $this->assertSame('Kementerian Uji', KopResmi::satuBaris('<table><tr><td>Kementerian</td><td>Uji</td></tr></table>'));
     }
 
     public function testBaris1DanBaris2TeksPolosSatuBarisDiEscape(): void
@@ -274,7 +278,14 @@ final class KopResmiTest extends CIUnitTestCase
             $baris .= '<tr><td>JABATAN' . $i . 'X</td><td>Pejabat ' . $i . '</td></tr>';
         }
 
-        $html   = '<table border="1" cellpadding="4" width="100%">' . $baris . '</table>';
+        $html = '<table border="1" cellpadding="4" width="100%">' . $baris . '</table>';
+
+        // Potret (DRH/LKH/surat: margin kop 42): halaman lanjutan juga mulai di margin 10 mm.
+        $potret      = (new TcpdfRenderer())->render(new DokumenPdf('S', $html, KopResmi::html('K', 'U', 'Jalan Uji'), marginAtasKop: 42.0));
+        $potretTanpa = (new TcpdfRenderer())->render(new DokumenPdf('S', $html));
+        $this->assertEqualsWithDelta($this->yTeksPertamaHalaman($potretTanpa, 2), $this->yTeksPertamaHalaman($potret, 2), 0.01, 'potret: halaman 2 mulai di margin 10 mm');
+        $this->assertLessThanOrEqual($this->jumlahHalaman($potretTanpa) + 1, $this->jumlahHalaman($potret));
+
         $dengan = (new TcpdfRenderer())->render(new DokumenPdf('S', $html, KopResmi::html('K', 'U', 'Jalan Uji', lanskap: true), orientasi: 'L', marginAtasKop: 40.0));
         $tanpa  = (new TcpdfRenderer())->render(new DokumenPdf('S', $html, orientasi: 'L'));
 

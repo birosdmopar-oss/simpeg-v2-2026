@@ -12,15 +12,19 @@ use Throwable;
 
 /**
  * Kop dokumen PDF dari `web_config` (PRD Fase 7 F7-15, §7.2.1; aditif — tiga generator Fase 3 DRH/LKH/tanda terima
- * tidak diubah). Pola sama dengan `DrhPegawai::kop()` [K `L_employee.php:7147-7166`]: baris 1 nama kementerian
- * (`pdf_header_nama_kementerian` ?? `nama_kementerian`, huruf besar), baris 2 nama unit/satker (unit UPT/lain →
- * satker), baris 3 alamat (`unit.alamat_pdf_header` / `satker.alamat_pdf_header` bila terisi, selain itu
- * `pdf_header_alamat_kementerian`), garis. Nama kosong → `NAMA_INSTANSI_BAWAAN` (CR-066). Tanpa lingkup (Baperjakat)
- * baris 2 dihilangkan.
+ * tidak diubah). Pola sama dengan `DrhPegawai::kop()` [K `L_employee.php:7147-7166`]: baris 1 nama kementerian lewat
+ * rantai tunggal {@see KopResmi::nama()} (`pdf_header_nama_kementerian` → `nama_kementerian` → `NAMA_INSTANSI_BAWAAN`,
+ * CR-066; huruf besar), baris 2 nama unit/satker (unit UPT/lain → satker), alamat (`unit.alamat_pdf_header` /
+ * `satker.alamat_pdf_header` bila terisi, selain itu `pdf_header_alamat_kementerian`), garis. Tanpa lingkup
+ * (Baperjakat) baris 2 dihilangkan.
  *
  * [CATAT] Kop seragam (keputusan Horii 24-11-2026, acuan gambar; CR-191): tata letak dan logo lewat {@see KopResmi}
- * (logo kiri/kanan `web_config` atau bawaan repo) — menggantikan keputusan F7-15 "tanpa logo". Sumber teks di atas
- * tidak berubah. Surat Cuti/TB/IB memakai {@see self::htmlSurat()}: baris 2 = `web_config` `pdf_header_nama_unit` (K2).
+ * (logo kiri/kanan `web_config` atau bawaan repo) — menggantikan keputusan F7-15 "tanpa logo". Sumber unit/alamat di
+ * atas tidak berubah. Teks dijadikan teks polos oleh `KopResmi`: di alamat, `<br>` dan penutup blok (`</p>`, `</div>`,
+ * `</li>`, `</tr>`, `<hr>`) menjadi ganti baris, penutup sel tabel menjadi spasi; tag lain dibuang dan isinya
+ * dipertahankan (sebelumnya `strip_tags` saja, sehingga baris alamat menyatu). Dokumen lanskap memakai `$lanskap`
+ * (kop dibatasi di tengah). Surat Cuti/TB/IB memakai {@see self::htmlSurat()}: baris 2 = `web_config`
+ * `pdf_header_nama_unit` (K2).
  */
 final class KopDokumen
 {

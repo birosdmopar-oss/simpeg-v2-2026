@@ -69,7 +69,7 @@ class WebConfig extends BaseConfig
         // --- Kop dokumen PDF (HTML tepercaya, dirender di kop; disanitasi saat simpan) ---
         'pdf_header_nama_kementerian' => [
             'label'       => 'Kop PDF: Nama Kementerian', 'group' => self::GROUP_KOP_PDF, 'type' => T::HTML, 'default' => '',
-            'description' => 'Baris 1 kop semua PDF; <br> menjadi spasi, ditampilkan huruf kapital. Kosong = Nama Kementerian.',
+            'description' => 'Baris 1 kop semua PDF; <br> menjadi spasi, tag lain dibuang, ditampilkan huruf kapital. Kosong = Nama Kementerian.',
         ],
         'pdf_header_nama_unit' => [
             'label'       => 'Kop PDF: Nama Unit', 'group' => self::GROUP_KOP_PDF, 'type' => T::HTML, 'default' => '',
@@ -77,7 +77,7 @@ class WebConfig extends BaseConfig
         ],
         'pdf_header_alamat_kementerian' => [
             'label'       => 'Kop PDF: Alamat', 'group' => self::GROUP_KOP_PDF, 'type' => T::HTML, 'default' => '',
-            'description' => 'Alamat kop semua PDF; <br> = ganti baris; tag lain (termasuk tautan) dibuang, isinya dipertahankan sebagai teks biasa.',
+            'description' => 'Alamat kop semua PDF; <br> dan akhir paragraf/butir daftar/baris tabel = ganti baris; tag lain (termasuk tautan) dibuang, isinya dipertahankan sebagai teks biasa.',
         ],
         'logo_kementerian_pdf' => [
             'label'       => 'Kop PDF: Logo Kiri', 'group' => self::GROUP_KOP_PDF, 'type' => T::ASSET_PATH, 'default' => '',

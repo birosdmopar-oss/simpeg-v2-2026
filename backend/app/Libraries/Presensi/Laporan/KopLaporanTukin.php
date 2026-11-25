@@ -80,16 +80,11 @@ final class KopLaporanTukin
     }
 
     /**
-     * Teks polos dari nilai `web_config`/master yang mungkin ber-HTML (`<br>` → baris baru, tag lain dibuang).
+     * Teks polos dari nilai `web_config`/master yang mungkin ber-HTML — aturan {@see KopResmi::teksAlamat()} (`<br>` dan
+     * penutup blok → baris baru, tag lain dibuang), sehingga "terisi" dan isi alamat dinilai sama dengan PDF lain.
      */
     private static function teks(mixed $nilai): string
     {
-        if (! is_string($nilai)) {
-            return '';
-        }
-
-        $polos = strip_tags((string) preg_replace('/<br\s*\/?>/i', "\n", $nilai));
-
-        return trim(html_entity_decode($polos, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        return is_string($nilai) ? KopResmi::teksAlamat($nilai) : '';
     }
 }

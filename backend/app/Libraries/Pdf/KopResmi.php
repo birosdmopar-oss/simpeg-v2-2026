@@ -29,8 +29,8 @@ use Config\Presensi;
  * - **Teks:** baris 1/2 dijadikan satu baris teks polos (`<br>` dan penutup blok → spasi, tag lain dibuang, isinya
  *   dipertahankan) lalu di-escape. Alamat boleh berasal dari HTML tersanitasi `web_config` atau teks master
  *   unit/satker: `<br>`, penutup blok (`</p>`, `</div>`, `</li>`, `</tr>`, judul, `<hr>`) dan baris baru menjadi ganti
- *   baris, SEMUA tag lain dibuang (isinya dipertahankan), hasilnya di-escape — tidak ada HTML masukan yang dirender apa
- *   adanya.
+ *   baris, penutup sel tabel menjadi spasi, SEMUA tag lain dibuang (isinya dipertahankan), hasilnya di-escape — tidak
+ *   ada HTML masukan yang dirender apa adanya.
  * - **Logo:** path berkas yang sudah di-resolve pemanggil. `null`, berkas tidak ada, atau bukan PNG/JPEG → logo bawaan
  *   di repo (`app/Assets/Kop/`, K4), sehingga kop tetap berlogo walau `web_config` kosong. Override `web_config`
  *   (`logo_kementerian_pdf` / `logo_wonderful_pdf`) tetap lewat {@see KopSlip::resolveAset()} — aturan akar aset tidak
@@ -58,6 +58,9 @@ final class KopResmi
 
     /** `<br>`, `<hr>`, dan penutup elemen blok: pemisah baris teks (alamat ber-`<p>`/daftar/tabel). */
     private const POLA_PEMISAH = '/<br\s*\/?>\R?|<hr\s*\/?>\R?|<\/(?:p|div|li|tr|h[1-6]|blockquote|table)\s*>\R?/i';
+
+    /** Penutup sel tabel: pemisah kata dalam satu baris (supaya isi sel bersebelahan tidak menyatu). */
+    private const POLA_SEL = '/<\/t[dh]\s*>/i';
 
     /** @var array<string, string> tag `<img>` per berkas (kunci path|ukuran|mtime) — satu proses merender banyak PDF */
     private static array $cacheImg = [];
@@ -159,23 +162,24 @@ final class KopResmi
     }
 
     /**
-     * Teks polos satu baris: `<br>` dan penutup blok → spasi, tag dibuang, entitas diurai (di-escape lagi saat dirender).
+     * Teks polos satu baris: `<br>`, penutup blok, dan penutup sel tabel → spasi, tag dibuang, entitas diurai (di-escape
+     * lagi saat dirender).
      */
     public static function satuBaris(string $nilai): string
     {
-        $polos = strip_tags((string) preg_replace(self::POLA_PEMISAH, ' ', $nilai));
+        $polos = strip_tags((string) preg_replace([self::POLA_SEL, self::POLA_PEMISAH], ' ', $nilai));
         $polos = html_entity_decode($polos, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
         return trim((string) preg_replace('/\s+/u', ' ', $polos));
     }
 
     /**
-     * Teks polos banyak baris: `<br>` dan penutup blok → baris baru, tag lain dibuang (isinya dipertahankan), entitas
-     * diurai, baris kosong dibuang.
+     * Teks polos banyak baris: `<br>` dan penutup blok → baris baru, penutup sel tabel → spasi, tag lain dibuang (isinya
+     * dipertahankan), entitas diurai, baris kosong dibuang.
      */
     public static function teksAlamat(string $nilai): string
     {
-        $polos = strip_tags((string) preg_replace(self::POLA_PEMISAH, "\n", $nilai));
+        $polos = strip_tags((string) preg_replace([self::POLA_SEL, self::POLA_PEMISAH], [' ', "\n"], $nilai));
         $polos = html_entity_decode($polos, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         $baris = array_map(static fn (string $b): string => trim((string) preg_replace('/\s+/u', ' ', $b)), preg_split('/\R/u', $polos) ?: []);
 

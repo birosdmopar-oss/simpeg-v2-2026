@@ -12,7 +12,8 @@ use App\Libraries\Pdf\KopResmi;
  * Kop PDF slip gaji dari nilai `web_config` (PRD 5A §7.3.6, G-09) — dipakai service slip sebelum membentuk
  * {@see DataPdfSlip}; generator PDF tidak me-resolve path sendiri.
  *
- * - Teks kop: `pdf_header_nama_kementerian` (bawaan `nama_kementerian`, pola PDF LKH), `pdf_header_nama_unit`,
+ * - Teks kop: nama lewat rantai tunggal {@see KopResmi::nama()} (`pdf_header_nama_kementerian` → `nama_kementerian` →
+ *   bawaan; teks polos satu baris), `pdf_header_nama_unit`,
  *   `pdf_header_alamat_kementerian` (HTML tersanitasi saat simpan).
  * - Logo: `logo_kementerian_pdf` (kiri) dan `logo_wonderful_pdf` (kanan), tipe ASSET_PATH = path relatif dari akar aset
  *   v2 (`Config\Presensi::$akarAset`). Kosong / tidak sah (path absolut, `..`, ekstensi lain) / berkas tidak ada / keluar
@@ -31,13 +32,11 @@ final class KopSlip
     public static function dariWebConfig(array $wc, string $akarAset): array
     {
         $namaKementerian = self::teks($wc['nama_kementerian'] ?? null);
-        $headerKem       = self::teks($wc['pdf_header_nama_kementerian'] ?? null);
-        // "Kosong" dinilai pada teks polosnya (mis. hanya `<br>`), sama dengan rantai `KopResmi::nama()` (CR-191).
-        $headerKem = KopResmi::satuBaris($headerKem) !== '' ? $headerKem : '';
 
         return [
             'kop' => [
-                'nama_kementerian' => $headerKem !== '' ? $headerKem : $namaKementerian,
+                // Rantai tunggal semua PDF (CR-191): header → nama_kementerian → bawaan; teks polos satu baris.
+                'nama_kementerian' => KopResmi::nama($wc),
                 'nama_unit'        => self::teks($wc['pdf_header_nama_unit'] ?? null),
                 'alamat'           => self::teks($wc['pdf_header_alamat_kementerian'] ?? null),
             ],
