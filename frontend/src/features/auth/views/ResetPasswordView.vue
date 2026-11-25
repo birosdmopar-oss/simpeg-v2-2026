@@ -102,7 +102,7 @@ const onSubmit = handleSubmit(async (values) => {
 <template>
   <AuthCardLayout>
     <form class="flex flex-col gap-4" novalidate data-testid="reset-form" @submit="onSubmit">
-      <div>
+      <div class="mb-2">
         <h2 class="text-[17px] font-semibold leading-[26px] tracking-[-0.25px] text-v5-text">Buat Password Baru</h2>
         <!-- Lihat ChangePasswordView: access token lain tetap sah sampai kedaluwarsa (jwt.accessTtl, default 60 menit). -->
         <p class="mt-1 text-[13px] leading-5 tracking-[-0.05px] text-v5-text-muted" data-testid="reset-note">
@@ -115,7 +115,7 @@ const onSubmit = handleSubmit(async (values) => {
         <p>{{ tokenRejected }}</p>
         <RouterLink
           :to="{ name: 'forgot-password' }"
-          class="mt-1 inline-block rounded-v5-sm text-[13px] font-medium leading-5 text-v5-link underline focus-visible:shadow-v5-focus focus-visible:outline-none"
+          class="mt-1 inline-block rounded-v5-sm text-[13px] font-medium leading-5 text-v5-link underline focus-visible:ring-2 focus-visible:ring-v5-blue focus-visible:ring-offset-2 focus-visible:ring-offset-white focus-visible:outline-none"
           data-testid="reset-request-new"
         >
           Minta tautan reset baru
@@ -142,7 +142,7 @@ const onSubmit = handleSubmit(async (values) => {
             Tidak punya tautan?
             <RouterLink
               :to="{ name: 'forgot-password' }"
-              class="rounded-v5-sm font-medium text-v5-link hover:underline focus-visible:shadow-v5-focus focus-visible:outline-none"
+              class="rounded-v5-sm font-medium text-v5-link hover:underline focus-visible:ring-2 focus-visible:ring-v5-blue focus-visible:ring-offset-2 focus-visible:ring-offset-white focus-visible:outline-none"
             >
               Minta tautan baru
             </RouterLink>
@@ -189,7 +189,7 @@ const onSubmit = handleSubmit(async (values) => {
 
       <RouterLink
         :to="{ name: 'login' }"
-        class="mx-auto inline-flex items-center gap-1 rounded-v5-sm text-[13px] font-medium leading-5 text-v5-link hover:underline focus-visible:shadow-v5-focus focus-visible:outline-none"
+        class="mx-auto inline-flex items-center gap-1 rounded-v5-sm text-[13px] font-medium leading-5 text-v5-link hover:underline focus-visible:ring-2 focus-visible:ring-v5-blue focus-visible:ring-offset-2 focus-visible:ring-offset-white focus-visible:outline-none"
       >
         <ArrowLeft class="h-4 w-4" aria-hidden="true" />
         Kembali ke halaman masuk

@@ -10,7 +10,7 @@
  * - CR-190: tampilan Figma SIMPEG V5 A-11 (Lupa Password); teks, field, dan perilaku tetap seperti `main`.
  */
 import { toTypedSchema } from '@vee-validate/zod'
-import { ArrowLeft, CircleAlert, MailCheck } from 'lucide-vue-next'
+import { ArrowLeft, CircleAlert } from 'lucide-vue-next'
 import { useForm } from 'vee-validate'
 import { computed, ref } from 'vue'
 
@@ -39,14 +39,15 @@ const { defineField, handleSubmit, errors, setFieldValue, setFieldError, submitC
 
 const [username] = defineField('username')
 
-/** CR-190: nada Alert V5 per jenis banner (semua banner tetap role="alert"). */
-const bannerTone = computed<'danger' | 'warning'>(() =>
-  banner.value?.kind === 'rate-limit' || banner.value?.kind === 'network' ? 'warning' : 'danger',
-)
+/**
+ * CR-190: nada Alert V5 per jenis banner: batas permintaan (429) = warning; gangguan jaringan (Figma 2130-65378),
+ * captcha, dan galat lain = error. Role tetap role="alert" untuk semua banner.
+ */
+const bannerTone = computed<'danger' | 'warning'>(() => (banner.value?.kind === 'rate-limit' ? 'warning' : 'danger'))
 
 /** CR-190: tautan "Kembali ke halaman masuk" gaya V5 (warna tautan + panah). */
 const LINK_KEMBALI =
-  'mx-auto inline-flex items-center gap-1 rounded-v5-sm text-[13px] font-medium leading-5 text-v5-link hover:underline focus-visible:shadow-v5-focus focus-visible:outline-none'
+  'mx-auto inline-flex items-center gap-1 rounded-v5-sm text-[13px] font-medium leading-5 text-v5-link hover:underline focus-visible:ring-2 focus-visible:ring-v5-blue focus-visible:ring-offset-2 focus-visible:ring-offset-white focus-visible:outline-none'
 
 /** Token hanya dikembalikan backend di development; kotak ini tidak pernah tampil di build production. */
 const devToken = computed(() => (import.meta.env.DEV && result.value?.token ? result.value.token : null))
@@ -97,17 +98,16 @@ const onSubmit = handleSubmit(async (values) => {
 <template>
   <AuthCardLayout>
     <div v-if="result" class="flex flex-col gap-4" data-testid="forgot-result">
-      <div class="flex items-start gap-3">
-        <MailCheck class="mt-0.5 h-5 w-5 shrink-0 text-v5-success" aria-hidden="true" />
-        <div>
-          <h2 class="text-[17px] font-semibold leading-[26px] tracking-[-0.25px] text-v5-text">Permintaan diterima</h2>
-          <p class="mt-1 text-[14px] leading-[22px] tracking-[-0.1px] text-v5-text" role="status" data-testid="forgot-message">{{ result.message }}</p>
-          <p class="mt-2 text-[13px] leading-5 tracking-[-0.05px] text-v5-text-muted">
-            Tautan reset hanya berlaku sementara dan hanya bisa dipakai sekali. Jika tidak menerima tautan, hubungi
-            Admin Kepegawaian satker Anda.
-          </p>
-        </div>
-      </div>
+      <h2 class="mb-2 text-[17px] font-semibold leading-[26px] tracking-[-0.25px] text-v5-text">Permintaan diterima</h2>
+
+      <!-- CR-190 R1: pola frame Tautan Terkirim (2234-73379): Alert sukses berisi pesan backend + catatan masa berlaku. -->
+      <UiNotice appearance="v5" tone="success">
+        <p role="status" data-testid="forgot-message">{{ result.message }}</p>
+        <p class="mt-0.5 text-[13px] font-normal leading-5 tracking-[-0.05px] text-v5-text">
+          Tautan reset hanya berlaku sementara dan hanya bisa dipakai sekali. Jika tidak menerima tautan, hubungi
+          Admin Kepegawaian satker Anda.
+        </p>
+      </UiNotice>
 
       <div
         v-if="devToken"
@@ -125,14 +125,13 @@ const onSubmit = handleSubmit(async (values) => {
         </RouterLink>
       </div>
 
-      <RouterLink :to="{ name: 'login' }" :class="LINK_KEMBALI" data-testid="forgot-back-login">
-        <ArrowLeft class="h-4 w-4" aria-hidden="true" />
+      <UiButton appearance="v5" variant="secondary" block :to="{ name: 'login' }" data-testid="forgot-back-login">
         Kembali ke halaman masuk
-      </RouterLink>
+      </UiButton>
     </div>
 
     <form v-else class="flex flex-col gap-4" novalidate data-testid="forgot-form" @submit="onSubmit">
-      <div>
+      <div class="mb-2">
         <h2 class="text-[17px] font-semibold leading-[26px] tracking-[-0.25px] text-v5-text">Lupa Password</h2>
         <p class="mt-1 text-[13px] leading-5 tracking-[-0.05px] text-v5-text-muted">
           Masukkan username/NIP akun Anda. Jika terdaftar, tautan untuk membuat password baru akan dikirimkan.

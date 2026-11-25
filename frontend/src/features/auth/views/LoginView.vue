@@ -54,10 +54,11 @@ const { defineField, handleSubmit, errors, setFieldValue, setFieldError, submitC
 const [username] = defineField('username')
 const [password] = defineField('password')
 
-/** CR-190: nada Alert V5 per jenis banner (warna dan role sama dengan sebelumnya: semua banner role="alert"). */
-const bannerTone = computed<'danger' | 'warning'>(() =>
-  banner.value?.kind === 'locked' || banner.value?.kind === 'network' ? 'warning' : 'danger',
-)
+/**
+ * CR-190: nada Alert V5 per jenis banner mengikuti Figma A-11: Akun Terkunci (2130-65345) = warning; Gangguan
+ * Jaringan (2130-65378), kredensial, captcha, dan galat lain = error. Role tetap role="alert" untuk semua banner.
+ */
+const bannerTone = computed<'danger' | 'warning'>(() => (banner.value?.kind === 'locked' ? 'warning' : 'danger'))
 
 function onCaptchaVerified(token: string): void {
   setFieldValue('captcha_token', token)
@@ -115,7 +116,7 @@ const onSubmit = handleSubmit(async (values) => {
 <template>
   <AuthCardLayout>
     <form class="flex flex-col gap-4" novalidate data-testid="login-form" @submit="onSubmit">
-      <h2 class="text-[17px] font-semibold leading-[26px] tracking-[-0.25px] text-v5-text">Masuk</h2>
+      <h2 class="mb-2 text-[17px] font-semibold leading-[26px] tracking-[-0.25px] text-v5-text">Masuk</h2>
 
       <UiNotice v-if="notice && !banner" appearance="v5" tone="success" data-testid="login-notice">
         {{ notice }}
@@ -150,7 +151,7 @@ const onSubmit = handleSubmit(async (values) => {
         <template #suffix>
           <button
             type="button"
-            class="absolute inset-y-0 right-3 my-auto flex h-7 w-7 items-center justify-center rounded-v5-sm text-v5-text-muted hover:text-v5-text focus-visible:shadow-v5-focus focus-visible:outline-none"
+            class="absolute inset-y-0 right-3 my-auto flex h-7 w-7 items-center justify-center rounded-v5-sm text-v5-text-muted hover:text-v5-text focus-visible:ring-2 focus-visible:ring-v5-blue focus-visible:ring-offset-2 focus-visible:ring-offset-white focus-visible:outline-none"
             :aria-label="showPassword ? 'Sembunyikan password' : 'Tampilkan password'"
             @click="showPassword = !showPassword"
           >
@@ -184,7 +185,7 @@ const onSubmit = handleSubmit(async (values) => {
       <p v-if="resetEnabled" class="text-center text-[13px] leading-5">
         <RouterLink
           :to="{ name: 'forgot-password' }"
-          class="rounded-v5-sm font-medium text-v5-link hover:underline focus-visible:shadow-v5-focus focus-visible:outline-none"
+          class="rounded-v5-sm font-medium text-v5-link hover:underline focus-visible:ring-2 focus-visible:ring-v5-blue focus-visible:ring-offset-2 focus-visible:ring-offset-white focus-visible:outline-none"
           data-testid="login-forgot-link"
         >
           Lupa password?

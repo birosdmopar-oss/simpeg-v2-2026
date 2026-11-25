@@ -71,7 +71,7 @@ const TONES_V5 = {
     <button
       v-if="dismissible"
       type="button"
-      class="-m-1 rounded-v5-sm p-1 text-v5-text-muted transition hover:text-v5-text focus-visible:shadow-v5-focus focus-visible:outline-none"
+      class="-m-1 rounded-v5-sm p-1 text-v5-text-muted transition hover:text-v5-text focus-visible:ring-2 focus-visible:ring-v5-blue focus-visible:ring-offset-2 focus-visible:ring-offset-white focus-visible:outline-none"
       aria-label="Tutup pesan"
       @click="$emit('dismiss')"
     >

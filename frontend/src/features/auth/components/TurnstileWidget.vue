@@ -117,7 +117,7 @@ function onMockChange(event: Event): void {
       <input
         type="checkbox"
         :checked="mockChecked"
-        class="h-[18px] w-[18px] shrink-0 accent-v5-primary focus-visible:shadow-v5-focus focus-visible:outline-none"
+        class="h-[18px] w-[18px] shrink-0 accent-v5-primary focus-visible:ring-2 focus-visible:ring-v5-blue focus-visible:ring-offset-2 focus-visible:ring-offset-white focus-visible:outline-none"
         @change="onMockChange"
       />
       <span>Saya bukan robot <span class="block text-[11px] leading-4 text-v5-text-muted">(mode pengembangan, Turnstile belum dikonfigurasi)</span></span>

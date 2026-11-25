@@ -8,9 +8,10 @@
  * - Font Inter (self-host, @fontsource-variable/inter) hanya berlaku di dalam layout ini (`font-v5`).
  * - Foto latar: `<picture>` AVIF → WebP → JPG; layar ≤ 1024 px memakai WebP 960 px. Foto Gunung Bromo dari Unsplash
  *   (1k7YRkRaXc0) masih aset sementara sampai ada foto resmi.
- * - Kaca: `backdrop-filter: blur(44px) saturate(1.2)` (+ prefiks -webkit-). Fallback isi putih solid + border nyata bila
+ * - Kaca: isi putih 72% (surface/card), `backdrop-filter: blur(44px) saturate(1.2)` (+ prefiks -webkit-). Fallback isi putih solid + border nyata bila
  *   backdrop-filter tidak didukung, pengguna meminta transparansi dikurangi, atau mode kontras paksa aktif.
- * - Lebar < 480 px: kartu selebar layar dengan margin 16 px.
+ * - Lebar < 480 px: kartu selebar layar dengan margin 16 px; footer BSrE dirapatkan (logo 73 px, teks 12 px) agar
+ *   teks sertifikat tidak terlipat.
  */
 import '@fontsource-variable/inter'
 
@@ -82,13 +83,19 @@ import logoWonderful from '@/assets/auth/logo-wonderful-indonesia.png'
         </div>
 
         <footer
-          class="flex items-center justify-center gap-3 border-t border-v5-border-subtle bg-white px-6 py-4 min-[480px]:px-10"
+          class="flex items-center justify-center gap-2 border-t border-v5-border-subtle bg-white px-4 py-4 min-[480px]:gap-3 min-[480px]:px-10"
           data-testid="auth-footer"
         >
-          <img :src="logoBsre" alt="Logo Balai Besar Sertifikasi Elektronik" class="h-8 w-[97px] object-contain" width="97" height="32" />
-          <span class="h-7 w-px bg-v5-border" aria-hidden="true" />
+          <img
+            :src="logoBsre"
+            alt="Logo Balai Besar Sertifikasi Elektronik"
+            class="h-6 w-[73px] shrink-0 object-contain min-[480px]:h-8 min-[480px]:w-[97px]"
+            width="97"
+            height="32"
+          />
+          <span class="h-7 w-px shrink-0 bg-v5-border" aria-hidden="true" />
           <div class="min-w-0 text-left">
-            <p class="text-[13px] font-medium leading-5 tracking-[-0.05px] text-v5-text">Tersertifikasi Sertifikat Elektronik</p>
+            <p class="text-[12px] font-medium leading-5 tracking-[-0.05px] text-v5-text min-[480px]:text-[13px]">Tersertifikasi Sertifikat Elektronik</p>
             <p class="text-[11px] leading-4 tracking-[0.05px] text-v5-text-muted">Badan Siber dan Sandi Negara (BSSN)</p>
           </div>
         </footer>
@@ -110,9 +117,9 @@ import logoWonderful from '@/assets/auth/logo-wonderful-indonesia.png'
   background: radial-gradient(closest-side, rgb(255 255 255 / 0.55), rgb(255 255 255 / 0) 100%);
 }
 
-/* V5 Material/Glass Thick: fill putih 78%, rim putih 75%, blur 44. */
+/* V5 Liquid Glass Card (node Figma 2130:65125): fill surface/card putih 72%, rim putih 75%, blur 44. */
 .auth-glass {
-  background: rgb(255 255 255 / 0.78);
+  background: rgb(255 255 255 / 0.72);
   border: 1px solid rgb(255 255 255 / 0.75);
   box-shadow:
     inset 0 1px 0 0 rgb(255 255 255 / 0.95),

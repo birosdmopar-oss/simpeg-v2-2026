@@ -45,7 +45,7 @@ const visible = ref(false)
         type="button"
         :class="
           appearance === 'v5'
-            ? 'absolute inset-y-0 right-3 my-auto flex h-7 w-7 items-center justify-center rounded-v5-sm text-v5-text-muted hover:text-v5-text focus-visible:shadow-v5-focus focus-visible:outline-none disabled:cursor-not-allowed disabled:text-v5-text-disabled'
+            ? 'absolute inset-y-0 right-3 my-auto flex h-7 w-7 items-center justify-center rounded-v5-sm text-v5-text-muted hover:text-v5-text focus-visible:ring-2 focus-visible:ring-v5-blue focus-visible:ring-offset-2 focus-visible:ring-offset-white focus-visible:outline-none disabled:cursor-not-allowed disabled:text-v5-text-disabled'
             : 'absolute inset-y-0 right-2 flex items-center text-slate-400 hover:text-slate-600 disabled:cursor-not-allowed'
         "
         :aria-label="visible ? `Sembunyikan ${label.toLowerCase()}` : `Tampilkan ${label.toLowerCase()}`"

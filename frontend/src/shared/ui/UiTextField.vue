@@ -134,8 +134,8 @@ const controlClassV5 = computed(() => [
   props.disabled
     ? 'cursor-not-allowed bg-v5-disabled text-v5-text-disabled placeholder:text-v5-text-disabled'
     : effState.value === 'error'
-      ? 'bg-v5-field focus:shadow-v5-focus-error'
-      : 'bg-v5-field focus:border-v5-blue focus:shadow-v5-focus',
+      ? 'bg-v5-field focus:ring-2 focus:ring-v5-error focus:ring-offset-2 focus:ring-offset-white'
+      : 'bg-v5-field focus:border-v5-blue focus:ring-2 focus:ring-v5-blue focus:ring-offset-2 focus:ring-offset-white',
 ])
 
 const controlClass = computed(() => isV5.value ? controlClassV5.value : [

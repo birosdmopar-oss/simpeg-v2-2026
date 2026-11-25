@@ -46,7 +46,8 @@ export default {
           text: { DEFAULT: '#1D1D1F', secondary: '#48484D', muted: '#636369', disabled: '#AEAEB2' },
           page: '#EEF1F8',
           border: { DEFAULT: 'rgb(60 60 67 / 0.16)', subtle: 'rgb(60 60 67 / 0.08)', strong: '#8E8E93', hover: 'rgb(60 60 67 / 0.28)' },
-          disabled: 'rgb(120 120 128 / 0.12)',
+          disabled: 'rgb(120 120 128 / 0.12)', // surface/disabled; juga isi Button Secondary
+          secondary: { hover: 'rgb(120 120 128 / 0.18)', pressed: 'rgb(120 120 128 / 0.24)' },
           field: 'rgb(255 255 255 / 0.72)',
           error: { DEFAULT: '#D70015', subtle: '#FDECEE', strong: '#A50011' },
           success: { DEFAULT: '#22A06B', subtle: '#E6F7EF', strong: '#11774A' },
@@ -89,11 +90,9 @@ export default {
         float: '0 12px 32px -12px rgb(28 57 100 / 0.28)',
         // Pemisah kolom yang menempel di kanan tabel (kolom Aksi sticky, CR-038) saat ada isi tergulir di bawahnya.
         'sticky-end': '-8px 0 8px -8px rgb(16 24 40 / 0.18)',
-        // CR-190: efek V5 (Liquid Glass Card, Shadow/Button Primary, Focus/Ring 2 lapis putih + biru/merah).
+        // CR-190: efek V5 (Liquid Glass Card, Shadow/Button Primary). Ring fokus V5 memakai utilitas ring-v5-blue/ring-v5-error + ring-offset putih.
         'v5-card': 'inset 0 1px 0 0 rgb(255 255 255 / 0.95), 0 30px 80px -16px rgb(28 33 64 / 0.28), 0 2px 8px 0 rgb(28 33 64 / 0.06)',
         'v5-button': '0 4px 14px 0 rgb(45 63 154 / 0.35), inset 0 1px 0 0 rgb(255 255 255 / 0.28)',
-        'v5-focus': '0 0 0 2px #FFFFFF, 0 0 0 4px #4560E6',
-        'v5-focus-error': '0 0 0 2px #FFFFFF, 0 0 0 4px #D70015',
       },
       transitionDuration: {
         DEFAULT: '150ms',

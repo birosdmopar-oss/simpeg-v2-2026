@@ -12,7 +12,11 @@ describe('UiButton appearance="v5"', () => {
     const w = mount(UiButton, { props: { appearance: 'v5', block: true }, slots: { default: 'Masuk' } })
     const cls = w.classes()
     expect(cls).toEqual(expect.arrayContaining(['h-[38px]', 'rounded-full', 'bg-v5-primary', 'text-white', 'shadow-v5-button', 'w-full']))
-    expect(cls).toEqual(expect.arrayContaining(['hover:bg-v5-primary-hover', 'active:bg-v5-primary-pressed', 'focus-visible:shadow-v5-focus']))
+    expect(cls).toEqual(expect.arrayContaining(['hover:bg-v5-primary-hover', 'active:bg-v5-primary-pressed']))
+    // R1 P3: ring utilitas (menang atas :focus-visible global main.css), bukan box-shadow yang tertimpa.
+    expect(cls).toEqual(
+      expect.arrayContaining(['focus-visible:outline-none', 'focus-visible:ring-2', 'focus-visible:ring-v5-blue', 'focus-visible:ring-offset-2', 'focus-visible:ring-offset-white']),
+    )
     expect(cls).not.toContain('bg-brand-tertiary')
     expect(cls).not.toContain('rounded-lg')
     expect(w.text()).toBe('Masuk')
@@ -35,6 +39,13 @@ describe('UiButton appearance="v5"', () => {
     expect(w.classes()).not.toContain('bg-v5-primary')
   })
 
+  it('variant secondary (R1): isi abu V5 12%, teks gelap, tanpa glow navy; `to` tetap merender RouterLink', () => {
+    const cls = mount(UiButton, { props: { appearance: 'v5', variant: 'secondary' } }).classes()
+    expect(cls).toEqual(expect.arrayContaining(['h-[38px]', 'rounded-full', 'bg-v5-disabled', 'text-v5-text', 'hover:bg-v5-secondary-hover', 'focus-visible:ring-v5-blue']))
+    expect(cls).not.toContain('bg-v5-primary')
+    expect(cls).not.toContain('shadow-v5-button')
+  })
+
   it('tampilan bawaan tidak berubah', () => {
     const cls = mount(UiButton).classes()
     expect(cls).toEqual(expect.arrayContaining(['bg-brand-tertiary', 'h-10', 'rounded-lg']))
@@ -51,7 +62,8 @@ describe('UiTextField appearance="v5"', () => {
     const input = w.find('input')
     expect(label.attributes('for')).toBe(input.attributes('id'))
     expect(input.attributes('aria-required')).toBe('true')
-    expect(input.classes()).toEqual(expect.arrayContaining(['h-[38px]', 'rounded-v5-md', 'border-v5-border', 'focus:shadow-v5-focus']))
+    expect(input.classes()).toEqual(expect.arrayContaining(['h-[38px]', 'rounded-v5-md', 'border-v5-border']))
+    expect(input.classes()).toEqual(expect.arrayContaining(['focus:ring-2', 'focus:ring-v5-blue', 'focus:ring-offset-2', 'focus:ring-offset-white']))
     expect(input.attributes('aria-invalid')).toBeUndefined()
   })
 
@@ -64,7 +76,8 @@ describe('UiTextField appearance="v5"', () => {
     expect(help.text()).toBe('Password wajib diisi.')
     expect(help.classes()).toContain('text-v5-error-strong')
     expect(help.find('svg[aria-hidden="true"]').exists()).toBe(true)
-    expect(input.classes()).toEqual(expect.arrayContaining(['border-v5-error', 'focus:shadow-v5-focus-error']))
+    expect(input.classes()).toEqual(expect.arrayContaining(['border-v5-error', 'focus:ring-2', 'focus:ring-v5-error', 'focus:ring-offset-2']))
+    expect(input.classes()).not.toContain('focus:ring-v5-blue')
   })
 
   it('disabled: isi abu V5', () => {
