@@ -15,8 +15,8 @@ use App\Libraries\Pdf\KopDokumen;
  *   `pdf_header_alamat_kementerian` (HTML tersanitasi saat simpan).
  * - Logo: `logo_kementerian_pdf` (kiri) dan `logo_wonderful_pdf` (kanan), tipe ASSET_PATH = path relatif dari akar aset
  *   v2 (`Config\Presensi::$akarAset`). Kosong / tidak sah (path absolut, `..`, ekstensi lain) / berkas tidak ada / keluar
- *   dari akar (symlink) → tanpa logo, PDF tetap dibuat (seperti PDF LKH). Cek PNG/JPEG isi berkas di
- *   {@see PdfSlipGaji::logo()}.
+ *   dari akar (symlink) → `null`, dan kop memakai logo bawaan repo (CR-191; sebelumnya tanpa logo). Cek PNG/JPEG isi
+ *   berkas di {@see \App\Libraries\Pdf\KopResmi}.
  * - Nama instansi pada kalimat "adalah benar pegawai …": `nama_kementerian`; kosong → literal legacy [K]
  *   {@see KopDokumen::NAMA_INSTANSI_BAWAAN} (satu sumber, CR-066).
  */

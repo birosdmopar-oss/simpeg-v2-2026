@@ -20,7 +20,7 @@ use RuntimeException;
 
 /**
  * Surat IB (PRD Fase 4 §6.8.1) — efek final IB: saat PIC menyetujui, PDF dirender dari `pdf/surat_ib` [K
- * `L_ib.php:896-964`, templat `print/surat_ib`] dengan kop kementerian (`KopDokumen::html(null, null)`) dan penanda tangan
+ * `L_ib.php:896-964`, templat `print/surat_ib`] dengan kop kementerian (`KopDokumen::htmlSurat()`, kop seragam CR-191) dan penanda tangan
  * Kabiro kepegawaian (`PenandaTanganKabiro`, Q-06(a)), lalu disimpan `document_attachment` kode 50 di DALAM transaksi
  * approval (rollback → berkas dikompensasi AttachmentService). `GET ib/{id}/surat` mengunduh surat tersimpan terbaru;
  * hanya IB disetujui, selain itu 404.
@@ -87,7 +87,7 @@ class SuratIbService
         $tujuan = $ttd->unitKepegawaian() ?? 'Sekretaris ' . (string) service('webConfigService')->value('nama_kementerian');
         $html   = view('pdf/surat_ib', ['ib' => $row, 'kabiro' => $ttd->kabiro(), 'tujuan' => $tujuan]);
 
-        return Pdf::renderer()->render(new DokumenPdf('Surat Izin Belajar ' . (string) $row['nama'], $html, KopDokumen::html(null, null, $this->db), marginAtasKop: 42));
+        return Pdf::renderer()->render(new DokumenPdf('Surat Izin Belajar ' . (string) $row['nama'], $html, KopDokumen::htmlSurat($this->db), marginAtasKop: 42));
     }
 
     private function lampiran(): AttachmentServiceInterface

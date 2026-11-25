@@ -14,7 +14,7 @@ use DateTimeInterface;
  * - `identitas`: nama bergelar (P-9), NIP, pangkat/golongan, jabatan/unit/satker jabatan saat ini [K]; '-' bila kosong.
  * - `sen`: 28 field `KolomGaji` + `uang_makan`, int sen.
  * - `kop`: HTML tersanitasi `web_config` (G-09) `pdf_header_*`.
- * - `logoKiri`/`logoKanan`: path berkas gambar yang sudah di-resolve service ({@see KopSlip::resolveAset()}); null → tanpa logo.
+ * - `logoKiri`/`logoKanan`: path berkas gambar yang sudah di-resolve service ({@see KopSlip::resolveAset()}); null → logo bawaan repo (CR-191).
  * - `namaInstansi`: `web_config` `nama_kementerian`, kosong → literal legacy (lihat {@see KopSlip}).
  * - `urlQr`: URL verifikasi berisi token aktif; null = tanpa QR (U-3, P5-36).
  */

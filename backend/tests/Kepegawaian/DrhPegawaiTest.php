@@ -61,8 +61,11 @@ final class DrhPegawaiTest extends DatabaseTestCase
         $renderer = new class () implements PdfRendererInterface {
             public string $html = '';
 
+            public string $kop = '';
+
             public function render(DokumenPdf $dokumen): string
             {
+                $this->kop  = $dokumen->kopHtml;
                 $this->html = $dokumen->kopHtml . $dokumen->html;
 
                 return '%PDF-uji';
@@ -78,6 +81,10 @@ final class DrhPegawaiTest extends DatabaseTestCase
 
         $html = $renderer->html;
         $this->assertSame('%PDF-uji', $hasil['isi']);
+        // Kop seragam (CR-191): berlogo, nama kementerian tidak pernah kosong (web_config kosong → bawaan), garis.
+        $this->assertSame(2, substr_count($renderer->kop, '<img src="@'), 'logo kiri dan kanan');
+        $this->assertStringContainsString('<span style="font-size:12.5pt;"><b>KEMENTERIAN PARIWISATA</b></span>', $renderer->kop);
+        $this->assertStringContainsString('border-top:2px solid #000000', $renderer->kop);
         $this->assertStringContainsString('Budi DRH, S.Kom.', $html);
         $this->assertStringContainsString('Kota Uji', $html);
         $this->assertStringContainsString('Seminar &lt;b&gt;Arsip&lt;/b&gt;', $html, 'data di-escape');

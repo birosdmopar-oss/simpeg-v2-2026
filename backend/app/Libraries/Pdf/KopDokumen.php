@@ -16,7 +16,11 @@ use Throwable;
  * (`pdf_header_nama_kementerian` ?? `nama_kementerian`, huruf besar), baris 2 nama unit/satker (unit UPT/lain →
  * satker), baris 3 alamat (`unit.alamat_pdf_header` / `satker.alamat_pdf_header` bila terisi, selain itu
  * `pdf_header_alamat_kementerian`), garis. Nama kosong → `NAMA_INSTANSI_BAWAAN` (CR-066). Tanpa lingkup (Baperjakat)
- * baris 2 dihilangkan. Tanpa logo (keputusan F7-15, konsisten DRH/LKH).
+ * baris 2 dihilangkan.
+ *
+ * [CATAT] Kop seragam (keputusan Horii 24-11-2026, acuan gambar; CR-191): tata letak dan logo lewat {@see KopResmi}
+ * (logo kiri/kanan `web_config` atau bawaan repo) — menggantikan keputusan F7-15 "tanpa logo". Sumber teks di atas
+ * tidak berubah. Surat Cuti/TB/IB memakai {@see self::htmlSurat()}: baris 2 = `web_config` `pdf_header_nama_unit` (K2).
  */
 final class KopDokumen
 {
@@ -35,6 +39,20 @@ final class KopDokumen
      * @param int|null $idSatker satker lingkup (null = seluruh unit)
      */
     public static function html(?int $idUnit, ?int $idSatker, ?BaseConnection $db = null): string
+    {
+        return self::susun($idUnit, $idSatker, $db, false);
+    }
+
+    /**
+     * Kop surat tingkat kementerian (Surat Cuti / Tugas Belajar / Izin Belajar): baris 2 = `web_config`
+     * `pdf_header_nama_unit` (K2, CR-191); kosong → baris dihilangkan.
+     */
+    public static function htmlSurat(?BaseConnection $db = null): string
+    {
+        return self::susun(null, null, $db, true);
+    }
+
+    private static function susun(?int $idUnit, ?int $idSatker, ?BaseConnection $db, bool $unitWebConfig): string
     {
         $db ??= Database::connect();
         $wc     = self::webConfig();
@@ -76,11 +94,10 @@ final class KopDokumen
             $nama = self::NAMA_INSTANSI_BAWAAN;
         }
 
-        return '<table width="100%" cellpadding="0"><tr><td style="text-align:center;font-size:12pt;"><b>'
-            . esc(mb_strtoupper(trim(strip_tags($nama)))) . '</b></td></tr>'
-            . ($baris2 !== '' ? '<tr><td style="text-align:center;font-size:9pt;"><b>' . esc(mb_strtoupper($baris2)) . '</b></td></tr>' : '')
-            . '<tr><td style="text-align:center;font-size:8pt;">' . nl2br(esc(trim(strip_tags($alamat)))) . '</td></tr></table>'
-            . '<hr style="height:2px;" />';
+        // Nama unit/satker master = teks polos (di-escape supaya tidak diurai sebagai HTML); `web_config` = HTML tersanitasi.
+        $baris2 = $unitWebConfig && $baris2 === '' ? (string) ($wc['pdf_header_nama_unit'] ?? '') : esc($baris2);
+
+        return KopResmi::html($nama, $baris2, $alamat, ...KopResmi::logo($wc));
     }
 
     /**

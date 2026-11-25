@@ -13,6 +13,7 @@ use App\Libraries\Kepegawaian\Riwayat\Definisi\Karpeg;
 use App\Libraries\Kepegawaian\Riwayat\StatusRiwayat;
 use App\Libraries\Kepegawaian\Struktur\StrukturService;
 use App\Libraries\Pdf\DokumenPdf;
+use App\Libraries\Pdf\KopResmi;
 use App\Libraries\Pdf\Pdf;
 use App\Libraries\Waktu\StempelUtc;
 use CodeIgniter\Database\BaseConnection;
@@ -28,7 +29,8 @@ use CodeIgniter\I18n\Time;
  *
  * [V2] dibangkitkan saat diminta (bukan disimpan ke `file_tanda_terima` saat diproses) supaya proses approval engine
  * tidak bergantung pada pembangkit PDF; hak lihat = hak `detail` engine riwayat (pemohon, antrean role 1/4/5); hanya
- * untuk usulan berstatus Disetujui (legacy hanya membuat tanda terima saat disetujui); kop tanpa logo.
+ * untuk usulan berstatus Disetujui (legacy hanya membuat tanda terima saat disetujui); kop berlogo lewat `KopResmi` ([CATAT] kop seragam,
+ * keputusan Horii 24-11-2026, CR-191).
  */
 final class TandaTerimaUsulan
 {
@@ -86,9 +88,13 @@ final class TandaTerimaUsulan
             'dicetak' => Time::now('Asia/Jakarta')->format('d-m-Y'),
         ]);
 
-        $kop = '<table width="100%" cellpadding="0"><tr><td style="text-align:center;font-size:12pt;"><b>'
-            . esc(mb_strtoupper((string) ($wc['pdf_header_nama_kementerian'] ?? $wc['nama_kementerian'] ?? ''))) . '</b></td></tr>'
-            . '<tr><td style="text-align:center;font-size:8pt;">' . nl2br(esc((string) ($wc['pdf_header_alamat_kementerian'] ?? ''))) . '</td></tr></table><hr style="height:2px;" />';
+        // Kop seragam (CR-191): sumber nama/alamat tidak berubah (tanpa baris unit); nama kosong → bawaan (KopResmi).
+        $kop = KopResmi::html(
+            (string) ($wc['pdf_header_nama_kementerian'] ?? $wc['nama_kementerian'] ?? ''),
+            '',
+            (string) ($wc['pdf_header_alamat_kementerian'] ?? ''),
+            ...KopResmi::logo($wc),
+        );
 
         $isi = Pdf::renderer()->render(new DokumenPdf(
             'Tanda Terima Permohonan ' . ($karpeg ? 'KARPEG' : 'KARIS/KARSU'),

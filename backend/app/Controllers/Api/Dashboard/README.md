@@ -83,7 +83,7 @@ Respons `GET dokumen/{jenis}`:
 
 Penolakan lingkup dan batas baris terjadi sebelum throttle dan sebelum render (kecuali batas baris Pensiun, yang baru diketahui sesudah kueri), jadi tidak memakan jatah unduhan dan tidak diaudit.
 
-Kop PDF (`Libraries/Pdf/KopDokumen.php`): nama kementerian dari `web_config` (`pdf_header_nama_kementerian`, lalu `nama_kementerian`), nama unit/satker lingkup, alamat `satker.alamat_pdf_header` / `unit.alamat_pdf_header` bila terisi, selain itu `pdf_header_alamat_kementerian`; tanpa logo. Kaki: "Dicetak <d M Y H:i> oleh <NIP/akun> — SIMPEG v2".
+Kop PDF (`Libraries/Pdf/KopDokumen.php`): nama kementerian dari `web_config` (`pdf_header_nama_kementerian`, lalu `nama_kementerian`), nama unit/satker lingkup, alamat `satker.alamat_pdf_header` / `unit.alamat_pdf_header` bila terisi, selain itu `pdf_header_alamat_kementerian`. **[CATAT] Kop seragam (keputusan Horii 24-11-2026, acuan gambar; CR-191):** tata letak dan logo lewat `Libraries/Pdf/KopResmi.php` (logo kiri/kanan `web_config` atau bawaan repo, garis 2px) — menggantikan F7-15 "tanpa logo"; `marginAtasKop` 32 → 40; sumber teks tidak berubah (rincian di `Libraries/Kepegawaian/README.md`). Kaki: "Dicetak <d M Y H:i> oleh <NIP/akun> — SIMPEG v2".
 
 Nama berkas `{jenis}_{lingkup}{id}_{YmdHis}.{pdf|xlsx}`; header `X-Content-Type-Options: nosniff`, `Cache-Control: private, no-store`.
 

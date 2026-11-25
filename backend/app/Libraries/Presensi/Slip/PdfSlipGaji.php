@@ -17,7 +17,7 @@ use RuntimeException;
 /**
  * Generator PDF slip gaji (PRD 5A §7.3.6, ADR-032): TCPDF lewat `Pdf::renderer()`, view `pdf/slip_gaji` — port tata
  * letak legacy `771f8b4` `views/hr/employee/sl_gaji/print/cetak.php` (A4 potret, margin 12 mm, helvetica 8,5; kop
- * di dalam kotak dokumen; A. GPP → B. TK → C. Uang Makan → Ringkasan) [K `Lsl_gaji.php:468-588` `cetak_pdf`].
+ * seragam `KopResmi` (CR-191) di dalam kotak dokumen; A. GPP → B. TK → C. Uang Makan → Ringkasan) [K `Lsl_gaji.php:468-588` `cetak_pdf`].
  *
  * - Total = `RingkasanSlip` (`bersih_gpp + bersih_tk + uang_makan`, F5-1); baris tukin kelas jabatan tidak ada.
  * - QR berisi URL verifikasi lewat `Pdf::qrImg`; **wajib gambar**: bila keluaran bukan `<img>` (GD/Imagick tidak ada),
@@ -66,8 +66,6 @@ final class PdfSlipGaji
             'labelUm'   => self::labelUangMakan($data->uangMakanPeriode),
             'tglCetak'  => FormatSlip::tanggalCetak($data->dicetakPada),
             'dibuka'    => $data->dibukaPada === null ? null : FormatSlip::waktuWib($data->dibukaPada),
-            'logoKiri'  => self::logo($data->logoKiri, 97),
-            'logoKanan' => self::logo($data->logoKanan, 87),
         ], ['saveData' => false]);
 
         return $this->renderer->render(new DokumenPdf(
@@ -75,27 +73,6 @@ final class PdfSlipGaji
             $html,
             marginSisi: 12.0,
         ));
-    }
-
-    /**
-     * Tag `<img>` logo kop tersemat (`@base64`, pola `Pdf::qrImg`); berkas tidak ada/bukan PNG/JPEG → '' (tanpa logo,
-     * tidak gagal; PRD 5A §7.3.6).
-     */
-    public static function logo(?string $path, int $lebarPx): string
-    {
-        if ($path === null || $path === '' || ! is_file($path)) {
-            return '';
-        }
-
-        $info = @getimagesize($path);
-
-        if ($info === false || ! in_array($info[2], [IMAGETYPE_PNG, IMAGETYPE_JPEG], true)) {
-            return '';
-        }
-
-        $isi = @file_get_contents($path);
-
-        return $isi === false ? '' : '<img src="@' . base64_encode($isi) . '" width="' . $lebarPx . '" />';
     }
 
     /**

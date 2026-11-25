@@ -413,6 +413,34 @@ Test: `tests/Kepegawaian/Riwayat/JabatanTest.php` (`use RiwayatBtcTrait` + `pasa
 
 ## Konket B-13, LKH B-12b, PDF (MAKE-013)
 
+**[CATAT] Kop seragam (keputusan Horii 24-11-2026, acuan gambar; CR-191).** Semua PDF unduhan memakai SATU komponen kop
+`app/Libraries/Pdf/KopResmi.php`: logo kementerian (kiri) | baris 1 nama kementerian (tebal 12,5pt, huruf besar), baris 2
+unit (tebal 11pt, huruf besar; kosong → baris dihilangkan), alamat (9pt) | logo Wonderful Indonesia (kanan), lalu satu
+garis hitam 2px. Ini **menggantikan** keputusan F7-15 "tanpa logo" (dokumen daftar, surat Cuti/TB/IB, DRH, LKH, tanda
+terima), tata letak kop legacy Slip Gaji, dan tata letak `MY_PDF_HEADER_UNIT` Laporan Tukin (dua garis).
+
+| PDF | Baris 2 (unit) | Alamat | Catatan |
+|---|---|---|---|
+| Slip Gaji | `web_config` `pdf_header_nama_unit` | `pdf_header_alamat_kementerian` | kop di dalam kotak dokumen |
+| Laporan Tukin per pegawai | unit; unit 6/7 → satker | cabang legacy unit/satker | logo kanan `satker.logo_uns` pada cabang legacy |
+| Rekap Tukin, dokumen daftar F-09, Struktur Organisasi | unit/satker lingkup (kementerian/Baperjakat: tanpa) | `satker`/`unit.alamat_pdf_header` → `pdf_header_alamat_kementerian` | Rekap Tukin dan Struktur **sebelumnya tanpa kop** |
+| Surat Cuti / Tugas Belajar / Izin Belajar | `pdf_header_nama_unit` (K2, baru) | `pdf_header_alamat_kementerian` | `KopDokumen::htmlSurat()` |
+| DRH | unit; unit 6/7 → satker | satker (6) / unit (≠ 7) → kementerian | |
+| LKH | unit pegawai | `unit.alamat_pdf_header` → kementerian | |
+| Tanda Terima Usulan | – | `pdf_header_alamat_kementerian` | |
+
+- Sumber teks per dokumen di tabel **tidak berubah** dari sebelum CR-191; hanya tata letaknya yang disatukan.
+- Baris 1 tidak pernah kosong: nama dari `web_config` kosong → `KopDokumen::NAMA_INSTANSI_BAWAAN` di semua PDF (termasuk
+  DRH/LKH/tanda terima yang sebelumnya bisa mencetak baris kosong).
+- Teks kop = **data** `web_config` (menu Web Config), bukan kode/seed (repo publik). Teks masukan dijadikan teks polos:
+  `<br>` → spasi (baris 1/2) atau ganti baris (alamat); tag lain, termasuk tautan, dibuang; semuanya di-escape.
+- Logo: `web_config` `logo_kementerian_pdf` / `logo_wonderful_pdf` (ASSET_PATH relatif dari `Config\Presensi::$akarAset`,
+  di-resolve `KopSlip::resolveAset` — aturan akar aset tidak berubah). Kosong / tidak sah / berkas tidak ada / bukan
+  PNG-JPEG → **logo bawaan repo** `app/Assets/Kop/` (PNG palet tanpa transparansi, supaya disematkan langsung tanpa topeng
+  alfa). Logo diskalakan ke kotak ±26 × 20 mm dengan rasio terjaga.
+- `TcpdfRenderer`: bila kop lebih tinggi dari `marginAtasKop` (alamat berbaris banyak), badan dimulai tepat di bawah kop
+  (tidak menimpanya). `marginAtasKop` 42 (potret) / 40 (lanskap: dokumen daftar — sebelumnya 32 —, Rekap Tukin, Struktur).
+
 **PDF (ADR-033)** — `app/Libraries/Pdf/`: `PdfRendererInterface` (`app/Interfaces/`), `DokumenPdf` (judul, HTML badan, kop
 halaman pertama, kaki setiap halaman, orientasi, ukuran), `TcpdfRenderer` (TCPDF ^6.6, LGPL-3.0-or-later, via Composer;
 font inti helvetica; cache `WRITEPATH/cache/tcpdf/`), `Pdf::renderer()` / `Pdf::pakai()` (ganti renderer, mis. dompdf
@@ -450,7 +478,7 @@ role 1 (legacy delete :464-472; role 3 → 403) dan tidak dapat diubah/dihapus p
 terkini (legacy sp()). Keputusan user 13-10-2026: [V2] verifikator = siapa pun ber-role 1/2/3/6/7 yang NIP-nya =
 `nip_atasan` (legacy userAuth(['2']); atasan berakun 4/5/8 belum dibuka); role 1 boleh menimpa atasan dengan `nip_atasan`
 (NIP pegawai aktif, 422 bila tidak) — bawaan tetap atasan otomatis; PDF hanya untuk LKH Disetujui (selain itu 422
-`status`; legacy file_lckh dibuat saat disetujui), dibangkitkan saat diminta, QR kode legacy (waktu WIB), kop tanpa logo;
+`status`; legacy file_lckh dibuat saat disetujui), dibangkitkan saat diminta, QR kode legacy (waktu WIB), kop seragam berlogo (CR-191, lihat [CATAT] Kop seragam);
 [V2] baris kegiatan setengah terisi 422, catatan wajib tolak/revisi, hapus status 10. Rekap LKH bawahan (legacy
 list_rekap) belum dibawa *(riwayat B-12b; sudah dibuat di MAKE-014 `94f978d4`: `LkhService::rekapBawahan`, lihat
 "B-20 penutup (MAKE-014)" di bawah)*.

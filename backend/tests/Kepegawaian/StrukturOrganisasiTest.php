@@ -6,7 +6,10 @@ namespace Tests\Kepegawaian;
 
 use App\Constants\Role;
 use App\Exceptions\ApiException;
+use App\Interfaces\PdfRendererInterface;
 use App\Libraries\Kepegawaian\Struktur\StrukturService;
+use App\Libraries\Pdf\DokumenPdf;
+use App\Libraries\Pdf\Pdf;
 use Closure;
 use CodeIgniter\I18n\Time;
 use CodeIgniter\Test\FeatureTestTrait;
@@ -166,6 +169,36 @@ final class StrukturOrganisasiTest extends DatabaseTestCase
             $pdf = (new StrukturService())->pdf($this->admin(), ['id_unit_satker' => (string) $this->unitDep]);
             $this->assertStringStartsWith('%PDF-', $pdf['isi']);
             $this->assertSame("struktur_organisasi_{$this->unitDep}_2026-10.pdf", $pdf['nama']);
+
+            // Kop seragam (CR-191): bagan kini berkop unit/satker bagan (dulu tanpa kop); kementerian → tanpa baris unit.
+            $penangkap = new class () implements PdfRendererInterface {
+                public ?DokumenPdf $dokumen = null;
+
+                public function render(DokumenPdf $dokumen): string
+                {
+                    $this->dokumen = $dokumen;
+
+                    return '%PDF-uji';
+                }
+            };
+            Pdf::pakai($penangkap);
+
+            try {
+                (new StrukturService())->pdf($this->admin(), ['id_unit_satker' => (string) $this->unitDep]);
+                $kopUnit = $penangkap->dokumen->kopHtml ?? '';
+                $isiUnit = $penangkap->dokumen->html ?? '';
+                (new StrukturService())->pdf($this->admin());
+                $kopKem = $penangkap->dokumen->kopHtml ?? '';
+            } finally {
+                Pdf::reset();
+            }
+
+            $namaUnit = mb_strtoupper((string) $this->db->table('unit')->select('unit')->where('id_unit', $this->unitDep)->get()->getRow('unit'));
+            $this->assertStringContainsString('<span style="font-size:11pt;"><b>' . esc($namaUnit) . '</b></span>', $kopUnit, 'baris 2 = unit bagan');
+            $this->assertSame(2, substr_count($kopUnit, '<img src="@'));
+            $this->assertStringContainsString('border-top:2px solid #000000', $kopUnit);
+            $this->assertStringNotContainsString('font-size:11pt', $kopKem, 'bagan kementerian: tanpa baris unit');
+            $this->assertStringStartsWith('<h3 style="text-align:center;">STRUKTUR ORGANISASI<br/>', $isiUnit, 'isi bagan tidak berubah');
 
             [, , $akun] = $this->aktor(Role::PEGAWAI);
             $res        = $this->asUser($akun)->get('api/v1/struktur-organisasi/pdf?bulan=2026-09');

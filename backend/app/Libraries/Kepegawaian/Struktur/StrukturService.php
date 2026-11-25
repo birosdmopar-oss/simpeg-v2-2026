@@ -9,6 +9,7 @@ use App\Interfaces\Kepegawaian\StrukturServiceInterface;
 use App\Libraries\Auth\AuthContext;
 use App\Libraries\Kepegawaian\Kalkulasi\TanggalBisnis;
 use App\Libraries\Pdf\DokumenPdf;
+use App\Libraries\Pdf\KopDokumen;
 use App\Libraries\Pdf\Pdf;
 use App\Libraries\Waktu\StempelUtc;
 use CodeIgniter\Database\BaseConnection;
@@ -635,11 +636,22 @@ final class StrukturService implements StrukturServiceInterface
             . '<table border="1" cellpadding="4" width="100%"><tr style="font-weight:bold;background-color:#eeeeee;"><td width="55%">Jabatan</td><td width="45%">Pejabat</td></tr>'
             . ($baris === '' ? '<tr><td colspan="2">Tidak ada jabatan struktural.</td></tr>' : $baris) . '</table>';
 
+        // [CATAT] Kop seragam (keputusan Horii 24-11-2026, CR-191): bagan sebelumnya TANPA kop; kini kop unit/satker
+        // bagan yang dipilih (aturan `KopDokumen`; kementerian → tanpa baris unit). Isi bagan tidak berubah.
+        $kunci = (string) $so['id_unit_satker'];
+        $kop   = KopDokumen::html(
+            $kunci === '0' || str_starts_with($kunci, 'sat_') ? null : (int) $kunci,
+            str_starts_with($kunci, 'sat_') ? (int) substr($kunci, 4) : null,
+            $this->db(),
+        );
+
         $isi = Pdf::renderer()->render(new DokumenPdf(
             'Struktur Organisasi ' . $so['judul'],
             $html,
+            kopHtml: $kop,
             kakiHtml: 'SIMPEG v2, ' . Time::now('Asia/Jakarta')->format('d-m-Y H:i'),
             orientasi: 'L',
+            marginAtasKop: 40.0,
         ));
 
         return ['isi' => $isi, 'nama' => 'struktur_organisasi_' . $so['id_unit_satker'] . '_' . $so['bulan'] . '.pdf'];

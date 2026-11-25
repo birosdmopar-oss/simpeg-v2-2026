@@ -21,6 +21,9 @@ final class RenderDokumenPdf
 
     public const UKURAN = 'A4';
 
+    /** Margin atas halaman pertama (mm) untuk kop seragam berlogo `KopResmi` (CR-191; sebelumnya 32, kop tanpa logo). */
+    public const MARGIN_ATAS_KOP = 40.0;
+
     /**
      * Bobot lebar kolom PDF (relatif; dinormalkan ke TEPAT 100% bersama kolom No). NIP 18 digit selalu muat satu baris
      * (CR-064 T9); kolom teks bebas (nama, jabatan, unit/satker, pendidikan, diklat, satker) cukup lebar untuk kata
@@ -87,7 +90,7 @@ final class RenderDokumenPdf
             $kaki,
             self::ORIENTASI,
             self::UKURAN,
-            32.0,
+            self::MARGIN_ATAS_KOP,
             10.0,
         ));
     }
