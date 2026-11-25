@@ -10,14 +10,18 @@
  * - 422 errors.token (tidak valid / kedaluwarsa / sudah dipakai / tidak berlaku lagi) → banner, form dinonaktifkan,
  *   tombol minta tautan baru. 5xx → token belum terpakai, sarankan coba lagi. Sukses → login dengan pesan sukses.
  * - Tidak ada endpoint cek token: token tidak valid baru ketahuan saat submit.
+ * - CR-190: tampilan Figma SIMPEG V5 A-11 (Atur Ulang Sandi); teks, field, dan perilaku tetap seperti `main`.
  */
 import { toTypedSchema } from '@vee-validate/zod'
+import { ArrowLeft } from 'lucide-vue-next'
 import { useForm } from 'vee-validate'
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { isApiError } from '@/lib/axios'
 import FormField from '@/shared/components/FormField.vue'
+import UiButton from '@/shared/ui/UiButton.vue'
+import UiNotice from '@/shared/ui/UiNotice.vue'
 
 import AuthCardLayout from '../components/AuthCardLayout.vue'
 import PasswordField from '../components/PasswordField.vue'
@@ -97,47 +101,32 @@ const onSubmit = handleSubmit(async (values) => {
 
 <template>
   <AuthCardLayout>
-    <form
-      class="space-y-4 rounded-xl bg-white p-6 shadow-xl"
-      novalidate
-      data-testid="reset-form"
-      @submit="onSubmit"
-    >
+    <form class="flex flex-col gap-4" novalidate data-testid="reset-form" @submit="onSubmit">
       <div>
-        <h2 class="text-lg font-semibold text-slate-800">Buat Password Baru</h2>
+        <h2 class="text-[17px] font-semibold leading-[26px] tracking-[-0.25px] text-v5-text">Buat Password Baru</h2>
         <!-- Lihat ChangePasswordView: access token lain tetap sah sampai kedaluwarsa (jwt.accessTtl, default 60 menit). -->
-        <p class="mt-1 text-sm text-slate-500" data-testid="reset-note">
+        <p class="mt-1 text-[13px] leading-5 tracking-[-0.05px] text-v5-text-muted" data-testid="reset-note">
           Setelah berhasil, masuk dengan password baru. Sesi login akun ini di perangkat lain tidak bisa diperpanjang
           lagi dan berakhir paling lambat 60 menit kemudian.
         </p>
       </div>
 
-      <div
-        v-if="tokenRejected"
-        class="space-y-2 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700"
-        role="alert"
-        data-testid="reset-token-error"
-      >
+      <UiNotice v-if="tokenRejected" appearance="v5" tone="danger" data-testid="reset-token-error">
         <p>{{ tokenRejected }}</p>
         <RouterLink
           :to="{ name: 'forgot-password' }"
-          class="inline-block font-medium text-brand-primary underline"
+          class="mt-1 inline-block rounded-v5-sm text-[13px] font-medium leading-5 text-v5-link underline focus-visible:shadow-v5-focus focus-visible:outline-none"
           data-testid="reset-request-new"
         >
           Minta tautan reset baru
         </RouterLink>
-      </div>
+      </UiNotice>
 
-      <div
-        v-else-if="banner"
-        class="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700"
-        role="alert"
-        data-testid="reset-error"
-      >
+      <UiNotice v-else-if="banner" appearance="v5" tone="danger" data-testid="reset-error">
         {{ banner }}
-      </div>
+      </UiNotice>
 
-      <fieldset class="space-y-4" :disabled="tokenRejected !== null" data-testid="reset-fields">
+      <fieldset class="flex flex-col gap-4" :disabled="tokenRejected !== null" data-testid="reset-fields">
         <div v-if="!fromLink" class="space-y-1">
           <FormField
             v-model="token"
@@ -146,11 +135,15 @@ const onSubmit = handleSubmit(async (values) => {
             placeholder="Tempel token dari tautan reset"
             autocomplete="off"
             required
+            appearance="v5"
             :error="errors.token"
           />
-          <p class="text-xs text-slate-500">
+          <p class="text-[13px] leading-5 tracking-[-0.05px] text-v5-text-muted">
             Tidak punya tautan?
-            <RouterLink :to="{ name: 'forgot-password' }" class="font-medium text-brand-primary hover:underline">
+            <RouterLink
+              :to="{ name: 'forgot-password' }"
+              class="rounded-v5-sm font-medium text-v5-link hover:underline focus-visible:shadow-v5-focus focus-visible:outline-none"
+            >
               Minta tautan baru
             </RouterLink>
           </p>
@@ -163,6 +156,7 @@ const onSubmit = handleSubmit(async (values) => {
           autocomplete="new-password"
           placeholder="Masukkan password baru"
           required
+          appearance="v5"
           :disabled="tokenRejected !== null"
           :error="errors.new_password"
         />
@@ -174,26 +168,30 @@ const onSubmit = handleSubmit(async (values) => {
           autocomplete="new-password"
           placeholder="Ulangi password baru"
           required
+          appearance="v5"
           :disabled="tokenRejected !== null"
           :error="errors.new_password_confirmation"
         />
 
-        <PasswordRulesChecklist :password="newPassword ?? ''" :extra="formRules" />
+        <PasswordRulesChecklist :password="newPassword ?? ''" :extra="formRules" appearance="v5" />
 
-        <button
+        <UiButton
           type="submit"
-          class="flex w-full items-center justify-center rounded-md bg-brand-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+          appearance="v5"
+          block
           :disabled="submitting || tokenRejected !== null"
+          :loading="submitting"
           data-testid="reset-submit"
         >
           {{ submitting ? 'Menyimpan...' : 'Simpan Password Baru' }}
-        </button>
+        </UiButton>
       </fieldset>
 
       <RouterLink
         :to="{ name: 'login' }"
-        class="block text-center text-sm font-medium text-brand-primary hover:underline"
+        class="mx-auto inline-flex items-center gap-1 rounded-v5-sm text-[13px] font-medium leading-5 text-v5-link hover:underline focus-visible:shadow-v5-focus focus-visible:outline-none"
       >
+        <ArrowLeft class="h-4 w-4" aria-hidden="true" />
         Kembali ke halaman masuk
       </RouterLink>
     </form>

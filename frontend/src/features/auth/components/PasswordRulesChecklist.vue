@@ -9,9 +9,13 @@ import { computed } from 'vue'
 
 import { PASSWORD_RULES, type PasswordChecklistItem } from '../schemas/password.schema'
 
-const props = withDefaults(defineProps<{ password: string; extra?: PasswordChecklistItem[] }>(), {
-  extra: () => [],
-})
+const props = withDefaults(
+  defineProps<{ password: string; extra?: PasswordChecklistItem[]; appearance?: 'default' | 'v5' }>(),
+  { extra: () => [], appearance: 'default' },
+)
+
+/** CR-190: gaya V5 (aditif) untuk halaman auth; halaman Ganti Password tetap tampilan bawaan. */
+const isV5 = computed(() => props.appearance === 'v5')
 
 const items = computed<PasswordChecklistItem[]>(() => [
   ...PASSWORD_RULES.map((rule) => ({ id: rule.id, label: rule.label, ok: rule.test(props.password) })),
@@ -20,12 +24,20 @@ const items = computed<PasswordChecklistItem[]>(() => [
 </script>
 
 <template>
-  <ul class="space-y-1 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs" aria-label="Syarat password" data-testid="password-checklist">
+  <ul
+    :class="
+      isV5
+        ? 'space-y-1 rounded-v5-md border border-v5-border-subtle bg-v5-field px-3 py-2.5 text-[13px] leading-5 tracking-[-0.05px]'
+        : 'space-y-1 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs'
+    "
+    aria-label="Syarat password"
+    data-testid="password-checklist"
+  >
     <li
       v-for="item in items"
       :key="item.id"
       class="flex items-center gap-2"
-      :class="item.ok ? 'text-emerald-700' : 'text-slate-500'"
+      :class="isV5 ? (item.ok ? 'text-v5-success-strong' : 'text-v5-text-muted') : item.ok ? 'text-emerald-700' : 'text-slate-500'"
       :data-testid="`password-rule-${item.id}`"
       :data-ok="item.ok ? 'true' : 'false'"
     >
