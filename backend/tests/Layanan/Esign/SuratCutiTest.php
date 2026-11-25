@@ -84,7 +84,7 @@ final class SuratCutiTest extends DatabaseTestCase
         // K2: baris 2 surat = web_config `pdf_header_nama_unit`.
         $this->assertStringContainsString('<span style="font-size:12.5pt;"><b>KEMENTERIAN UJI</b></span><br /><span style="font-size:11pt;"><b>SEKRETARIAT UJI</b></span>', $kop);
         $this->assertSame(2, substr_count($kop, '<img src="@'), 'logo kiri dan kanan tertanam');
-        $this->assertStringContainsString('border-top:2px solid #000000', $kop);
+        $this->assertStringContainsString('border-top:1px solid #000000', $kop);
         $this->assertStringNotContainsString('<img src="@' . base64_encode((string) file_get_contents(KopResmi::logoBawaan(KopResmi::BERKAS_LOGO_KIRI))), $penangkap->dokumen->html, 'kop tidak masuk badan');
     }
 

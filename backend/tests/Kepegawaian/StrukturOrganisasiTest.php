@@ -196,7 +196,7 @@ final class StrukturOrganisasiTest extends DatabaseTestCase
             $namaUnit = mb_strtoupper((string) $this->db->table('unit')->select('unit')->where('id_unit', $this->unitDep)->get()->getRow('unit'));
             $this->assertStringContainsString('<span style="font-size:11pt;"><b>' . esc($namaUnit) . '</b></span>', $kopUnit, 'baris 2 = unit bagan');
             $this->assertSame(2, substr_count($kopUnit, '<img src="@'));
-            $this->assertStringContainsString('border-top:2px solid #000000', $kopUnit);
+            $this->assertStringContainsString('border-top:1px solid #000000', $kopUnit);
             $this->assertStringNotContainsString('font-size:11pt', $kopKem, 'bagan kementerian: tanpa baris unit');
             $this->assertStringStartsWith('<h3 style="text-align:center;">STRUKTUR ORGANISASI<br/>', $isiUnit, 'isi bagan tidak berubah');
 

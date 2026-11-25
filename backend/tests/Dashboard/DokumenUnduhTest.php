@@ -184,7 +184,7 @@ final class DokumenUnduhTest extends DatabaseTestCase
         // Kop seragam (CR-191, menggantikan F7-15 "tanpa logo"): baris 1 dan 2 terpisah, dua logo bawaan, garis.
         $this->assertStringContainsString('<span style="font-size:12.5pt;"><b>KEMENTERIAN UJI</b></span><br /><span style="font-size:11pt;"><b>SATKER A1</b></span>', $satker);
         $this->assertSame(2, substr_count($satker, '<img src="@'), 'logo kiri dan kanan bawaan');
-        $this->assertStringContainsString('border-top:2px solid #000000', $satker);
+        $this->assertStringContainsString('border-top:1px solid #000000', $satker);
         $this->assertStringNotContainsString('font-size:11pt', $kemen, 'lingkup kementerian: tanpa baris unit');
     }
 

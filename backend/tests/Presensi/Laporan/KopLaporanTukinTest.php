@@ -158,7 +158,7 @@ final class KopLaporanTukinTest extends DatabaseTestCase
             '/<span style="font-size:12\.5pt;"><b>KEMENTERIAN UJI<\/b><\/span><br \/><span style="font-size:11pt;"><b>UNIT FIXTURE [^<]*<\/b><\/span><br \/><span style="font-size:9pt;">Jalan Unit 2<br \/>\nJakarta<\/span>/',
             $kop,
         );
-        $this->assertSame(1, substr_count($kop, 'border-top:2px solid #000000'), 'satu garis hitam');
+        $this->assertSame(1, substr_count($kop, 'border-top:1px solid #000000'), 'satu garis hitam');
         $this->assertStringNotContainsString('<hr', $kop, 'dua garis legacy (putih 7px + hitam 2px) diganti');
     }
 

@@ -100,7 +100,7 @@ final class DrhPegawaiTest extends DatabaseTestCase
         // Kop seragam (CR-191): berlogo, nama kementerian tidak pernah kosong (web_config kosong → bawaan), garis.
         $this->assertSame(2, substr_count($kopBawaan, '<img src="@'), 'logo kiri dan kanan');
         $this->assertStringContainsString('<span style="font-size:12.5pt;"><b>KEMENTERIAN PARIWISATA</b></span>', $kopBawaan);
-        $this->assertStringContainsString('border-top:2px solid #000000', $kopBawaan);
+        $this->assertStringContainsString('border-top:1px solid #000000', $kopBawaan);
         $this->assertStringContainsString('Budi DRH, S.Kom.', $html);
         $this->assertStringContainsString('Kota Uji', $html);
         $this->assertStringContainsString('Seminar &lt;b&gt;Arsip&lt;/b&gt;', $html, 'data di-escape');

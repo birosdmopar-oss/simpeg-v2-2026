@@ -18,7 +18,7 @@ use Config\Presensi;
  * | Kiri | logo kementerian |
  * | Tengah | baris 1 nama kementerian (tebal, 12,5pt, huruf besar); baris 2 unit (tebal, 11pt, huruf besar; kosong → baris dihilangkan); alamat (9pt, baris demi baris) |
  * | Kanan | logo Wonderful Indonesia (Laporan Tukin: logo satker pada cabang legacy) |
- * | Bawah | satu garis hitam 2px (K3) |
+ * | Bawah | satu garis hitam tipis 1pt (K3; CR-192, sebelumnya 2pt) |
  *
  * Komponen ini HANYA menata letak. Sumber teks per dokumen (unit/satker, alamat) tetap ditentukan pemanggil
  * masing-masing seperti sebelum CR-191; komponen tidak membaca `web_config` selain lewat {@see self::nama()} dan
@@ -46,6 +46,9 @@ final class KopResmi
 
     /** Lebar kotak logo, px TCPDF (±26 mm; muat di kolom 15% halaman A4 potret). */
     public const LEBAR_LOGO_PX = 74;
+
+    /** Tebal garis di bawah kop (px = pt TCPDF): satu garis tipis, keputusan Horii 25-11-2026 (CR-192; sebelumnya 2). */
+    public const TEBAL_GARIS_PX = 1;
 
     public const BERKAS_LOGO_KIRI = 'logo-kementerian.png';
 
@@ -112,7 +115,7 @@ final class KopResmi
             . $pengisi . '</tr></table>'
             . ($garis ? '<table width="100%" cellpadding="0" cellspacing="0" border="0">'
                 . '<tr><td style="font-size:1px;line-height:4px;">&nbsp;</td></tr>'
-                . '<tr><td style="border-top:2px solid #000000;font-size:1px;line-height:1px;">&nbsp;</td></tr></table>' : '');
+                . '<tr><td style="border-top:' . self::TEBAL_GARIS_PX . 'px solid #000000;font-size:1px;line-height:1px;">&nbsp;</td></tr></table>' : '');
     }
 
     /**
