@@ -416,7 +416,7 @@ Test: `tests/Kepegawaian/Riwayat/JabatanTest.php` (`use RiwayatBtcTrait` + `pasa
 **[CATAT] Kop seragam (keputusan Horii 24-11-2026, acuan gambar; CR-191).** Semua PDF unduhan memakai SATU komponen kop
 `app/Libraries/Pdf/KopResmi.php`: logo kementerian (kiri) | baris 1 nama kementerian (tebal 12,5pt, huruf besar), baris 2
 unit (tebal 11pt, huruf besar; kosong → baris dihilangkan), alamat (9pt) | logo Wonderful Indonesia (kanan), lalu satu
-garis hitam 2px. Ini **menggantikan** keputusan F7-15 "tanpa logo" (dokumen daftar, surat Cuti/TB/IB, DRH, LKH, tanda
+garis hitam tipis 1pt (CR-192, keputusan Horii 25-11-2026; di CR-191 2pt). Ini **menggantikan** keputusan F7-15 "tanpa logo" (dokumen daftar, surat Cuti/TB/IB, DRH, LKH, tanda
 terima), tata letak kop legacy Slip Gaji, dan tata letak `MY_PDF_HEADER_UNIT` Laporan Tukin (dua garis).
 
 | PDF | Baris 2 (unit) | Alamat | Catatan |

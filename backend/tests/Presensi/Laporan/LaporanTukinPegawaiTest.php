@@ -248,7 +248,7 @@ final class LaporanTukinPegawaiTest extends DatabaseTestCase
             $this->assertStringContainsString('Jalan Uji No. 1<br />' . "\n" . 'Jakarta', $kop);
             // Kop seragam (CR-191): baris 1 dan 2 terpisah, satu garis hitam, logo kanan bawaan (web_config kosong).
             $this->assertMatchesRegularExpression('/KEMENTERIAN UJI<\/b><\/span><br \/><span style="font-size:11pt;"><b>UNIT FIXTURE /', $kop);
-            $this->assertStringContainsString('border-top:2px solid #000000', $kop, 'garis kop');
+            $this->assertStringContainsString('border-top:1px solid #000000', $kop, 'garis kop');
             $this->assertSame(2, substr_count($kop, '<img src="@'), 'logo kiri web_config + logo kanan bawaan');
 
             Pdf::reset();

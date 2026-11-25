@@ -59,7 +59,7 @@ final class KopResmiTest extends CIUnitTestCase
             '<span style="font-size:11pt;"><b>SEKRETARIAT UJI</b></span>',
             '<span style="font-size:9pt;">Jalan Uji 1<br />' . "\n" . 'Telepon 000<br />' . "\n" . 'Laman: contoh.test</span>',
             '<img src="@' . $this->base64(KopResmi::logoBawaan(KopResmi::BERKAS_LOGO_KANAN)),
-            'border-top:2px solid #000000',
+            'border-top:1px solid #000000',
         ]);
 
         $this->assertNotContains(false, $posisi, $kop);
@@ -158,9 +158,21 @@ final class KopResmiTest extends CIUnitTestCase
         $this->assertSame(1, substr_count($kop, '<b>'));
     }
 
+    /** CR-192 (Horii 25-11-2026): satu garis tipis 1 pt di bawah kop — bukan 2 pt, bukan garis ganda. */
+    public function testGarisKopSatuGarisTipisSatuPoin(): void
+    {
+        $kop = KopResmi::html('K', 'U', 'Jalan Uji');
+
+        $this->assertSame(1, KopResmi::TEBAL_GARIS_PX);
+        $this->assertSame(1, substr_count($kop, 'border-top:'), 'tepat satu garis');
+        $this->assertStringContainsString('<td style="border-top:1px solid #000000;font-size:1px;line-height:1px;">', $kop);
+        $this->assertStringNotContainsString('2px solid', $kop);
+        $this->assertStringNotContainsString('<hr', $kop);
+    }
+
     public function testGarisBisaDimatikan(): void
     {
-        $this->assertStringContainsString('border-top:2px solid #000000', KopResmi::html('K', '', ''));
+        $this->assertStringContainsString('border-top:1px solid #000000', KopResmi::html('K', '', ''));
         $this->assertStringNotContainsString('border-top', KopResmi::html('K', '', '', garis: false));
     }
 

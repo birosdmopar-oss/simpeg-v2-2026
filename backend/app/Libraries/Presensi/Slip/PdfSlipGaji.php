@@ -29,6 +29,9 @@ final class PdfSlipGaji
 {
     public const VIEW = 'pdf/slip_gaji';
 
+    /** Tinggi gambar QR di slip, px TCPDF (1 px = 0,353 mm → ±34 mm; CR-192, sebelumnya 128 px = ±45 mm). */
+    public const TINGGI_QR_PX = 96;
+
     /** @var Closure(string, int): string */
     private readonly Closure $pembuatQr;
 
@@ -50,7 +53,7 @@ final class PdfSlipGaji
         $qr = null;
 
         if ($data->urlQr !== null) {
-            $qr = ($this->pembuatQr)($data->urlQr, 128);
+            $qr = ($this->pembuatQr)($data->urlQr, self::TINGGI_QR_PX);
 
             if (! str_starts_with($qr, '<img')) {
                 throw new RuntimeException('QR verifikasi slip gagal dibuat (ekstensi gd/imagick tidak tersedia).');
