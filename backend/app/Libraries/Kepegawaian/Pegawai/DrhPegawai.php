@@ -250,8 +250,8 @@ final class DrhPegawai
             $alamat = $sumber;
         }
 
-        // Kop seragam (CR-191): sumber nama/unit/alamat di atas tidak berubah; nama kosong → bawaan (KopResmi).
-        return KopResmi::html((string) ($wc['pdf_header_nama_kementerian'] ?? $wc['nama_kementerian'] ?? ''), esc($unitPdf), $alamat, ...KopResmi::logo($wc));
+        // Kop seragam (CR-191): sumber unit/alamat di atas tidak berubah; nama lewat rantai tunggal `KopResmi::nama()`.
+        return KopResmi::html(esc(KopResmi::nama($wc)), esc($unitPdf), $alamat, ...KopResmi::logo($wc));
     }
 
     /**

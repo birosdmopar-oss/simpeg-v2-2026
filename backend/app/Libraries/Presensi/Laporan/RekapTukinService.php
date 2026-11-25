@@ -122,6 +122,7 @@ final class RekapTukinService
             $lingkup->tipe === LingkupLaporan::UNIT ? $lingkup->id : null,
             $lingkup->tipe === LingkupLaporan::SATKER ? $lingkup->id : null,
             $this->db,
+            true,
         );
 
         $html = view('pdf/rekap_tukin', [

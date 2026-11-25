@@ -77,7 +77,7 @@ class WebConfig extends BaseConfig
         ],
         'pdf_header_alamat_kementerian' => [
             'label'       => 'Kop PDF: Alamat', 'group' => self::GROUP_KOP_PDF, 'type' => T::HTML, 'default' => '',
-            'description' => 'Alamat kop semua PDF; <br> = ganti baris, tag lain (termasuk tautan) ditampilkan sebagai teks biasa.',
+            'description' => 'Alamat kop semua PDF; <br> = ganti baris; tag lain (termasuk tautan) dibuang, isinya dipertahankan sebagai teks biasa.',
         ],
         'logo_kementerian_pdf' => [
             'label'       => 'Kop PDF: Logo Kiri', 'group' => self::GROUP_KOP_PDF, 'type' => T::ASSET_PATH, 'default' => '',

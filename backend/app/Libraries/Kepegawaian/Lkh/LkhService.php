@@ -321,9 +321,9 @@ final class LkhService implements LkhServiceInterface
         $wc  = $this->webConfig();
         $uns = $this->db()->table('unit')->select('unit, alamat_pdf_header')->where('id_unit', $row['id_unit'])->get()->getRowArray();
 
-        // Kop seragam (CR-191): sumber nama/unit/alamat tidak berubah; nama kosong → bawaan (KopResmi).
+        // Kop seragam (CR-191): sumber unit/alamat tidak berubah; nama lewat rantai tunggal `KopResmi::nama()`.
         $kop = KopResmi::html(
-            (string) ($wc['pdf_header_nama_kementerian'] ?? $wc['nama_kementerian'] ?? ''),
+            esc(KopResmi::nama($wc)),
             esc((string) ($row['unit'] ?? '')),
             (string) ($uns['alamat_pdf_header'] ?? $wc['pdf_header_alamat_kementerian'] ?? ''),
             ...KopResmi::logo($wc),

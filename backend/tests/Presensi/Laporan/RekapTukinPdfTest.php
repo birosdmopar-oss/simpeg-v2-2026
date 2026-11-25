@@ -57,6 +57,7 @@ final class RekapTukinPdfTest extends DatabaseTestCase
         $this->assertSame(2, substr_count($kop, '<img src="@'));
         $this->assertStringContainsString('border-top:2px solid #000000', $kop);
         $this->assertSame(40.0, $this->pdfTertangkap[0]->marginAtasKop);
+        $this->assertStringContainsString('<td width="15.5%"></td>', $kop, 'lanskap: kop dibatasi di tengah');
 
         $config                    = new Presensi();
         $config->pdfRekapMaksBaris = 1;

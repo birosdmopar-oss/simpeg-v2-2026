@@ -37,10 +37,11 @@ final class KopDokumen
     /**
      * @param int|null $idUnit   unit lingkup (null = kementerian)
      * @param int|null $idSatker satker lingkup (null = seluruh unit)
+     * @param bool     $lanskap  dokumen lanskap (kop dibatasi di tengah halaman, lihat `KopResmi`)
      */
-    public static function html(?int $idUnit, ?int $idSatker, ?BaseConnection $db = null): string
+    public static function html(?int $idUnit, ?int $idSatker, ?BaseConnection $db = null, bool $lanskap = false): string
     {
-        return self::susun($idUnit, $idSatker, $db, false);
+        return self::susun($idUnit, $idSatker, $db, false, $lanskap);
     }
 
     /**
@@ -49,10 +50,10 @@ final class KopDokumen
      */
     public static function htmlSurat(?BaseConnection $db = null): string
     {
-        return self::susun(null, null, $db, true);
+        return self::susun(null, null, $db, true, false);
     }
 
-    private static function susun(?int $idUnit, ?int $idSatker, ?BaseConnection $db, bool $unitWebConfig): string
+    private static function susun(?int $idUnit, ?int $idSatker, ?BaseConnection $db, bool $unitWebConfig, bool $lanskap): string
     {
         $db ??= Database::connect();
         $wc     = self::webConfig();
@@ -84,20 +85,12 @@ final class KopDokumen
             }
         }
 
-        $nama = (string) ($wc['pdf_header_nama_kementerian'] ?? '');
-
-        if (trim(strip_tags($nama)) === '') {
-            $nama = (string) ($wc['nama_kementerian'] ?? '');
-        }
-
-        if (trim(strip_tags($nama)) === '') {
-            $nama = self::NAMA_INSTANSI_BAWAAN;
-        }
-
         // Nama unit/satker master = teks polos (di-escape supaya tidak diurai sebagai HTML); `web_config` = HTML tersanitasi.
         $baris2 = $unitWebConfig && $baris2 === '' ? (string) ($wc['pdf_header_nama_unit'] ?? '') : esc($baris2);
 
-        return KopResmi::html($nama, $baris2, $alamat, ...KopResmi::logo($wc));
+        [$logoKiri, $logoKanan] = KopResmi::logo($wc);
+
+        return KopResmi::html(esc(KopResmi::nama($wc)), $baris2, $alamat, $logoKiri, $logoKanan, lanskap: $lanskap);
     }
 
     /**

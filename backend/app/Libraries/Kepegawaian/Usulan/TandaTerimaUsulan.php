@@ -88,9 +88,9 @@ final class TandaTerimaUsulan
             'dicetak' => Time::now('Asia/Jakarta')->format('d-m-Y'),
         ]);
 
-        // Kop seragam (CR-191): sumber nama/alamat tidak berubah (tanpa baris unit); nama kosong → bawaan (KopResmi).
+        // Kop seragam (CR-191): sumber alamat tidak berubah (tanpa baris unit); nama lewat rantai tunggal `KopResmi::nama()`.
         $kop = KopResmi::html(
-            (string) ($wc['pdf_header_nama_kementerian'] ?? $wc['nama_kementerian'] ?? ''),
+            esc(KopResmi::nama($wc)),
             '',
             (string) ($wc['pdf_header_alamat_kementerian'] ?? ''),
             ...KopResmi::logo($wc),

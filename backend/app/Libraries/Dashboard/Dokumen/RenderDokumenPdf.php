@@ -86,7 +86,7 @@ final class RenderDokumenPdf
         return Pdf::renderer()->render(new DokumenPdf(
             $judul,
             $html,
-            KopDokumen::html($idUnit, $idSatker, $this->db),
+            KopDokumen::html($idUnit, $idSatker, $this->db, true),
             $kaki,
             self::ORIENTASI,
             self::UKURAN,

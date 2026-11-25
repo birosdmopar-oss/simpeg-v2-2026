@@ -430,16 +430,20 @@ terima), tata letak kop legacy Slip Gaji, dan tata letak `MY_PDF_HEADER_UNIT` La
 | Tanda Terima Usulan | – | `pdf_header_alamat_kementerian` | |
 
 - Sumber teks per dokumen di tabel **tidak berubah** dari sebelum CR-191; hanya tata letaknya yang disatukan.
-- Baris 1 tidak pernah kosong: nama dari `web_config` kosong → `KopDokumen::NAMA_INSTANSI_BAWAAN` di semua PDF (termasuk
-  DRH/LKH/tanda terima yang sebelumnya bisa mencetak baris kosong).
+- Baris 1 lewat rantai tunggal `KopResmi::nama()` di semua PDF: `pdf_header_nama_kementerian` → `nama_kementerian` →
+  `KopDokumen::NAMA_INSTANSI_BAWAAN`; "kosong" dinilai pada teks polosnya (mis. hanya `<br>`), jadi baris 1 tidak pernah
+  kosong (DRH/LKH/tanda terima sebelumnya memakai `??` saja dan bisa mencetak baris kosong).
 - Teks kop = **data** `web_config` (menu Web Config), bukan kode/seed (repo publik). Teks masukan dijadikan teks polos:
-  `<br>` → spasi (baris 1/2) atau ganti baris (alamat); tag lain, termasuk tautan, dibuang; semuanya di-escape.
+  `<br>` dan penutup blok (`</p>`, `</div>`, `</li>`, `</tr>`, `<hr>`) → spasi (baris 1/2) atau ganti baris (alamat); tag
+  lain, termasuk tautan, dibuang dan isinya dipertahankan; semuanya di-escape.
 - Logo: `web_config` `logo_kementerian_pdf` / `logo_wonderful_pdf` (ASSET_PATH relatif dari `Config\Presensi::$akarAset`,
   di-resolve `KopSlip::resolveAset` — aturan akar aset tidak berubah). Kosong / tidak sah / berkas tidak ada / bukan
   PNG-JPEG → **logo bawaan repo** `app/Assets/Kop/` (PNG palet tanpa transparansi, supaya disematkan langsung tanpa topeng
-  alfa). Logo diskalakan ke kotak ±26 × 20 mm dengan rasio terjaga.
+  alfa). Logo diskalakan ke kotak ±26 × 24 mm dengan rasio terjaga; logo dan blok teks yang lebih pendek diturunkan ke
+  tengah. Dokumen lanskap (dokumen daftar, Rekap Tukin, Struktur): kop dibatasi ±190 mm di tengah halaman.
 - `TcpdfRenderer`: bila kop lebih tinggi dari `marginAtasKop` (alamat berbaris banyak), badan dimulai tepat di bawah kop
-  (tidak menimpanya). `marginAtasKop` 42 (potret) / 40 (lanskap: dokumen daftar — sebelumnya 32 —, Rekap Tukin, Struktur).
+  (tidak menimpanya); halaman lanjutan selalu mulai di margin 10 mm, termasuk tabel tanpa `<thead>` yang melintasi
+  halaman (margin halaman dicatat ulang sesudah kop). `marginAtasKop` 42 (potret) / 40 (lanskap: dokumen daftar — sebelumnya 32 —, Rekap Tukin, Struktur).
 
 **PDF (ADR-033)** — `app/Libraries/Pdf/`: `PdfRendererInterface` (`app/Interfaces/`), `DokumenPdf` (judul, HTML badan, kop
 halaman pertama, kaki setiap halaman, orientasi, ukuran), `TcpdfRenderer` (TCPDF ^6.6, LGPL-3.0-or-later, via Composer;

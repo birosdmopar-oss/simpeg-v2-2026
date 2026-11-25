@@ -72,6 +72,58 @@ final class KopResmiTest extends CIUnitTestCase
         $this->assertStringContainsString('<td width="15%" align="right">', $kop, 'kolom logo simetris');
     }
 
+    /** Lanskap: kop dibatasi di tengah halaman (pengisi kiri/kanan) supaya logo tetap rapat ke teks. */
+    public function testLanskapKopDibatasiDiTengah(): void
+    {
+        $kop = KopResmi::html('Kementerian Uji', 'Unit Uji', 'Jalan Uji', lanskap: true);
+
+        $this->assertSame(5, substr_count($kop, '<td width='), 'pengisi | logo | teks | logo | pengisi');
+        $this->assertSame(2, substr_count($kop, '<td width="15.5%"></td>'), 'pengisi simetris');
+        $this->assertStringContainsString('<td width="10.5%" align="left">', $kop);
+        $this->assertStringContainsString('<td width="48%" align="center"', $kop);
+        $this->assertStringContainsString('<td width="10.5%" align="right">', $kop);
+        $this->assertStringNotContainsString('15.5%', KopResmi::html('Kementerian Uji', 'Unit Uji', 'Jalan Uji'), 'potret: tanpa pengisi');
+    }
+
+    /** Blok teks yang lebih pendek dari logo diturunkan ke tengah; blok penuh (5 baris) nyaris tanpa pengisi. */
+    public function testBlokTeksPendekDiturunkanKeTengah(): void
+    {
+        $this->assertStringContainsString('style="line-height:1.15;"><div style="font-size:26px;line-height:1;">&nbsp;</div><span style="font-size:12.5pt;">', KopResmi::html('K', '', ''));
+        $this->assertStringContainsString('style="line-height:1.15;"><div style="font-size:4px;line-height:1;">&nbsp;</div><span', KopResmi::html('K', 'U', "a\nb\nc"));
+        $this->assertStringContainsString('style="line-height:1.15;"><span', KopResmi::html('K', 'U', "a\nb\nc\nd\ne"), 'blok lebih tinggi dari logo: tanpa pengisi');
+    }
+
+    /** Rantai nama tunggal semua PDF: pdf_header_nama_kementerian → nama_kementerian → bawaan; kosong = teks polos kosong. */
+    public function testRantaiNamaKementerian(): void
+    {
+        $this->assertSame('Kop Uji Dua', KopResmi::nama(['pdf_header_nama_kementerian' => 'Kop Uji<br />Dua', 'nama_kementerian' => 'Kementerian Uji']));
+
+        foreach ([[], ['pdf_header_nama_kementerian' => ''], ['pdf_header_nama_kementerian' => ' <br /> '], ['pdf_header_nama_kementerian' => null]] as $wc) {
+            $this->assertSame('Kementerian Uji', KopResmi::nama($wc + ['nama_kementerian' => ' Kementerian Uji ']), (string) json_encode($wc));
+            $this->assertSame(KopDokumen::NAMA_INSTANSI_BAWAAN, KopResmi::nama($wc + ['nama_kementerian' => '']), (string) json_encode($wc));
+            $this->assertSame(KopDokumen::NAMA_INSTANSI_BAWAAN, KopResmi::nama($wc));
+        }
+    }
+
+    /** Alamat berstruktur blok (<p>, <li>, <div>, <tr>, <hr>): tiap blok jadi baris sendiri, tidak menyatu. */
+    public function testAlamatBerblokDipisahPerBaris(): void
+    {
+        $harap = '<span style="font-size:9pt;">Jalan Uji 1<br />' . "\n" . 'Telepon 000<br />' . "\n" . 'Laman: contoh.test</span>';
+
+        foreach ([
+            '<p>Jalan Uji 1</p><p>Telepon 000</p><p>Laman: contoh.test</p>',
+            '<div>Jalan Uji 1</div><div>Telepon 000</div>Laman: contoh.test',
+            '<ul><li>Jalan Uji 1</li><li>Telepon 000</li><li>Laman: contoh.test</li></ul>',
+            '<table><tr><td>Jalan Uji 1</td></tr><tr><td>Telepon 000</td></tr></table>Laman: contoh.test',
+            'Jalan Uji 1<hr />Telepon 000<HR>Laman: contoh.test',
+            "<p>Jalan   Uji 1</p>\n\n<p>Telepon 000<br /></p>\n<p>Laman: contoh.test</p>",
+        ] as $alamat) {
+            $this->assertStringContainsString($harap, KopResmi::html('K', '', $alamat), $alamat);
+        }
+
+        $this->assertStringContainsString('<b>KEMENTERIAN UJI</b>', KopResmi::html('<p>Kementerian</p><p>Uji</p>', '', ''), 'baris 1: blok → spasi');
+    }
+
     public function testBaris1DanBaris2TeksPolosSatuBarisDiEscape(): void
     {
         $kop = KopResmi::html('Kementerian<br>Uji <script>alert(1)</script> &amp; "Kawan"', 'Biro<br />A &lt; B <i>miring</i>', '');
@@ -135,9 +187,9 @@ final class KopResmiTest extends CIUnitTestCase
 
         $kop = KopResmi::html('K', '', '', $kiri, $kanan);
 
-        // 40×40 → dibatasi tinggi kotak; 100×20 → dibatasi lebar kotak, diturunkan ke tengah.
-        $this->assertStringContainsString('<img src="@' . $this->base64((string) $kiri) . '" width="57" height="57" />', $kop);
-        $this->assertStringContainsString('<div style="font-size:21px;line-height:1;">&nbsp;</div><img src="@' . $this->base64((string) $kanan) . '" width="74" height="15" />', $kop);
+        // 40×40 → dibatasi tinggi kotak (±24 mm); 100×20 → dibatasi lebar kotak (±26 mm), diturunkan ke tengah.
+        $this->assertStringContainsString('<img src="@' . $this->base64((string) $kiri) . '" width="68" height="68" />', $kop);
+        $this->assertStringContainsString('<div style="font-size:26px;line-height:1;">&nbsp;</div><img src="@' . $this->base64((string) $kanan) . '" width="74" height="15" />', $kop);
         $this->assertStringNotContainsString($this->base64(KopResmi::logoBawaan(KopResmi::BERKAS_LOGO_KIRI)), $kop);
         $this->assertStringNotContainsString($this->base64(KopResmi::logoBawaan(KopResmi::BERKAS_LOGO_KANAN)), $kop);
     }
@@ -199,6 +251,70 @@ final class KopResmiTest extends CIUnitTestCase
         $a = $this->yTeks((new TcpdfRenderer())->render(new DokumenPdf('Kop', '<p>AWALBADAN</p>', KopResmi::html('K', 'U', 'Jalan Uji'), marginAtasKop: 42)), 'AWALBADAN');
         $b = $this->yTeks((new TcpdfRenderer())->render(new DokumenPdf('Kop', '<p>AWALBADAN</p>', '<p>kop pendek</p>', marginAtasKop: 42)), 'AWALBADAN');
         $this->assertEqualsWithDelta($b, $a, 0.01);
+
+        // Kop lengkap (logo ±24 mm, tiga baris alamat) muat di margin lanskap 40 dan potret 42: garis di atas badan.
+        $alamat3 = 'Jalan Uji 1<br />Telepon 000<br />Laman: contoh.test';
+
+        foreach ([['L', 40.0, true], ['P', 42.0, false]] as [$orientasi, $margin, $lanskap]) {
+            $pdf   = (new TcpdfRenderer())->render(new DokumenPdf('Kop', '<p>AWALBADAN</p>', KopResmi::html('Kementerian Uji', 'Unit Uji', $alamat3, lanskap: $lanskap), orientasi: $orientasi, marginAtasKop: $margin));
+            $tanpa = (new TcpdfRenderer())->render(new DokumenPdf('Kop', '<p>AWALBADAN</p>', '<p>kop pendek</p>', orientasi: $orientasi, marginAtasKop: $margin));
+            $this->assertEqualsWithDelta($this->yTeks($tanpa, 'AWALBADAN'), $this->yTeks($pdf, 'AWALBADAN'), 0.01, $orientasi . ': badan tetap di marginAtasKop');
+        }
+    }
+
+    /**
+     * Halaman lanjutan tabel TANPA <thead> (mis. Struktur Organisasi) mulai di margin atas 10 mm, bukan di margin kop
+     * halaman pertama (TCPDF memulihkan margin dari `pagedim` saat tabel melintasi halaman).
+     */
+    public function testHalamanLanjutanTabelTanpaTheadTidakMewarisiMarginKop(): void
+    {
+        $baris = '';
+
+        for ($i = 1; $i <= 90; $i++) {
+            $baris .= '<tr><td>JABATAN' . $i . 'X</td><td>Pejabat ' . $i . '</td></tr>';
+        }
+
+        $html   = '<table border="1" cellpadding="4" width="100%">' . $baris . '</table>';
+        $dengan = (new TcpdfRenderer())->render(new DokumenPdf('S', $html, KopResmi::html('K', 'U', 'Jalan Uji', lanskap: true), orientasi: 'L', marginAtasKop: 40.0));
+        $tanpa  = (new TcpdfRenderer())->render(new DokumenPdf('S', $html, orientasi: 'L'));
+
+        // Baris pertama halaman 2 dokumen berkop = baris ke-N; di halaman itu posisinya harus sama dengan baris pertama
+        // halaman 2 dokumen tanpa kop (margin 10 mm), dan jumlah halaman hanya boleh bertambah akibat kop halaman 1.
+        $this->assertEqualsWithDelta($this->yTeksPertamaHalaman($tanpa, 2), $this->yTeksPertamaHalaman($dengan, 2), 0.01, 'halaman 2 mulai di margin 10 mm');
+        $this->assertEqualsWithDelta($this->yTeksPertamaHalaman($tanpa, 3), $this->yTeksPertamaHalaman($dengan, 3), 0.01, 'halaman 3 mulai di margin 10 mm');
+        $this->assertLessThanOrEqual($this->jumlahHalaman($tanpa) + 1, $this->jumlahHalaman($dengan));
+        $this->assertSame(4, $this->jumlahHalaman($tanpa));
+    }
+
+    private function jumlahHalaman(string $pdf): int
+    {
+        return (int) preg_match_all('/\/Type\s*\/Page\b(?!s)/', $pdf);
+    }
+
+    /**
+     * Koordinat y teks pertama pada aliran isi halaman ke-$halaman (urutan aliran yang memuat teks tabel).
+     */
+    private function yTeksPertamaHalaman(string $pdf, int $halaman): float
+    {
+        preg_match_all('/stream\r?\n(.*?)\r?\nendstream/s', $pdf, $aliran);
+        $ke = 0;
+
+        foreach ($aliran[1] as $mentah) {
+            $isi = @gzuncompress($mentah);
+
+            if ($isi === false || ! str_contains($isi, 'JABATAN')) {
+                continue;
+            }
+
+            if (++$ke === $halaman) {
+                $sebelum = substr($isi, 0, (int) strpos($isi, 'JABATAN'));
+                $this->assertGreaterThan(0, preg_match_all('/BT\s+[-\d.]+\s+([-\d.]+)\s+Td/', $sebelum, $m));
+
+                return (float) end($m[1]);
+            }
+        }
+
+        $this->fail('halaman ' . $halaman . ' tidak ditemukan');
     }
 
     private function base64(string $path): string

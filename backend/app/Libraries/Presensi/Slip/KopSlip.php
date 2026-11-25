@@ -6,6 +6,7 @@ namespace App\Libraries\Presensi\Slip;
 
 use App\Libraries\MasterData\WebConfigTypes;
 use App\Libraries\Pdf\KopDokumen;
+use App\Libraries\Pdf\KopResmi;
 
 /**
  * Kop PDF slip gaji dari nilai `web_config` (PRD 5A §7.3.6, G-09) — dipakai service slip sebelum membentuk
@@ -31,6 +32,8 @@ final class KopSlip
     {
         $namaKementerian = self::teks($wc['nama_kementerian'] ?? null);
         $headerKem       = self::teks($wc['pdf_header_nama_kementerian'] ?? null);
+        // "Kosong" dinilai pada teks polosnya (mis. hanya `<br>`), sama dengan rantai `KopResmi::nama()` (CR-191).
+        $headerKem = KopResmi::satuBaris($headerKem) !== '' ? $headerKem : '';
 
         return [
             'kop' => [

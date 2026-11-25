@@ -111,6 +111,10 @@ final class KopSlipTest extends CIUnitTestCase
 
         $hasil = KopSlip::dariWebConfig(['nama_kementerian' => 'Kementerian Uji'], $this->akar);
         $this->assertSame('Kementerian Uji', $hasil['kop']['nama_kementerian'], 'kop jatuh ke nama_kementerian (pola PDF LKH)');
+
+        // CR-191: "kosong" dinilai pada teks polos — header hanya `<br>` juga jatuh ke nama_kementerian.
+        $hasil = KopSlip::dariWebConfig(['pdf_header_nama_kementerian' => '<br />', 'nama_kementerian' => 'Kementerian Uji'], $this->akar);
+        $this->assertSame('Kementerian Uji', $hasil['kop']['nama_kementerian']);
     }
 
     public function testDirektoriAbsolut(): void

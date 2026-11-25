@@ -8,6 +8,7 @@ use App\Exceptions\NotFoundException;
 use App\Interfaces\PdfRendererInterface;
 use App\Libraries\Layanan\Cuti\CutiService;
 use App\Libraries\Layanan\Cuti\SuratCutiService;
+use App\Libraries\MasterData\WebConfigService;
 use App\Libraries\Pdf\DokumenPdf;
 use App\Libraries\Pdf\KopDokumen;
 use App\Libraries\Pdf\KopResmi;
@@ -54,7 +55,12 @@ final class SuratCutiTest extends DatabaseTestCase
     public function testSuratCutiMemakaiKopSeragamBerlogo(): void
     {
         ['id' => $id] = $this->cutiFinal();
-        $penangkap    = new class () implements PdfRendererInterface {
+        $this->db->table('web_config')->insertBatch([
+            ['config_name' => 'pdf_header_nama_kementerian', 'config_value' => 'Kementerian Uji'],
+            ['config_name' => 'pdf_header_nama_unit', 'config_value' => 'Sekretariat Uji'],
+        ]);
+        service('cacheService')->invalidate(WebConfigService::CACHE_KEY);
+        $penangkap = new class () implements PdfRendererInterface {
             public ?DokumenPdf $dokumen = null;
 
             public function render(DokumenPdf $dokumen): string
@@ -75,7 +81,8 @@ final class SuratCutiTest extends DatabaseTestCase
         $this->assertNotNull($penangkap->dokumen);
         $kop = $penangkap->dokumen->kopHtml;
         $this->assertSame(KopDokumen::htmlSurat($this->db), $kop);
-        $this->assertStringContainsString('<span style="font-size:12.5pt;"><b>', $kop);
+        // K2: baris 2 surat = web_config `pdf_header_nama_unit`.
+        $this->assertStringContainsString('<span style="font-size:12.5pt;"><b>KEMENTERIAN UJI</b></span><br /><span style="font-size:11pt;"><b>SEKRETARIAT UJI</b></span>', $kop);
         $this->assertSame(2, substr_count($kop, '<img src="@'), 'logo kiri dan kanan tertanam');
         $this->assertStringContainsString('border-top:2px solid #000000', $kop);
         $this->assertStringNotContainsString('<img src="@' . base64_encode((string) file_get_contents(KopResmi::logoBawaan(KopResmi::BERKAS_LOGO_KIRI))), $penangkap->dokumen->html, 'kop tidak masuk badan');

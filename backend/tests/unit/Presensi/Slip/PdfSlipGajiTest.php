@@ -31,7 +31,11 @@ final class PdfSlipGajiTest extends CIUnitTestCase
 
         $this->assertStringStartsWith('%PDF-', $isi);
         $this->assertStringContainsString('%%EOF', $isi);
-        $this->assertMatchesRegularExpression('/\/Subtype\s*\/Image/', $isi, 'QR tertanam sebagai gambar');
+        // Logo kop bawaan selalu tertanam (CR-191), jadi QR dibuktikan dari JUMLAH gambar: tanpa token tepat dua logo;
+        // dengan token bertambah gambar QR (PNG QR beralfa = gambar + topengnya).
+        $tanpaQr = preg_match_all('/\/Subtype\s*\/Image/', PdfSlipGaji::bawaan()->render($this->data(urlQr: null)));
+        $this->assertSame(2, $tanpaQr, 'tanpa token: hanya dua logo kop');
+        $this->assertGreaterThan($tanpaQr, preg_match_all('/\/Subtype\s*\/Image/', $isi), 'QR tertanam sebagai gambar di samping dua logo');
     }
 
     public function testIsiViewUrutanBagianTotalDanEscape(): void

@@ -7,6 +7,7 @@ namespace Tests\Kepegawaian;
 use App\Constants\Role;
 use App\Interfaces\PdfRendererInterface;
 use App\Libraries\Kepegawaian\Pegawai\DrhPegawai;
+use App\Libraries\MasterData\WebConfigService;
 use App\Libraries\Pdf\DokumenPdf;
 use App\Libraries\Pdf\Pdf;
 use CodeIgniter\Test\FeatureTestTrait;
@@ -74,17 +75,32 @@ final class DrhPegawaiTest extends DatabaseTestCase
         Pdf::pakai($renderer);
 
         try {
-            $hasil = (new DrhPegawai())->pdf($auth, $nip);
+            $hasil     = (new DrhPegawai())->pdf($auth, $nip);
+            $kopBawaan = $renderer->kop;
+
+            // C1 (CR-191): baris `pdf_header_nama_kementerian` ADA tetapi kosong → jatuh ke `nama_kementerian`,
+            // bukan baris kosong dan bukan langsung bawaan (rantai tunggal `KopResmi::nama()`; dulu `??` saja).
+            $this->db->table('web_config')->insertBatch([
+                ['config_name' => 'pdf_header_nama_kementerian', 'config_value' => ''],
+                ['config_name' => 'nama_kementerian', 'config_value' => 'Kementerian Uji Rantai'],
+            ]);
+            service('cacheService')->invalidate(WebConfigService::CACHE_KEY);
+            (new DrhPegawai())->pdf($auth, $nip);
+            $kopRantai = $renderer->kop;
         } finally {
+            $this->db->table('web_config')->whereIn('config_name', ['pdf_header_nama_kementerian', 'nama_kementerian'])->delete();
+            service('cacheService')->invalidate(WebConfigService::CACHE_KEY);
             Pdf::reset();
         }
+
+        $this->assertStringContainsString('<span style="font-size:12.5pt;"><b>KEMENTERIAN UJI RANTAI</b></span>', $kopRantai);
 
         $html = $renderer->html;
         $this->assertSame('%PDF-uji', $hasil['isi']);
         // Kop seragam (CR-191): berlogo, nama kementerian tidak pernah kosong (web_config kosong → bawaan), garis.
-        $this->assertSame(2, substr_count($renderer->kop, '<img src="@'), 'logo kiri dan kanan');
-        $this->assertStringContainsString('<span style="font-size:12.5pt;"><b>KEMENTERIAN PARIWISATA</b></span>', $renderer->kop);
-        $this->assertStringContainsString('border-top:2px solid #000000', $renderer->kop);
+        $this->assertSame(2, substr_count($kopBawaan, '<img src="@'), 'logo kiri dan kanan');
+        $this->assertStringContainsString('<span style="font-size:12.5pt;"><b>KEMENTERIAN PARIWISATA</b></span>', $kopBawaan);
+        $this->assertStringContainsString('border-top:2px solid #000000', $kopBawaan);
         $this->assertStringContainsString('Budi DRH, S.Kom.', $html);
         $this->assertStringContainsString('Kota Uji', $html);
         $this->assertStringContainsString('Seminar &lt;b&gt;Arsip&lt;/b&gt;', $html, 'data di-escape');

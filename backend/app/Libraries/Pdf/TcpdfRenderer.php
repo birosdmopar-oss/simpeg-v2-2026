@@ -52,6 +52,11 @@ final class TcpdfRenderer implements PdfRendererInterface
                 } else {
                     $this->SetTopMargin(10);
                 }
+
+                // TCPDF memulihkan margin atas dari `pagedim[halaman]['tm']` saat tabel melintasi halaman; nilai itu
+                // dicatat SEBELUM Header() (masih margin kop halaman 1), sehingga halaman lanjutan tabel tanpa <thead>
+                // ikut kosong setinggi kop. Samakan dengan margin yang baru ditetapkan (CR-191).
+                $this->pagedim[$this->page]['tm'] = $this->tMargin;
             }
 
             // phpcs:ignore -- nama method milik TCPDF

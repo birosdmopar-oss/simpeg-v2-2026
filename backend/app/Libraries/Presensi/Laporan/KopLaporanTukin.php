@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Libraries\Presensi\Laporan;
 
-use App\Libraries\Pdf\KopDokumen;
 use App\Libraries\Pdf\KopResmi;
 use App\Libraries\Presensi\Slip\KopSlip;
 use CodeIgniter\Database\BaseConnection;
@@ -20,7 +19,8 @@ use Config\Presensi;
  * ke logo bawaan repo, bukan sel kosong. Sumber nama/unit/alamat/logo kanan di bawah TIDAK berubah.
  *
  * Sumber v2 (tanpa path di-hard-code, pola CR-066 / slip gaji):
- * - nama: `web_config` `pdf_header_nama_kementerian` → `nama_kementerian` → {@see KopDokumen::NAMA_INSTANSI_BAWAAN};
+ * - nama: `web_config` `pdf_header_nama_kementerian` → `nama_kementerian` → `KopDokumen::NAMA_INSTANSI_BAWAAN`
+ *   ({@see KopResmi::nama()}, rantai tunggal semua PDF);
  * - baris unit: nama **satker** bila unit ∈ {`$unitTtdSatkerTerpilih`, `$unitTtdSatkerKepegawaian`} (legacy id 6/7, F3),
  *   selain itu nama unit;
  * - alamat & logo kanan ikut cabang legacy [K] (`L_presensi.php:6512-6521` bawaan, `:7105-7116` pengisian):
@@ -55,9 +55,7 @@ final class KopLaporanTukin
 
         $pakaiSatker = $idUnit !== null && in_array($idUnit, [$config->unitTtdSatkerTerpilih, $config->unitTtdSatkerKepegawaian], true);
 
-        $nama = self::teks($wc['pdf_header_nama_kementerian'] ?? null);
-        $nama = $nama !== '' ? $nama : self::teks($wc['nama_kementerian'] ?? null);
-        $nama = $nama !== '' ? $nama : KopDokumen::NAMA_INSTANSI_BAWAAN;
+        $nama = KopResmi::nama($wc);
 
         $namaUnit = (string) ($pakaiSatker ? ($satker['satker'] ?? '') : ($unit['unit'] ?? ''));
 

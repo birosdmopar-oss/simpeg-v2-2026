@@ -643,6 +643,7 @@ final class StrukturService implements StrukturServiceInterface
             $kunci === '0' || str_starts_with($kunci, 'sat_') ? null : (int) $kunci,
             str_starts_with($kunci, 'sat_') ? (int) substr($kunci, 4) : null,
             $this->db(),
+            true,
         );
 
         $isi = Pdf::renderer()->render(new DokumenPdf(
