@@ -230,7 +230,7 @@ MAKE-052 merged + MAKE-054.
   elemen (1 per elemen; kolom × baris = matriks penuh; pencarian bernilai cari larik × jumlah elemen) + biaya pindai
   `J:J` (sel sheet / 200) + byte hasil `REPT` literal / 4 + teks hasil `&` atas larik / 256 + kriteria wildcard menurut
   jumlah `*` + teks terpanjang workbook / 128 per operasi teks. **Daftar putih fungsi:** hanya fungsi yang biayanya
-  sudah diukur (±65 fungsi lazim templat gaji, daftar di README BB-12) yang boleh dipakai; rumus dengan fungsi di luar
+  sudah diukur (95 fungsi lazim templat gaji + operator `&` + larik literal; daftar di README BB-12) yang boleh dipakai; rumus dengan fungsi di luar
   daftar ditolak, tempel sebagai nilai. Tak terbatas (ditolak): fungsi di luar daftar putih (termasuk `INDIRECT`,
   `OFFSET`, operator `#` dan `@`, pembangkit larik), rumus > 8.192 karakter, `REPT` berjumlah ulang bukan literal,
   `SUBSTITUTE` berhasil > 4 MB, ujung rentang hasil hitung, rujukan 3D, rumus tidak terurai, nama terdefinisi

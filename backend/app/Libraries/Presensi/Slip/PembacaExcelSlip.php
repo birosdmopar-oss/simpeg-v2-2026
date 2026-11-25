@@ -43,8 +43,10 @@ use Throwable;
  *    {@see PemuatXlsxSlip}.
  * 3. SEBELUM ada sel rumus yang dihitung (CR-181), anggaran beban hitung rumus GPP + TK, ditaksir dari teks rumus
  *    ({@see PenaksirBebanRumus}): batas per sel rumus dan batas jumlah (konstanta `Config\Presensi`), dan hanya fungsi
- *    di daftar putih penaksir yang boleh dipakai. Lewat batas atau memakai fungsi lain → {@see self::PESAN_RUMUS}. Ini pagar masukan saja: sel rumus berkas yang lolos tetap dihitung ulang dengan
- *    `getCalculatedValue` seperti legacy; nilai tersimpan di berkas (`<v>`) tidak pernah dipakai.
+ *    di daftar putih penaksir yang boleh dipakai. Lewat batas atau memakai fungsi lain → {@see self::PESAN_RUMUS}.
+ *    Ini pagar masukan saja: sel rumus berkas yang lolos tetap dihitung ulang dengan `getCalculatedValue` seperti
+ *    legacy; nilai tersimpan sel rumus (`<v>`) tidak dipakai, kecuali yang dipakai kalkulator sendiri untuk rujukan ke
+ *    workbook eksternal (`[1]Sheet!A1`), sama seperti sebelum CR-181.
  *
  * Read filter (`IReadFilter`) SENGAJA TIDAK dipasang pada pemuat, jangan ditambahkan: begitu ada read filter kustom,
  * reader Xlsx memanggilnya untuk setiap kolom `<cols>` × setiap `<row>` (`Reader/Xlsx/ColumnAndRowAttributes`, juga saat

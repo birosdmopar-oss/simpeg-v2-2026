@@ -132,7 +132,10 @@ class Presensi extends BaseConfig
      */
     public const PEMBAGI_KUADRAT_BARIS_RUMUS_IMPOR = 6_000;
 
-    /** Pembagi suku kuadratik larik argumen `SUBTOTAL` (satu kolom: 2.500 baris 36 ms, 5.000 baris 128 ms, 10.000 baris 350 ms). */
+    /**
+     * Pembagi suku kuadratik larik argumen `SUBTOTAL` (satu kolom: 2.500 baris 36 ms, 5.000 baris 128 ms, 10.000 baris
+     * 350 ms) dan `LOOKUP` (review R3: dua vektor 2.500–10.000 baris per satuan setara `VLOOKUP`).
+     */
     public const PEMBAGI_KUADRAT_BARIS_SEDANG_RUMUS_IMPOR = 2_000;
 
     /**
@@ -169,6 +172,21 @@ class Presensi extends BaseConfig
      * sementara puluhan MB menghabiskan memori. Lebih besar dari ini → ditolak.
      */
     public const MAKS_BYTE_HASIL_TEKS_RUMUS_IMPOR = 4 * 1024 * 1024;
+
+    /**
+     * CR-181 R4 (B2): `TEXT` menafsirkan kode formatnya dengan biaya kuadratik menurut panjang format (format 32.000 `?`
+     * ±0,43 detik per panggilan). Tiap panggilan ditagih panjang format² / nilai ini.
+     */
+    public const PEMBAGI_KUADRAT_FORMAT_TEKS_RUMUS_IMPOR = 12_000;
+
+    /** Panjang kode format `TEXT` terbesar = batas Excel (255 karakter); format yang pasti lebih panjang → ditolak. */
+    public const MAKS_PANJANG_FORMAT_TEKS_RUMUS_IMPOR = 255;
+
+    /**
+     * CR-181 R4 (B3): `SEARCH`/`FIND` (`mb_stripos`/`mb_strpos`) pada kasus terburuk ±byte teks cari × byte teks sumber
+     * (15.000 × 30.000 byte ±0,1 detik per panggilan). Tiap panggilan ditagih hasil kali itu / nilai ini.
+     */
+    public const PEMBAGI_CARI_TEKS_RUMUS_IMPOR = 15_000;
 
     /** Beban tetap tiap sel yang dicocokkan dengan kriteria berwildcard `*` (±15 mikrodetik di atas kriteria biasa). */
     public const BEBAN_TETAP_WILDCARD_RUMUS_IMPOR = 4;

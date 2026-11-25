@@ -173,6 +173,60 @@ final class PembacaExcelSlipAnggaranRumusTest extends CIUnitTestCase
         yield 'VLOOKUP bernilai cari larik' => $tk('=SUM(VLOOKUP(GPP!$A$2:$A$1001,GPP!$A$2:$C$1001,3,0))');
         yield 'larik hasil operator lewat nama terdefinisi' => [...$tk('=SUM(LUAS*TRANSPOSE(LUAS))'), ['LUAS' => 'GPP!$C$2:$C$3001*1']];
         yield 'MAX atas 24 kolom kali 10.000 baris' => $tk('=MAX(GPP!$C$2:$Z$10001)');
+
+        // Review R3 B1: kalkulator melewati token cabang IF yang dipangkas lalu memproses token sesudahnya; penaksir dulu
+        // berhenti di rujukan workbook eksternal / variabel `_xleta`, sehingga INDIRECT sesudahnya lolos dan dihitung.
+        yield 'rujukan workbook eksternal di cabang IF lalu INDIRECT' => $tk('=IF(FALSE,[1]Sheet1!A1,0)+INDIRECT("C2")');
+        yield 'variabel _xleta di cabang IF lalu INDIRECT' => $tk('=IF(FALSE,_xleta.x,0)+INDIRECT("C2")');
+        // Review R3 B4: REPT dengan teks dari sel dulu dianggap 32 byte; 6.000 huruf × 90.000 = 540 MB, fatal memori 512M.
+        yield 'REPT teks sel 6.000 huruf' => [[XlsxMentah::sel('AC2', str_repeat('a', 6000)), XlsxMentah::rumus('AB2', '=LEN(REPT($AC$2,90000))')], []];
+        // Review R3 B2: kode format TEXT dari sel ditafsirkan dengan biaya kuadratik (32.000 `?` ±0,43 detik per panggilan);
+        // format lebih panjang dari batas Excel (255) pasti ditolak.
+        yield 'TEXT berformat sel 300 karakter' => [[XlsxMentah::sel('AC2', str_repeat('0', 300)), XlsxMentah::rumus('AB2', '=LEN(TEXT(E2,$AC$2))')], []];
+        // Review R3 P2: XLOOKUP kelas pencarian.
+        yield 'XLOOKUP match_mode 2 wildcard berantai' => $tk('=_xlfn.XLOOKUP("*a*a*a*a*a*a*a*a*a*a*b",GPP!$D$2:$D$10001,GPP!$E$2:$E$10001,0,2)');
+        // D1-b (keputusan Horii 25-11): MAXIFS kelas berkriteria; TEXTJOIN dibatasi hasil 4 MB.
+        yield 'MAXIFS empat pasang kriteria 10.000 baris' => $tk('=MAXIFS(GPP!$E$2:$E$10001,GPP!$C$2:$C$10001,">5",GPP!$A$2:$A$10001,">5",GPP!$C$2:$C$10001,"<90",GPP!$D$2:$D$10001,">5")');
+        yield 'TEXTJOIN hasil di atas 4 MB' => [[XlsxMentah::sel('AC2', str_repeat('a', 6000)), XlsxMentah::rumus('AB2', '=LEN(_xlfn.TEXTJOIN(",",TRUE,$AC$2:$AC$1000))')], []];
+        yield 'NETWORKDAYS tetap di luar daftar (D1-d)' => $gpp('=NETWORKDAYS(1,2958465)');
+        yield 'XLOOKUP bernilai cari larik 1.000 × 1.000' => $tk('=SUM(_xlfn.XLOOKUP(GPP!$A$2:$A$1001,GPP!$A$2:$A$1001,GPP!$C$2:$C$1001))');
+    }
+
+    /**
+     * Review R4 (korpus): rujukan dan RENTANG ke workbook eksternal ber-nilai tersimpan (`<v>`) tetap diterima seperti di
+     * main. Kalkulator tidak menjabarkan rentang eksternal (berhenti dengan "Unable to access External Workbook", lalu sel
+     * memakai nilai tersimpannya); operand buram eksternal di operator `:` bukan rentang dinamis.
+     */
+    public function testRentangWorkbookEksternalBernilaiTersimpanDiterima(): void
+    {
+        $sel = [
+            '<c r="AB2"><f>SUM([1]Sheet1!$A$1:$A$10)+E2</f><v>1005</v></c>',
+            '<c r="AC2"><f>[1]Sheet1!B2*2</f><v>42</v></c>',
+        ];
+        $sheet = $this->assertDiterima($this->xlsx($sel));
+
+        $this->assertEquals(1005, $sheet['GPP'][2][27], 'GPP!AB2 = nilai tersimpan (rentang eksternal)');
+        $this->assertEquals(42, $sheet['GPP'][2][28], 'GPP!AC2 = nilai tersimpan (sel eksternal)');
+    }
+
+    /**
+     * Review R3 B3: `SEARCH`/`FIND` pada kasus terburuk ±byte teks cari × byte teks sumber per panggilan (15.000 × 30.000
+     * byte ±0,1 detik). 700 sel dulu ditaksir linear (±740 per sel) lalu dihitung 51,8 detik; kini tiap sel ±30 ribu dan
+     * jumlahnya melewati anggaran. Teks pendek tetap murah (dijaga `testFungsiLazimTambahanDiterimaDenganNilaiSama`).
+     */
+    public function testSearchTeksPanjangDitolakLewatJumlahAnggaran(): void
+    {
+        $tk = XlsxMentah::baris(1, self::headerTk())
+            . '<row r="2">' . XlsxMentah::sel('A2', self::NIP) . XlsxMentah::sel('N2', str_repeat('a', 30000)) . XlsxMentah::sel('O2', str_repeat('a', 14999) . 'b') . '</row>';
+
+        for ($r = 3; $r <= 702; $r++) {
+            $tk .= '<row r="' . $r . '">' . XlsxMentah::sel('A' . $r, self::NIP) . XlsxMentah::rumus('M' . $r, '=IFERROR(SEARCH($O$2,$N$2),0)') . '</row>';
+        }
+
+        $path = $this->temp('.xlsx');
+        XlsxMentah::tulis($path, ['GPP' => self::sheetGpp(), 'TK' => $tk]);
+
+        $this->assertDitolak($path);
     }
 
     /**
@@ -267,6 +321,24 @@ final class PembacaExcelSlipAnggaranRumusTest extends CIUnitTestCase
         yield 'fungsi per elemen atas rentang' => ['=SUM(ROUND(A1:J600,0))', 40 + 6350 + 6000 + 330];
         yield 'perkalian luar 600 × 600' => ['=SUM(A1:A600*TRANSPOSE(A1:A600))', 50 + 2 * 680 + 360_000 + 18_030];
         yield 'MATCH bernilai cari larik' => ['=SUM(MATCH(A1:A600,A1:A600,0))', 56 + 2 * 680 + 2 * (400 - 60) + 600 + 599 * (600 + 400) + 60];
+
+        // Review R3 P2 — kelas R3 (A1:A600 = 680; B1:C600 = 20 + 1.200 + 90 = 1.310; suku kuadratik satu kolom 600 baris:
+        // murah 60, sedang 180, umum 400; A1:J600: murah 330, umum 2.200).
+        yield 'LOOKUP (sedang)' => ['=LOOKUP(1,A1:A600,B1:B600)', 49 + 2 * 680 + 2 * (180 - 60)];
+        yield 'XLOOKUP satu kolom (umum)' => ['=XLOOKUP(1,A1:A600,B1:B600)', 49 + 2 * 680 + 2 * (400 - 60)];
+        yield 'XLOOKUP returnArray dua kolom (hasil 1 × 2)' => ['=SUM(XLOOKUP(1,A1:A600,B1:C600))', 56 + 680 + 1310 + (400 - 60) + (600 - 90)];
+        // match_mode 2: wildcard 1 bintang = 4 per sel larik (2 × 600); match_mode 0 tanpa tagihan wildcard.
+        yield 'XLOOKUP match_mode 0' => ['=XLOOKUP("a*b",D1:D600,E1:E600,0,0)', 59 + 2 * 680 + 2 * (400 - 60)];
+        yield 'XLOOKUP match_mode 2 (wildcard)' => ['=XLOOKUP("a*b",D1:D600,E1:E600,0,2)', 59 + 2 * 680 + 2 * (400 - 60) + 1200 * 4];
+        // Pengurut: kelas umum dan luas × 3.
+        yield 'LARGE (pengurut, luas × 3)' => ['=LARGE(A1:J600,1)', 33 + 6350 + (2200 - 330) + 2 * 6000];
+        yield 'MEDIAN (pengurut)' => ['=MEDIAN(A1:J600)', 29 + 6350 + (2200 - 330) + 2 * 6000];
+        yield 'RANK (pengurut)' => ['=RANK(A1,A1:J600)', 39 + 6350 + (2200 - 330) + 2 * 6000];
+        // Per elemen: satu satuan per elemen larik hasil, lalu suku kuadratik SUM atas larik itu (60).
+        yield 'SEARCH per elemen' => ['=SUM(SEARCH("a",D1:D600))', 40 + 680 + 600 + 60];
+        yield 'DATEDIF per elemen' => ['=SUM(DATEDIF(A1:A600,B1:B600,"Y"))', 56 + 2 * 680 + 600 + 60];
+        // Larik literal {1,2;3,4}: dua baris + satu larik × 20, operator atas 4 elemen.
+        yield 'larik literal' => ['=SUM({1,2;3,4}*2)', 31 + 3 * 20 + 4];
     }
 
     /**
@@ -385,8 +457,9 @@ final class PembacaExcelSlipAnggaranRumusTest extends CIUnitTestCase
     }
 
     /**
-     * Kalibrasi ujung atas (review R2 R3-1): templat yang di mesin ukur saat tenang selesai lebih dari ±40 detik tetap
-     * di atas anggaran (8 kolom + PPh + 2 kolom TK pada 10.000 baris ±36 detik sebelum taksiran; 22 kolom `ROUND(IF)`).
+     * Kalibrasi ujung atas (review R2 R3-1): templat yang di mesin ukur selesai lebih dari ±40 detik tetap di atas
+     * anggaran (8 kolom + PPh + 2 kolom TK pada 10.000 baris = `L1_10000`, main 52 detik CPU di jendela tenang R3 dan
+     * ±36 detik pada run tenang Fable; 22 kolom `ROUND(IF)`).
      *
      * @param list<string> $rumus
      */
@@ -411,7 +484,9 @@ final class PembacaExcelSlipAnggaranRumusTest extends CIUnitTestCase
     }
 
     /**
-     * Jumlah beban dan beban sel terbesar satu templat, per baris nyata, tanpa menghitung satu sel pun.
+     * Jumlah beban dan beban sel terbesar satu templat, per baris nyata, tanpa menghitung satu sel pun. Beban hanya
+     * bergantung pada TEKS rumus, dan teks tiap baris hanya berbeda pada nomor barisnya: cukup ditaksir sekali per
+     * kelompok panjang digit nomor baris (2–9, 10–99, …) lalu dikalikan jumlah baris kelompok itu (CI lebih cepat).
      *
      * @param list<string> $rumus
      * @param list<string> $total
@@ -430,10 +505,13 @@ final class PembacaExcelSlipAnggaranRumusTest extends CIUnitTestCase
         foreach ([...$rumus, ...$total] as $i => $r) {
             $sel = $gpp->getCell(XlsxMentah::kolom(40 + $i) . '2');
 
-            for ($b = 2, $akhir = $i < count($rumus) ? $baris + 1 : 2; $b <= $akhir; $b++) {
-                $sel->setValue((string) preg_replace('/(?<=[A-Z])2\b/', (string) $b, $r));
+            $akhir = $i < count($rumus) ? $baris + 1 : 2;
+
+            for ($awal = 2; $awal <= $akhir; $awal = $ujung + 1) {
+                $ujung = min($akhir, 10 ** strlen((string) $awal) - 1);
+                $sel->setValue((string) preg_replace('/(?<=[A-Z])2\b/', (string) $awal, $r));
                 $satu = $penaksir->beban($sel);
-                $beban += $satu;
+                $beban += $satu * ($ujung - $awal + 1);
                 $terbesar = max($terbesar, $satu);
             }
         }
@@ -472,6 +550,8 @@ final class PembacaExcelSlipAnggaranRumusTest extends CIUnitTestCase
         yield '10.000 baris, MATCH ke referensi 200 baris' => [['=MATCH(K2,$N$2:$N$201,0)'], 10000];
         yield '9.999 baris, baris total SUBTOTAL' => [[], 9999, array_fill(0, 28, '=SUBTOTAL(9,E$2:E$10000)')];
         // Review R2 R3-1: templat lazim yang ditolak batas 4,5 juta padahal main menyelesaikannya 25–31 detik saat tenang.
+        // Tepi kalibrasi DISENGAJA dikunci di sini: `10.000 baris, 6 kolom + PPh` = 5.969.896, ±30 ribu di bawah 6 juta;
+        // menambah beban dasar sekecil apa pun membuat test ini merah dan menuntut kalibrasi ulang README BB-12.
         yield '10.000 baris, 6 kolom ROUND/IF/SUM + PPh' => [[...$enam, self::PPH], 10000];
         yield '5.000 baris, 6 kolom + PPh + SUMIF/COUNTIF 17 baris + LEFT/MID/TEXT + baris total' => [[
             ...$enam, self::PPH, '=SUMIF($N$2:$N$18,K2,$O$2:$O$18)', '=COUNTIF($N$2:$N$18,K2)', '=VALUE(MID(A2,5,2))',
@@ -771,8 +851,10 @@ final class PembacaExcelSlipAnggaranRumusTest extends CIUnitTestCase
             'AB2' => '=SEARCH("udi",D2)+FIND("U",D2)+IFERROR(SEARCH("x",D2),0)',
             'AC2' => '=DATEDIF(DATE(2010,3,1),DATE(2026,11,1),"Y")&" thn "&DATEDIF(DATE(2010,3,1),DATE(2026,11,1),"YM")&" bln"',
             'AD2' => '=EDATE(DATE(C2,B2,15),12)+EOMONTH(DATE(C2,B2,15),0)-EOMONTH(DATE(C2,B2,15),-1)',
-            'AE2' => '=LOOKUP(1500,E2:G2)+LOOKUP(20,E2:G2,E2:G2)',
-            'AF2' => '=_xlfn.XLOOKUP(20,E2:G2,E2:G2,0)+_xlfn.XLOOKUP("B*",D2:D2,E2:E2,0,0,2)',
+            // Review R3 P1: vektor cari urut (larik literal) dan rujukan satu sel, sehingga hasilnya pasti, bukan #N/A.
+            'AE2' => '=LOOKUP(25,{10,20,30},{100,200,300})+LOOKUP(1000,E2:E2,F2:F2)',
+            // match_mode 2 (argumen ke-5) = wildcard; nilai cari "B*" cocok dengan "Budi Uji" → E2 = 1000.
+            'AF2' => '=_xlfn.XLOOKUP(20,E2:G2,E2:G2,0)+_xlfn.XLOOKUP("B*",D2:D2,E2:E2,0,2)',
             'AG2' => '=LARGE(E2:G2,1)+SMALL(E2:G2,1)+MEDIAN(E2:G2)+RANK(E2,E2:G2)+_xlfn.RANK.EQ(F2,E2:G2,1)',
         ];
         $path = $this->xlsx(array_map(XlsxMentah::rumus(...), array_keys($gpp), $gpp));
@@ -783,6 +865,44 @@ final class PembacaExcelSlipAnggaranRumusTest extends CIUnitTestCase
         $this->assertCount(count($gpp), $acuan);
         $this->assertSamaDenganAcuan($acuan, $sheet);
         $this->assertSame('16 thn 8 bln', $sheet['GPP'][2][28]);
+        $this->assertEquals(200 + 20, $sheet['GPP'][2][30], 'GPP!AE2 = LOOKUP urut (200) + LOOKUP tepat (F2 = 20)');
+        $this->assertEquals(20 + 1000, $sheet['GPP'][2][31], 'GPP!AF2 = XLOOKUP tepat (20) + XLOOKUP wildcard match_mode 2 (E2 = 1000)');
+
+        foreach ($acuan as $alamat => $nilai) {
+            $this->assertFalse(is_string($nilai) && str_starts_with($nilai, '#'), "acuan {$alamat} bukan nilai galat");
+        }
+    }
+
+    /**
+     * D1 (keputusan Horii 25-11): fungsi skalar murah yang lazim di templat gaji masuk daftar putih (pola berkas reviewer
+     * n01–n10): `MROUND`, `PRODUCT`, `N`, `POWER`, `SQRT`, `SIGN`, `ISERR`, `ISLOGICAL`, `EXACT`, `DAYS`, `WEEKDAY`,
+     * `MAXIFS`/`MINIFS`, `TEXTJOIN`, `TODAY`/`NOW` (nilai = tanggal impor, sama dengan legacy). Diterima dengan nilai sama
+     * dengan kalkulator.
+     */
+    public function testFungsiD1DiterimaDenganNilaiSama(): void
+    {
+        $gpp = [
+            'AB2' => '=MROUND(E2,300)+PRODUCT(E2,F2,0.5)+N(E2)+N(D2)',
+            'AC2' => '=POWER(G2,2)+SQRT(E2)+SIGN(F2-E2)',
+            'AD2' => '=IF(ISERR(E2/0),1,0)+IF(ISLOGICAL(TRUE),1,0)+IF(EXACT(D2,"Budi Uji"),1,0)',
+            'AE2' => '=DAYS(DATE(2026,11,30),DATE(2026,11,1))+WEEKDAY(DATE(2026,11,25),2)',
+            'AF2' => '=_xlfn.MAXIFS(E2:G2,E2:G2,">5")+_xlfn.MINIFS(E2:G2,E2:G2,">5",E2:G2,"<5000")',
+            'AG2' => '=_xlfn.TEXTJOIN("-",TRUE,D2,E2,"",G2)',
+            'AH2' => '=IF(TODAY()>DATE(2000,1,1),1,0)+IF(YEAR(NOW())>=2026,1,0)',
+        ];
+        $path = $this->xlsx(array_map(XlsxMentah::rumus(...), array_keys($gpp), $gpp));
+
+        $acuan = $this->nilaiKalkulator($path);
+        $sheet = $this->assertDiterima($path);
+
+        $this->assertCount(count($gpp), $acuan);
+        $this->assertSamaDenganAcuan($acuan, $sheet);
+        $this->assertEquals(900 + 10000 + 1000 + 0, $sheet['GPP'][2][27], 'GPP!AB2 = MROUND + PRODUCT + N(angka) + N(teks)');
+        $this->assertEquals(3, $sheet['GPP'][2][29], 'GPP!AD2 = ISERR + ISLOGICAL + EXACT');
+        $this->assertEquals(29 + 3, $sheet['GPP'][2][30], 'GPP!AE2 = DAYS + WEEKDAY (Rabu, mode 2)');
+        $this->assertEquals(1000 + 20, $sheet['GPP'][2][31], 'GPP!AF2 = MAXIFS + MINIFS');
+        $this->assertSame('Budi Uji-1000-3', $sheet['GPP'][2][32]);
+        $this->assertEquals(2, $sheet['GPP'][2][33], 'GPP!AH2 = TODAY/NOW (tanggal impor)');
     }
 
     /**

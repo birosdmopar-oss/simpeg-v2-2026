@@ -61,17 +61,28 @@ use Throwable;
  *   dibagi `BYTE_PER_BEBAN_TEKS_SEL_RUMUS_IMPOR` ditagihkan untuk tiap kurung buka, tiap operator, dan tiap elemen
  *   larik, karena fungsi teks, pembandingan, dan pencarian menyalin seluruh teks operandnya. Workbook tanpa teks 128
  *   byte atau lebih tidak terkena;
- * - teks hasil: `REPT` berargumen literal = byte hasil / `BYTE_PER_BEBAN_TEKS_RUMUS_IMPOR`; operator `&` = elemen hasil
+ * - teks hasil: `REPT` = byte hasil (ulang × byte teks operandnya: literal, isi sel yang dirujuk, atau teks terpanjang
+ *   workbook) / `BYTE_PER_BEBAN_TEKS_RUMUS_IMPOR`; operator `&` = elemen hasil
  *   × taksiran byte tiap elemen / `BYTE_PER_BEBAN_TEKS_LARIK_RUMUS_IMPOR`; `SUBSTITUTE` = (byte sumber + byte hasil) /
  *   `BYTE_PER_BEBAN_TEKS_SEL_RUMUS_IMPOR` dengan byte hasil = sumber + kemunculan × pengganti, dan
- *   {@see self::TAK_HINGGA} bila hasil itu bisa melewati `MAKS_BYTE_HASIL_TEKS_RUMUS_IMPOR`;
+ *   {@see self::TAK_HINGGA} bila hasil itu bisa melewati `MAKS_BYTE_HASIL_TEKS_RUMUS_IMPOR`; batas yang sama untuk
+ *   hasil `REPT`, operator `&`, dan penggabung (`CONCATENATE`, `CONCAT`, `REPLACE`) (review R3 B4);
+ * - TEKS OPERAND (review R3 B2/B3): `TEXT` ditagih panjang format² / `PEMBAGI_KUADRAT_FORMAT_TEKS_RUMUS_IMPOR` per
+ *   panggilan (format yang pasti lebih panjang dari `MAKS_PANJANG_FORMAT_TEKS_RUMUS_IMPOR` → {@see self::TAK_HINGGA});
+ *   `SEARCH`/`FIND` ditagih byte teks cari × byte teks sumber / `PEMBAGI_CARI_TEKS_RUMUS_IMPOR` per panggilan; panjang
+ *   teks dari literal, isi sel bukan rumus yang dirujuk (tanpa menghitung), atau teks terpanjang workbook
+ *   ({@see self::byteNilai()});
+ * - OPERAND BURAM (review R3 B1): rujukan workbook eksternal dan variabel `_xleta` menjadi operand satu nilai dengan teks
+ *   terpanjang workbook, lalu penaksiran berlanjut ke token sesudahnya (kalkulator bisa melewati cabang `IF` yang
+ *   dipangkas lalu menghitung token sesudahnya); penaksir tidak pernah berhenti di tengah daftar token;
  * - WILDCARD: kriteria `COUNTIF`/`SUMIF`/`AVERAGEIF`/`…IFS` dan nilai cari `MATCH` bertipe cocok 0 yang memuat `*`
  *   dicocokkan kalkulator dengan pola `.*` berantai; tiap sel larik ditagih {@see self::bebanWildcard()} menurut jumlah
  *   `*`. Jumlah `*` diambil dari literal di rumus, dari isi sel bernilai yang dirujuk langsung, atau (untuk sel rumus
  *   dan hasil fungsi) dari jumlah `*` terbanyak di workbook ({@see self::$bintangBuku});
  * - {@see self::TAK_HINGGA} untuk: fungsi di luar daftar putih (termasuk `INDIRECT`, `OFFSET`, operator `#` dan `@`,
  *   pembangkit larik, fungsi yang tidak dikenal kalkulator), `REPT` berjumlah ulang bukan literal, operator `:` dengan
- *   operand hasil hitung, rujukan 3D, rumus yang tidak terurai, dan nama terdefinisi yang berputar atau terlalu dalam.
+ *   operand hasil hitung, rujukan 3D, rumus yang tidak terurai, urutan token yang tidak terduga (tumpukan operand atau
+ *   argumen kurang, jumlah argumen tidak dikenal), dan nama terdefinisi yang berputar atau terlalu dalam.
  *
  * Supaya tidak menyimpang dari kalkulator, teks rumus diurai dengan pengurai kalkulator itu sendiri
  * (`Calculation::parseFormula` pada kalkulator TERSENDIRI, diperiksa pada PhpSpreadsheet 5.10.0), lalu daftar tokennya
@@ -94,6 +105,9 @@ use Throwable;
 final class PenaksirBebanRumus
 {
     public const TAK_HINGGA = PHP_INT_MAX;
+
+    /** Penanda operand buram hasil rujukan workbook eksternal (bukan nama fungsi kalkulator). */
+    private const EKSTERNAL = '#EKSTERNAL';
 
     private const MAKS_KEDALAMAN_NAMA = 8;
     private const BARIS_LEMBAR        = 1_048_576;
@@ -127,6 +141,8 @@ final class PenaksirBebanRumus
      */
     private const PENGALI_LUAS = [
         'COUNTIF' => 6, 'COUNTIFS' => 6, 'SUMIFS' => 6, 'AVERAGEIFS' => 6, 'SUMIF' => 4, 'AVERAGEIF' => 4, 'SUBTOTAL' => 2,
+        // D1-b (keputusan Horii 25-11): jalur basis data kalkulator yang sama dengan `SUMIFS`.
+        'MAXIFS' => 6, 'MINIFS' => 6,
         // Pengurut (CR-181 R3 butir d): sekali urut (`sort`/`rsort`) per panggilan atas seluruh larik argumennya; dengan
         // pembagi umum, 3 = per satuan setara `MAX` pada 2.500 / 5.000 / 10.000 baris (README BB-12).
         'LARGE' => 3, 'SMALL' => 3, 'MEDIAN' => 3, 'RANK' => 3, 'RANK.EQ' => 3,
@@ -141,6 +157,8 @@ final class PenaksirBebanRumus
         'COLUMNS'   => true, 'COUNTIF' => true, 'COUNTIFS' => true, 'SUMIF' => true, 'SUMIFS' => true,
         'AVERAGEIF' => true, 'AVERAGEIFS' => true, 'LARGE' => true, 'SMALL' => true, 'MEDIAN' => true, 'RANK' => true,
         'RANK.EQ'   => true,
+        // D1 (keputusan Horii 25-11): agregat satu nilai; `TEXTJOIN` juga penggabung (byte hasil dijumlah, batas 4 MB).
+        'PRODUCT' => true, 'MAXIFS' => true, 'MINIFS' => true, 'TEXTJOIN' => true,
     ];
 
     /**
@@ -163,10 +181,14 @@ final class PenaksirBebanRumus
         'YEAR'     => true, 'MONTH' => true, 'DAY' => true, 'ROW' => true, 'COLUMN' => true,
         // CR-181 R3 butir d: pencarian teks tanpa wildcard (`mb_stripos`/`mb_strpos`) dan tanggal (masa kerja).
         'SEARCH' => true, 'FIND' => true, 'DATEDIF' => true, 'EDATE' => true, 'EOMONTH' => true,
+        // D1-a/D1-c (keputusan Horii 25-11): skalar per elemen; `EXACT` menagih teks lewat beban teks panjang; `TODAY`/`NOW`
+        // bernilai tanggal impor (sama dengan legacy).
+        'MROUND'    => true, 'N' => true, 'POWER' => true, 'SQRT' => true, 'SIGN' => true, 'ISERR' => true,
+        'ISLOGICAL' => true, 'EXACT' => true, 'DAYS' => true, 'WEEKDAY' => true, 'TODAY' => true, 'NOW' => true,
     ];
 
     /** Fungsi penggabung teks: byte hasil = jumlah byte semua elemen argumennya. */
-    private const FUNGSI_GABUNG = ['CONCATENATE' => true, 'CONCAT' => true, 'REPLACE' => true];
+    private const FUNGSI_GABUNG = ['CONCATENATE' => true, 'CONCAT' => true, 'REPLACE' => true, 'TEXTJOIN' => true];
 
     /**
      * DAFTAR PUTIH: hanya fungsi ini yang boleh ada di rumus GPP/TK. Tiap fungsi punya kelas biaya yang diukur (README
@@ -186,6 +208,8 @@ final class PenaksirBebanRumus
     private const WAJIB_DIURAI = [
         'REPT'   => true, 'SUBSTITUTE' => true, 'REPLACE' => true, 'COUNTIF' => true, 'COUNTIFS' => true, 'SUMIF' => true,
         'SUMIFS' => true, 'AVERAGEIF' => true, 'AVERAGEIFS' => true, 'MATCH' => true, 'MKMATRIX' => true, 'XLOOKUP' => true,
+        // CR-181 R4: biaya menurut panjang teks operandnya (format `TEXT`, teks cari/sumber `SEARCH`/`FIND`).
+        'TEXT' => true, 'SEARCH' => true, 'FIND' => true, 'MAXIFS' => true, 'MINIFS' => true, 'TEXTJOIN' => true,
     ];
 
     /**
@@ -193,6 +217,7 @@ final class PenaksirBebanRumus
      */
     private const LETAK_KRITERIA = [
         'COUNTIF' => [1, 0], 'SUMIF' => [1, 0], 'AVERAGEIF' => [1, 0], 'COUNTIFS' => [1, 2], 'SUMIFS' => [2, 2], 'AVERAGEIFS' => [2, 2],
+        'MAXIFS'  => [2, 2], 'MINIFS' => [2, 2],
     ];
 
     private const OPERATOR_BINER = [
@@ -470,7 +495,9 @@ final class PenaksirBebanRumus
      * Menjalankan token `$rumus` secara abstrak di sheet `$konteks` dan mencatat beban semua rentang yang akan dijabarkan
      * kalkulator serta semua larik yang dihasilkan operator dan fungsi ({@see self::pakai()}).
      *
-     * @return array<string, mixed>|null operand hasil rumus; `null` bila kalkulator berhenti dengan galat di tengah jalan
+     * @return array<string, mixed>|null operand hasil rumus; `null` bila daftar tokennya kosong. Penaksiran tidak pernah
+     *                                   berhenti di tengah daftar token (CR-181 R4 B1): token yang nilainya tidak terlihat
+     *                                   menjadi operand buram, urutan token yang tidak terduga → {@see self::TAK_HINGGA}
      *
      * @phpstan-return Operand|null
      *
@@ -501,9 +528,9 @@ final class PenaksirBebanRumus
                 $kanan = array_pop($tumpukan);
                 $kiri  = array_pop($tumpukan);
 
-                // Kalkulator berhenti dengan galat di sini; yang sudah dijabarkan sebelumnya tetap tercatat.
+                // Tumpukan kurang = urutan token yang tidak terduga: tidak bisa dibatasi (CR-181 R4 B1).
                 if ($kanan === null || $kiri === null) {
-                    return null;
+                    throw new RuntimeException('Tumpukan operand kurang.');
                 }
 
                 $tumpukan[] = $nilai === ':' ? $this->rentang($kiri, $kanan, $konteks) : $this->operator($nilai, $kiri, $kanan);
@@ -515,7 +542,7 @@ final class PenaksirBebanRumus
                 $operand = array_pop($tumpukan);
 
                 if ($operand === null) {
-                    return null;
+                    throw new RuntimeException('Tumpukan operand kurang.');
                 }
 
                 $tumpukan[] = $this->operator($nilai, $operand, $operand);
@@ -526,9 +553,13 @@ final class PenaksirBebanRumus
             if (is_string($nilai) && preg_match(self::POLA_SEL, $nilai, $m) === 1) {
                 $sheet = trim((string) $m[2], "\"'");
 
-                // Rujukan ke workbook lain: kalkulator berhenti di token ini.
+                // Rujukan ke workbook lain (`[1]Sheet!A1`): nilainya dari luar workbook ini. Kalkulator bisa melewati token
+                // ini (cabang `IF` yang dipangkas) lalu memproses token sesudahnya, jadi penaksir TIDAK berhenti: operand
+                // buram satu nilai, lalu lanjut (CR-181 R4 B1).
                 if (str_contains($sheet, '[') || str_contains($sheet, ']')) {
-                    return null;
+                    $tumpukan[] = $this->buram(true);
+
+                    continue;
                 }
 
                 $kolom = strtoupper($m[6]);
@@ -571,7 +602,7 @@ final class PenaksirBebanRumus
                 $jumlah = array_pop($tumpukan)['nilai'] ?? null;
 
                 if (! is_int($jumlah)) {
-                    return null;
+                    throw new RuntimeException('Jumlah argumen fungsi tidak dikenal.');
                 }
 
                 $argumen = [];
@@ -580,7 +611,7 @@ final class PenaksirBebanRumus
                     $x = array_pop($tumpukan);
 
                     if ($x === null) {
-                        return null;
+                        throw new RuntimeException('Argumen fungsi kurang.');
                     }
 
                     $argumen[] = $x;
@@ -593,9 +624,11 @@ final class PenaksirBebanRumus
 
             if (is_string($nilai) && $nilai !== '' && ! is_numeric($nilai) && ! Calculation::keyInExcelConstants(strtoupper($nilai))
                 && $nilai[0] !== '"' && $nilai[0] !== '#' && preg_match(self::POLA_NAMA, $nilai, $m) === 1) {
-                // Kalkulator mengembalikan nilai tersimpan untuk nama `_xleta…` tanpa melanjutkan.
+                // Nama `_xleta…` (variabel `LET`): operand buram satu nilai, lalu lanjut ke token sesudahnya (CR-181 R4 B1).
                 if (str_starts_with($m[6], '_xleta')) {
-                    return null;
+                    $tumpukan[] = $this->buram();
+
+                    continue;
                 }
 
                 $tumpukan[] = $this->nama($m[6], trim($m[2], "'"), $konteks, $kedalaman);
@@ -645,7 +678,14 @@ final class PenaksirBebanRumus
         }
 
         if ($operator === '&') {
-            $byte    = self::tambah($kiri['byte'], $kanan['byte']);
+            $byte = self::tambah($kiri['byte'], $kanan['byte']);
+
+            // Kalkulator menyusun teks hasil dulu, baru memeriksa batas 32.767 huruf (CR-181 R4 B4).
+            if ($byte > Presensi::MAKS_BYTE_HASIL_TEKS_RUMUS_IMPOR) {
+                throw new RuntimeException('Hasil & terlalu besar.');
+            }
+
+
             $bintang = self::tambah($this->bintang($kiri), $this->bintang($kanan));
             $this->pakai(self::kali($elemen, intdiv($byte, Presensi::BYTE_PER_BEBAN_TEKS_LARIK_RUMUS_IMPOR)));
         }
@@ -767,6 +807,38 @@ final class PenaksirBebanRumus
             $this->pakai(self::kali($panggilan, intdiv($sumber + $byte, Presensi::BYTE_PER_BEBAN_TEKS_SEL_RUMUS_IMPOR)));
         }
 
+        // `TEXT` menafsirkan kode formatnya dengan biaya kuadratik menurut panjangnya (CR-181 R4 B2).
+        if ($fungsi === 'TEXT' && isset($argumen[1])) {
+            [$format, $pasti] = $this->byteNilai($argumen[1]);
+
+            if ($pasti && $format > Presensi::MAKS_PANJANG_FORMAT_TEKS_RUMUS_IMPOR) {
+                throw new RuntimeException('Format TEXT melewati batas Excel.');
+            }
+
+            $this->pakai(self::kali($panggilan, intdiv(self::kali($format, $format), Presensi::PEMBAGI_KUADRAT_FORMAT_TEKS_RUMUS_IMPOR)));
+        }
+
+        // `SEARCH`/`FIND`: kasus terburuk ±byte teks cari × byte teks sumber per panggilan (CR-181 R4 B3).
+        if (($fungsi === 'SEARCH' || $fungsi === 'FIND') && isset($argumen[1])) {
+            $this->pakai(self::kali($panggilan, intdiv(self::kali($this->byteNilai($argumen[0])[0], $this->byteNilai($argumen[1])[0]), Presensi::PEMBAGI_CARI_TEKS_RUMUS_IMPOR)));
+        }
+
+        // `TEXTJOIN(pemisah, abaikan, teks…)`: pemisah disisipkan di antara SEMUA elemen teks, bukan sekali.
+        if ($fungsi === 'TEXTJOIN' && isset($argumen[0])) {
+            $elemenTeks = 0;
+
+            foreach (array_slice($argumen, 2) as $a) {
+                $elemenTeks = self::tambah($elemenTeks, self::elemen($a['baris'], $a['kolom']));
+            }
+
+            $byte = self::tambah($byte, self::kali($this->byteNilai($argumen[0])[0], $elemenTeks));
+        }
+
+        // Penggabung teks: kalkulator menyusun hasilnya dulu, baru memeriksa batas 32.767 huruf (CR-181 R4 B4).
+        if (isset(self::FUNGSI_GABUNG[$fungsi]) && $byte > Presensi::MAKS_BYTE_HASIL_TEKS_RUMUS_IMPOR) {
+            throw new RuntimeException('Hasil penggabung teks terlalu besar.');
+        }
+
         // `REPT` memanggil `str_repeat` sebelum memeriksa panjang hasil: jumlah ulang yang bukan literal tidak terbatas.
         if ($fungsi === 'REPT' && count($argumen) === 2) {
             $ulang = $argumen[1]['nilai'];
@@ -775,10 +847,15 @@ final class PenaksirBebanRumus
                 throw new RuntimeException('REPT berjumlah ulang bukan literal.');
             }
 
-            $teks    = $argumen[0]['nilai'];
-            $satu    = is_string($teks) && str_starts_with($teks, '"') ? max(1, strlen($teks) - 2) : Presensi::BYTE_TEKS_ANGGAPAN_RUMUS_IMPOR;
+            // Teks yang diulang = byte operandnya sendiri (literal, isi sel yang dirujuk, atau teks terpanjang workbook),
+            // bukan anggapan 32 byte (CR-181 R4 B4: teks sel 6.000 huruf × 90.000 = 540 MB fatal).
+            $satu    = max(1, $this->byteNilai($argumen[0])[0]);
             $panjang = max(0.0, (float) $ulang) * $satu;
             $byte    = $panjang >= (float) self::TAK_HINGGA ? self::TAK_HINGGA : (int) $panjang;
+
+            if ($byte > Presensi::MAKS_BYTE_HASIL_TEKS_RUMUS_IMPOR) {
+                throw new RuntimeException('Hasil REPT terlalu besar.');
+            }
             $bintang = self::kali($this->bintang($argumen[0]), (int) min(max(0.0, (float) $ulang), 1e9));
 
             $this->pakai(self::kali($panggilan, intdiv($byte, Presensi::BYTE_PER_BEBAN_TEKS_RUMUS_IMPOR)));
@@ -918,6 +995,63 @@ final class PenaksirBebanRumus
     }
 
     /**
+     * Byte teks nilai operand dan apakah angka itu PASTI: literal teks (panjangnya), rujukan satu sel bernilai bukan rumus
+     * (panjang nilai tersimpannya, dibaca tanpa menghitung), selain itu batas atas operand (teks terpanjang workbook atau
+     * taksiran hasil fungsi/operator; tidak pasti).
+     *
+     * @param array<string, mixed> $operand
+     *
+     * @phpstan-param Operand $operand
+     *
+     * @return array{0: int, 1: bool}
+     */
+    private function byteNilai(array $operand): array
+    {
+        $nilai = $operand['nilai'];
+
+        if (is_string($nilai) && str_starts_with($nilai, '"')) {
+            return [max(0, strlen($nilai) - 2), true];
+        }
+
+        if ($operand['sel'] !== null) {
+            $sel = $this->buku->getSheetByName($operand['sel'][0])?->getCellCollection();
+
+            if ($sel !== null && $sel->has($operand['sel'][1])) {
+                $s = $sel->get($operand['sel'][1]);
+
+                if ($s !== null && $s->getDataType() !== DataType::TYPE_FORMULA) {
+                    $isi = $s->getValue();
+
+                    return [strlen($isi instanceof RichText ? $isi->getPlainText() : (is_scalar($isi) ? (string) $isi : '')), true];
+                }
+            } elseif ($sel !== null) {
+                return [0, true];
+            }
+        }
+
+        return [$operand['byte'], false];
+    }
+
+    /**
+     * Operand buram satu nilai (rujukan workbook eksternal, variabel `LET`): nilainya tidak terlihat dari teks rumus,
+     * jadi teksnya dianggap paling panjang teks terpanjang workbook dan jumlah `*`-nya anggapan workbook. Rujukan
+     * eksternal ditandai {@see self::EKSTERNAL} supaya operator `:` dengannya tidak dianggap rentang dinamis.
+     *
+     * @return array<string, mixed>
+     *
+     * @phpstan-return Operand
+     */
+    private function buram(bool $eksternal = false): array
+    {
+        $operand            = $this->operand(null);
+        $operand['byte']    = $this->byteSel;
+        $operand['bintang'] = null;
+        $operand['fungsi']  = $eksternal ? self::EKSTERNAL : null;
+
+        return $operand;
+    }
+
+    /**
      * Ukuran hasil `INDEX(larik, baris, kolom)`: satu nilai hanya bila semua nomor yang diberikan pasti bukan nol
      * (angka literal atau hasil `MATCH`) dan mencukupi untuk larik itu; selain itu sebesar lariknya (nomor 0 atau kosong
      * mengembalikan seluruh baris/kolom).
@@ -1004,6 +1138,13 @@ final class PenaksirBebanRumus
     {
         if ($kiri['galat'] || $kanan['galat']) {
             return $this->galat();
+        }
+
+        // Rentang ke workbook eksternal (`[1]Sheet!A1:B10`): kalkulator tidak menjabarkannya (berhenti dengan "Unable to
+        // access External Workbook" lalu sel memakai nilai tersimpan), jadi hasilnya tetap operand buram, bukan rentang
+        // dinamis (review R4: templat sah ber-rujukan eksternal tetap diterima seperti di main).
+        if ($kiri['fungsi'] === self::EKSTERNAL || $kanan['fungsi'] === self::EKSTERNAL) {
+            return $this->buram(true);
         }
 
         // Operand kiri berupa nama terdefinisi: kalkulator mengganti rujukannya dengan isi rentang bernama itu.
