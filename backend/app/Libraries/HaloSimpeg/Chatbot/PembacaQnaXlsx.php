@@ -8,6 +8,7 @@ use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Reader\Xlsx;
 use PhpOffice\PhpSpreadsheet\Reader\Xlsx\Namespaces;
+use PhpOffice\PhpSpreadsheet\Reader\Xlsx\SharedFormula;
 use PhpOffice\PhpSpreadsheet\RichText\RichText;
 use PhpOffice\PhpSpreadsheet\Shared\Date;
 use PhpOffice\PhpSpreadsheet\Shared\File;
@@ -31,7 +32,8 @@ use ZipArchive;
  * Kenapa: sejak R1 setiap pagar yang meniru perilaku `load()` tanpa read filter (relasi, nama sheet, rumus shared,
  * kolom, `<col>`) membuka celah baru, karena `load()` membangun SELURUH workbook (semua sheet bernama sama, semua sel,
  * definisi kolom, terjemahan rumus shared per sel). Pembaca ini biayanya linear terhadap byte part sheet dan shared
- * strings yang dialirkan (parser SAX ext-xml TANPA mode namespace di atas aliran `zip://`, potongan 64 KB, prefiks diresolusikan manual), dan memorinya dibatasi jumlah
+ * strings yang dialirkan (parser SAX ext-xml ber-namespace di atas aliran `zip://`, `fread` 8.192 byte per potongan, byte
+ * mentah dipindai lebih dulu: nilai `xmlns` ≤ 256 byte, ≤ 256 deklarasi per part, ≤ 1.024 atribut per tag), dan memorinya dibatasi jumlah
  * sel yang dipakai (≤ 4 × (baris maks + 1) + E1) serta shared string yang dirujuk sel-sel itu.
  *
  * Paritas nilai dengan main (read filter A-D/E1 + `rangeToArray(A1:D(maks+1), null, false, false, false)`):
@@ -81,7 +83,6 @@ final class PembacaQnaXlsx extends Xlsx
         $this->terlaluBesar = false;
         $this->cacheMuat    = [];
         $this->biayaShared  = 0;
-        $this->entitasAsing = false;
 
         try {
             [$basename, $nsBase] = $this->namaWorkbook($zip);
@@ -513,26 +514,31 @@ final class PembacaQnaXlsx extends Xlsx
 
     private int $biayaShared = 0;
 
-    private const NS_XML = 'http://www.w3.org/XML/1998/namespace';
-
-    /** Batas panjang nilai satu deklarasi `xmlns`/`xmlns:*` (R7 K2). URI OOXML terpanjang < 100 byte. */
+    /** Batas panjang nilai mentah satu deklarasi `xmlns`/`xmlns:*` (R7 K2, R8). URI OOXML terpanjang < 100 byte. */
     public const MAKS_URI_NS = 256;
 
-    /** Batas jumlah prefiks namespace dalam satu lingkup (R7 K2). Tulisan Excel ±10. */
-    public const MAKS_PREFIKS = 64;
+    /** Batas jumlah deklarasi `xmlns` mentah per part (R8). Tulisan Excel ±10 di akar, sedikit lagi di `extLst`. */
+    public const MAKS_DEKL_NS = 256;
 
-    /** @var array<string, string> peta prefiks → URI lingkup saat ini ('' = default) */
-    private array $ns = [];
+    /**
+     * Batas pola atribut (`=` + kutip) mentah per tag (R8 B3): pemeriksaan atribut ganda libxml tidak bisa diinterupsi
+     * `max_execution_time`. Excel menulis < 20 atribut per tag.
+     */
+    public const MAKS_ATRIBUT_TAG = 1024;
 
-    /** @var list<array<string, string>> */
-    private array $nsTumpuk = [];
+    /** Batas jumlah `<c>` di dalam filter A1:D(maks+1) + E1 yang diurai (R8 P2); unik paling banyak 4.005. */
+    public const MAKS_SEL_FILTER = 8192;
 
-    /** @var array<string, string> lingkup namespace saat `<c>` dibuka */
-    private array $nsSel = [];
+    private int $selFilter = 0;
 
-    private string $namaSel = 'c';
+    // Status pindai byte mentah per part (R8).
+    private string $sisaNs       = '';
+    private int $jumlahDekl      = 0;
+    private int $atributTag      = 0;
+    private bool $ekorSamaDengan = false;
 
-    private bool $entitasAsing = false;
+    /** Nama SAX `uri\x1Fc` untuk jalur cepat sel. */
+    private string $namaC = '';
 
     /** @var array<string, SimpleXMLElement> hasil muat() per nama entri + namespace (R6 B3) */
     private array $cacheMuat = [];
@@ -568,8 +574,13 @@ final class PembacaQnaXlsx extends Xlsx
     /** @var array<string, string> */
     private array $atributSel = [];
     private ?string $rekam    = null;
-    private ?string $rekamF   = null;
     private int $dalamF       = 0;
+
+    /** Teks mentah rekaman yang belum di-escape (digabung dulu: entitas memecah teks jadi banyak callback). */
+    private string $teksTunda = '';
+    private bool $adaF        = false;
+    private string $siF       = '';
+    private string $teksF     = '';
 
     /** @var list<string> nama tag yang dibuka di rekaman, untuk penutupnya */
     private array $tumpuk = [];
@@ -598,6 +609,7 @@ final class PembacaQnaXlsx extends Xlsx
         $this->elemen         = 0;
         $this->anggaran       = self::MAKS_ELEMEN;
         $this->mainNs         = $mainNs;
+        $this->namaC          = "{$mainNs}\x1Fc";
         $this->maksBaris      = $maksBaris;
         $this->modeSst        = false;
         $this->dalam          = 0;
@@ -608,6 +620,9 @@ final class PembacaQnaXlsx extends Xlsx
         $this->gagal          = false;
         $this->barisLebih     = 0;
         $this->dalamSel       = 0;
+        $this->selFilter      = 0;
+        $this->rekam          = null;
+        $this->dalamF         = 0;
 
         $this->alirkan($path, $entri);
 
@@ -627,6 +642,7 @@ final class PembacaQnaXlsx extends Xlsx
         $this->sdPertama = null;
         $this->diRow     = false;
         $this->dalamSel  = 0;
+        $this->dalamF    = 0;
         $this->elemen    = 0;
         $this->anggaran  = self::MAKS_ELEMEN_SST;
         $this->dalam     = 0;
@@ -648,18 +664,16 @@ final class PembacaQnaXlsx extends Xlsx
             throw new RuntimeException('Part xlsx tidak dapat dibuka.');
         }
 
-        // Parser TANPA mode namespace (R7 K2): dengan xml_parser_create_ns, URI namespace panjang ikut disalin ke setiap
-        // nama elemen/atribut sehingga biaya per elemen membengkak. Prefiks diresolusikan manual dengan tumpukan lingkup.
-        $awalPart       = true;
-        $this->ns       = ['xml' => self::NS_XML];
-        $this->nsTumpuk = [];
-        $parser         = xml_parser_create('UTF-8');
+        $awalPart = true;
+        $parser   = xml_parser_create_ns(null, "\x1F");
         xml_parser_set_option($parser, XML_OPTION_CASE_FOLDING, false);
         xml_set_element_handler($parser, $this->buka(...), $this->tutup(...));
         xml_set_character_data_handler($parser, $this->teks(...));
-        // Pertahanan berlapis (R7 K1): rujukan entitas selain bawaan tidak diekspansi tetapi sampai ke handler bawaan.
-        xml_set_default_handler($parser, $this->bawaan(...));
-        $ekor = '';
+        $ekor                 = '';
+        $this->sisaNs         = '';
+        $this->jumlahDekl     = 0;
+        $this->atributTag     = 0;
+        $this->ekorSamaDengan = false;
 
         try {
             while (! $this->henti && ! feof($aliran)) {
@@ -675,7 +689,8 @@ final class PembacaQnaXlsx extends Xlsx
                 }
 
                 // Seperti XmlScanner vendor: DOCTYPE (byte nol diabaikan) ditolak.
-                $periksa = $ekor . (str_contains($potong, "\0") ? str_replace("\0", '', $potong) : $potong);
+                $bersih  = str_contains($potong, "\0") ? str_replace("\0", '', $potong) : $potong;
+                $periksa = $ekor . $bersih;
 
                 if (str_contains($periksa, '<!DOCTYPE')) {
                     throw new RuntimeException('DOCTYPE tidak diizinkan.');
@@ -688,12 +703,10 @@ final class PembacaQnaXlsx extends Xlsx
                     throw new RuntimeException('Isi xlsx terlalu besar.');
                 }
 
+                $this->pindaiMentah($bersih);
+
                 if (xml_parse($parser, $potong, false) !== 1) {
                     throw new RuntimeException('XML part xlsx tidak sah.');
-                }
-
-                if ($this->entitasAsing) {
-                    throw new RuntimeException('Rujukan entitas tidak diizinkan.');
                 }
             }
 
@@ -704,70 +717,9 @@ final class PembacaQnaXlsx extends Xlsx
             fclose($aliran);
         }
 
-        if ($this->entitasAsing) {
-            throw new RuntimeException('Rujukan entitas tidak diizinkan.');
-        }
-
         if ($this->terlaluBesar) {
             throw new RuntimeException('Elemen xlsx terlalu banyak.');
         }
-    }
-
-    private function bawaan(\XMLParser $parser, string $data): void
-    {
-        if ($data !== '' && $data[0] === '&' && preg_match('/^&(#[0-9]+|#x[0-9A-Fa-f]+|amp|lt|gt|quot|apos);$/', $data) !== 1) {
-            $this->entitasAsing = true;
-            $this->henti        = true;
-        }
-    }
-
-    /**
-     * Lingkup namespace elemen ini: deklarasi `xmlns`/`xmlns:*` diterapkan pada salinan peta induk (R7 K2: nilai > 256
-     * byte atau > 64 prefiks dalam lingkup → "rusak").
-     *
-     * @param array<string, string> $atribut
-     */
-    private function masukLingkup(array $atribut): void
-    {
-        $this->nsTumpuk[] = $this->ns;
-
-        if ($atribut === []) {
-            return;
-        }
-
-        foreach ($atribut as $an => $av) {
-            if ($an === 'xmlns') {
-                $prefiks = '';
-            } elseif (str_starts_with($an, 'xmlns:')) {
-                $prefiks = substr($an, 6);
-            } else {
-                continue;
-            }
-
-            if (strlen($av) > self::MAKS_URI_NS) {
-                throw new RuntimeException('URI namespace terlalu panjang.');
-            }
-
-            $this->ns[$prefiks] = $av;
-
-            if (count($this->ns) > self::MAKS_PREFIKS) {
-                throw new RuntimeException('Prefiks namespace terlalu banyak.');
-            }
-        }
-    }
-
-    /**
-     * @return array{0: string|null, 1: string} [URI namespace elemen (null = prefiks tidak terikat), nama lokal]
-     */
-    private function resolusi(string $nama): array
-    {
-        $p = strpos($nama, ':');
-
-        if ($p === false) {
-            return [$this->ns[''] ?? '', $nama];
-        }
-
-        return [$this->ns[substr($nama, 0, $p)] ?? null, substr($nama, $p + 1)];
     }
 
     /**
@@ -780,7 +732,6 @@ final class PembacaQnaXlsx extends Xlsx
         }
 
         $this->dalam++;
-        $this->masukLingkup($atribut);
 
         if (++$this->elemen > $this->anggaran) {
             $this->terlaluBesar = true;
@@ -789,34 +740,31 @@ final class PembacaQnaXlsx extends Xlsx
             return;
         }
 
+        if ($nama === $this->namaC && $this->dalam === 4 && $this->diRow && $this->sdPertama === true
+            && $this->rekam === null && $this->dalamSel === 0) {
+            $this->mulaiSel($atribut);
+
+            return;
+        }
+
+        [$uri, $lokal] = self::pecah($nama);
+
         if ($this->rekam !== null) {
-            $this->rekam .= $this->tag($nama, $atribut);
+            $this->tuangTeks();
+            $this->rekam .= $this->tag($nama, $atribut, false, strlen($this->rekam));
             $this->isiSel = true;
-            $this->periksaRekaman($this->rekam);
 
             return;
         }
-
-        if ($this->rekamF !== null) {
-            $this->rekamF .= $this->tag($nama, $atribut);
-            $this->periksaRekaman($this->rekamF);
-
-            return;
-        }
-
-        [$uri, $lokal] = $this->resolusi($nama);
-        $utama         = $uri === $this->mainNs;
 
         if ($this->modeSst) {
-            if ($this->dalam === 2 && $utama && $lokal === 'si') {
+            if ($this->dalam === 2 && $uri === $this->mainNs && $lokal === 'si') {
                 $this->indeksSi++;
 
                 if (isset($this->sstPerlu[$this->indeksSi])) {
                     $this->tumpuk   = [];
                     $this->dalamSel = $this->dalam;
-                    $this->rekam    = $this->tagAkar($nama, $atribut);
-                    $this->tumpuk[] = $nama;
-                    $this->periksaRekaman($this->rekam);
+                    $this->rekam    = '<si xmlns="' . self::esc($this->mainNs) . '">';
                 }
             }
 
@@ -824,18 +772,26 @@ final class PembacaQnaXlsx extends Xlsx
         }
 
         if ($this->dalamSel !== 0) {
-            // Anak sel di luar filter: hanya `<f>` yang direkam (induk rumus shared).
+            // Sel di luar filter (R8): seperti `loadSheetData` + `castToFormula(..., false)`, satu-satunya efeknya adalah
+            // mendaftarkan induk rumus shared — `<f>` pertama dengan `t` "shared" (tanpa beda huruf) yang `si`-nya belum
+            // terdaftar, dengan rumus "=" + teks langsung `<f>`. Atribut dan anak lain tidak dibangun ulang.
             $this->isiSel = true;
 
-            if ($this->dalam === $this->dalamSel + 1 && $utama && $lokal === 'f') {
-                $this->tumpuk = [];
-                $this->dalamF = $this->dalam;
-                $this->rekamF = $this->tag($nama, $atribut);
-                $this->periksaRekaman($this->rekamF);
+            if (! $this->adaF && $this->dalam === $this->dalamSel + 1 && $uri === $this->mainNs && $lokal === 'f') {
+                $this->adaF = true;
+                $si         = (string) ($atribut['si'] ?? '');
+
+                if (strtolower((string) ($atribut['t'] ?? '')) === 'shared' && ! isset($this->sharedFormulae[$si])) {
+                    $this->dalamF = $this->dalam;
+                    $this->siF    = $si;
+                    $this->teksF  = '';
+                }
             }
 
             return;
         }
+
+        $utama = $uri === $this->mainNs;
 
         if ($this->dalam === 2) {
             if ($this->sdPertama === null && $utama && $lokal === 'sheetData') {
@@ -849,21 +805,21 @@ final class PembacaQnaXlsx extends Xlsx
                 $this->rowIndex = 1;
             }
         } elseif ($this->dalam === 4 && $this->diRow && $this->sdPertama === true && $utama && $lokal === 'c') {
-            $this->mulaiSel($nama, $atribut);
+            $this->mulaiSel($atribut);
         }
     }
 
     /**
      * @param array<string, string> $atribut
      */
-    private function mulaiSel(string $nama, array $atribut): void
+    private function mulaiSel(array $atribut): void
     {
         $this->dalamSel   = $this->dalam;
         $this->isiSel     = false;
-        $this->rekamF     = null;
-        $this->namaSel    = $nama;
+        $this->dalamF     = 0;
+        $this->adaF       = false;
+        $this->teksTunda  = '';
         $this->atributSel = $atribut;
-        $this->nsSel      = $this->ns;
         $this->bukaSel    = '';
 
         try {
@@ -887,9 +843,12 @@ final class PembacaQnaXlsx extends Xlsx
         }
 
         if ($this->selDiFilter) {
+            if (++$this->selFilter > self::MAKS_SEL_FILTER) {
+                throw new RuntimeException('Sel xlsx di dalam filter terlalu banyak.');
+            }
+
             $this->tumpuk = [];
             $this->rekam  = $this->bukaSel();
-            $this->periksaRekaman($this->rekam);
         }
     }
 
@@ -902,23 +861,26 @@ final class PembacaQnaXlsx extends Xlsx
         if ($this->dalamSel !== 0 && $this->dalam === $this->dalamSel) {
             $this->selesaiSel();
         } elseif ($this->rekam !== null) {
+            $this->tuangTeks();
             $this->rekam .= '</' . array_pop($this->tumpuk) . '>';
-        } elseif ($this->rekamF !== null && $this->dalam >= $this->dalamF) {
-            $this->rekamF .= '</' . array_pop($this->tumpuk) . '>';
+        } elseif ($this->dalamF !== 0 && $this->dalam === $this->dalamF) {
+            $this->sharedFormulae[$this->siF] = new SharedFormula($this->rSel, '=' . self::replacePrefixes($this->teksF));
+            $this->dalamF                     = 0;
+            $this->teksF                      = '';
         } elseif (! $this->modeSst && $this->dalam === 2 && $this->sdPertama === true) {
             $this->sdPertama = false;
         }
 
-        $this->ns = array_pop($this->nsTumpuk) ?? ['xml' => self::NS_XML];
         $this->dalam--;
     }
 
     private function selesaiSel(): void
     {
+        $this->tuangTeks();
         $this->dalamSel = 0;
 
         if ($this->modeSst) {
-            $si                              = $this->simpul((string) $this->rekam . '</' . array_pop($this->tumpuk) . '>');
+            $si                              = $this->simpul((string) $this->rekam . '</si>');
             $this->rekam                     = null;
             $this->sstHasil[$this->indeksSi] = isset($si->t)
                 ? StringHelper::controlCharacterOOXML2PHP((string) $si->t)
@@ -929,20 +891,11 @@ final class PembacaQnaXlsx extends Xlsx
 
         try {
             if ($this->rekam !== null) {
-                $c           = $this->simpul($this->rekam . '</' . $this->namaSel . '>');
+                $c           = $this->simpul($this->rekam . '</c>');
                 $this->rekam = null;
 
                 if (! $this->gagal) {
                     $this->selBaca[] = $this->nilaiSel($c, $this->rSel);
-                }
-            } elseif ($this->rekamF !== null) {
-                $c            = $this->simpul($this->bukaSel() . $this->rekamF . '</' . $this->namaSel . '>');
-                $this->rekamF = null;
-
-                if (isset($c->f, $c->f->attributes()['t']) && strtolower((string) $c->f->attributes()['t']) === 'shared') {
-                    $jenis = (string) self::getAttributes($c)['t'];
-                    $v     = $h = null;
-                    $this->castToFormula($c, $this->rSel, $jenis, $v, $h, 'castToError', false);
                 }
             }
         } catch (\Throwable) {
@@ -967,65 +920,62 @@ final class PembacaQnaXlsx extends Xlsx
         }
 
         if ($this->rekam !== null) {
-            $this->rekam .= self::esc($data);
-            $this->periksaRekaman($this->rekam);
-        } elseif ($this->rekamF !== null) {
-            $this->rekamF .= self::esc($data);
-            $this->periksaRekaman($this->rekamF);
-        }
-    }
-
-    private function periksaRekaman(string $rekaman): void
-    {
-        if (strlen($rekaman) > self::MAKS_REKAMAN) {
-            throw new RuntimeException('Isi satu sel xlsx terlalu besar.');
+            $this->teksTunda .= $data;
+            self::periksaRekaman(strlen($this->rekam) + 6 * strlen($this->teksTunda));
+        } elseif ($this->dalamF !== 0 && $this->dalam === $this->dalamF) {
+            self::periksaRekaman(strlen($this->teksF) + strlen($data));
+            $this->teksF .= $data;
         }
     }
 
     /**
-     * Tag pembuka elemen di dalam rekaman: nama dan atribut mentah (termasuk deklarasi namespace elemen itu sendiri),
-     * nilai di-escape ulang. Prefiks dari leluhur sudah dideklarasikan sekali di akar rekaman ({@see tagAkar}).
+     * Tag pembuka hasil rekonstruksi dari nama SAX (`uri\x1Flokal`), dengan deklarasi namespace yang diperlukan.
      *
      * @param array<string, string> $atribut
      */
-    private function tag(string $nama, array $atribut): string
+    private function tag(string $nama, array $atribut, bool $tanpaTumpuk = false, int $sudah = 0): string
     {
-        $s = '<' . $nama;
+        // R7 K3 / R8 P1: biaya mentah (nama + 6 × nilai, batas atas escape) dicek SEBELUM tag dibangun.
+        $biaya = $sudah + 2 * strlen($nama) + 32;
 
         foreach ($atribut as $an => $av) {
-            $s .= ' ' . $an . '="' . self::esc($av) . '"';
+            $biaya += 2 * strlen($an) + 6 * strlen($av) + 32;
         }
 
-        $this->tumpuk[] = $nama;
+        self::periksaRekaman($biaya);
 
-        return $s . '>';
-    }
+        [$uri, $lokal] = self::pecah($nama);
+        $dekl          = '';
 
-    /**
-     * Tag pembuka akar rekaman (`<c>` atau `<si>`): seluruh namespace dalam lingkup dideklarasikan SEKALI di sini,
-     * lalu atribut mentah selain deklarasi namespace.
-     *
-     * @param array<string, string> $atribut
-     * @param array<string, string>|null $ns
-     */
-    private function tagAkar(string $nama, array $atribut, ?array $ns = null): string
-    {
-        $s = '<' . $nama;
-
-        foreach ($ns ?? $this->ns as $prefiks => $uri) {
-            if ($prefiks === 'xml') {
-                continue;
-            }
-
-            $s .= ($prefiks === '' ? ' xmlns="' : " xmlns:{$prefiks}=\"") . self::esc($uri) . '"';
+        if ($uri === $this->mainNs) {
+            $qn   = $lokal;
+            $dekl = ' xmlns="' . self::esc($this->mainNs) . '"';
+        } elseif ($uri === '') {
+            $qn   = $lokal;
+            $dekl = ' xmlns=""';
+        } else {
+            $qn   = 'n0:' . $lokal;
+            $dekl = ' xmlns:n0="' . self::esc($uri) . '"';
         }
+
+        $s = '<' . $qn . $dekl;
+        $k = 0;
 
         foreach ($atribut as $an => $av) {
-            if ($an === 'xmlns' || str_starts_with($an, 'xmlns:')) {
-                continue;
-            }
+            [$au, $al] = self::pecah($an);
 
-            $s .= ' ' . $an . '="' . self::esc($av) . '"';
+            if ($au === '') {
+                $s .= ' ' . $al . '="' . self::esc($av) . '"';
+            } elseif ($au === 'http://www.w3.org/XML/1998/namespace') {
+                $s .= ' xml:' . $al . '="' . self::esc($av) . '"';
+            } else {
+                $k++;
+                $s .= " xmlns:a{$k}=\"" . self::esc($au) . "\" a{$k}:{$al}=\"" . self::esc($av) . '"';
+            }
+        }
+
+        if (! $tanpaTumpuk) {
+            $this->tumpuk[] = $qn;
         }
 
         return $s . '>';
@@ -1034,10 +984,113 @@ final class PembacaQnaXlsx extends Xlsx
     private function bukaSel(): string
     {
         if ($this->bukaSel === '') {
-            $this->bukaSel = $this->tagAkar($this->namaSel, $this->atributSel, $this->nsSel);
+            $this->bukaSel = $this->tag("{$this->mainNs}\x1Fc", $this->atributSel, true);
+            self::periksaRekaman(strlen($this->bukaSel));
         }
 
         return $this->bukaSel;
+    }
+
+    private function tuangTeks(): void
+    {
+        if ($this->teksTunda !== '' && $this->rekam !== null) {
+            $this->rekam .= self::esc($this->teksTunda);
+        }
+
+        $this->teksTunda = '';
+    }
+
+    private static function periksaRekaman(int $panjang): void
+    {
+        if ($panjang > self::MAKS_REKAMAN) {
+            throw new RuntimeException('Isi satu sel xlsx terlalu besar.');
+        }
+    }
+
+    /**
+     * Pindai byte mentah satu potongan SEBELUM `xml_parse` (R8): parser ber-namespace menyalin URI ke setiap nama elemen
+     * dan atribut, dan pemeriksaan atribut ganda libxml berjalan di luar jangkauan `max_execution_time`, jadi keduanya
+     * dibatasi di sini. Byte nol sudah dibuang (UTF-16/32). Menolak → "rusak":
+     * - nilai deklarasi `xmlns`/`xmlns:*` > {@see MAKS_URI_NS} byte, atau > {@see MAKS_DEKL_NS} deklarasi per part;
+     * - > {@see MAKS_ATRIBUT_TAG} pola `=` + kutip di antara dua `<` (nilai atribut tidak boleh memuat `<`).
+     * Pola di dalam teks/komentar ikut terhitung (hanya bisa membuat berkas tidak wajar ditolak, tidak meloloskan).
+     */
+    private function pindaiMentah(string $potong): void
+    {
+        // Atribut per tag; `=` + spasi di akhir potongan dibawa ke potongan berikutnya.
+        if ($this->ekorSamaDengan && preg_match('/^[ \t\r\n]*["\']/', $potong) === 1) {
+            $this->atributTag++;
+        }
+
+        if (preg_match_all('/<|=[ \t\r\n]*["\']/', $potong, $m) > 0) {
+            foreach ($m[0] as $token) {
+                if ($token === '<') {
+                    $this->atributTag = 0;
+                } elseif (++$this->atributTag > self::MAKS_ATRIBUT_TAG) {
+                    throw new RuntimeException('Atribut satu tag xlsx terlalu banyak.');
+                }
+            }
+        }
+
+        $this->ekorSamaDengan = preg_match('/=[ \t\r\n]*$/', $potong) === 1
+            || ($this->ekorSamaDengan && trim($potong, " \t\r\n") === '');
+
+        // Deklarasi namespace; spasi dirapatkan supaya sisa yang dibawa antarpotongan tetap kecil.
+        $buf  = (string) preg_replace('/[ \t\r\n]+/', ' ', $this->sisaNs . $potong);
+        $pos  = 0;
+        $dari = null;
+
+        while (preg_match('/xmlns(?::[^ =\/>"\'<]*)? ?= ?(["\'])/', $buf, $mm, PREG_OFFSET_CAPTURE, $pos) === 1) {
+            $awal  = $mm[0][1];
+            $nilai = $awal + strlen($mm[0][0]);
+            $tutup = strpos($buf, $mm[1][0], $nilai);
+
+            if ($tutup === false) {
+                if (strlen($buf) - $nilai > self::MAKS_URI_NS) {
+                    throw new RuntimeException('Deklarasi namespace xlsx terlalu panjang.');
+                }
+
+                $dari = $awal;
+
+                break;
+            }
+
+            if ($tutup - $nilai > self::MAKS_URI_NS) {
+                throw new RuntimeException('Deklarasi namespace xlsx terlalu panjang.');
+            }
+
+            if (++$this->jumlahDekl > self::MAKS_DEKL_NS) {
+                throw new RuntimeException('Deklarasi namespace xlsx terlalu banyak.');
+            }
+
+            $pos = $tutup + 1;
+        }
+
+        if ($dari === null) {
+            $t = strrpos($buf, 'xmlns', $pos);
+
+            if ($t !== false && preg_match('/^xmlns(?::[^ =\/>"\'<]*)? ?(?:= ?)?$/', substr($buf, $t)) === 1) {
+                if (strlen($buf) - $t > 1024) {
+                    throw new RuntimeException('Deklarasi namespace xlsx tidak wajar.');
+                }
+
+                $dari = $t;
+            } else {
+                $dari = max($pos, strlen($buf) - 5);
+            }
+        }
+
+        $this->sisaNs = substr($buf, $dari);
+    }
+
+    /**
+     * @return array{0: string, 1: string}
+     */
+    private static function pecah(string $nama): array
+    {
+        $p = strrpos($nama, "\x1F");
+
+        return $p === false ? ['', $nama] : [substr($nama, 0, $p), substr($nama, $p + 1)];
     }
 
     /**

@@ -1082,9 +1082,10 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
     }
 
     /**
-     * R7 K3: atribut ber-apostrof (escape → `&apos;`) pada `<rPh>` kosong di dalam A3 (3 × 3 × 350 KB) dan atribut 3 × 1 MB
-     * pada `<f>` sel di luar filter → "rusak" oleh batas rekaman 2 MB. Di 8e7afc3f atribut tidak dijumlahkan ke rekaman:
-     * varian A3 diterima dengan memori ±340 MB.
+     * R7 K3: atribut ber-apostrof (escape → `&apos;`) pada `<rPh>` kosong di dalam A3 (3 × 3 × 350 KB) → "rusak" oleh batas
+     * rekaman 2 MB, dihitung mentah sebelum tag dibangun. Di 8e7afc3f atribut tidak dijumlahkan ke rekaman: diterima dengan
+     * memori ±340 MB. Varian `<f>` di Z3 (3 × 350 KB, tanpa `<v>`): sejak R8 sel di luar filter tidak dibangun ulang, jadi
+     * diterima identik dengan main dengan memori kecil.
      */
     #[DataProvider('atributRaksasa')]
     public function testAtributRaksasaDalamRekamanDitolak(string $varian): void
@@ -1093,10 +1094,14 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
         $rph   = str_repeat("<rPh sb=\"0\" eb=\"1\" x=\"{$nilai}\" y=\"{$nilai}\" z=\"{$nilai}\"/>", 3);
         $isi   = $varian === 'a3'
             ? "<row r=\"3\"><c r=\"A3\" t=\"inlineStr\"><is><t>P?</t>{$rph}</is></c></row>"
-            : "<row r=\"3\"><c r=\"Z3\"><f t=\"shared\" ref=\"Z3:Z4\" si=\"0\" x=\"{$nilai}\" y=\"{$nilai}\" z=\"{$nilai}\">1+1</f><v>2</v></c></row>";
-        $berkas = $this->rakit('', $isi, [], '', true);
+            : "<row r=\"3\"><c r=\"Z3\"><f t=\"shared\" ref=\"Z3:Z4\" si=\"0\" x=\"{$nilai}\" y=\"{$nilai}\" z=\"{$nilai}\"/></c></row>";
+        if ($varian === 'a3') {
+            $this->assertGalatBerkas(self::RUSAK, $this->rakit('', $isi, [], '', true));
 
-        $this->assertGalatBerkas(self::RUSAK, $berkas);
+            return;
+        }
+
+        $this->assertDibacaRinganLaluSamaDenganMain($this->rakit('', $isi), 24);
     }
 
     /**
@@ -1107,6 +1112,210 @@ final class ImporQnaPemindaiTest extends DatabaseTestCase
         yield 'atribut di sel A3' => ['a3'];
 
         yield 'atribut di <f> sel Z3' => ['f'];
+    }
+
+    /**
+     * R8 B1: akar worksheet dengan 62 prefiks (masih di bawah batas deklarasi) tidak lagi diperbesar ke setiap rekaman
+     * sel: tag dibangun ulang per tag. Di dc3b33e2 setiap sel direkam ulang dengan 62 deklarasi `xmlns` (varian di luar
+     * filter: FATAL timeout). Proses anak; berkas sah → diimpor.
+     */
+    #[DataProvider('amplifikasiLingkup')]
+    public function testLingkupNamespaceBanyakTidakDiperbesar(string $varian): void
+    {
+        $dekl = '';
+
+        for ($i = 0; $i < 62; $i++) {
+            $dekl .= " xmlns:p{$i}=\"urn:simpeg:uji:" . str_repeat('n', 40) . "{$i}\"";
+        }
+
+        $isi = '';
+
+        if ($varian === 'luarF') {
+            for ($b = 3; $b <= 1001; $b++) {
+                $isi .= "<row r=\"{$b}\">";
+
+                for ($k = 6; $k < 346; $k++) {
+                    $isi .= '<c r="' . Coordinate::stringFromColumnIndex($k) . $b . '"><f>1</f></c>';
+                }
+
+                $isi .= '</row>';
+            }
+        } else {
+            for ($b = 3; $b <= 1001; $b++) {
+                $isi .= "<row r=\"{$b}\"><c r=\"A{$b}\" t=\"inlineStr\"><is><t>P{$b}?</t></is></c><c r=\"B{$b}\" t=\"inlineStr\"><is><t>J{$b}.</t></is></c><c r=\"D{$b}\" t=\"inlineStr\"><is><t>a,b</t></is></c></row>";
+            }
+        }
+
+        $berkas = $this->rakit('', $isi, [], '', true);
+        $zip    = new ZipArchive();
+        $this->assertTrue($zip->open($berkas));
+        $xml = (string) $zip->getFromName('xl/worksheets/sheet1.xml');
+        $zip->addFromString('xl/worksheets/sheet1.xml', (string) preg_replace('~<worksheet ~', "<worksheet{$dekl} ", $xml, 1));
+        $zip->close();
+
+        $hasil = $this->jalankanWorker($berkas, '256M', 30);
+        $this->assertSame(200, $hasil['status'] ?? null, 'tanpa fatal: ' . json_encode($hasil));
+        $this->assertLessThan(self::DETIK_CI, $hasil['detik'] ?? INF);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function amplifikasiLingkup(): iterable
+    {
+        yield '1.000 baris data A-D' => ['filter'];
+
+        yield '340 ribu sel <f> di luar filter' => ['luarF'];
+    }
+
+    /**
+     * R8 B2: well-formedness namespace kembali diperiksa libxml (parser ber-namespace), sama dengan main. Di dc3b33e2
+     * semua varian ini DITERIMA (`<:si>` bahkan dengan nilai berbeda dari main).
+     */
+    #[DataProvider('namespaceTidakSah')]
+    public function testNamespaceTidakSahDitolakSepertiMain(string $varian): void
+    {
+        $berkas = $this->rakit('');
+        $zip    = new ZipArchive();
+        $this->assertTrue($zip->open($berkas));
+        $xml = (string) $zip->getFromName('xl/worksheets/sheet1.xml');
+        $a2  = '<c r="A2" t="inlineStr"><is><t xml:space="preserve">Bagaimana cara mengajukan cuti?</t></is></c>';
+        $this->assertStringContainsString($a2, $xml);
+
+        if ($varian === 'sst') {
+            $zip->addFromString('xl/sharedStrings.xml', '<?xml version="1.0" encoding="UTF-8"?><sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><:si><t>PALSU</t></:si><si><t>Q2</t></si></sst>');
+            $rels = (string) $zip->getFromName('xl/_rels/workbook.xml.rels');
+            $zip->addFromString('xl/_rels/workbook.xml.rels', str_replace('</Relationships>', '<Relationship Id="rIdS" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/></Relationships>', $rels));
+            $xml = str_replace($a2, '<c r="A2" t="s"><v>0</v></c>', $xml);
+        } else {
+            $xml = str_replace($a2, match ($varian) {
+                'tanpaIkatan' => '<c r="A2" t="inlineStr"><is><t>Q2</t><q:z/></is></c>',
+                'titikDua'    => '<c r="A2" t="inlineStr"><is><t>Q2</t><:z/></is></c>',
+                'kosong'      => '<c r="A2" t="inlineStr" xmlns:a=""><is><t>Q2</t></is></c>',
+                'xmlnsXmlns'  => '<c r="A2" t="inlineStr" xmlns:xmlns="urn:x"><is><t>Q2</t></is></c>',
+                default       => '<c r="A2" t="inlineStr" xmlns:a="urn:x" xmlns:b="urn:x" a:k="1" b:k="2"><is><t>Q2</t></is></c>',
+            }, $xml);
+        }
+
+        $zip->addFromString('xl/worksheets/sheet1.xml', $xml);
+        $zip->close();
+
+        $this->assertGalatBerkas(self::RUSAK, $berkas);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function namespaceTidakSah(): iterable
+    {
+        yield '<:si> di sharedStrings' => ['sst'];
+
+        yield 'prefiks tidak terikat' => ['tanpaIkatan'];
+
+        yield 'nama :z' => ['titikDua'];
+
+        yield 'xmlns:a kosong' => ['kosong'];
+
+        yield 'xmlns:xmlns' => ['xmlnsXmlns'];
+
+        yield 'atribut ganda sesudah resolusi' => ['ganda'];
+    }
+
+    /**
+     * R8 B3 + K2: batas pindai byte mentah tepat di tepinya. Di bawah/di batas → identik dengan main; lewat → "rusak".
+     */
+    #[DataProvider('batasMentah')]
+    public function testBatasPindaiMentah(string $varian, bool $ditolak): void
+    {
+        $uri = static fn (int $n): string => 'urn:' . str_repeat('u', $n - 4);
+        $isi = match ($varian) {
+            'uri'   => '<row r="3"><c r="Z3" xmlns:q="' . $uri($ditolak ? 257 : 256) . '"><v>1</v></c></row>',
+            'dekl'  => '<row r="3">' . implode('', array_map(static fn (int $i): string => "<c r=\"Z3\" xmlns:q{$i}=\"urn:x\"/>", range(1, $ditolak ? 257 : 250))) . '</row>',
+            default => '<row r="3"><c r="Z3"' . implode('', array_map(static fn (int $i): string => " x{$i}=\"1\"", range(1, $ditolak ? 1025 : 1000))) . '/></row>',
+        };
+        $berkas = $this->rakit('', $isi);
+
+        if ($ditolak) {
+            $this->assertGalatBerkas(self::RUSAK, $berkas);
+        } else {
+            $this->assertSamaDenganMain($berkas);
+        }
+    }
+
+    /**
+     * @return iterable<string, array{string, bool}>
+     */
+    public static function batasMentah(): iterable
+    {
+        yield 'URI 256 byte' => ['uri', false];
+
+        yield 'URI 257 byte' => ['uri', true];
+
+        yield '250 deklarasi' => ['dekl', false];
+
+        yield '257 deklarasi' => ['dekl', true];
+
+        yield '1.000 atribut' => ['atribut', false];
+
+        yield '1.025 atribut' => ['atribut', true];
+    }
+
+    /**
+     * R8 B3: 40 ribu atribut dalam satu tag (unggahan kecil). Di dc3b33e2 pemeriksaan atribut ganda libxml O(n²) ±3,3 s
+     * dan tidak bisa diinterupsi `max_execution_time`; sekarang ditolak oleh pindai mentah sebelum `xml_parse`.
+     */
+    public function testAtributSangatBanyakDitolakCepat(): void
+    {
+        $atr    = implode('', array_map(static fn (int $i): string => " x{$i}=\"1\"", range(1, 40_000)));
+        $berkas = $this->rakit('', "<row r=\"3\"><c r=\"Z3\"{$atr}/></row>");
+
+        $mulai = hrtime(true);
+        $this->assertGalatBerkas(self::RUSAK, $berkas);
+        $this->assertLessThan(1.0, (hrtime(true) - $mulai) / 1e9);
+    }
+
+    /**
+     * R8 P1: atribut 9 MB pada `<c>` di luar filter yang memuat `<f>` shared. Sejak R8 sel di luar filter tidak dibangun
+     * ulang (hanya induk rumus shared yang didaftarkan dari teks `<f>`), jadi diterima identik dengan main dengan memori
+     * ±ukuran atribut. Di dc3b33e2 tag dibangun lalu di-escape: puncak ±130 MB.
+     */
+    public function testAtributBesarSelLuarFilterDenganRumusRingan(): void
+    {
+        $nilai  = str_repeat("'", 9 * 1024 * 1024);
+        $berkas = $this->rakit('', "<row r=\"3\"><c r=\"Z3\" x=\"{$nilai}\"><f t=\"shared\" ref=\"Z3:Z4\" si=\"0\">1+1</f></c></row>");
+        unset($nilai);
+
+        $this->assertDibacaRinganLaluSamaDenganMain($berkas, 40);
+    }
+
+    /**
+     * Puncak memori pembaca sendiri (tanpa main) di bawah batas MB, lalu nilainya identik dengan main.
+     */
+    private function assertDibacaRinganLaluSamaDenganMain(string $berkas, int $mb): void
+    {
+        memory_reset_peak_usage();
+        $awal = memory_get_peak_usage();
+        $baru = (new PembacaQnaXlsx())->bacaQna($berkas, 1000);
+        $this->assertLessThan($mb * 1024 * 1024, memory_get_peak_usage() - $awal);
+        $this->assertNotNull($baru);
+        unset($baru);
+        $this->assertSamaDenganMain($berkas);
+    }
+
+    /**
+     * R8 P2: sel duplikat di dalam filter. Sedikit duplikat → identik dengan main (yang terakhir menang); > 8.192 `<c>`
+     * di filter → "rusak" dengan memori kecil. Di dc3b33e2 setiap duplikat disimpan (unggahan 16 KB → ±188 MB).
+     */
+    public function testSelDuplikatDiFilter(): void
+    {
+        $sel = static fn (string $t): string => "<c r=\"A3\" t=\"inlineStr\"><is><t>{$t}</t></is></c>";
+        $this->assertSamaDenganMain($this->rakit('', '<row r="3">' . $sel('P1?') . $sel('') . $sel('P3?') . '<c r="B3" t="inlineStr"><is><t>J.</t></is></c><c r="C3" t="inlineStr"><is><t>Umum</t></is></c></row>'));
+
+        $berkas = $this->rakit('', '<row r="3">' . str_repeat($sel('P?'), 20_000) . '</row>');
+        memory_reset_peak_usage();
+        $awal = memory_get_peak_usage();
+        $this->assertGalatBerkas(self::RUSAK, $berkas);
+        $this->assertLessThan(32 * 1024 * 1024, memory_get_peak_usage() - $awal);
     }
 
     /**
